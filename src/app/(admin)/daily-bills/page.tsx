@@ -15,6 +15,7 @@ import {
   Edit, 
   Trash2, 
   X, 
+  Lock,
   AlertTriangle, 
   FileText, 
   Filter,
@@ -57,6 +58,10 @@ export default function DailyBillsPage() {
   const [loading, setLoading] = useState(true)
   const [taxYear, setTaxYear] = useState("2026")
   
+  // สิทธิ์และสถานะการช่วยเหลือสำหรับ Super Admin
+  const [userRole, setUserRole] = useState<string>("admin")
+  const [supportApproved, setSupportApproved] = useState<boolean>(true)
+  
   // ตัวกรองตาราง
   const [categoryFilter, setCategoryFilter] = useState<"all" | "40_5" | "40_8">("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -78,7 +83,8 @@ export default function DailyBillsPage() {
   const loadData = async (year: string) => {
     setLoading(true)
     try {
-      const res = await getExpenses(year)
+      const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
+      const res = await getExpenses(year, wsId)
       if (res.success && res.data) {
         setExpenses(res.data)
       }
@@ -90,8 +96,62 @@ export default function DailyBillsPage() {
   }
 
   useEffect(() => {
-    loadData(taxYear)
-  }, [taxYear])
+    // 1. ดึงสิทธิ์ผู้ใช้และสถานะการเข้าช่วยเหลือ
+    const mockRole = typeof document !== "undefined"
+      ? document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("horset_user_role="))
+          ?.split("=")[1] || "admin"
+      : "admin"
+    setUserRole(mockRole)
+
+    const checkSupportStatus = async () => {
+      if (mockRole === "super_admin") {
+        const activeWsId = localStorage.getItem("horset_current_workspace_id")
+        if (!activeWsId) {
+          setSupportApproved(false)
+          return
+        }
+
+        // เช็คจาก Supabase ด้วย (ถ้ามี)
+        const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+        if (!isDemo) {
+          try {
+            const { createClient: createSupabaseClient } = await import("@/lib/supabase/client")
+            const supabase = createSupabaseClient()
+            const { data: grantData } = await supabase
+              .from("support_access_grants")
+              .select("status")
+              .eq("workspace_id", activeWsId)
+              .single()
+
+            if (grantData) {
+              setSupportApproved(grantData.status === "approved")
+            } else {
+              setSupportApproved(false)
+            }
+          } catch (e) {
+            // fallback เช็คจาก localStorage
+            const savedStatus = localStorage.getItem(`horset_support_status_${activeWsId}`) || "none"
+            setSupportApproved(savedStatus === "approved")
+          }
+        } else {
+          const savedStatus = localStorage.getItem(`horset_support_status_${activeWsId}`) || "none"
+          setSupportApproved(savedStatus === "approved")
+        }
+      } else {
+        setSupportApproved(true)
+      }
+    }
+
+    checkSupportStatus()
+  }, [])
+
+  useEffect(() => {
+    if (supportApproved) {
+      loadData(taxYear)
+    }
+  }, [taxYear, supportApproved])
 
   // คำนวณยอดรวมสุทธิแยกประเภท
   const total405 = expenses
@@ -155,10 +215,11 @@ export default function DailyBillsPage() {
 
     try {
       let res
+      const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
       if (editingExpense) {
         res = await updateExpense(editingExpense.id, formTitle.trim(), amt, taxYear, formCategory)
       } else {
-        res = await createExpense(formTitle.trim(), amt, taxYear, formCategory)
+        res = await createExpense(formTitle.trim(), amt, taxYear, formCategory, wsId)
       }
 
       if (res.success) {
@@ -200,8 +261,29 @@ export default function DailyBillsPage() {
     }
   }
 
+  if (userRole === "super_admin" && !supportApproved) {
+    return (
+      <DashboardLayout role="super_admin">
+        <div className="flex flex-col items-center justify-center p-12 text-center bg-slate-900/40 border border-slate-800/60 rounded-3xl max-w-2xl mx-auto space-y-6 mt-12 animate-scale-up backdrop-blur-sm shadow-xl">
+          <div className="p-4 bg-red-500/10 rounded-2xl text-red-400 border border-red-500/20">
+            <Lock className="w-10 h-10 animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg font-bold text-slate-100">พื้นที่จำกัดสิทธิ์เฉพาะการเข้าช่วยเหลือระบบ</h3>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
+              ขออภัย บัญชีสิทธิ์ <span className="text-red-400 font-semibold font-mono">Super Admin</span> ของคุณจำเป็นต้องมีสถานะได้รับการอนุมัติช่วยเหลือจึงจะสามารถเข้าดูหรือบันทึกบิลรายจ่ายรายวันใน Workspace นี้ได้
+            </p>
+          </div>
+          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 text-[11px] text-slate-500 leading-relaxed max-w-sm mx-auto">
+            💡 กรุณาเปิดแผงควบคุมหลักด้านซ้าย แล้วเลือก <strong>"ส่งคำขอเข้าช่วยเหลือระบบ"</strong> และได้รับการยืนยันสิทธิ์จากเจ้าของระบบก่อนดำเนินการเข้าสลับหอพัก
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout role={userRole as any}>
       {/* Header */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>

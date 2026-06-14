@@ -15,13 +15,17 @@ export interface ExpenseItem {
 /**
  * ดึงข้อมูลค่าใช้จ่ายทั้งหมดของปีภาษีที่เลือก
  */
-export async function getExpenses(taxYear?: string) {
+export async function getExpenses(taxYear?: string, workspaceId?: string) {
   try {
     const supabase = await createClient()
     let query = supabase.from("expenses").select("*")
     
     if (taxYear) {
       query = query.eq("tax_year", taxYear)
+    }
+
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
     }
     
     const { data, error } = await query.order("created_at", { ascending: false })
@@ -74,22 +78,26 @@ export async function getExpenses(taxYear?: string) {
 /**
  * บันทึกค่าใช้จ่ายใหม่
  */
-export async function createExpense(title: string, amount: number, taxYear: string, category: "40_5" | "40_8") {
+export async function createExpense(title: string, amount: number, taxYear: string, category: "40_5" | "40_8", workspaceId?: string) {
   try {
     const supabase = await createClient()
     const prefixTitle = `[${category}] ${title}`
 
+    const insertPayload: any = {
+      title: prefixTitle,
+      amount,
+      tax_year: taxYear,
+      category
+    }
+
+    if (workspaceId) {
+      insertPayload.workspace_id = workspaceId
+    }
+
     // พยายาม insert แบบมี category
     const { data, error } = await supabase
       .from("expenses")
-      .insert([
-        {
-          title: prefixTitle,
-          amount,
-          tax_year: taxYear,
-          category
-        }
-      ])
+      .insert([insertPayload])
       .select()
 
     if (error) {
@@ -100,16 +108,20 @@ export async function createExpense(title: string, amount: number, taxYear: stri
         error.code === "42703" // Postgres undefined_column code
 
       if (isMissingColumn) {
+        const fallbackPayload: any = {
+          title: prefixTitle,
+          amount,
+          tax_year: taxYear
+        }
+
+        if (workspaceId) {
+          fallbackPayload.workspace_id = workspaceId
+        }
+
         // ลอง insert อีกครั้งโดยไม่มีฟิลด์ category (ใช้ prefix ใน title เพื่อระบุประเภทแทน)
         const { data: fallbackData, error: fallbackError } = await supabase
           .from("expenses")
-          .insert([
-            {
-              title: prefixTitle,
-              amount,
-              tax_year: taxYear
-            }
-          ])
+          .insert([fallbackPayload])
           .select()
 
         if (fallbackError) throw fallbackError

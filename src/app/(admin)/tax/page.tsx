@@ -133,7 +133,8 @@ export default function TaxPage() {
   const loadExpensesData = async (year: string) => {
     setLoadingExpenses(true)
     try {
-      const res = await getExpenses(year)
+      const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
+      const res = await getExpenses(year, wsId)
       if (res.success && res.data) {
         setExpenses(res.data)
         
@@ -211,11 +212,13 @@ export default function TaxPage() {
           expenseCategory
         )
       } else {
+        const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
         res = await createExpense(
           expenseTitle.trim(),
           amt,
           taxYear,
-          expenseCategory
+          expenseCategory,
+          wsId
         )
       }
 

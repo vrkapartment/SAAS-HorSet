@@ -443,6 +443,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         "/rooms",
         "/tenants",
         "/billing",
+        "/daily-bills",
         "/tax",
         "/finance-settings"
       ]
