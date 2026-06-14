@@ -21,7 +21,9 @@
     "billing": "Billing & Meters",
     "tax": "Tax Reports",
     "finance": "Finance Settings",
-    "super_admin": "Super Admin Control"
+    "test_connection": "Supabase Connection",
+    "super_admin": "Super Admin Control",
+    "profile": "Edit Profile & Password"
   },
   "landing": {
     "hero_title": "Fast Meter Invoicing, Directly to Tenants via LINE",
@@ -30,5 +32,49 @@
     "get_started": "Get Started",
     "docs": "Documentation",
     "features_title": "Our Key Features"
+  },
+  "dashboard": {
+    "system_subtitle": "SaaS Apartment Management System",
+    "select_workspace": "Select Workspace to Assist",
+    "support_access": "Support Access:",
+    "approved": "Approved",
+    "pending": "Pending",
+    "no_access": "No Access",
+    "request_support": "Request Support Access",
+    "awaiting_admin_approval": "Awaiting Admin approval",
+    "building": "Building",
+    "current_cycle": "Current Cycle • Jun 2026",
+    "support_mode": "Support Active",
+    "authorized_revoke": "Authorized (Click to revoke)",
+    "access_revoked": "Access Revoked"
+  },
+  "test_connection": {
+    "title": "Supabase Connection Diagnostics",
+    "subtitle": "This page helps you verify the connection between the HorSet application and your local or cloud Supabase database.",
+    "test_results": "System Test Results",
+    "retest": "Retest",
+    "testing": "Sending request to verify database connection...",
+    "connection_success": "Connection Successful",
+    "connection_failed": "Connection Failed",
+    "service_status": "Service Status",
+    "auth_system": "Authentication System",
+    "database_access": "Database Access",
+    "normal": "Active",
+    "limited": "Limited",
+    "sql_advice": "💡 Recommendation: If database connection is successful but tables cannot be loaded, you might not have run the SQL script in your Supabase SQL Editor. Follow the instructions below.",
+    "error_logs": "Error Logs",
+    "env_status": "Environment Variables Status",
+    "configured": "Configured",
+    "not_configured": "Not Configured",
+    "guide_title": "Supabase Connection Guide",
+    "step1_title": "Create a Supabase Project",
+    "step1_desc": "If you don't have a project yet, go to Supabase.com, sign up, and create a new project.",
+    "step2_title": "Copy API Keys to .env",
+    "step2_desc": "Go to your Supabase project 👉 Settings > API, copy the keys, and edit the .env file in your root folder:",
+    "step3_title": "Create Tables & Set RLS Policies",
+    "step3_desc": "Go to Supabase 👉 SQL Editor, select \"New query\", paste the entire contents of schema.sql, and click \"Run\" to set up tables, RLS policies, and triggers.",
+    "step4_title": "Test Connection",
+    "step4_desc": "Once the above steps are completed, click \"Retest\" above to verify the database connection is 100% operational.",
+    "no_test": "No diagnostics run yet"
   }
 }

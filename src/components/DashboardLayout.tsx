@@ -28,6 +28,7 @@ import {
   ChevronDown
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { getCurrentUserProfileAction, updateUserProfileAction } from "@/features/auth/actions"
 
 interface DashboardLayoutProps {
@@ -44,6 +45,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const router = useRouter()
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { t } = useLanguage()
 
   // ดึงบทบาทจริงจากคุกกี้ หรือใช้ค่า prop เป็นค่าเริ่มต้น
   const [userRole, setUserRole] = useState<"admin" | "staff" | "super_admin">(role)
@@ -333,55 +335,55 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   // เมนูนำทาง
   const menuItems = [
     {
-      name: "แดชบอร์ดภาพรวม",
+      name: t("nav.dashboard") || "แดชบอร์ดภาพรวม",
       path: "/dashboard",
       icon: LayoutDashboard,
       roles: ["admin", "super_admin"]
     },
     {
-      name: "จัดการห้องพัก",
+      name: t("nav.rooms") || "จัดการห้องพัก",
       path: "/rooms",
       icon: Home,
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "จัดการผู้เช่า",
+      name: t("nav.tenants") || "จัดการผู้เช่า",
       path: "/tenants",
       icon: Users,
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "จดมิเตอร์ & จัดการบิล",
+      name: t("nav.billing") || "จดมิเตอร์ & จัดการบิล",
       path: "/billing",
       icon: Receipt,
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "จัดการภาษี ภ.ง.ด.",
+      name: t("nav.tax") || "จัดการภาษี ภ.ง.ด.",
       path: "/tax",
       icon: FileText,
       roles: ["admin", "super_admin"]
     },
     {
-      name: "ตั้งค่าการเงิน",
+      name: t("nav.finance") || "ตั้งค่าการเงิน",
       path: "/finance-settings",
       icon: Landmark,
       roles: ["admin", "super_admin"]
     },
     {
-      name: "เช็คการเชื่อมต่อ Supabase",
+      name: t("nav.test_connection") || "เช็คการเชื่อมต่อ Supabase",
       path: "/test-connection",
       icon: Database,
       roles: ["admin", "super_admin"]
     },
     {
-      name: "แผงควบคุม Super Admin",
+      name: t("nav.super_admin") || "แผงควบคุม Super Admin",
       path: "/super-admin",
       icon: ShieldCheck,
       roles: ["super_admin"]
     },
     {
-      name: "แก้ไขโปรไฟล์ & รหัสผ่าน",
+      name: t("nav.profile") || "แก้ไขโปรไฟล์ & รหัสผ่าน",
       path: "#profile",
       icon: KeyRound,
       roles: ["admin", "staff", "super_admin"],
@@ -412,16 +414,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           </div>
           <div>
             <h2 className="text-lg font-bold tracking-wide flex items-center gap-1">
-              HorSet <span className="text-blue-500 font-semibold">หอเสร็จ</span>
+              {t("common.app_name")}
             </h2>
-            <p className="text-[10px] text-slate-400">ระบบบริหารจัดการหอพักแบบ SaaS</p>
+            <p className="text-[10px] text-slate-400">{t("dashboard.system_subtitle")}</p>
           </div>
         </div>
 
         {/* ส่วนจัดการ Workspace สำหรับ Super Admin */}
         {userRole === "super_admin" && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-tr from-slate-950 to-slate-900 border border-slate-800 relative">
-            <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase tracking-wider">เลือก Workspace ที่เข้าช่วยเหลือ</label>
+            <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
             
             <button
               onClick={() => setShowDropdown(!showDropdown)}
@@ -452,20 +454,20 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             {/* แสดงสถานะ Support Permission ของ Workspace ปัจจุบัน */}
             <div className="mt-3 pt-2.5 border-t border-slate-900 flex flex-col gap-1.5 text-[11px]">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">สิทธิ์การช่วยเหลือ:</span>
+                <span className="text-slate-500">{t("dashboard.support_access")}</span>
                 {supportStatus === "approved" && (
                   <span className="text-teal-400 font-semibold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> อนุมัติแล้ว
+                    <Check className="w-3 h-3" /> {t("dashboard.approved")}
                   </span>
                 )}
                 {supportStatus === "pending" && (
                   <span className="text-amber-400 font-semibold animate-pulse flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3 animate-spin" /> รอยืนยัน
+                    <RefreshCw className="w-3 h-3 animate-spin" /> {t("dashboard.pending")}
                   </span>
                 )}
                 {(supportStatus === "revoked" || supportStatus === "none") && (
                   <span className="text-red-400 font-semibold flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> ไม่มีสิทธิ์
+                    <AlertCircle className="w-3 h-3" /> {t("dashboard.no_access")}
                   </span>
                 )}
               </div>
@@ -475,13 +477,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   onClick={handleRequestSupport}
                   className="w-full mt-1.5 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-[10px] text-center transition-colors shadow-lg shadow-blue-600/10"
                 >
-                  ส่งคำขอเข้าช่วยเหลือระบบ
+                  {t("dashboard.request_support")}
                 </button>
               )}
 
               {supportStatus === "pending" && (
                 <div className="text-[9px] text-slate-500 text-center mt-1">
-                  รอยืนยันคำขอจากสิทธิ์ Admin หอพักนี้
+                  {t("dashboard.awaiting_admin_approval")}
                 </div>
               )}
             </div>
@@ -545,7 +547,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
           >
             <LogOut className="w-4 h-4" />
-            ออกจากระบบ
+            {t("common.logout") || "ออกจากระบบ"}
           </button>
         </div>
       </aside>
@@ -567,7 +569,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
             {userRole === "super_admin" && (
               <div className="mb-6 p-4 rounded-2xl bg-slate-950 border border-slate-900">
-                <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase">เลือก Workspace</label>
+                <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase">{t("dashboard.select_workspace")}</label>
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="w-full flex items-center justify-between text-xs bg-slate-900 text-slate-200 py-2.5 px-3 rounded-xl border border-slate-800"
@@ -640,7 +642,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 className="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-red-400"
               >
                 <LogOut className="w-4 h-4" />
-                ออกจากระบบ
+                {t("common.logout") || "ออกจากระบบ"}
               </button>
             </div>
           </aside>
@@ -662,19 +664,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <div>
               <h1 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                 <span>
-                  {pathname === "/dashboard" && "หน้าแรกภาพรวมสถิติ"}
-                  {pathname === "/rooms" && "ระบบจัดการห้องพัก"}
-                  {pathname === "/tenants" && "ระบบจัดการข้อมูลสัญญาผู้เช่า"}
-                  {pathname === "/billing" && "ระบบบันทึกจดมิเตอร์และจัดบิล"}
-                  {pathname === "/meter" && "ระบบบันทึกจดมิเตอร์และจัดบิล"}
-                  {pathname === "/tax" && "ระบบรายงานภาษีอพาร์ทเมนท์ ภ.ง.ด."}
-                  {pathname === "/finance-settings" && "ตั้งค่าการเงินและบัญชีรับเงิน"}
-                  {pathname === "/test-connection" && "เช็คระบบตรวจสอบการเชื่อมต่อ Supabase"}
+                  {pathname === "/dashboard" && (t("nav.dashboard") || "หน้าแรกภาพรวมสถิติ")}
+                  {pathname === "/rooms" && (t("nav.rooms") || "ระบบจัดการห้องพัก")}
+                  {pathname === "/tenants" && (t("nav.tenants") || "ระบบจัดการข้อมูลสัญญาผู้เช่า")}
+                  {pathname === "/billing" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
+                  {pathname === "/meter" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
+                  {pathname === "/tax" && (t("nav.tax") || "ระบบรายงานภาษีอพาร์ทเมนท์ ภ.ง.ด.")}
+                  {pathname === "/finance-settings" && (t("nav.finance") || "ตั้งค่าการเงินและบัญชีรับเงิน")}
+                  {pathname === "/test-connection" && (t("nav.test_connection") || "เช็คระบบตรวจสอบการเชื่อมต่อ Supabase")}
                 </span>
                 
                 {userRole === "super_admin" && (
                   <span className="text-[10px] bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    เข้าช่วยเหลือระบบ
+                    {t("dashboard.support_mode")}
                   </span>
                 )}
               </h1>
@@ -685,7 +687,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             {/* แสดงสถานะสิทธิ์เข้าช่วยเหลือสำหรับ Admin เพื่อความโปร่งใส */}
             {userRole === "admin" && (
               <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-slate-900/40 rounded-xl border border-slate-800">
-                <span className="text-[11px] text-slate-500">สิทธิ์สนับสนุน:</span>
+                <span className="text-[11px] text-slate-500">{t("dashboard.support_access")}</span>
                 {supportStatus === "approved" ? (
                   <button
                     onClick={() => handleDecideSupport(false)}
@@ -693,11 +695,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     title="คลิกเพื่อสั่งระงับสิทธิ์ชั่วคราว"
                   >
                     <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse" />
-                    อนุญาตอยู่ (คลิกยกเลิก)
+                    {t("dashboard.authorized_revoke")}
                   </button>
                 ) : (
                   <span className="text-[10px] text-slate-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-lg">
-                    ปิดการเข้าถึง
+                    {t("dashboard.access_revoked")}
                   </span>
                 )}
               </div>
@@ -714,8 +716,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <div className="h-6 w-px bg-slate-900" />
             
             <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold text-slate-300">อาคาร {currentWorkspace.name}</p>
-              <p className="text-[10px] text-slate-500">รอบบิลปัจจุบัน • มิ.ย. 2026</p>
+              <p className="text-xs font-semibold text-slate-300">{t("dashboard.building")} {currentWorkspace.name}</p>
+              <p className="text-[10px] text-slate-500">{t("dashboard.current_cycle")}</p>
             </div>
           </div>
         </header>
