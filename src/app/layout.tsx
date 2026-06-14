@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Prompt } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { LanguageProvider } from "@/lib/translations/LanguageProvider";
 
 const promptFont = Prompt({
   variable: "--font-prompt",
@@ -22,10 +24,17 @@ export default function RootLayout({
     <html
       lang="th"
       className={`${promptFont.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col font-sans bg-[#090e1a] text-slate-100 antialiased">
-        {children}
+      <body className="min-h-full flex flex-col font-sans antialiased">
+        <ThemeProvider>
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
 }
+
+

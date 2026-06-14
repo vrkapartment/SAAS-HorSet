@@ -1,0 +1,34 @@
+{
+  "common": {
+    "app_name": "HorSet",
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "search": "Search...",
+    "thai": "Thai",
+    "english": "English",
+    "profile_settings": "Profile & Password Settings"
+  },
+  "nav": {
+    "dashboard": "Dashboard Overview",
+    "rooms": "Manage Rooms",
+    "tenants": "Tenant Contracts",
+    "billing": "Billing & Meters",
+    "tax": "Tax Reports",
+    "finance": "Finance Settings",
+    "super_admin": "Super Admin Control"
+  },
+  "landing": {
+    "hero_title": "Fast Meter Invoicing, Directly to Tenants via LINE",
+    "hero_subtitle": "with HorSet Platform",
+    "hero_desc": "No more paper meters, calculation errors, or high transfer fees. Generate PromptPay QRs sent directly to LINE OA with automated P.N.D. 90/94 tax reports all in one place.",
+    "get_started": "Get Started",
+    "docs": "Documentation",
+    "features_title": "Our Key Features"
+  }
+}

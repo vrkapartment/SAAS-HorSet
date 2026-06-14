@@ -2,9 +2,13 @@
 
 import { useRouter } from "next/navigation"
 import { Building, Shield, Gauge, Receipt, FileText, BellRing, ArrowRight, Sparkles } from "lucide-react"
+import { ThemeToggle } from "@/components/ThemeToggle"
+import { LanguageToggle } from "@/components/LanguageToggle"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 export default function LandingPage() {
   const router = useRouter()
+  const { t } = useLanguage()
 
   return (
     <div className="relative min-h-screen bg-[#060a13] text-slate-100 font-sans overflow-hidden">
@@ -21,11 +25,13 @@ export default function LandingPage() {
           <span className="text-xl font-bold tracking-wide">HorSet <span className="text-blue-500">หอเสร็จ</span></span>
         </div>
         <div className="flex items-center gap-3">
+          <LanguageToggle />
+          <ThemeToggle />
           <button
             onClick={() => router.push("/login")}
             className="glow-btn bg-slate-900 border border-slate-800 hover:border-blue-500 text-blue-400 hover:text-white text-xs font-semibold py-2.5 px-5 rounded-full transition-all"
           >
-            เข้าสู่ระบบการทำงาน
+            {t("common.login")}
           </button>
         </div>
       </header>
@@ -33,28 +39,32 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="max-w-4xl mx-auto text-center px-6 pt-20 pb-16 relative z-10">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full text-xs font-semibold mb-6 animate-bounce">
-          <Sparkles className="w-3.5 h-3.5" /> บริหารจัดการหอพักสำหรับคนไทยอย่างมืออาชีพ
+          <Sparkles className="w-3.5 h-3.5" /> {t("common.profile_settings") ? "บริหารจัดการหอพักสำหรับคนไทยอย่างมืออาชีพ" : "Professional Thai Apartment Management"}
         </div>
         <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-slate-100 to-slate-400">
-          จดบิลเสร็จไว ส่งบิลถึงมือผู้เช่าผ่าน LINE<br />
-          ด้วยระบบ <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400">HorSet (หอเสร็จ)</span>
+          {t("landing.hero_title")}<br />
+          {t("landing.hero_subtitle") === "with HorSet Platform" ? (
+            <>with <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400">HorSet Platform</span></>
+          ) : (
+            <>ด้วยระบบ <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400">HorSet (หอเสร็จ)</span></>
+          )}
         </h1>
         <p className="text-slate-400 text-sm sm:text-lg max-w-2xl mx-auto mt-6 leading-relaxed">
-          หมดปัญหากับการจดมิเตอร์กระดาษ คำนวณบิลผิดพลาด และโอนเงินแล้วหักค่าธรรมเนียมแพงๆ ด้วยระบบออกบิลพร้อมเพย์ QR ส่งตรงเข้า LINE OA และมีรายงานภาษี ภ.ง.ด. 90/94 ครบในที่เดียว
+          {t("landing.hero_desc")}
         </p>
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={() => router.push("/login")}
             className="glow-btn bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium py-3.5 px-8 rounded-full flex items-center justify-center gap-2 text-sm shadow-xl shadow-blue-600/20 hover:scale-105 transition-transform"
           >
-            เริ่มต้นใช้งานระบบ <ArrowRight className="w-4 h-4" />
+            {t("landing.get_started")} <ArrowRight className="w-4 h-4" />
           </button>
           <a
             href="https://github.com"
             target="_blank"
             className="bg-slate-900/60 border border-slate-800 hover:bg-slate-800/60 py-3.5 px-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors"
           >
-            ศึกษาคู่มือการใช้งาน
+            {t("landing.docs")}
           </a>
         </div>
       </section>

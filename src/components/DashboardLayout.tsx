@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
+import { ThemeToggle } from "./ThemeToggle"
+import { LanguageToggle } from "./LanguageToggle"
 import {
   LayoutDashboard,
   Home,
@@ -538,6 +540,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             </div>
 
             {/* ปุ่มแก้ไขรหัสผ่านและโปรไฟล์ */}
+            <LanguageToggle />
+            <ThemeToggle />
             <button
               onClick={() => {
                 setProfileError(null)
@@ -725,6 +729,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 )}
               </div>
             )}
+
+            <LanguageToggle />
+            <ThemeToggle />
 
             <button className="relative p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-900/50 transition-colors">
               <BellRing className="w-4 h-4" />
