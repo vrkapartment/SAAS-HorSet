@@ -402,7 +402,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   }
 
   return (
-    <div className="min-h-screen flex bg-[#060a13] text-slate-100 font-sans">
+    <div className="min-h-screen flex bg-slate-950 text-slate-100 font-sans">
       
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
       <aside className="hidden md:flex flex-col w-64 glass-panel border-r border-slate-900/60 p-6 z-20 shrink-0">

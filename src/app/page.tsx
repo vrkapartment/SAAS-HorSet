@@ -11,7 +11,7 @@ export default function LandingPage() {
   const { t } = useLanguage()
 
   return (
-    <div className="relative min-h-screen bg-[#060a13] text-slate-100 font-sans overflow-hidden">
+    <div className="relative min-h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
       {/* เอฟเฟกต์สีฟุ้งเรืองแสง */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-blue-600/10 rounded-full blur-[160px] pointer-events-none" />
       <div className="absolute bottom-0 left-10 w-[400px] h-[400px] bg-indigo-600/5 rounded-full blur-[140px] pointer-events-none" />
@@ -41,12 +41,12 @@ export default function LandingPage() {
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full text-xs font-semibold mb-6 animate-bounce">
           <Sparkles className="w-3.5 h-3.5" /> {t("common.profile_settings") ? "บริหารจัดการหอพักสำหรับคนไทยอย่างมืออาชีพ" : "Professional Thai Apartment Management"}
         </div>
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-slate-100 to-slate-400">
+        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-b from-slate-900 via-slate-800 to-slate-600 dark:from-white dark:via-slate-100 dark:to-slate-400">
           {t("landing.hero_title")}<br />
           {t("landing.hero_subtitle") === "with HorSet Platform" ? (
-            <>with <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400">HorSet Platform</span></>
+            <>with <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-500 dark:via-indigo-400 dark:to-violet-400">HorSet Platform</span></>
           ) : (
-            <>ด้วยระบบ <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-400 to-violet-400">HorSet (หอเสร็จ)</span></>
+            <>ด้วยระบบ <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-500 dark:via-indigo-400 dark:to-violet-400">HorSet (หอเสร็จ)</span></>
           )}
         </h1>
         <p className="text-slate-400 text-sm sm:text-lg max-w-2xl mx-auto mt-6 leading-relaxed">

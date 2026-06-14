@@ -11,7 +11,7 @@ export default function MeterRedirectPage() {
   }, [router])
 
   return (
-    <div className="min-h-screen bg-[#060a13] flex items-center justify-center">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
       <div className="text-center space-y-4">
         <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-slate-400 text-sm font-medium animate-pulse">

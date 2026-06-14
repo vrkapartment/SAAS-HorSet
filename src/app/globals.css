@@ -6,24 +6,97 @@
   --background: #f8fafc; /* Light mode background */
   --foreground: #0f172a; /* Light mode foreground */
   --font-prompt: var(--font-prompt);
+
+  /* Slate colors for Light Mode (Inverted for stunning readability) */
+  --slate-50: #0f172a;   /* Maps slate-50 (normally white text) to dark text */
+  --slate-100: #0f172a;  /* Maps slate-100 (normally light text) to dark text */
+  --slate-200: #1e293b;  /* Maps slate-200 to dark text */
+  --slate-300: #334155;  /* Maps slate-300 to dark text */
+  --slate-400: #475569;  /* Maps slate-400 to dark text */
+  --slate-500: #64748b;  /* Maps slate-500 to standard muted text */
+  --slate-600: #94a3b8;  /* Maps slate-600 to light border/accent */
+  --slate-700: #cbd5e1;  /* Maps slate-700 to light border */
+  --slate-800: #cbd5e1;  /* Maps slate-800 to light border */
+  --slate-850: #f1f5f9;  /* Maps slate-850 to light panel bg */
+  --slate-900: #f1f5f9;  /* Maps slate-900 to light container bg */
+  --slate-950: #ffffff;  /* Maps slate-950 to pure white card bg */
+
+  /* Inverted brand colors for better contrast in Light Mode */
+  --teal-400: #0d9488;   /* Maps teal-400 to teal-600 */
+  --teal-500: #0f766e;   /* Maps teal-500 to teal-700 */
+  --blue-400: #2563eb;   /* Maps blue-400 to blue-600 */
+  --blue-500: #1d4ed8;   /* Maps blue-500 to blue-700 */
+  --red-400: #dc2626;    /* Maps red-400 to red-600 */
+  --amber-400: #d97706;  /* Maps amber-400 to amber-600 */
 }
 
 .dark {
   --background: #090e1a; /* Dark mode background */
   --foreground: #f8fafc; /* Dark mode foreground */
+
+  /* Slate colors for Dark Mode (Standard beautiful deep dark slate palette) */
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-850: #151f32;
+  --slate-900: #0f172a;
+  --slate-950: #090e1a;
+
+  /* Standard brand colors for Dark Mode */
+  --teal-400: #2dd4bf;
+  --teal-500: #14b8a6;
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;
+  --red-400: #f87171;
+  --amber-400: #fbbf24;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-prompt);
+
+  /* Slate overrides */
+  --color-slate-50: var(--slate-50);
+  --color-slate-100: var(--slate-100);
+  --color-slate-200: var(--slate-200);
+  --color-slate-300: var(--slate-300);
+  --color-slate-400: var(--slate-400);
+  --color-slate-500: var(--slate-500);
+  --color-slate-600: var(--slate-600);
+  --color-slate-700: var(--slate-700);
+  --color-slate-800: var(--slate-800);
+  --color-slate-850: var(--slate-850);
+  --color-slate-900: var(--slate-900);
+  --color-slate-950: var(--slate-950);
+
+  /* Status overrides */
+  --color-teal-400: var(--teal-400);
+  --color-teal-500: var(--teal-500);
+  --color-blue-400: var(--blue-400);
+  --color-blue-500: var(--blue-500);
+  --color-red-400: var(--red-400);
+  --color-amber-400: var(--amber-400);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-prompt), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Creamy smooth transitions for panels and text when toggling theme modes */
+div, nav, header, aside, section, main, footer, button, p, h1, h2, h3, h4, h5, h6, span, label, input, select, textarea, table, tr, th, td {
+  transition-property: background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
+  transition-duration: 400ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* เพิ่มการเคลือบแก้ว Glassmorphic classes */
@@ -32,7 +105,7 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  transition: background 0.3s ease, border-color 0.3s ease;
+  transition: background 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark .glass-panel {
@@ -45,7 +118,7 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(15, 23, 42, 0.05);
-  transition: background 0.3s ease, border-color 0.3s ease;
+  transition: background 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark .glass-card {
@@ -61,4 +134,5 @@ body {
 .glow-btn:hover {
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
 }
+
 

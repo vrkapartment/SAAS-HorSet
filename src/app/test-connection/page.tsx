@@ -71,7 +71,7 @@ export default function TestConnectionPage() {
   }, [])
 
   return (
-    <main className="relative min-h-screen bg-[#060a13] text-slate-100 font-sans overflow-hidden py-12 px-4">
+    <main className="relative min-h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden py-12 px-4">
       {/* Glow Effects */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-0 right-10 w-[300px] h-[300px] bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
