@@ -1,0 +1,212 @@
+"use server"
+
+import { createClient } from "@/lib/supabase/server"
+
+const isSupabaseConfigured = 
+  process.env.NEXT_PUBLIC_SUPABASE_URL && 
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
+
+export async function getTenants() {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("tenants")
+      .select(`
+        *,
+        rooms (
+          room_number
+        )
+      `)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    // จัดรูปแบบข้อมูลให้เข้ากับ TenantItem interface ของหน้าบ้าน
+    const formatted = data.map((t: any) => ({
+      id: t.id,
+      roomNumber: t.rooms?.room_number || "ไม่มีห้อง",
+      fullName: t.tenant_name,
+      phone: t.tenant_phone,
+      lineUserId: t.line_user_id,
+      contractStart: t.lease_start,
+      contractEnd: t.lease_end,
+      status: new Date(t.lease_end) >= new Date() ? "active" : "expired"
+    }))
+
+    return { success: true, data: formatted }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลผู้เช่า"
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function createTenant(
+  roomNumber: string,
+  fullName: string,
+  phone: string,
+  lineUserId: string | null,
+  contractStart: string,
+  contractEnd: string
+) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    // 1. ค้นหา roomId จาก roomNumber
+    const { data: room, error: roomError } = await supabase
+      .from("rooms")
+      .select("id")
+      .eq("room_number", roomNumber)
+      .single()
+
+    if (roomError || !room) {
+      throw new Error(`ไม่พบห้องหมายเลข ${roomNumber} ในระบบ กรุณาตรวจสอบหรือสร้างห้องพักก่อนทำสัญญา`)
+    }
+
+    // 2. เพิ่มข้อมูลผู้เช่าและสัญญา
+    const { data: tenant, error: tenantError } = await supabase
+      .from("tenants")
+      .insert([{
+        room_id: room.id,
+        tenant_name: fullName,
+        tenant_phone: phone,
+        line_user_id: lineUserId || null,
+        lease_start: contractStart,
+        lease_end: contractEnd
+      }])
+      .select()
+
+    if (tenantError) throw tenantError
+
+    // 3. อัปเดตห้องพักให้เป็นมีผู้เช่า (occupied)
+    const { error: roomUpdateError } = await supabase
+      .from("rooms")
+      .update({ status: "occupied" })
+      .eq("id", room.id)
+
+    if (roomUpdateError) throw roomUpdateError
+
+    return { success: true, data: tenant[0] }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการทำสัญญาเช่าใหม่"
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function deleteTenant(id: string, roomNumber: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    // 1. ลบสัญญาผู้เช่า
+    const { error: deleteError } = await supabase
+      .from("tenants")
+      .delete()
+      .eq("id", id)
+
+    if (deleteError) throw deleteError
+
+    // 2. ค้นหาห้องและตั้งค่าเป็นว่าง (available)
+    const { data: room } = await supabase
+      .from("rooms")
+      .select("id")
+      .eq("room_number", roomNumber)
+      .single()
+
+    if (room) {
+      await supabase
+        .from("rooms")
+        .update({ status: "available" })
+        .eq("id", room.id)
+    }
+
+    return { success: true }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบสัญญาผู้เช่า"
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function updateTenant(
+  id: string,
+  roomNumber: string,
+  fullName: string,
+  phone: string,
+  lineUserId: string | null,
+  contractStart: string,
+  contractEnd: string
+) {
+  try {
+    const supabase = await createClient()
+
+    // 1. ดึงข้อมูลสัญญาเดิมมาเช็คว่ามีการย้ายห้องหรือไม่
+    const { data: oldTenant, error: oldError } = await supabase
+      .from("tenants")
+      .select("room_id, rooms(room_number)")
+      .eq("id", id)
+      .single()
+
+    if (oldError || !oldTenant) {
+      throw new Error("ไม่พบข้อมูลผู้เช่าที่ต้องการแก้ไข")
+    }
+
+    // 2. ค้นหา roomId ใหม่จาก roomNumber
+    const { data: newRoom, error: roomError } = await supabase
+      .from("rooms")
+      .select("id")
+      .eq("room_number", roomNumber)
+      .single()
+
+    if (roomError || !newRoom) {
+      throw new Error(`ไม่พบห้องหมายเลข ${roomNumber} ในระบบ`)
+    }
+
+    // 3. อัปเดตข้อมูลผู้เช่า
+    const { data: updatedTenant, error: tenantError } = await supabase
+      .from("tenants")
+      .update({
+        room_id: newRoom.id,
+        tenant_name: fullName,
+        tenant_phone: phone,
+        line_user_id: lineUserId || null,
+        lease_start: contractStart,
+        lease_end: contractEnd,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id)
+      .select()
+
+    if (tenantError) throw tenantError
+
+    // 4. หากมีการย้ายห้องพัก ให้สลับสถานะห้องเดิมและห้องใหม่
+    const oldRoomNumber = (oldTenant.rooms as any)?.room_number
+    if (oldRoomNumber && oldRoomNumber !== roomNumber) {
+      // ตั้งห้องเก่าเป็นว่าง (available)
+      await supabase
+        .from("rooms")
+        .update({ status: "available" })
+        .eq("id", oldTenant.room_id)
+
+      // ตั้งห้องใหม่เป็นมีผู้เช่า (occupied)
+      await supabase
+        .from("rooms")
+        .update({ status: "occupied" })
+        .eq("id", newRoom.id)
+    }
+
+    return { success: true, data: updatedTenant[0] }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการแก้ไขข้อมูลผู้เช่า"
+    return { success: false, error: errorMessage }
+  }
+}

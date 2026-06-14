@@ -1,0 +1,188 @@
+Button1 -> ล้างข้อมูล
+Text1.1 -> เลขประจำตัวผู้เสียภาษีอากร
+Text1.2 -> 
+Text1.3 -> 
+Text1.4 -> 
+Text1.5 -> 
+Text1.6 -> 
+Text1.7 -> 
+Text1.8 -> 
+Text1.9 -> 
+Text1.10 -> 
+Text1.11 -> 
+Text1.12 -> 
+Text1.13 -> 
+Text1.14 -> 
+Text1.15 -> 
+Text1.21 -> 
+Text1.16 -> 
+Text1.17 -> 
+Text1.18 -> 
+Text1.19 -> 
+Text1.20 -> 
+Text1.23 -> 
+Text1.24 -> เลขประจำตัวผู้เสียภาษีอากร
+Text1.25 -> 
+Text1.26 -> 
+Text1.27 -> 
+Text1.28 -> 
+Text1.29 -> 
+Text1.30 -> 
+Text1.31 -> 
+Text1.32 -> 
+Text1.33 -> 
+Radio Button1 -> 
+Radio Button2 -> 
+Radio Button3 -> 
+Radio Button4 -> 
+Radio Button5 -> 
+Text2.1 -> 
+Text2.2 -> 
+Text2.3 -> 
+Text2.4 -> 
+Text2.5 -> 
+Text2.6 -> 
+Text2.7 -> 
+Text2.8 -> 
+Text2.25 -> 
+Text2.26 -> 
+Text2.9 -> 
+Text2.10 -> 
+Text2.11 -> 
+Text2.12 -> 
+Text2.13 -> 
+Text2.15 -> 
+Text2.16 -> 
+Text2.17 -> 
+Text2.18 -> 
+Text2.19 -> 
+Text2.20 -> 
+Text2.27 -> 
+Text2.28 -> 
+Text2.29 -> 
+Text2.30 -> 
+Text2.31 -> 
+Text3.11 -> 
+Text3.10 -> เลขประจำตัวผู้เสียภาษีอากร
+Text3.12 -> 
+Text3.13 -> 
+Text3.14 -> 
+Text3.15 -> 
+Text3.16 -> 
+Text3.17 -> 
+Text3.21 -> 
+Text3.20 -> เลขประจำตัวผู้เสียภาษีอากร
+Text3.22 -> 
+Text3.23 -> 
+Text3.24 -> 
+Text3.25 -> 
+Text3.26 -> 
+Text3.27 -> 
+Text3.30 -> เลขประจำตัวผู้เสียภาษีอากร
+Text3.31 -> 
+Text3.32 -> 
+Text3.33 -> 
+Text3.34 -> 
+Text3.35 -> 
+Text3.36 -> 
+Text3.37 -> 
+Text3.41 -> 
+Text3.40 -> เลขประจำตัวผู้เสียภาษีอากร
+Text3.42 -> 
+Text3.43 -> 
+Text3.44 -> 
+Text3.45 -> 
+Text3.46 -> 
+Text3.47 -> 
+Text3.48 -> เลขประจำตัวผู้เสียภาษีอากร
+Text3.50 -> 
+Text3.51 -> 
+Text3.52 -> 
+Text3.49 -> 
+Text3.53 -> 
+Text3.54 -> 
+Text3.55 -> 
+Text3.57 -> 
+Text3.56 -> เลขประจำตัวผู้เสียภาษีอากร
+Text3.58 -> 
+Text3.59 -> 
+Text3.60 -> 
+Text3.61 -> 
+Text3.62 -> 
+Text3.63 -> 
+Text3.65 -> 
+Text3.64 -> 
+Text3.66 -> 
+Text3.67 -> 
+Text3.68 -> 
+Text3.69 -> 
+Text3.70 -> 
+Text3.71 -> 
+Text3.72 -> 
+Text3.73 -> 
+Text3.74 -> 
+Text3.75 -> 
+Text3.76 -> 
+Text3.77 -> 
+Text3.78 -> 
+Text3.79 -> 
+Text3.80 -> 
+Text3.81 -> 
+Text3.82 -> 
+Text3.83 -> 
+Text3.84 -> 
+Text3.85 -> 
+Text4.10.1 -> 
+Text4.10.2 -> 
+Text4.10.3 -> 
+Text4.10.4 -> 
+Text4.12 -> 
+Text4.11 -> 
+Text4.13 -> 
+Text4.14 -> 
+Text4.15 -> 
+Text4.17 -> 
+Text4.18 -> 
+Text4.19 -> 
+Text4.20 -> 
+Text4.16 -> 
+Radio Button6 -> 
+Text5.10 -> 
+Text5.11 -> 
+Text5.13 -> 
+Text5.15 -> 
+Text5.17 -> 
+Text5.18 -> 
+Text5.12 -> 
+Text5.14 -> 
+Text5.16 -> 
+Text5.19 -> 
+Text5.23 -> 
+Text5.20 -> 
+Text5.21 -> 
+Text5.22 -> 
+Text5.24 -> 
+Text5.25 -> 
+Text5.26 -> 
+Text5.27 -> 
+Text5.28 -> 
+Text5.29 -> 
+Text5.31 -> 
+Text5.32 -> 
+Text5.33 -> 
+Text5.34 -> 
+Text5.35 -> 
+Text5.36 -> 
+Text5.37 -> 
+Text5.86 -> 
+Text5.87 -> 
+Text5.88 -> 
+Text5.89 -> 
+Text5.90 -> 
+Text5.91 -> 
+Text5.92 -> 
+Radio Button7 -> 
+Radio Button8 -> 
+Radio Button9 -> 
+Radio Button10 -> 
+Radio Button11 -> 
