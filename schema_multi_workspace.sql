@@ -150,8 +150,6 @@ drop policy if exists "Read bills in workspace or support approved" on public.bi
 drop policy if exists "Manage bills in workspace or support approved" on public.bills;
 drop policy if exists "Read expenses in workspace or support approved" on public.expenses;
 drop policy if exists "Manage expenses in workspace or support approved" on public.expenses;
-drop policy if exists "Super Admins can manage registration codes" on public.registration_codes;
-drop policy if exists "Anyone can read registration codes for verification" on public.registration_codes;
 
 
 -- ==================== WORKSPACES POLICIES ====================
@@ -381,6 +379,10 @@ create table if not exists public.registration_codes (
 
 -- Enable RLS
 alter table public.registration_codes enable row level security;
+
+-- Drop policies if they exist (safe now because table exists)
+drop policy if exists "Super Admins can manage registration codes" on public.registration_codes;
+drop policy if exists "Anyone can read registration codes for verification" on public.registration_codes;
 
 -- Policies for registration_codes
 create policy "Super Admins can manage registration codes"
