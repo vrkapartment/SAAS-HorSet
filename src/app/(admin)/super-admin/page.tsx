@@ -355,6 +355,46 @@ export default function SuperAdminPage() {
     }
   }
 
+  // ฟังก์ชันลบ Workspace
+  const handleDeleteWorkspace = async (id: string, name: string) => {
+    if (!confirm(`⚠️ คำเตือน: หากคุณลบพื้นที่ทำงาน "${name}" ข้อมูลและการตั้งค่าที่เกี่ยวข้องทั้งหมดจะได้รับผลกระทบ\nคุณต้องการลบพื้นที่ทำงานนี้ใช่หรือไม่?`)) return
+
+    setError(null)
+    setResultSuccess(null)
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error: wsErr } = await supabase
+          .from("workspaces")
+          .delete()
+          .eq("id", id)
+
+        if (wsErr) throw wsErr
+
+        setWorkspaces(workspaces.filter((w) => w.id !== id))
+        setResultSuccess(`✓ ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
+      } catch (err: any) {
+        setError("ไม่สามารถลบ Workspace ใน Supabase (กรุณาตรวจสอบว่ามีข้อมูลห้องพัก บิล หรือผู้ใช้งานสังกัดอยู่หรือไม่): " + err.message)
+      }
+    } else {
+      // โหมด Demo
+      const updatedWs = workspaces.filter((w) => w.id !== id)
+      setWorkspaces(updatedWs)
+      localStorage.setItem("horset_workspaces", JSON.stringify(updatedWs))
+
+      // ลบสิทธิ์ช่วยเหลือด้วยถ้ามี
+      localStorage.removeItem(`horset_support_status_${id}`)
+
+      // ปรับโปรไฟล์ที่เกี่ยวข้องให้ไม่มีสังกัด
+      const updatedProfs = profiles.map((p) => p.workspace_id === id ? { ...p, workspace_id: null } : p)
+      setProfiles(updatedProfs)
+      localStorage.setItem("horset_profiles", JSON.stringify(updatedProfs))
+
+      setResultSuccess(`✓ [Demo] ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
+    }
+  }
+
   // ฟังก์ชันอัปเดต Workspace (เช่น เปลี่ยนชื่อ)
   const handleUpdateWorkspaceName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -590,6 +630,14 @@ export default function SuperAdminPage() {
                           title="แก้ไขชื่อ Workspace"
                         >
                           <Edit className="w-3.5 h-3.5" /> แก้ไข
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteWorkspace(ws.id, ws.name)}
+                          className="p-2 py-1.5 text-[11px] font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-red-400 hover:text-red-300 rounded-lg flex items-center gap-1 transition-all"
+                          title="ลบ Workspace"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> ลบ
                         </button>
 
                         <button
