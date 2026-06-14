@@ -25,7 +25,9 @@ import {
   Check,
   AlertCircle,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  Coins,
+  Scroll
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
@@ -386,6 +388,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       path: "/billing",
       icon: Receipt,
       roles: ["admin", "staff", "super_admin"]
+    },
+    {
+      name: "จัดการบิลรายจ่ายรายวัน",
+      path: "/daily-bills",
+      icon: Coins,
+      roles: ["admin", "super_admin"]
     },
     {
       name: t("nav.tax") || "จัดการภาษี ภ.ง.ด.",
@@ -775,6 +783,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   {pathname === "/tenants" && (t("nav.tenants") || "ระบบจัดการข้อมูลสัญญาผู้เช่า")}
                   {pathname === "/billing" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
                   {pathname === "/meter" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
+                  {pathname === "/daily-bills" && "จัดการบิลรายจ่ายรายวัน (40(5) / 40(8))"}
                   {pathname === "/tax" && (t("nav.tax") || "ระบบรายงานภาษีอพาร์ทเมนท์ ภ.ง.ด.")}
                   {pathname === "/finance-settings" && (t("nav.finance") || "ตั้งค่าการเงินและบัญชีรับเงิน")}
                   {pathname === "/test-connection" && (t("nav.test_connection") || "เช็คระบบตรวจสอบการเชื่อมต่อ Supabase")}
