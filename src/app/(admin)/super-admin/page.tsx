@@ -22,7 +22,13 @@ import {
   Lock,
   Edit,
   X,
-  Key
+  Key,
+  Copy,
+  Check,
+  Globe,
+  Terminal,
+  ChevronRight,
+  FileText
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { 
@@ -72,6 +78,9 @@ export default function SuperAdminPage() {
   const [profiles, setProfiles] = useState<ProfileItem[]>([])
   const [supportGrants, setSupportGrants] = useState<{ [key: string]: string }>({})
 
+  // คืนค่าคัดลอกรหัสเชิญชวนสำเร็จชั่วคราว
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+
   // ค้นหาและคัดกรอง
   const [searchWorkspace, setSearchWorkspace] = useState("")
   const [searchProfile, setSearchProfile] = useState("")
@@ -110,6 +119,13 @@ export default function SuperAdminPage() {
 
   // ตรวจสอบโหมดทดสอบ
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+
+  // ฟังก์ชันช่วยคัดลอกลง Clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedCode(text)
+    setTimeout(() => setCopiedCode(null), 2000)
+  }
 
   // โหลดข้อมูลทั้งหมด
   const loadData = async () => {
@@ -373,7 +389,6 @@ export default function SuperAdminPage() {
     localStorage.setItem("horset_current_workspace_id", ws.id)
     document.cookie = `horset_current_workspace_id=${ws.id}; path=/; max-age=86400`
     
-    // ตั้งคุกกี้สิทธิ์เป็น admin ชั่วคราวหากได้รับการอนุมัติช่วยเหลือ เพื่อให้สามารถเปิดหน้า แดชบอร์ด, จัดการห้องพัก, จัดการบิล ได้ปกติ
     const status = supportGrants[ws.id] || "none"
     if (status === "approved") {
       alert(`✓ กำลังเปลี่ยนโหมดเข้าสลับช่วยเหลือหอพัก "${ws.name}" ด้วยสิทธิ์ตรวจสอบระบบ...`)
@@ -633,66 +648,76 @@ export default function SuperAdminPage() {
 
   return (
     <DashboardLayout role="super_admin">
-      <div className="space-y-8 pb-12">
+      <div className="relative space-y-8 pb-16 overflow-hidden">
         
-        {/* หัวข้อ แนะนำผู้ดูแลระบบ */}
-        <div className="relative p-8 rounded-3xl overflow-hidden glass-panel border border-purple-500/10 shadow-2xl">
-          <div className="absolute top-0 right-0 w-[400px] h-[200px] bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold rounded-full text-xs uppercase tracking-wider animate-pulse">
-                <ShieldCheck className="w-3.5 h-3.5" /> แผงควบคุมควบคุมระบบสูงสุด
+        {/* Background Glowing Ambient Orbs */}
+        <div className="absolute top-[-10%] right-[-15%] w-[600px] h-[600px] bg-purple-500/5 dark:bg-purple-600/10 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-[20%] left-[-15%] w-[500px] h-[500px] bg-indigo-500/5 dark:bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-[40%] right-[-10%] w-[350px] h-[350px] bg-violet-500/5 dark:bg-violet-600/5 rounded-full blur-[90px] pointer-events-none" />
+
+        {/* Header Console Banner */}
+        <div className="relative p-8 rounded-3xl overflow-hidden backdrop-blur-md bg-slate-900/60 border border-purple-500/20 shadow-[0_8px_32px_rgba(147,51,234,0.1)] transition-all hover:border-purple-500/30">
+          <div className="absolute top-0 right-0 w-[400px] h-[200px] bg-purple-600/15 rounded-full blur-[100px] pointer-events-none" />
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold rounded-full text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5 text-purple-400 animate-pulse" /> 
+                ระบบจัดการส่วนควบคุมหลัก • Super Admin
               </div>
               <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-purple-400">
-                Super Admin Console
+                Super Admin Control Panel
               </h1>
-              <p className="text-slate-400 text-sm max-w-xl">
-                ระบบจัดการผู้ใช้แบบรวมศูนย์กลาง มอบหมายพื้นที่ทำงาน (Workspace) ตั้งค่าบทบาท และสลับสิทธิ์การเข้าตรวจสอบข้อมูลเพื่อบริการช่วยเหลือลูกค้า
+              <p className="text-slate-400 text-sm max-w-xl leading-relaxed">
+                แผงควบคุมหลักแบบพรีเมียม เพื่อจัดการพื้นที่ทำงาน (Workspace) ดูแลระดับสิทธิ์การเข้าถึง และออกรหัสเชิญชวนอย่างมีประสิทธิภาพและปลอดภัยสูงสุด
               </p>
             </div>
             
             <button
               onClick={loadData}
-              className="px-5 py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg shrink-0 self-start md:self-center"
+              disabled={loading}
+              className="px-5 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/40 hover:bg-slate-900 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shrink-0 self-start lg:self-center hover:-translate-y-0.5 active:scale-95 duration-300 disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-purple-400" : ""}`} /> 
+              <RefreshCw className={`w-4 h-4 text-purple-400 ${loading ? "animate-spin" : ""}`} /> 
               รีเฟรชข้อมูลระบบ
             </button>
           </div>
         </div>
 
-        {/* แสดงผลแจ้งเตือนสถานะสำเร็จ / ข้อผิดพลาด */}
+        {/* Banner Toast Alerts */}
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/25 text-red-400 rounded-2xl text-xs flex items-center gap-3 shadow-lg">
-            <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
-            <span>{error}</span>
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl text-xs flex items-center gap-3 shadow-lg shadow-rose-500/5 animate-in fade-in slide-in-from-top-1 duration-300">
+            <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
+            <span className="font-semibold">{error}</span>
           </div>
         )}
         {success && (
-          <div className="p-4 bg-teal-500/10 border border-teal-500/25 text-teal-400 rounded-2xl text-xs flex items-center gap-3 shadow-lg">
-            <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0" />
-            <span>{success}</span>
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl text-xs flex items-center gap-3 shadow-lg shadow-emerald-500/5 animate-in fade-in slide-in-from-top-1 duration-300">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="font-semibold">{success}</span>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Main Workspaces and Provisioning Layout Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
           
-          {/* คอลัมน์ซ้าย: จัดการพื้นที่ทำงาน (Workspace Management) */}
+          {/* LEFT COLUMN: Workspace Management (lg:col-span-7) */}
           <div className="lg:col-span-7 space-y-8">
-            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+            
+            <div className="backdrop-blur-md bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 shadow-2xl space-y-6">
+              
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 bg-blue-600/10 text-blue-400 rounded-xl border border-blue-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-purple-600/10 text-purple-400 rounded-2xl border border-purple-500/20">
                     <Building className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-200">พื้นที่ทำงานทั้งหมด (Workspaces)</h2>
-                    <p className="text-[11px] text-slate-500">จำลองสิทธิ์การเข้าตรวจสอบดูแลข้อมูลแยกแต่ละตึก</p>
+                    <h2 className="text-lg font-bold text-slate-100">พื้นที่ทำงานทั้งหมด (Workspaces)</h2>
+                    <p className="text-[11px] text-slate-500">ตรวจสอบ แก้ไข และเข้าสิทธิ์ช่วยเหลือดูแลในตึกต่างๆ</p>
                   </div>
                 </div>
               </div>
 
-              {/* ค้นหา Workspace */}
+              {/* Workspace Search Input */}
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
                   <Search className="w-4 h-4 text-slate-500" />
@@ -700,54 +725,58 @@ export default function SuperAdminPage() {
                 <input
                   type="text"
                   placeholder="ค้นหาชื่อหอพัก/Workspace..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 transition-colors text-xs"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/40 border border-slate-800/80 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 text-slate-200 transition-all text-xs placeholder-slate-500"
                   value={searchWorkspace}
                   onChange={(e) => setSearchWorkspace(e.target.value)}
                 />
               </div>
 
-              {/* รายการพื้นที่ทำงาน */}
-              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+              {/* Workspace Scrollable List */}
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-purple-500/20 scrollbar-track-transparent">
                 {filteredWorkspaces.map((ws) => {
                   const status = supportGrants[ws.id] || "none"
                   return (
                     <div
                       key={ws.id}
-                      className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/60 hover:border-slate-700/80 transition-all flex items-center justify-between gap-4"
+                      className="p-4 rounded-2xl bg-slate-950/30 border border-slate-900/80 hover:border-purple-500/20 hover:bg-slate-950/60 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                     >
                       <div className="space-y-1.5 min-w-0">
-                        <h4 className="text-sm font-semibold text-slate-200 truncate">{ws.name}</h4>
-                        <div className="flex items-center gap-4 text-[10px] text-slate-500">
-                          <span className="font-mono">ID: {ws.id.substring(0, 8)}...</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> {new Date(ws.created_at).toLocaleDateString("th-TH")}
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-slate-200 truncate">{ws.name}</h4>
+                          
+                          {/* Active state micro-indicators */}
+                          {status === "approved" ? (
+                            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shrink-0">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                              อนุมัติช่วยเหลือ
+                            </span>
+                          ) : status === "pending" ? (
+                            <span className="text-[9px] bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-lg animate-pulse shrink-0">
+                              ⏳ รอยืนยันคำขอ
+                            </span>
+                          ) : (
+                            <span className="text-[9px] bg-slate-800 border border-slate-700/60 text-slate-400 font-bold px-2 py-0.5 rounded-lg shrink-0">
+                              ✕ ไม่มีสิทธิ์
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-4 text-[10px] text-slate-500 font-mono">
+                          <span>ID: {ws.id.substring(0, 8)}...</span>
+                          <span className="flex items-center gap-1 font-sans">
+                            <Clock className="w-3 h-3 text-slate-500" /> {new Date(ws.created_at).toLocaleDateString("th-TH")}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        {/* ป้ายแสดงสิทธิ์การเข้าช่วยเหลือ */}
-                        {status === "approved" ? (
-                          <span className="text-[10px] bg-teal-500/10 border border-teal-500/25 text-teal-400 font-semibold px-2 py-0.5 rounded-lg flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-ping" />
-                            อนุมัติช่วยเหลือแล้ว
-                          </span>
-                        ) : status === "pending" ? (
-                          <span className="text-[10px] bg-amber-500/10 border border-amber-500/25 text-amber-400 font-semibold px-2 py-0.5 rounded-lg animate-pulse">
-                            ⏳ รอยืนยันคำขอ
-                          </span>
-                        ) : (
-                          <span className="text-[10px] bg-red-500/10 border border-red-500/25 text-red-400 font-semibold px-2 py-0.5 rounded-lg">
-                            ✕ ไม่มีสิทธิ์
-                          </span>
-                        )}
-
+                      {/* Workspace Controls */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                         <button
                           onClick={() => {
                             setEditingWorkspace(ws)
                             setEditingWorkspaceName(ws.name)
                           }}
-                          className="p-2 py-1.5 text-[11px] font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-blue-400 hover:text-blue-300 rounded-lg flex items-center gap-1 transition-all"
+                          className="p-2 py-1.5 text-[11px] font-semibold bg-slate-950 border border-slate-800/80 hover:border-purple-500/30 hover:bg-purple-500/5 text-purple-400 hover:text-purple-300 rounded-xl flex items-center gap-1 transition-all hover:-translate-y-0.5 active:scale-95 duration-200"
                           title="แก้ไขชื่อ Workspace"
                         >
                           <Edit className="w-3.5 h-3.5" /> แก้ไข
@@ -755,7 +784,7 @@ export default function SuperAdminPage() {
 
                         <button
                           onClick={() => handleDeleteWorkspace(ws.id, ws.name)}
-                          className="p-2 py-1.5 text-[11px] font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-red-400 hover:text-red-300 rounded-lg flex items-center gap-1 transition-all"
+                          className="p-2 py-1.5 text-[11px] font-semibold bg-slate-950 border border-slate-800/80 hover:border-rose-500/30 hover:bg-rose-500/5 text-rose-400 hover:text-rose-300 rounded-xl flex items-center gap-1 transition-all hover:-translate-y-0.5 active:scale-95 duration-200"
                           title="ลบ Workspace"
                         >
                           <Trash2 className="w-3.5 h-3.5" /> ลบ
@@ -763,10 +792,10 @@ export default function SuperAdminPage() {
 
                         <button
                           onClick={() => handleEnterWorkspace(ws)}
-                          className={`p-2 py-1.5 text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-all ${
+                          className={`p-2 py-1.5 text-[11px] font-bold rounded-xl flex items-center gap-1 transition-all hover:-translate-y-0.5 active:scale-95 duration-250 ${
                             status === "approved"
-                              ? "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/10"
-                              : "bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                              ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:via-indigo-500 hover:to-blue-500 text-white shadow-lg shadow-purple-600/25"
+                              : "bg-slate-950 border border-slate-800/80 hover:bg-slate-850 text-slate-400 hover:text-slate-200"
                           }`}
                         >
                           สลับหอ <ArrowRight className="w-3.5 h-3.5" />
@@ -777,34 +806,35 @@ export default function SuperAdminPage() {
                 })}
 
                 {filteredWorkspaces.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 text-xs">
-                    ไม่พบข้อมูลหอพักที่ค้นหา
+                  <div className="text-center py-12 rounded-2xl bg-slate-950/20 border border-slate-900 border-dashed text-slate-500 text-xs space-y-2">
+                    <Building className="w-8 h-8 text-slate-600 mx-auto animate-pulse" />
+                    <p>ไม่พบข้อมูลหอพักที่ต้องการค้นหา</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* ฟอร์มเพิ่ม Workspace */}
-            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl">
+            {/* Create Workspace Panel Form */}
+            <div className="backdrop-blur-md bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 shadow-2xl">
               <form onSubmit={handleAddWorkspace} className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-blue-400" />
+                  <Plus className="w-4 h-4 text-purple-400" />
                   <h3 className="text-sm font-semibold text-slate-200">สร้างพื้นที่ทำงานหอพักใหม่ (Add Workspace)</h3>
                 </div>
                 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="text"
                     required
                     placeholder="เช่น ตึก บานเย็น คอร์ท, แสนสบาย เพลส..."
-                    className="flex-1 px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-xs transition-colors"
+                    className="flex-1 px-4 py-2.5 bg-slate-950/40 border border-slate-800/80 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
                     value={newWorkspaceName}
                     onChange={(e) => setNewWorkspaceName(e.target.value)}
                   />
                   <button
                     type="submit"
                     disabled={addingWorkspace}
-                    className="px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-blue-600/10 shrink-0"
+                    className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-purple-600/10 shrink-0"
                   >
                     {addingWorkspace ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -819,16 +849,18 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
-          {/* คอลัมน์ขวา: จัดการบัญชีและบทบาทผู้ใช้งาน (User & Role Provisoning) */}
+          {/* RIGHT COLUMN: Provisioning and Secret Invitation Codes (lg:col-span-5) */}
           <div className="lg:col-span-5 space-y-8">
-            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+            
+            {/* Create User & Role Form */}
+            <div className="backdrop-blur-md bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 shadow-2xl space-y-6">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 bg-purple-600/10 text-purple-400 rounded-xl border border-purple-500/20">
-                  <UserPlus className="w-5 h-5" />
+                <div className="p-3 bg-purple-600/10 text-purple-400 rounded-2xl border border-purple-500/20">
+                  <UserPlus className="w-5 h-5 text-purple-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-200">มอบบทบาท/สิทธิ์ (Add User Role)</h2>
-                  <p className="text-[11px] text-slate-500">กำหนดบัญชีผู้ใช้งานระบุ Workspace และระดับสิทธิ์</p>
+                  <h2 className="text-lg font-bold text-slate-100">มอบสิทธิ์และบทบาท (Add User)</h2>
+                  <p className="text-[11px] text-slate-500">สร้างผู้ใช้งานใหม่พร้อมระบุระดับความปลอดภัย</p>
                 </div>
               </div>
 
@@ -854,29 +886,29 @@ export default function SuperAdminPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">อีเมลใช้งานสำหรับเข้าสู่ระบบ</label>
+                    <label className="text-[11px] text-slate-400 font-medium">อีเมลผู้ใช้</label>
                     <input
                       type="email"
                       required
                       placeholder="name@horset.com"
-                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
                       value={newUserEmail}
                       onChange={(e) => setNewUserEmail(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">รหัสผ่านสำหรับเข้าสู่ระบบ</label>
+                    <label className="text-[11px] text-slate-400 font-medium">กำหนดรหัสผ่าน</label>
                     <div className="relative">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-500">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                         <Lock className="w-3.5 h-3.5" />
                       </span>
                       <input
                         type="password"
                         required
                         minLength={6}
-                        placeholder="รหัสผ่านอย่างน้อย 6 ตัว"
-                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                        placeholder="อย่างน้อย 6 ตัว"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
                         value={newUserPassword}
                         onChange={(e) => setNewUserPassword(e.target.value)}
                       />
@@ -890,7 +922,7 @@ export default function SuperAdminPage() {
                     <input
                       type="text"
                       placeholder="เช่น สมใจ รักษ์ดี"
-                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
                       value={newUserFullName}
                       onChange={(e) => setNewUserFullName(e.target.value)}
                     />
@@ -901,7 +933,7 @@ export default function SuperAdminPage() {
                     <input
                       type="text"
                       placeholder="08xxxxxxxx"
-                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
                       value={newUserPhone}
                       onChange={(e) => setNewUserPhone(e.target.value)}
                     />
@@ -909,21 +941,21 @@ export default function SuperAdminPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์ในระบบ (Role)</label>
+                  <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์ (Role)</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { role: "admin", label: "แอดมิน (เจ้าของ)" },
                       { role: "staff", label: "ผู้ช่วย (สต๊าฟ)" },
-                      { role: "tenant", label: "ผู้เช่าตึก" }
+                      { role: "tenant", label: "ผู้เช่าหอ" }
                     ].map((item) => (
                       <button
                         key={item.role}
                         type="button"
                         onClick={() => setNewUserRole(item.role as any)}
-                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold border transition-all ${
+                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-bold border transition-all duration-200 ${
                           newUserRole === item.role
-                            ? "bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/10"
-                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                            ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-lg shadow-purple-600/15"
+                            : "bg-slate-950 border-slate-800/85 text-slate-400 hover:text-slate-200 hover:bg-slate-900"
                         }`}
                       >
                         {item.label}
@@ -935,34 +967,34 @@ export default function SuperAdminPage() {
                 <button
                   type="submit"
                   disabled={addingUser || !selectedWorkspaceId}
-                  className="w-full mt-2 glow-btn bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-purple-600/10"
+                  className="w-full mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-purple-600/20"
                 >
                   {addingUser ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      <UserPlus className="w-4 h-4" /> สร้างบัญชีและมอบสิทธิ์
+                      <UserPlus className="w-4 h-4" /> สร้างบัญชีผู้ใช้และสิทธิ์
                     </>
                   )}
                 </button>
               </form>
             </div>
 
-            {/* ส่วนควบคุมสร้าง Secret Code สำหรับสมัครสมาชิก */}
-            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+            {/* Secret Invitation Codes Section */}
+            <div className="backdrop-blur-md bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 shadow-2xl space-y-6">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
-                  <Key className="w-5 h-5" />
+                <div className="p-3 bg-indigo-600/10 text-indigo-400 rounded-2xl border border-indigo-500/20">
+                  <Key className="w-5 h-5 text-indigo-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-200">สร้างรหัสเชิญชวน (Secret Invite Code)</h2>
-                  <p className="text-[11px] text-slate-500">รหัสลงทะเบียนล็อคสังกัดตึก มีอายุจำกัด 2 ชม.</p>
+                  <h2 className="text-lg font-bold text-slate-100">ออกรหัสลงทะเบียน (Secret Code)</h2>
+                  <p className="text-[11px] text-slate-500">รหัสสมัครสมาชิกสำหรับผู้เข้าใช้หอพัก (หมดอายุ 2 ชม.)</p>
                 </div>
               </div>
 
               <form onSubmit={handleGenerateCode} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-slate-400 font-medium">สังกัดตึกที่กำหนด (Locked Workspace)</label>
+                  <label className="text-[11px] text-slate-400 font-medium">ตึกที่ผูกมัด (Locked Workspace)</label>
                   <select
                     className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-indigo-500 text-xs transition-colors"
                     value={genWorkspaceId}
@@ -981,21 +1013,21 @@ export default function SuperAdminPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์เมื่อสมัครสำเร็จ (Designated Role)</label>
+                  <label className="text-[11px] text-slate-400 font-medium block">สิทธิ์ที่ได้รับเมื่อลงทะเบียน (Designated Role)</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { role: "admin", label: "แอดมิน (เจ้าของ)" },
                       { role: "staff", label: "ผู้ช่วย (สต๊าฟ)" },
-                      { role: "tenant", label: "ผู้เช่าตึก" }
+                      { role: "tenant", label: "ผู้เช่าหอ" }
                     ].map((item) => (
                       <button
                         key={item.role}
                         type="button"
                         onClick={() => setGenRole(item.role as any)}
-                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold border transition-all ${
+                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-bold border transition-all duration-200 ${
                           genRole === item.role
-                            ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10"
-                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                            ? "bg-gradient-to-r from-indigo-600 to-blue-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/15"
+                            : "bg-slate-950 border-slate-800/85 text-slate-400 hover:text-slate-200 hover:bg-slate-900"
                         }`}
                       >
                         {item.label}
@@ -1007,58 +1039,71 @@ export default function SuperAdminPage() {
                 <button
                   type="submit"
                   disabled={generatingCode || !genWorkspaceId}
-                  className="w-full mt-2 glow-btn bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10"
+                  className="w-full mt-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-indigo-600/20"
                 >
                   {generatingCode ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      <Plus className="w-4 h-4" /> สร้าง Secret Code (มีอายุ 2 ชม.)
+                      <Plus className="w-4 h-4" /> ออกรหัสลงทะเบียน (HS-XXXXXX)
                     </>
                   )}
                 </button>
               </form>
 
-              {/* รายการรหัสเชิญชวน */}
+              {/* Invitation Code List */}
               <div className="space-y-3 pt-2">
-                <h3 className="text-xs font-semibold text-slate-300">รายการรหัสเชิญชวนทั้งหมด</h3>
-                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                <h3 className="text-xs font-bold text-slate-300">รหัสเชิญชวนในระบบ</h3>
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-indigo-500/20 scrollbar-track-transparent">
                   {registrationCodes.map((item) => {
                     const wsName = workspaces.find((w) => w.id === item.workspace_id)?.name || "ตึกที่ถูกลบ"
                     const isExpired = new Date(item.expires_at) < new Date()
                     return (
                       <div
                         key={item.code}
-                        className="p-3 rounded-xl bg-slate-950/60 border border-slate-900 flex items-center justify-between gap-3 text-xs"
+                        className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-900 flex items-center justify-between gap-3 text-xs hover:border-indigo-500/10 transition-all duration-200"
                       >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded text-xs select-all">
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-lg text-xs select-all">
                               {item.code}
                             </span>
-                            <span className="text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded border border-slate-800 font-bold">
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(item.code)}
+                              className="p-1 text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 rounded-md transition-all hover:border-indigo-500/30"
+                              title="คัดลอกรหัส"
+                            >
+                              {copiedCode === item.code ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                            <span className="text-[9px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded border border-slate-800 font-bold">
                               {item.role.toUpperCase()}
                             </span>
                           </div>
+                          
                           <p className="text-[10px] text-slate-400 truncate">
                             ตึก: {wsName}
                           </p>
                           <p className="text-[9px] text-slate-500 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> หมดอายุ: {new Date(item.expires_at).toLocaleTimeString("th-TH")}
+                            <Clock className="w-3 h-3 text-slate-500" /> หมดอายุ: {new Date(item.expires_at).toLocaleTimeString("th-TH")}
                           </p>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
                           {item.is_used ? (
-                            <span className="text-[9px] bg-teal-500/10 border border-teal-500/25 text-teal-400 font-semibold px-2 py-0.5 rounded-lg">
+                            <span className="text-[9px] bg-teal-500/10 border border-teal-500/25 text-teal-400 font-bold px-2 py-0.5 rounded-lg">
                               ใช้แล้ว ({item.used_by_email?.split("@")[0]})
                             </span>
                           ) : isExpired ? (
-                            <span className="text-[9px] bg-red-500/10 border border-red-500/25 text-red-400 font-semibold px-2 py-0.5 rounded-lg">
+                            <span className="text-[9px] bg-rose-500/10 border border-rose-500/25 text-rose-400 font-bold px-2 py-0.5 rounded-lg">
                               หมดอายุ
                             </span>
                           ) : (
-                            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-semibold px-2 py-0.5 rounded-lg animate-pulse">
+                            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-bold px-2 py-0.5 rounded-lg animate-pulse">
                               พร้อมใช้
                             </span>
                           )}
@@ -1066,7 +1111,7 @@ export default function SuperAdminPage() {
                           <button
                             type="button"
                             onClick={() => handleDeleteCode(item.code)}
-                            className="p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-lg border border-red-500/10 transition-colors"
+                            className="p-2 text-rose-400 hover:text-rose-300 bg-rose-500/5 hover:bg-rose-500/15 rounded-xl border border-rose-500/10 transition-colors"
                             title="ลบ Code"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1088,20 +1133,20 @@ export default function SuperAdminPage() {
 
         </div>
 
-        {/* แผงตารางด้านล่าง: รายชื่อผู้ใช้งานสิทธิ์ต่างๆ */}
-        <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+        {/* BOTTOM SECTION: Full User Registry Directory */}
+        <div className="backdrop-blur-md bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 shadow-2xl space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-purple-600/10 text-purple-400 rounded-2xl border border-purple-500/20">
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-200">บัญชีรายชื่อสิทธิ์ผู้ใช้งานทั้งหมด</h2>
-                <p className="text-[11px] text-slate-500">สแกนบทบาททั้งหมด แยกแต่ละตึก และจัดการถอนสิทธิ์ระบบหลัก</p>
+                <h2 className="text-lg font-bold text-slate-100">บัญชีรายชื่อสิทธิ์ผู้ใช้งานทั้งหมด</h2>
+                <p className="text-[11px] text-slate-500">ตรวจสอบสิทธิ์ระดับ Global สังกัด Workspace และถอนสิทธิ์ระบบหลัก</p>
               </div>
             </div>
 
-            {/* ค้นหาโปรไฟล์ */}
+            {/* Profile search queries */}
             <div className="w-full md:w-80 relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
                 <Search className="w-4 h-4 text-slate-500" />
@@ -1109,15 +1154,17 @@ export default function SuperAdminPage() {
               <input
                 type="text"
                 placeholder="ค้นหาด้วย อีเมล, ชื่อ-นามสกุล, หรือสิทธิ์..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-200 transition-colors text-xs"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-950/40 border border-slate-800/80 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 text-slate-200 transition-colors text-xs placeholder-slate-500"
                 value={searchProfile}
                 onChange={(e) => setSearchProfile(e.target.value)}
               />
             </div>
           </div>
 
-          {/* ตารางโปรไฟล์ */}
-          <div className="overflow-x-auto rounded-2xl border border-slate-900">
+          {/* TABLE RESPONSIVE TRANSFORMATION (Part 4, Rule 5 of UXUI.md) */}
+          
+          {/* 1. Desktop View Table */}
+          <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-900">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-900">
@@ -1157,7 +1204,7 @@ export default function SuperAdminPage() {
                           p.role === "super_admin"
                             ? "bg-purple-500/20 text-purple-400 border border-purple-500/10"
                             : p.role === "admin"
-                            ? "bg-red-500/20 text-red-400 border border-red-500/10"
+                            ? "bg-rose-500/20 text-rose-400 border border-rose-500/10"
                             : p.role === "staff"
                             ? "bg-teal-500/20 text-teal-400 border border-teal-500/10"
                             : "bg-blue-500/20 text-blue-400 border border-blue-500/10"
@@ -1165,7 +1212,7 @@ export default function SuperAdminPage() {
                           {p.role.toUpperCase()}
                         </span>
                       </td>
-                      <td className="p-4 text-slate-300 font-medium">
+                      <td className="p-4 text-slate-300 font-semibold">
                         {wsName}
                       </td>
                       <td className="p-4 text-center">
@@ -1186,7 +1233,7 @@ export default function SuperAdminPage() {
                           {p.role !== "super_admin" && (
                             <button
                               onClick={() => handleDeleteProfile(p.id, p.email)}
-                              className="p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-lg border border-red-500/10 transition-colors"
+                              className="p-1.5 text-rose-400 hover:text-rose-300 bg-rose-500/5 hover:bg-rose-500/15 rounded-lg border border-rose-500/10 transition-colors"
                               title="ถอนสิทธิ์ผู้ใช้งาน"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1197,33 +1244,103 @@ export default function SuperAdminPage() {
                     </tr>
                   )
                 })}
-
-                {filteredProfiles.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="text-center p-8 text-slate-500 text-xs">
-                      ไม่พบข้อมูลรายชื่อบัญชีผู้ใช้ในระบบ
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
+
+          {/* 2. Mobile View Card List */}
+          <div className="block md:hidden space-y-4">
+            {filteredProfiles.map((p) => {
+              const wsName = workspaces.find((w) => w.id === p.workspace_id)?.name || "ไม่มีสังกัด (Global / Super Admin)"
+              return (
+                <div 
+                  key={p.id} 
+                  className="p-4 rounded-2xl bg-slate-950/40 border border-slate-900 hover:border-purple-500/20 transition-all duration-300 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-1.5 text-slate-200 font-semibold break-all text-xs">
+                        <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        {p.email}
+                      </div>
+                      {p.full_name && (
+                        <p className="text-xs text-slate-300">{p.full_name}</p>
+                      )}
+                    </div>
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
+                      p.role === "super_admin"
+                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/10"
+                        : p.role === "admin"
+                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/10"
+                        : p.role === "staff"
+                        ? "bg-teal-500/20 text-teal-400 border border-teal-500/10"
+                        : "bg-blue-500/20 text-blue-400 border border-blue-500/10"
+                    }`}>
+                      {p.role.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-slate-900/60 pt-2.5 text-slate-400">
+                    <div>
+                      <span className="text-[9px] text-slate-500 block">สังกัดตึก (Workspace)</span>
+                      <span className="text-slate-300 font-medium">{wsName}</span>
+                    </div>
+                    {p.phone && (
+                      <div>
+                        <span className="text-[9px] text-slate-500 block">เบอร์โทรศัพท์</span>
+                        <span className="text-slate-300 font-mono">{p.phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 border-t border-slate-900/60 pt-3">
+                    <button
+                      onClick={() => {
+                        setEditingProfile(p)
+                        setEditingProfileRole(p.role)
+                        setEditingProfileWorkspaceId(p.workspace_id)
+                        setEditingProfileFullName(p.full_name || "")
+                        setEditingProfilePhone(p.phone || "")
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs text-purple-400 hover:text-purple-300 bg-purple-500/5 hover:bg-purple-500/15 rounded-xl border border-purple-500/10 transition-all active:scale-95"
+                    >
+                      <Edit className="w-3.5 h-3.5" /> แก้ไขสิทธิ์
+                    </button>
+                    {p.role !== "super_admin" && (
+                      <button
+                        onClick={() => handleDeleteProfile(p.id, p.email)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs text-rose-400 hover:text-rose-300 bg-rose-500/5 hover:bg-rose-500/15 rounded-xl border border-rose-500/10 transition-all active:scale-95"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> ถอนสิทธิ์
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {filteredProfiles.length === 0 && (
+            <div className="text-center py-10 text-slate-500 text-xs">
+              ไม่พบข้อมูลรายชื่อบัญชีผู้ใช้ในระบบ
+            </div>
+          )}
         </div>
 
-        {/* Workspace Edit Modal */}
+        {/* Modal: Edit Workspace Name */}
         {editingWorkspace && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
-            <div className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-blue-600/10 rounded-full blur-[50px] pointer-events-none" />
+            <div className="w-full max-w-md backdrop-blur-md bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-purple-600/10 rounded-full blur-[50px] pointer-events-none" />
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 bg-blue-600/10 text-blue-400 rounded-xl border border-blue-500/20">
+                  <div className="p-3 bg-purple-600/10 text-purple-400 rounded-2xl border border-purple-500/20">
                     <Building className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-200">แก้ไขพื้นที่ทำงาน (Edit Workspace)</h3>
-                    <p className="text-[10px] text-slate-500">เปลี่ยนชื่อหอพักหรือตึกในระบบ</p>
+                    <p className="text-[10px] text-slate-500">เปลี่ยนชื่อหอพักหรืออาคารในระบบ</p>
                   </div>
                 </div>
                 <button
@@ -1242,7 +1359,7 @@ export default function SuperAdminPage() {
                     type="text"
                     required
                     placeholder="ระบุชื่อหอพัก..."
-                    className="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-xs transition-colors"
+                    className="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
                     value={editingWorkspaceName}
                     onChange={(e) => setEditingWorkspaceName(e.target.value)}
                   />
@@ -1259,12 +1376,12 @@ export default function SuperAdminPage() {
                   <button
                     type="submit"
                     disabled={updatingWorkspace}
-                    className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-blue-600/10"
+                    className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-purple-600/10"
                   >
                     {updatingWorkspace ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      "บันทึกการเปลี่ยนแปลง"
+                      "บันทึกข้อมูล"
                     )}
                   </button>
                 </div>
@@ -1273,19 +1390,19 @@ export default function SuperAdminPage() {
           </div>
         )}
 
-        {/* Profile Edit Modal */}
+        {/* Modal: Edit Profile & Role Access */}
         {editingProfile && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
-            <div className="w-full max-w-lg glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-full max-w-lg backdrop-blur-md bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-purple-600/10 rounded-full blur-[50px] pointer-events-none" />
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 bg-purple-600/10 text-purple-400 rounded-xl border border-purple-500/20">
-                    <Users className="w-5 h-5" />
+                  <div className="p-3 bg-purple-600/10 text-purple-400 rounded-2xl border border-purple-500/20">
+                    <Users className="w-5 h-5 animate-pulse" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-200">แก้ไขข้อมูลผู้ใช้งานและสิทธิ์ (Edit Profile)</h3>
+                    <h3 className="text-base font-bold text-slate-200">แก้ไขข้อมูลผู้ใช้งานและสิทธิ์</h3>
                     <p className="text-[10px] text-slate-500">จัดการอีเมล: {editingProfile.email}</p>
                   </div>
                 </div>
@@ -1344,18 +1461,18 @@ export default function SuperAdminPage() {
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { role: "super_admin", label: "Super Admin" },
-                      { role: "admin", label: "แอดมิน (เจ้าของ)" },
-                      { role: "staff", label: "ผู้ช่วย (สต๊าฟ)" },
+                      { role: "admin", label: "แอดมิน" },
+                      { role: "staff", label: "ผู้ช่วย" },
                       { role: "tenant", label: "ผู้เช่าตึก" }
                     ].map((item) => (
                       <button
                         key={item.role}
                         type="button"
                         onClick={() => setEditingProfileRole(item.role as any)}
-                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold border transition-all ${
+                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-bold border transition-all duration-200 ${
                           editingProfileRole === item.role
-                            ? "bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/10"
-                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                            ? "bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/15"
+                            : "bg-slate-900 border-slate-800/85 text-slate-400 hover:text-slate-200 hover:bg-slate-850"
                         }`}
                       >
                         {item.label}
@@ -1380,7 +1497,7 @@ export default function SuperAdminPage() {
                     {updatingProfile ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      "บันทึกการเปลี่ยนแปลง"
+                      "บันทึกข้อมูล"
                     )}
                   </button>
                 </div>
