@@ -58,6 +58,12 @@ export default function UnifiedBillingPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
   const [commonFee, setCommonFee] = useState<number>(50)
+  const [elecRate, setElecRate] = useState<number>(7)
+  const [waterRate, setWaterRate] = useState<number>(18)
+  const [waterMinChecked, setWaterMinChecked] = useState<boolean>(true)
+  const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
+  const [electricMinChecked, setElectricMinChecked] = useState<boolean>(true)
+  const [electricMinUnit, setElectricMinUnit] = useState<number>(10)
   
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
@@ -69,10 +75,12 @@ export default function UnifiedBillingPage() {
   const [waterUnitsManual, setWaterUnitsManual] = useState(10)
 
   const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
-  const elecRate = 7 // 7 บาทต่อหน่วย
-  const waterRate = 18 // 18 บาทต่อหน่วย
-  const computedElecCost = elecUnitsManual <= 10 ? 80 : elecUnitsManual * elecRate
-  const computedWaterCost = waterUnitsManual <= 3 ? 51 : waterUnitsManual * waterRate
+  const computedElecCost = electricMinChecked && elecUnitsManual <= electricMinUnit
+    ? electricMinUnit * elecRate
+    : elecUnitsManual * elecRate
+  const computedWaterCost = waterMinChecked && waterUnitsManual <= waterMinUnit
+    ? waterMinUnit * waterRate
+    : waterUnitsManual * waterRate
   const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee
 
   const getPreviousCycle = (cycle: string) => {
@@ -279,9 +287,20 @@ export default function UnifiedBillingPage() {
 
   useEffect(() => {
     const savedCommonFee = localStorage.getItem("horset_common_fee")
-    if (savedCommonFee) {
-      setCommonFee(Number(savedCommonFee))
-    }
+    const savedWaterRate = localStorage.getItem("horset_water_rate")
+    const savedElectricRate = localStorage.getItem("horset_electric_rate")
+    const savedWaterMinChecked = localStorage.getItem("horset_water_min_checked")
+    const savedWaterMinUnit = localStorage.getItem("horset_water_min_unit")
+    const savedElectricMinChecked = localStorage.getItem("horset_electric_min_checked")
+    const savedElectricMinUnit = localStorage.getItem("horset_electric_min_unit")
+
+    if (savedCommonFee) setCommonFee(Number(savedCommonFee))
+    if (savedWaterRate) setWaterRate(Number(savedWaterRate))
+    if (savedElectricRate) setElecRate(Number(savedElectricRate))
+    if (savedWaterMinChecked) setWaterMinChecked(savedWaterMinChecked === "true")
+    if (savedWaterMinUnit) setWaterMinUnit(Number(savedWaterMinUnit))
+    if (savedElectricMinChecked) setElectricMinChecked(savedElectricMinChecked === "true")
+    if (savedElectricMinUnit) setElectricMinUnit(Number(savedElectricMinUnit))
   }, [])
 
   const showToast = (msg: string) => {
@@ -415,8 +434,12 @@ export default function UnifiedBillingPage() {
 
     const eUnits = (elecVal as number) - item.elecPrev
     const wUnits = (waterVal as number) - item.waterPrev
-    const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
-    const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
+    const elecCost = electricMinChecked && eUnits <= electricMinUnit
+      ? electricMinUnit * elecRate
+      : eUnits * elecRate
+    const waterCost = waterMinChecked && wUnits <= waterMinUnit
+      ? waterMinUnit * waterRate
+      : wUnits * waterRate
     const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
     if (isDemo) {
@@ -557,8 +580,12 @@ export default function UnifiedBillingPage() {
         const waterVal = Number(item.waterCurr)
         const eUnits = elecVal - item.elecPrev
         const wUnits = waterVal - item.waterPrev
-        const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
-        const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
+        const elecCost = electricMinChecked && eUnits <= electricMinUnit
+          ? electricMinUnit * elecRate
+          : eUnits * elecRate
+        const waterCost = waterMinChecked && wUnits <= waterMinUnit
+          ? waterMinUnit * waterRate
+          : wUnits * waterRate
         const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
         // 1. มิเตอร์
@@ -611,8 +638,12 @@ export default function UnifiedBillingPage() {
         const waterVal = Number(item.waterCurr)
         const eUnits = elecVal - item.elecPrev
         const wUnits = waterVal - item.waterPrev
-        const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
-        const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
+        const elecCost = electricMinChecked && eUnits <= electricMinUnit
+          ? electricMinUnit * elecRate
+          : eUnits * elecRate
+        const waterCost = waterMinChecked && wUnits <= waterMinUnit
+          ? waterMinUnit * waterRate
+          : wUnits * waterRate
         const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
         // 1. บันทึกเลขมิเตอร์
@@ -672,13 +703,17 @@ export default function UnifiedBillingPage() {
         billingCycle: billingCycle === "2026-06" ? "มิถุนายน 2026" : "พฤษภาคม 2026",
         baseRent: item.baseRent,
         electricUnits: elecUnitsUsed,
-        electricRate: 7,
+        electricRate: elecRate,
         waterUnits: waterUnitsUsed,
-        waterRate: 18,
+        waterRate: waterRate,
         commonFee,
+        waterMinChecked,
+        waterMinUnit,
+        electricMinChecked,
+        electricMinUnit,
         amount: item.billAmount || (() => {
-          const elecCost = elecUnitsUsed <= 10 ? 80 : elecUnitsUsed * 7
-          const waterCost = waterUnitsUsed <= 3 ? 51 : waterUnitsUsed * 18
+          const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+          const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
           return item.baseRent + elecCost + waterCost + commonFee
         })(),
         promptPayId,
@@ -913,13 +948,13 @@ export default function UnifiedBillingPage() {
                   const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
                   const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - item.elecPrev : 0
                   const elecCost = hasElecCurr && elecUnitsUsed >= 0
-                    ? (elecUnitsUsed <= 10 ? 80 : elecUnitsUsed * elecRate)
+                    ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                     : 0
 
                   const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
                   const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - item.waterPrev : 0
                   const waterCost = hasWaterCurr && waterUnitsUsed >= 0
-                    ? (waterUnitsUsed <= 3 ? 51 : waterUnitsUsed * waterRate)
+                    ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
                   
                   // คำนวณยอดเงินเรียลไทม์
@@ -972,7 +1007,7 @@ export default function UnifiedBillingPage() {
                         </div>
                         <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
                           {hasElecCurr && elecUnitsUsed >= 0 
-                            ? `${elecCost.toLocaleString()}.- ${elecUnitsUsed <= 10 ? "(ขั้นต่ำ)" : ""}` 
+                            ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                             : "-"}
                         </div>
                       </td>
@@ -1007,7 +1042,7 @@ export default function UnifiedBillingPage() {
                         </div>
                         <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
                           {hasWaterCurr && waterUnitsUsed >= 0 
-                            ? `${waterCost.toLocaleString()}.- ${waterUnitsUsed <= 3 ? "(ขั้นต่ำ)" : ""}` 
+                            ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
                             : "-"}
                         </div>
                       </td>
@@ -1286,17 +1321,17 @@ export default function UnifiedBillingPage() {
                 <div className="flex justify-between text-slate-400">
                   <span>ค่าไฟฟ้า ({elecUnitsManual} หน่วย):</span>
                   <span>
-                    {elecUnitsManual <= 10 
-                      ? "80 บาท (ขั้นต่ำ 10 หน่วย)" 
-                      : `${(elecUnitsManual * elecRate).toLocaleString()} บาท (หน่วยละ 7.-)`}
+                    {electricMinChecked && elecUnitsManual <= electricMinUnit 
+                      ? `${(electricMinUnit * elecRate).toLocaleString()} บาท (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
+                      : `${(elecUnitsManual * elecRate).toLocaleString()} บาท (หน่วยละ ${elecRate}.-)`}
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>ค่าน้ำประปา ({waterUnitsManual} หน่วย):</span>
                   <span>
-                    {waterUnitsManual <= 3 
-                      ? "51 บาท (ขั้นต่ำ 3 หน่วย)" 
-                      : `${(waterUnitsManual * waterRate).toLocaleString()} บาท (หน่วยละ 18.-)`}
+                    {waterMinChecked && waterUnitsManual <= waterMinUnit 
+                      ? `${(waterMinUnit * waterRate).toLocaleString()} บาท (ขั้นต่ำ ${waterMinUnit} หน่วย)` 
+                      : `${(waterUnitsManual * waterRate).toLocaleString()} บาท (หน่วยละ ${waterRate}.-)`}
                   </span>
                 </div>
                 <div className="h-px bg-slate-800 my-1.5" />

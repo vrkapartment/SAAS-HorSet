@@ -12,6 +12,12 @@ export interface FinanceSettings {
   promptpay_id: string
   promptpay_name: string
   common_fee: number
+  water_rate: number
+  electric_rate: number
+  water_min_checked: boolean
+  water_min_unit: number
+  electric_min_checked: boolean
+  electric_min_unit: number
 }
 
 /**
@@ -23,7 +29,7 @@ export async function getFinanceSettings(workspaceId: string) {
 
     const { data, error } = await supabase
       .from("workspaces")
-      .select("tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee")
+      .select("tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
       .eq("id", workspaceId)
       .single()
 
@@ -55,7 +61,13 @@ export async function getFinanceSettings(workspaceId: string) {
         promptpay_type: (data.promptpay_type as "phone" | "national_id") || "phone",
         promptpay_id: data.promptpay_id || "",
         promptpay_name: data.promptpay_name || "",
-        common_fee: Number(data.common_fee || 50)
+        common_fee: Number(data.common_fee || 50),
+        water_rate: Number(data.water_rate !== null && data.water_rate !== undefined ? data.water_rate : 18),
+        electric_rate: Number(data.electric_rate !== null && data.electric_rate !== undefined ? data.electric_rate : 7),
+        water_min_checked: Boolean(data.water_min_checked !== null && data.water_min_checked !== undefined ? data.water_min_checked : true),
+        water_min_unit: Number(data.water_min_unit !== null && data.water_min_unit !== undefined ? data.water_min_unit : 3),
+        electric_min_checked: Boolean(data.electric_min_checked !== null && data.electric_min_checked !== undefined ? data.electric_min_checked : true),
+        electric_min_unit: Number(data.electric_min_unit !== null && data.electric_min_unit !== undefined ? data.electric_min_unit : 10)
       } as FinanceSettings 
     }
   } catch (error) {
@@ -107,7 +119,13 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         promptpay_type: settings.promptpay_type,
         promptpay_id: settings.promptpay_id.trim(),
         promptpay_name: settings.promptpay_name.trim(),
-        common_fee: Number(settings.common_fee)
+        common_fee: Number(settings.common_fee),
+        water_rate: Number(settings.water_rate),
+        electric_rate: Number(settings.electric_rate),
+        water_min_checked: Boolean(settings.water_min_checked),
+        water_min_unit: Number(settings.water_min_unit),
+        electric_min_checked: Boolean(settings.electric_min_checked),
+        electric_min_unit: Number(settings.electric_min_unit)
       })
       .eq("id", workspaceId)
 

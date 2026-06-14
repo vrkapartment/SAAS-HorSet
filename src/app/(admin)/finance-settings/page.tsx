@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
-import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2 } from "lucide-react"
+import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2, Droplet, Zap, Building, Sliders } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
 
 export default function FinanceSettingsPage() {
@@ -16,6 +16,14 @@ export default function FinanceSettingsPage() {
   const [promptPayId, setPromptPayId] = useState("0899999999")
   const [promptPayName, setPromptPayName] = useState("สมเจตน์ แสนสุข")
   const [commonFee, setCommonFee] = useState<number>(50)
+
+  // สำหรับราคาหน่วย ค่าน้ำ ค่าไฟ และขั้นต่ำ
+  const [waterRate, setWaterRate] = useState<number>(18)
+  const [electricRate, setElectricRate] = useState<number>(7)
+  const [waterMinChecked, setWaterMinChecked] = useState<boolean>(true)
+  const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
+  const [electricMinChecked, setElectricMinChecked] = useState<boolean>(true)
+  const [electricMinUnit, setElectricMinUnit] = useState<number>(10)
 
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -43,6 +51,12 @@ export default function FinanceSettingsPage() {
           setPromptPayId(res.data.promptpay_id)
           setPromptPayName(res.data.promptpay_name)
           setCommonFee(res.data.common_fee)
+          setWaterRate(res.data.water_rate)
+          setElectricRate(res.data.electric_rate)
+          setWaterMinChecked(res.data.water_min_checked)
+          setWaterMinUnit(res.data.water_min_unit)
+          setElectricMinChecked(res.data.electric_min_checked)
+          setElectricMinUnit(res.data.electric_min_unit)
           setIsDatabaseBacked(true)
         } else {
           // หากฐานข้อมูลไม่พบคอลัมน์ (fallback Mode) หรือล้มเหลว ให้ใช้ข้อมูลเก่าจาก localStorage
@@ -58,6 +72,12 @@ export default function FinanceSettingsPage() {
           const savedPPId = localStorage.getItem("horset_promptpay_id")
           const savedPPName = localStorage.getItem("horset_promptpay_name")
           const savedCommonFee = localStorage.getItem("horset_common_fee")
+          const savedWaterRate = localStorage.getItem("horset_water_rate")
+          const savedElectricRate = localStorage.getItem("horset_electric_rate")
+          const savedWaterMinChecked = localStorage.getItem("horset_water_min_checked")
+          const savedWaterMinUnit = localStorage.getItem("horset_water_min_unit")
+          const savedElectricMinChecked = localStorage.getItem("horset_electric_min_checked")
+          const savedElectricMinUnit = localStorage.getItem("horset_electric_min_unit")
 
           if (savedFirstName) setFirstName(savedFirstName)
           if (savedLastName) setLastName(savedLastName)
@@ -68,6 +88,12 @@ export default function FinanceSettingsPage() {
           if (savedPPId) setPromptPayId(savedPPId)
           if (savedPPName) setPromptPayName(savedPPName)
           if (savedCommonFee) setCommonFee(Number(savedCommonFee))
+          if (savedWaterRate) setWaterRate(Number(savedWaterRate))
+          if (savedElectricRate) setElectricRate(Number(savedElectricRate))
+          if (savedWaterMinChecked) setWaterMinChecked(savedWaterMinChecked === "true")
+          if (savedWaterMinUnit) setWaterMinUnit(Number(savedWaterMinUnit))
+          if (savedElectricMinChecked) setElectricMinChecked(savedElectricMinChecked === "true")
+          if (savedElectricMinUnit) setElectricMinUnit(Number(savedElectricMinUnit))
         }
       } catch (err) {
         console.error("Failed to load settings:", err)
@@ -111,7 +137,13 @@ export default function FinanceSettingsPage() {
         promptpay_type: promptPayType,
         promptpay_id: cleanedPPId,
         promptpay_name: promptPayName,
-        common_fee: commonFee
+        common_fee: commonFee,
+        water_rate: waterRate,
+        electric_rate: electricRate,
+        water_min_checked: waterMinChecked,
+        water_min_unit: waterMinUnit,
+        electric_min_checked: electricMinChecked,
+        electric_min_unit: electricMinUnit
       }
 
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
@@ -127,6 +159,12 @@ export default function FinanceSettingsPage() {
         localStorage.setItem("horset_promptpay_id", cleanedPPId)
         localStorage.setItem("horset_promptpay_name", promptPayName)
         localStorage.setItem("horset_common_fee", commonFee.toString())
+        localStorage.setItem("horset_water_rate", waterRate.toString())
+        localStorage.setItem("horset_electric_rate", electricRate.toString())
+        localStorage.setItem("horset_water_min_checked", waterMinChecked.toString())
+        localStorage.setItem("horset_water_min_unit", waterMinUnit.toString())
+        localStorage.setItem("horset_electric_min_checked", electricMinChecked.toString())
+        localStorage.setItem("horset_electric_min_unit", electricMinUnit.toString())
 
         showToast(res.fallback ? "บันทึกในอุปกรณ์นี้สำเร็จเรียบร้อยแล้ว!" : "บันทึกข้อมูลเข้าสู่เซิร์ฟเวอร์ระบบคลาวด์สำเร็จเรียบร้อย!")
       } else {
@@ -262,7 +300,7 @@ export default function FinanceSettingsPage() {
 
           {/* คอลัมน์ขวา: พร้อมเพย์และอัตราส่วนกลาง */}
           <div className="flex flex-col gap-6">
-            <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-6 flex-1">
+            <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-6">
               <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-900 pb-3">
                 <CreditCard className="w-4 h-4 text-teal-400" /> ตั้งค่าระบบรับเงินพร้อมเพย์ (PromptPay QR)
               </h3>
@@ -327,28 +365,158 @@ export default function FinanceSettingsPage() {
                 />
               </div>
 
-              <div className="space-y-1.5 border-t border-slate-900/60 pt-4 mt-4">
-                <label className="text-xs text-slate-300 font-bold block">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    value={commonFee}
-                    onChange={(e) => setCommonFee(Number(e.target.value))}
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  ค่าส่วนกลางคงที่รายเดือน สำหรับนำไปบวกเพิ่มในใบแจ้งหนี้ทุกห้องพักอัตโนมัติ
-                </p>
-              </div>
-
               <div className="p-4 bg-teal-500/5 border border-teal-500/10 rounded-xl flex items-start gap-3">
                 <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
                 <div className="text-[10px] text-slate-400 leading-relaxed">
                   <span className="font-bold text-slate-300">สแกนจ่ายได้จริง:</span> ข้อมูลนี้จะนำไปประกอบการสร้าง QR Code ด้วยรูปแบบมาตรฐาน EMVCo ของประเทศไทยโดยตรง เพื่อให้ผู้เช่าสามารถนำโทรศัพท์ไปสแกนและชำระค่าเช่าเข้าบัญชีคุณได้ทันทีในยอดสุทธิที่ถูกต้อง
+                </div>
+              </div>
+            </div>
+
+            {/* กล่องอัตราค่าสาธารณูปโภคและค่าบริการส่วนกลาง */}
+            <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-6">
+              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-900 pb-3">
+                <Sliders className="w-4 h-4 text-blue-400" /> อัตราสาธารณูปโภคและค่าบริการส่วนกลาง
+              </h3>
+
+              {/* ค่าน้ำประปา */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Droplet className="w-4 h-4 text-blue-400" /> ค่าน้ำประปา (Water Utility)
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-slate-400 font-medium">ราคาต่อหน่วย (บาท / หน่วย)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        step="0.01"
+                        placeholder="18"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 font-mono text-sm transition-all"
+                        value={waterRate}
+                        onChange={(e) => setWaterRate(Number(e.target.value))}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-end space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
+                        checked={waterMinChecked}
+                        onChange={(e) => setWaterMinChecked(e.target.checked)}
+                      />
+                      <span className="text-xs text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                    </label>
+                  </div>
+                </div>
+
+                {waterMinChecked && (
+                  <div className="p-3 bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-[11px] text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่าน้ำประปา</label>
+                    <div className="relative max-w-[200px]">
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 font-mono text-sm transition-all"
+                        value={waterMinUnit}
+                        onChange={(e) => setWaterMinUnit(Number(e.target.value))}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-semibold">หน่วย</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      * หากใช้น้ำประปาไม่ถึง {waterMinUnit} หน่วย ระบบจะคิดเหมาจ่ายเทียบเท่า {waterMinUnit} หน่วย ({waterMinUnit * waterRate} บาท)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* ค่าไฟฟ้า */}
+              <div className="space-y-4 border-t border-slate-900/40 pt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Zap className="w-4 h-4 text-amber-400" /> ค่ากระแสไฟฟ้า (Electricity Utility)
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-slate-400 font-medium">ราคาต่อหน่วย (บาท / หน่วย)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        step="0.01"
+                        placeholder="7"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-200 font-mono text-sm transition-all"
+                        value={electricRate}
+                        onChange={(e) => setElectricRate(Number(e.target.value))}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-end space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
+                        checked={electricMinChecked}
+                        onChange={(e) => setElectricMinChecked(e.target.checked)}
+                      />
+                      <span className="text-xs text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                    </label>
+                  </div>
+                </div>
+
+                {electricMinChecked && (
+                  <div className="p-3 bg-amber-950/20 border border-amber-500/10 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-[11px] text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่ากระแสไฟฟ้า</label>
+                    <div className="relative max-w-[200px]">
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-200 font-mono text-sm transition-all"
+                        value={electricMinUnit}
+                        onChange={(e) => setElectricMinUnit(Number(e.target.value))}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-semibold">หน่วย</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      * หากใช้ไฟฟ้าไม่ถึง {electricMinUnit} หน่วย ระบบจะคิดเหมาจ่ายเทียบเท่า {electricMinUnit} หน่วย ({electricMinUnit * electricRate} บาท)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* ค่าบริการส่วนกลาง */}
+              <div className="space-y-2 border-t border-slate-900/40 pt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Building className="w-4 h-4 text-teal-400" /> ค่าบริการส่วนกลางคงที่
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="50"
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={commonFee}
+                      onChange={(e) => setCommonFee(Number(e.target.value))}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    ค่าส่วนกลางคงที่รายเดือน สำหรับนำไปบวกเพิ่มในใบแจ้งหนี้ทุกห้องพักอัตโนมัติ
+                  </p>
                 </div>
               </div>
             </div>

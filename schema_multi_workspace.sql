@@ -409,6 +409,12 @@ alter table public.workspaces add column if not exists promptpay_type text check
 alter table public.workspaces add column if not exists promptpay_id text;
 alter table public.workspaces add column if not exists promptpay_name text;
 alter table public.workspaces add column if not exists common_fee numeric default 50;
+alter table public.workspaces add column if not exists water_rate numeric default 18;
+alter table public.workspaces add column if not exists electric_rate numeric default 7;
+alter table public.workspaces add column if not exists water_min_checked boolean default true;
+alter table public.workspaces add column if not exists water_min_unit numeric default 3;
+alter table public.workspaces add column if not exists electric_min_checked boolean default true;
+alter table public.workspaces add column if not exists electric_min_unit numeric default 10;
 
 -- Drop policy if it exists
 drop policy if exists "Workspace admins can update their own workspace" on public.workspaces;

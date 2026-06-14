@@ -230,6 +230,10 @@ export interface BillPdfData {
   promptPayId: string
   promptPayName: string
   commonFee?: number
+  waterMinChecked?: boolean
+  waterMinUnit?: number
+  electricMinChecked?: boolean
+  electricMinUnit?: number
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -286,13 +290,24 @@ export async function generateBillPdf(data: BillPdfData) {
   // เนื้อหาในตาราง
   let y = 600
   const commonFee = data.commonFee !== undefined ? data.commonFee : 50
-  const isElecMin = data.electricUnits <= 10
-  const isWaterMin = data.waterUnits <= 3
-  const elecAmount = isElecMin ? 80 : data.electricUnits * data.electricRate
-  const waterAmount = isWaterMin ? 51 : data.waterUnits * data.waterRate
   
-  const elecDesc = isElecMin ? "2. ค่ากระแสไฟฟ้า (ขั้นต่ำ 10 หน่วย)" : "2. ค่ากระแสไฟฟ้า (Electricity Bill)"
-  const waterDesc = isWaterMin ? "3. ค่าน้ำประปา (ขั้นต่ำ 3 หน่วย)" : "3. ค่าน้ำประปา (Water Bill)"
+  const waterMinChecked = data.waterMinChecked !== undefined ? data.waterMinChecked : true
+  const waterMinUnit = data.waterMinUnit !== undefined ? data.waterMinUnit : 3
+  const electricMinChecked = data.electricMinChecked !== undefined ? data.electricMinChecked : true
+  const electricMinUnit = data.electricMinUnit !== undefined ? data.electricMinUnit : 10
+
+  const isElecMin = electricMinChecked && data.electricUnits <= electricMinUnit
+  const isWaterMin = waterMinChecked && data.waterUnits <= waterMinUnit
+
+  const elecAmount = isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate
+  const waterAmount = isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate
+  
+  const elecDesc = isElecMin 
+    ? `2. ค่ากระแสไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
+    : "2. ค่ากระแสไฟฟ้า (Electricity Bill)"
+  const waterDesc = isWaterMin 
+    ? `3. ค่าน้ำประปา (ขั้นต่ำ ${waterMinUnit} หน่วย)` 
+    : "3. ค่าน้ำประปา (Water Bill)"
 
   // รายการ 1: ค่าเช่าห้องพัก
   drawText("1. ค่าเช่าห้องพักหลัก (Base Room Rent)", 50, y, 9, rgb(0.2, 0.2, 0.2))
