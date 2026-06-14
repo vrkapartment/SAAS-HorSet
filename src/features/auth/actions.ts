@@ -167,4 +167,83 @@ export async function updateUserProfileAction(data: {
   }
 }
 
+/**
+ * ฟังก์ชันสำหรับการลงทะเบียนสมาชิกใหม่ด้วย Secret Code (เชิญชวน) ที่เจ็นโดย Super Admin
+ */
+export async function registerWithSecretCodeAction(data: {
+  email: string
+  password: string
+  fullName: string
+  phone: string
+  secretCode: string
+}) {
+  try {
+    const supabase = await createClient()
+
+    // 1. ตรวจสอบ Secret Code ในฐานข้อมูล
+    const { data: codeData, error: codeErr } = await supabase
+      .from("registration_codes")
+      .select("*")
+      .eq("code", data.secretCode.trim())
+      .single()
+
+    if (codeErr || !codeData) {
+      return { success: false, error: "ไม่พบรหัสเชิญชวนนี้ในระบบ กรุณาตรวจสอบความถูกต้อง" }
+    }
+
+    if (codeData.is_used) {
+      return { success: false, error: "รหัสเชิญชวนนี้ถูกใช้งานไปแล้ว" }
+    }
+
+    if (new Date(codeData.expires_at) < new Date()) {
+      return { success: false, error: "รหัสเชิญชวนนี้หมดอายุแล้ว (รหัสเชิญชวนมีอายุการใช้งาน 2 ชั่วโมง)" }
+    }
+
+    // 2. สมัครสมาชิกผ่าน Supabase Auth พร้อมระบุ role และ workspace_id ที่ล็อคไว้
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: data.email.trim(),
+      password: data.password,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`,
+        data: {
+          role: codeData.role,
+          full_name: data.fullName.trim(),
+          phone: data.phone.trim(),
+          workspace_id: codeData.workspace_id
+        }
+      }
+    })
+
+    if (authError) {
+      return { success: false, error: `สมัครสมาชิกไม่สำเร็จ: ${authError.message}` }
+    }
+
+    if (!authData.user) {
+      return { success: false, error: "สมัครสมาชิกไม่สำเร็จ: ไม่มีข้อมูลผู้ใช้งานที่สร้างขึ้น" }
+    }
+
+    // 3. ปรับสถานะ Secret Code ว่าถูกใช้แล้ว
+    const { error: updateErr } = await supabase
+      .from("registration_codes")
+      .update({
+        is_used: true,
+        used_by_email: data.email.trim()
+      })
+      .eq("code", data.secretCode.trim())
+
+    if (updateErr) {
+      console.error("Warning: Failed to mark code as used:", updateErr)
+    }
+
+    return { 
+      success: true, 
+      message: "สมัครสมาชิกและลงทะเบียนสิทธิ์ของคุณเรียบร้อยแล้ว! สามารถเข้าสู่ระบบได้ทันที" 
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลงทะเบียน"
+    return { success: false, error: errorMessage }
+  }
+}
+
+
 

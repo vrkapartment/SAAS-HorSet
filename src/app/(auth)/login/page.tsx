@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight } from "lucide-react"
 import { loginAction } from "@/features/auth/actions"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,6 +18,17 @@ export default function LoginPage() {
 
   // ตรวจสอบว่าระบบอยู่ในโหมดจำลอง (Demo Mode) หรือไม่
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+
+  // ดึงค่า email จาก URL Parameter ในกรณีที่มาจากการสมัครสมาชิกหน้า Register
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const emailParam = params.get("email")
+      if (emailParam) {
+        setEmail(emailParam)
+      }
+    }
+  }, [])
 
   const handleAutofill = (role: "admin" | "staff" | "tenant") => {
     setSelectedRole(role)
@@ -39,9 +51,18 @@ export default function LoginPage() {
     setError(null)
 
     if (isDemo) {
-      // หาบทบาทอัตโนมัติจากอีเมล หากผู้ใช้ไม่ได้กดปุ่มเลือกอัตโนมัติ
+      // ค้นหาผู้ใช้จาก localStorage ของ Demo Mode
+      const localProfiles = localStorage.getItem("horset_profiles")
+      const mockProfs = localProfiles ? JSON.parse(localProfiles) : []
+      const foundProfile = mockProfs.find((p: any) => p.email.toLowerCase() === email.trim().toLowerCase())
+
       let role = selectedRole
-      if (!role) {
+      let workspaceId = ""
+
+      if (foundProfile) {
+        role = foundProfile.role
+        workspaceId = foundProfile.workspace_id || ""
+      } else if (!role) {
         if (email.includes("admin")) {
           role = "admin"
         } else if (email.includes("staff")) {
@@ -49,7 +70,6 @@ export default function LoginPage() {
         } else {
           role = "tenant"
         }
-        setSelectedRole(role)
       }
 
       // จำลองการโหลด
@@ -58,10 +78,15 @@ export default function LoginPage() {
         if (role === "admin" && !show2FA) {
           // แอดมินต้องเปิดหน้า 2FA
           setShow2FA(true)
+          setSelectedRole(role)
         } else {
           // บทบาทอื่นนำทางไปหน้าหลักโดยตรง
           if (role) {
             document.cookie = `horset_user_role=${role}; path=/; max-age=86400`
+          }
+          if (workspaceId) {
+            localStorage.setItem("horset_current_workspace_id", workspaceId)
+            document.cookie = `horset_current_workspace_id=${workspaceId}; path=/; max-age=86400`
           }
           navigateToDashboardWithRole(role)
         }
@@ -78,6 +103,19 @@ export default function LoginPage() {
           if (role === "admin" && res.data.tfaEnabled && !show2FA) {
             setShow2FA(true)
           } else {
+            // ดึง workspace_id ล่าสุดของผู้ใช้ที่ล็อกอินจริงมาเก็บใน cookie/localStorage
+            const supabase = createClient()
+            const { data: profData } = await supabase
+              .from("profiles")
+              .select("workspace_id")
+              .eq("id", res.data.userId)
+              .single()
+            
+            if (profData?.workspace_id) {
+              localStorage.setItem("horset_current_workspace_id", profData.workspace_id)
+              document.cookie = `horset_current_workspace_id=${profData.workspace_id}; path=/; max-age=86400`
+            }
+            
             navigateToDashboardWithRole(role)
           }
         } else {
@@ -100,6 +138,18 @@ export default function LoginPage() {
         if (selectedRole) {
           document.cookie = `horset_user_role=${selectedRole}; path=/; max-age=86400`
         }
+        
+        // ถ้าเป็น Demo Mode และมี profile ใน localStorage ให้ดึง workspace_id มาเซ็ตด้วย
+        if (isDemo) {
+          const localProfiles = localStorage.getItem("horset_profiles")
+          const mockProfs = localProfiles ? JSON.parse(localProfiles) : []
+          const foundProfile = mockProfs.find((p: any) => p.email.toLowerCase() === email.trim().toLowerCase())
+          if (foundProfile?.workspace_id) {
+            localStorage.setItem("horset_current_workspace_id", foundProfile.workspace_id)
+            document.cookie = `horset_current_workspace_id=${foundProfile.workspace_id}; path=/; max-age=86400`
+          }
+        }
+        
         navigateToDashboardWithRole(selectedRole)
       }
     }, 1200)
@@ -216,7 +266,18 @@ export default function LoginPage() {
               )}
             </button>
 
-
+            <div className="text-center pt-2">
+              <p className="text-xs text-slate-500">
+                ยังไม่มีบัญชีผู้ใช้งานใช่หรือไม่?{" "}
+                <button
+                  type="button"
+                  onClick={() => router.push("/register")}
+                  className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline"
+                >
+                  สมัครสมาชิกใหม่ด้วยรหัสคำเชิญ (Secret Code)
+                </button>
+              </p>
+            </div>
           </form>
         ) : (
           <form onSubmit={handleVerify2FA} className="space-y-6">

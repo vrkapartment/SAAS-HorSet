@@ -343,3 +343,32 @@ begin
   return new;
 end;
 $$ language plpgsql security definer;
+
+
+-- =========================================================================
+-- 8. Create Registration Secret Codes Table
+-- =========================================================================
+create table if not exists public.registration_codes (
+  code text primary key,
+  workspace_id uuid references public.workspaces(id) on delete cascade not null,
+  role text check (role in ('admin', 'staff', 'tenant')) not null default 'tenant',
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '2 hours'),
+  is_used boolean not null default false,
+  used_by_email text
+);
+
+-- Enable RLS
+alter table public.registration_codes enable row level security;
+
+-- Policies for registration_codes
+create policy "Super Admins can manage registration codes"
+on public.registration_codes for all
+using (
+  exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+);
+
+create policy "Anyone can read registration codes for verification"
+on public.registration_codes for select
+using (true);
+

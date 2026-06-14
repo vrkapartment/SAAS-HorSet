@@ -21,7 +21,8 @@ import {
   Clock,
   Lock,
   Edit,
-  X
+  X,
+  Key
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { createWorkspaceUserAction } from "@/features/super-admin/actions"
@@ -41,6 +42,16 @@ interface ProfileItem {
   workspace_id: string | null
   workspace_name?: string
   created_at: string
+}
+
+interface RegistrationCode {
+  code: string
+  workspace_id: string
+  role: "admin" | "staff" | "tenant"
+  created_at: string
+  expires_at: string
+  is_used: boolean
+  used_by_email: string | null
 }
 
 export default function SuperAdminPage() {
@@ -83,6 +94,12 @@ export default function SuperAdminPage() {
   const [editingProfileFullName, setEditingProfileFullName] = useState("")
   const [editingProfilePhone, setEditingProfilePhone] = useState("")
   const [updatingProfile, setUpdatingProfile] = useState(false)
+
+  // Registration Secret Codes
+  const [registrationCodes, setRegistrationCodes] = useState<RegistrationCode[]>([])
+  const [genWorkspaceId, setGenWorkspaceId] = useState("")
+  const [genRole, setGenRole] = useState<"admin" | "staff" | "tenant">("tenant")
+  const [generatingCode, setGeneratingCode] = useState(false)
 
   // ตรวจสอบโหมดทดสอบ
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
@@ -130,6 +147,21 @@ export default function SuperAdminPage() {
             grantMap[g.workspace_id] = g.status
           })
           setSupportGrants(grantMap)
+        }
+
+        // 4. โหลดข้อมูลรหัสเชิญชวน (Registration Secret Codes)
+        const { data: codeData, error: codeError } = await supabase
+          .from("registration_codes")
+          .select("*")
+          .order("created_at", { ascending: false })
+
+        if (!codeError && codeData) {
+          setRegistrationCodes(codeData)
+        }
+
+        if (wsData && wsData.length > 0) {
+          if (!selectedWorkspaceId) setSelectedWorkspaceId(wsData[0].id)
+          if (!genWorkspaceId) setGenWorkspaceId(wsData[0].id)
         }
       } catch (err) {
         console.error(err)
@@ -198,6 +230,14 @@ export default function SuperAdminPage() {
       grantMap[ws.id] = localStorage.getItem(`horset_support_status_${ws.id}`) || "none"
     })
     setSupportGrants(grantMap)
+
+    // โหลดข้อมูลรหัสเชิญชวนแบบจำลอง
+    const localCodes = localStorage.getItem("horset_registration_codes")
+    const mockCodes: RegistrationCode[] = localCodes ? JSON.parse(localCodes) : []
+    setRegistrationCodes(mockCodes)
+    if (mockWs.length > 0 && !genWorkspaceId) {
+      setGenWorkspaceId(mockWs[0].id)
+    }
   }
 
   useEffect(() => {
@@ -492,6 +532,92 @@ export default function SuperAdminPage() {
       setResultSuccess(`✓ [Demo] อัปเดตข้อมูลและสิทธิ์ของผู้ใช้งาน ${editingProfile.email} สำเร็จ`)
       setEditingProfile(null)
       setUpdatingProfile(false)
+    }
+  }
+
+  // ฟังก์ชันสร้าง Secret Code สำหรับสมัครสมาชิก
+  const handleGenerateCode = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!genWorkspaceId) return
+
+    setGeneratingCode(true)
+    setError(null)
+    setResultSuccess(null)
+
+    // สร้าง Code รูปแบบ HS-XXXXXX
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    let randomPart = ""
+    for (let i = 0; i < 6; i++) {
+      randomPart += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    const newCodeStr = `HS-${randomPart}`
+
+    const createdAt = new Date()
+    const expiresAt = new Date(createdAt.getTime() + 2 * 60 * 60 * 1000) // 2 ชั่วโมง
+
+    const newCodeObj: RegistrationCode = {
+      code: newCodeStr,
+      workspace_id: genWorkspaceId,
+      role: genRole,
+      created_at: createdAt.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      is_used: false,
+      used_by_email: null
+    }
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error: genErr } = await supabase
+          .from("registration_codes")
+          .insert([newCodeObj])
+
+        if (genErr) throw genErr
+
+        setRegistrationCodes([newCodeObj, ...registrationCodes])
+        setResultSuccess(`✓ สร้าง Secret Code "${newCodeStr}" สำเร็จ (มีอายุใช้งาน 2 ชั่วโมง)`)
+      } catch (err: any) {
+        setError("ไม่สามารถบันทึก Secret Code ใน Supabase: " + err.message)
+      } finally {
+        setGeneratingCode(false)
+      }
+    } else {
+      // โหมด Demo
+      const updated = [newCodeObj, ...registrationCodes]
+      setRegistrationCodes(updated)
+      localStorage.setItem("horset_registration_codes", JSON.stringify(updated))
+      setResultSuccess(`✓ [Demo] สร้าง Secret Code "${newCodeStr}" สำเร็จ (มีอายุใช้งาน 2 ชั่วโมง)`)
+      setGeneratingCode(false)
+    }
+  }
+
+  // ฟังก์ชันลบ Secret Code
+  const handleDeleteCode = async (code: string) => {
+    if (!confirm(`คุณต้องการลบ Secret Code "${code}" ใช่หรือไม่?`)) return
+
+    setError(null)
+    setResultSuccess(null)
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error: delErr } = await supabase
+          .from("registration_codes")
+          .delete()
+          .eq("code", code)
+
+        if (delErr) throw delErr
+
+        setRegistrationCodes(registrationCodes.filter((c) => c.code !== code))
+        setResultSuccess(`✓ ลบ Secret Code ${code} เรียบร้อยแล้ว`)
+      } catch (err: any) {
+        setError("เกิดข้อผิดพลาดในการลบ Code: " + err.message)
+      }
+    } else {
+      const updated = registrationCodes.filter((c) => c.code !== code)
+      setRegistrationCodes(updated)
+      localStorage.setItem("horset_registration_codes", JSON.stringify(updated))
+      setResultSuccess(`✓ [Demo] ลบ Secret Code ${code} สำเร็จ`)
     }
   }
 
@@ -821,6 +947,139 @@ export default function SuperAdminPage() {
                   )}
                 </button>
               </form>
+            </div>
+
+            {/* ส่วนควบคุมสร้าง Secret Code สำหรับสมัครสมาชิก */}
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-200">สร้างรหัสเชิญชวน (Secret Invite Code)</h2>
+                  <p className="text-[11px] text-slate-500">รหัสลงทะเบียนล็อคสังกัดตึก มีอายุจำกัด 2 ชม.</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleGenerateCode} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium">สังกัดตึกที่กำหนด (Locked Workspace)</label>
+                  <select
+                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                    value={genWorkspaceId}
+                    onChange={(e) => setGenWorkspaceId(e.target.value)}
+                  >
+                    {workspaces.map((ws) => (
+                      <option key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์เมื่อสมัครสำเร็จ (Designated Role)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { role: "admin", label: "แอดมิน (เจ้าของ)" },
+                      { role: "staff", label: "ผู้ช่วย (สต๊าฟ)" },
+                      { role: "tenant", label: "ผู้เช่าตึก" }
+                    ].map((item) => (
+                      <button
+                        key={item.role}
+                        type="button"
+                        onClick={() => setGenRole(item.role as any)}
+                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold border transition-all ${
+                          genRole === item.role
+                            ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={generatingCode || !genWorkspaceId}
+                  className="w-full mt-2 glow-btn bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10"
+                >
+                  {generatingCode ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" /> สร้าง Secret Code (มีอายุ 2 ชม.)
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* รายการรหัสเชิญชวน */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-semibold text-slate-300">รายการรหัสเชิญชวนทั้งหมด</h3>
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {registrationCodes.map((item) => {
+                    const wsName = workspaces.find((w) => w.id === item.workspace_id)?.name || "ตึกที่ถูกลบ"
+                    const isExpired = new Date(item.expires_at) < new Date()
+                    return (
+                      <div
+                        key={item.code}
+                        className="p-3 rounded-xl bg-slate-950/60 border border-slate-900 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded text-xs select-all">
+                              {item.code}
+                            </span>
+                            <span className="text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded border border-slate-800 font-bold">
+                              {item.role.toUpperCase()}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            ตึก: {wsName}
+                          </p>
+                          <p className="text-[9px] text-slate-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> หมดอายุ: {new Date(item.expires_at).toLocaleTimeString("th-TH")}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {item.is_used ? (
+                            <span className="text-[9px] bg-teal-500/10 border border-teal-500/25 text-teal-400 font-semibold px-2 py-0.5 rounded-lg">
+                              ใช้แล้ว ({item.used_by_email?.split("@")[0]})
+                            </span>
+                          ) : isExpired ? (
+                            <span className="text-[9px] bg-red-500/10 border border-red-500/25 text-red-400 font-semibold px-2 py-0.5 rounded-lg">
+                              หมดอายุ
+                            </span>
+                          ) : (
+                            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-semibold px-2 py-0.5 rounded-lg animate-pulse">
+                              พร้อมใช้
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCode(item.code)}
+                            className="p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-lg border border-red-500/10 transition-colors"
+                            title="ลบ Code"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {registrationCodes.length === 0 && (
+                    <div className="text-center py-6 text-slate-500 text-xs">
+                      ยังไม่มีรหัสเชิญชวนในระบบ
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
