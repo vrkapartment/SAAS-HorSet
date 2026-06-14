@@ -63,13 +63,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "staff"]
     },
     {
-      name: "จดมิเตอร์ไฟ/น้ำ",
-      path: "/meter",
-      icon: Gauge,
-      roles: ["admin", "staff"]
-    },
-    {
-      name: "สร้างบิลและสแกนเงิน",
+      name: "จดมิเตอร์ & จัดการบิล",
       path: "/billing",
       icon: Receipt,
       roles: ["admin", "staff"]
@@ -244,8 +238,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 {pathname === "/dashboard" && "หน้าแรกภาพรวม"}
                 {pathname === "/rooms" && "ระบบจัดการห้องพัก"}
                 {pathname === "/tenants" && "ระบบจัดการข้อมูลสัญญาผู้เช่า"}
-                {pathname === "/meter" && "ระบบบันทึกค่ามิเตอร์น้ำไฟ"}
-                {pathname === "/billing" && "ระบบสร้างใบแจ้งหนี้ / ตรวจสลิป"}
+                {pathname === "/meter" && "ระบบจดมิเตอร์และจัดการบิล"}
+                {pathname === "/billing" && "ระบบจดมิเตอร์และจัดการบิล"}
                 {pathname === "/tax" && "ระบบรายงานภาษีอพาร์ทเมนท์"}
                 {pathname === "/finance-settings" && "ตั้งค่าการเงินและพร้อมเพย์"}
               </h1>
