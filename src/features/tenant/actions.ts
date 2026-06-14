@@ -244,7 +244,10 @@ export async function getTenantPortalData() {
         rooms (
           id,
           room_number,
-          base_rent
+          base_rent,
+          room_types (
+            default_rent
+          )
         )
       `)
       .eq("tenant_phone", profile.phone)
@@ -300,7 +303,7 @@ export async function getTenantPortalData() {
         profile,
         roomNumber: roomNumber || null,
         tenantName: tenant.tenant_name || profile.full_name,
-        baseRent: tenant.rooms?.base_rent ? Number(tenant.rooms.base_rent) : 0,
+        baseRent: tenant.rooms?.room_types ? Number((tenant.rooms as any).room_types.default_rent) : (tenant.rooms?.base_rent ? Number(tenant.rooms.base_rent) : 0),
         bills: formattedBills
       }
     }

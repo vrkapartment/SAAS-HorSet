@@ -15,7 +15,8 @@ import {
   X,
   User,
   Building,
-  Landmark
+  Landmark,
+  Database
 } from "lucide-react"
 
 interface DashboardLayoutProps {
@@ -83,6 +84,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       name: "ตั้งค่าการเงิน",
       path: "/finance-settings",
       icon: Landmark,
+      roles: ["admin"]
+    },
+    {
+      name: "เช็คการเชื่อมต่อ Supabase",
+      path: "/test-connection",
+      icon: Database,
       roles: ["admin"]
     }
   ]

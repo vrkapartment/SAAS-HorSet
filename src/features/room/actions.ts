@@ -102,7 +102,7 @@ export async function getRooms() {
         id: room.id,
         roomNumber: room.room_number,
         status: room.status,
-        baseRent: Number(room.base_rent),
+        baseRent: room.room_types ? Number(room.room_types.default_rent) : Number(room.base_rent),
         tenantName: tenant ? tenant.tenant_name : null,
         tenantPhone: tenant ? tenant.tenant_phone : null,
         roomTypeId: room.room_type_id,

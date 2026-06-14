@@ -447,16 +447,16 @@ export default function RoomsPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-medium">ราคาค่าเช่าพื้นฐาน (บาท / เดือน)</label>
+                <label className="text-xs text-slate-400 font-medium">ค่าเช่าสุทธิ (บาท / เดือน)</label>
                 <input
                   type="number"
-                  required
-                  placeholder="ระบบจะดึงจากประเภทห้อง หรือคุณกำหนดเองได้"
-                  className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-xs transition-colors"
+                  readOnly
+                  disabled
+                  placeholder="ระบบจะดึงจากประเภทห้องพักที่เลือกโดยอัตโนมัติ"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-900 rounded-xl text-slate-400 text-xs transition-colors cursor-not-allowed font-medium"
                   value={newBaseRent}
-                  onChange={(e) => setNewBaseRent(e.target.value ? Number(e.target.value) : "")}
                 />
-                <span className="text-[10px] text-slate-500 block">ราคาที่บันทึกจริง สามารถกำหนดให้ต่างจากราคาเริ่มต้นของประเภทห้องได้</span>
+                <span className="text-[10px] text-indigo-400 block">🔒 ถูกบังคับให้ตรงตามราคามาตรฐานของประเภทห้องพักเท่านั้น</span>
               </div>
 
               <div className="flex gap-3 pt-3">

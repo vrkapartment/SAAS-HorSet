@@ -22,12 +22,6 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push("/test-connection")}
-            className="hidden sm:inline-flex bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold py-2.5 px-5 rounded-full transition-all"
-          >
-            เช็คการเชื่อมต่อ Supabase
-          </button>
-          <button
             onClick={() => router.push("/login")}
             className="glow-btn bg-slate-900 border border-slate-800 hover:border-blue-500 text-blue-400 hover:text-white text-xs font-semibold py-2.5 px-5 rounded-full transition-all"
           >

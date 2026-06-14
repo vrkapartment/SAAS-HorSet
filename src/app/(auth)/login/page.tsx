@@ -151,15 +151,8 @@ export default function LoginPage() {
 
             {/* บาจแสดงสถานะเชื่อมต่อ Supabase */}
             {isDemo ? (
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-[11px] flex justify-between items-center mb-4">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-[11px] flex items-center gap-2 mb-4">
                 <span>⚠️ โหมดจำลอง (ยังไม่ได้เชื่อมต่อ Supabase)</span>
-                <button 
-                  type="button"
-                  onClick={() => router.push("/test-connection")}
-                  className="text-blue-400 hover:text-blue-300 font-bold underline"
-                >
-                  เชื่อมต่อ
-                </button>
               </div>
             ) : (
               <div className="p-3 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl text-[11px] flex items-center gap-2 mb-4">
@@ -223,45 +216,7 @@ export default function LoginPage() {
               )}
             </button>
 
-            {/* ส่วนลัดสำหรับการทดสอบ (Autofill Buttons) */}
-            <div className="pt-6 border-t border-slate-900">
-              <p className="text-xs text-slate-400 font-medium mb-3 text-center">ทดสอบเข้าชมหน้าตา UI แต่ละ Role</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleAutofill("admin")}
-                  className={`py-2 px-1 text-[11px] font-medium rounded-lg transition-all border ${
-                    selectedRole === "admin"
-                      ? "bg-blue-600/20 border-blue-500 text-blue-400"
-                      : "bg-slate-900/40 border-slate-800 text-slate-400 hover:border-slate-700"
-                  }`}
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAutofill("staff")}
-                  className={`py-2 px-1 text-[11px] font-medium rounded-lg transition-all border ${
-                    selectedRole === "staff"
-                      ? "bg-teal-600/20 border-teal-500 text-teal-400"
-                      : "bg-slate-900/40 border-slate-800 text-slate-400 hover:border-slate-700"
-                  }`}
-                >
-                  Staff
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAutofill("tenant")}
-                  className={`py-2 px-1 text-[11px] font-medium rounded-lg transition-all border ${
-                    selectedRole === "tenant"
-                      ? "bg-purple-600/20 border-purple-500 text-purple-400"
-                      : "bg-slate-900/40 border-slate-800 text-slate-400 hover:border-slate-700"
-                  }`}
-                >
-                  Tenant
-                </button>
-              </div>
-            </div>
+
           </form>
         ) : (
           <form onSubmit={handleVerify2FA} className="space-y-6">

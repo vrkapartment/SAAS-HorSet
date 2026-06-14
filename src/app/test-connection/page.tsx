@@ -57,6 +57,16 @@ export default function TestConnectionPage() {
   }
 
   useEffect(() => {
+    const userRole = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("horset_user_role="))
+      ?.split("=")[1]
+    
+    if (userRole !== "admin") {
+      router.push("/login")
+      return
+    }
+
     checkConnection()
   }, [])
 
