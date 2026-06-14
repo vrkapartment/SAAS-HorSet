@@ -294,3 +294,29 @@ $$ language plpgsql security definer;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+
+-- =========================================================================
+-- 6. Add Finance & Tax Setting Columns to workspaces Table
+-- =========================================================================
+alter table public.workspaces add column if not exists tax_firstname text;
+alter table public.workspaces add column if not exists tax_lastname text;
+alter table public.workspaces add column if not exists tax_id text;
+alter table public.workspaces add column if not exists tax_address text;
+alter table public.workspaces add column if not exists tax_phone text;
+alter table public.workspaces add column if not exists promptpay_type text check (promptpay_type in ('phone', 'national_id')) default 'phone';
+alter table public.workspaces add column if not exists promptpay_id text;
+alter table public.workspaces add column if not exists promptpay_name text;
+alter table public.workspaces add column if not exists common_fee numeric default 50;
+
+-- Drop policy if it exists
+drop policy if exists "Workspace admins can update their own workspace" on public.workspaces;
+
+-- Policies for workspaces update
+create policy "Workspace admins can update their own workspace"
+on public.workspaces for update
+using (
+  id = (select workspace_id from public.profiles where id = auth.uid())
+  and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'super_admin'))
+);
+
