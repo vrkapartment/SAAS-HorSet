@@ -133,6 +133,27 @@ drop policy if exists "Staff can read, insert and update bills" on public.bills;
 drop policy if exists "Tenant can view their own bills" on public.bills;
 drop policy if exists "Admin has full access on expenses" on public.expenses;
 
+-- Drop new multi-workspace policies if they already exist (to make script re-runnable)
+drop policy if exists "Super Admins can manage all workspaces" on public.workspaces;
+drop policy if exists "Users can view their own workspace" on public.workspaces;
+drop policy if exists "Super Admins can manage all support grants" on public.support_access_grants;
+drop policy if exists "Workspace admins can manage support grants for their workspace" on public.support_access_grants;
+drop policy if exists "Read room_types in workspace or support approved" on public.room_types;
+drop policy if exists "Manage room_types in workspace or support approved" on public.room_types;
+drop policy if exists "Read rooms in workspace or support approved" on public.rooms;
+drop policy if exists "Manage rooms in workspace or support approved" on public.rooms;
+drop policy if exists "Read tenants in workspace or support approved" on public.tenants;
+drop policy if exists "Manage tenants in workspace or support approved" on public.tenants;
+drop policy if exists "Read meter_records in workspace or support approved" on public.meter_records;
+drop policy if exists "Manage meter_records in workspace or support approved" on public.meter_records;
+drop policy if exists "Read bills in workspace or support approved" on public.bills;
+drop policy if exists "Manage bills in workspace or support approved" on public.bills;
+drop policy if exists "Read expenses in workspace or support approved" on public.expenses;
+drop policy if exists "Manage expenses in workspace or support approved" on public.expenses;
+drop policy if exists "Super Admins can manage registration codes" on public.registration_codes;
+drop policy if exists "Anyone can read registration codes for verification" on public.registration_codes;
+
+
 -- ==================== WORKSPACES POLICIES ====================
 create policy "Super Admins can manage all workspaces" 
 on public.workspaces for all 
