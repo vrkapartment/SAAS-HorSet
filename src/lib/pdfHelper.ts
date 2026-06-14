@@ -284,8 +284,13 @@ export async function generateBillPdf(data: BillPdfData) {
 
   // เนื้อหาในตาราง
   let y = 600
-  const elecAmount = data.electricUnits * data.electricRate
-  const waterAmount = data.waterUnits * data.waterRate
+  const isElecMin = data.electricUnits <= 10
+  const isWaterMin = data.waterUnits <= 3
+  const elecAmount = isElecMin ? 80 : data.electricUnits * data.electricRate
+  const waterAmount = isWaterMin ? 51 : data.waterUnits * data.waterRate
+  
+  const elecDesc = isElecMin ? "2. ค่ากระแสไฟฟ้า (ขั้นต่ำ 10 หน่วย)" : "2. ค่ากระแสไฟฟ้า (Electricity Bill)"
+  const waterDesc = isWaterMin ? "3. ค่าน้ำประปา (ขั้นต่ำ 3 หน่วย)" : "3. ค่าน้ำประปา (Water Bill)"
 
   // รายการ 1: ค่าเช่าห้องพัก
   drawText("1. ค่าเช่าห้องพักหลัก (Base Room Rent)", 50, y, 9, rgb(0.2, 0.2, 0.2))
@@ -295,16 +300,16 @@ export async function generateBillPdf(data: BillPdfData) {
 
   y -= 25
   // รายการ 2: ค่าไฟฟ้า
-  drawText("2. ค่ากระแสไฟฟ้า (Electricity Bill)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(elecDesc, 50, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(data.electricUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(data.electricRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(isElecMin ? "-" : data.electricRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(elecAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   y -= 25
   // รายการ 3: ค่าน้ำประปา
-  drawText("3. ค่าน้ำประปา (Water Bill)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(waterDesc, 50, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(data.waterUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(data.waterRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(isWaterMin ? "-" : data.waterRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(waterAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   // ขีดเส้นใต้ตาราง

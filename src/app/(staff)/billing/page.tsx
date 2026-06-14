@@ -70,7 +70,9 @@ export default function UnifiedBillingPage() {
   const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
   const elecRate = 7 // 7 บาทต่อหน่วย
   const waterRate = 18 // 18 บาทต่อหน่วย
-  const computedTotal = rentPrice + (elecUnitsManual * elecRate) + (waterUnitsManual * waterRate)
+  const computedElecCost = elecUnitsManual <= 10 ? 80 : elecUnitsManual * elecRate
+  const computedWaterCost = waterUnitsManual <= 3 ? 51 : waterUnitsManual * waterRate
+  const computedTotal = rentPrice + computedElecCost + computedWaterCost
 
   const getPreviousCycle = (cycle: string) => {
     const [year, month] = cycle.split("-").map(Number)
@@ -343,7 +345,9 @@ export default function UnifiedBillingPage() {
 
     const eUnits = (elecVal as number) - item.elecPrev
     const wUnits = (waterVal as number) - item.waterPrev
-    const totalAmount = item.baseRent + (eUnits * elecRate) + (wUnits * waterRate)
+    const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
+    const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
+    const totalAmount = item.baseRent + elecCost + waterCost
 
     if (isDemo) {
       // 1. บันทึกเลขมิเตอร์
@@ -483,7 +487,9 @@ export default function UnifiedBillingPage() {
         const waterVal = Number(item.waterCurr)
         const eUnits = elecVal - item.elecPrev
         const wUnits = waterVal - item.waterPrev
-        const totalAmount = item.baseRent + (eUnits * elecRate) + (wUnits * waterRate)
+        const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
+        const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
+        const totalAmount = item.baseRent + elecCost + waterCost
 
         // 1. มิเตอร์
         const existingMeterIdx = localMeters.findIndex((m: any) => m.roomNumber === item.roomNumber)
@@ -535,7 +541,9 @@ export default function UnifiedBillingPage() {
         const waterVal = Number(item.waterCurr)
         const eUnits = elecVal - item.elecPrev
         const wUnits = waterVal - item.waterPrev
-        const totalAmount = item.baseRent + (eUnits * elecRate) + (wUnits * waterRate)
+        const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
+        const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
+        const totalAmount = item.baseRent + elecCost + waterCost
 
         // 1. บันทึกเลขมิเตอร์
         const meterRes = await saveMeterRecord(
@@ -597,7 +605,11 @@ export default function UnifiedBillingPage() {
         electricRate: 7,
         waterUnits: waterUnitsUsed,
         waterRate: 18,
-        amount: item.billAmount || (item.baseRent + (elecUnitsUsed * 7) + (waterUnitsUsed * 18)),
+        amount: item.billAmount || (() => {
+          const elecCost = elecUnitsUsed <= 10 ? 80 : elecUnitsUsed * 7
+          const waterCost = waterUnitsUsed <= 3 ? 51 : waterUnitsUsed * 18
+          return item.baseRent + elecCost + waterCost
+        })(),
         promptPayId,
         promptPayName
       })
@@ -827,11 +839,17 @@ export default function UnifiedBillingPage() {
                 </tr>
               ) : unifiedItems.length > 0 ? (
                 unifiedItems.map((item) => {
-                  const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - item.elecPrev : 0
-                  const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - item.waterPrev : 0
-                  
-                  const elecCost = Math.max(0, elecUnitsUsed) * elecRate
-                  const waterCost = Math.max(0, waterUnitsUsed) * waterRate
+                  const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
+                  const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - item.elecPrev : 0
+                  const elecCost = hasElecCurr && elecUnitsUsed >= 0
+                    ? (elecUnitsUsed <= 10 ? 80 : elecUnitsUsed * elecRate)
+                    : 0
+
+                  const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
+                  const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - item.waterPrev : 0
+                  const waterCost = hasWaterCurr && waterUnitsUsed >= 0
+                    ? (waterUnitsUsed <= 3 ? 51 : waterUnitsUsed * waterRate)
+                    : 0
                   
                   // คำนวณยอดเงินเรียลไทม์
                   const calculatedAmount = item.baseRent + elecCost + waterCost
@@ -878,11 +896,13 @@ export default function UnifiedBillingPage() {
 
                       {/* ไฟฟ้า - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
                       <td className="py-4 text-center bg-blue-500/5 border-r border-slate-900/30 font-mono">
-                        <div className={`font-black text-xs ${elecUnitsUsed < 0 ? "text-red-400" : "text-blue-400"}`}>
-                          {elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด"}
+                        <div className={`font-black text-xs ${!hasElecCurr ? "text-slate-500" : elecUnitsUsed < 0 ? "text-red-400" : "text-blue-400"}`}>
+                          {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                         </div>
                         <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
-                          {elecUnitsUsed >= 0 ? `${elecCost.toLocaleString()}.-` : "-"}
+                          {hasElecCurr && elecUnitsUsed >= 0 
+                            ? `${elecCost.toLocaleString()}.- ${elecUnitsUsed <= 10 ? "(ขั้นต่ำ)" : ""}` 
+                            : "-"}
                         </div>
                       </td>
 
@@ -911,11 +931,13 @@ export default function UnifiedBillingPage() {
 
                       {/* น้ำประปา - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
                       <td className="py-4 text-center bg-teal-500/5 border-r border-slate-900/30 font-mono">
-                        <div className={`font-black text-xs ${waterUnitsUsed < 0 ? "text-red-400" : "text-teal-400"}`}>
-                          {waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด"}
+                        <div className={`font-black text-xs ${!hasWaterCurr ? "text-slate-500" : waterUnitsUsed < 0 ? "text-red-400" : "text-teal-400"}`}>
+                          {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                         </div>
                         <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
-                          {waterUnitsUsed >= 0 ? `${waterCost.toLocaleString()}.-` : "-"}
+                          {hasWaterCurr && waterUnitsUsed >= 0 
+                            ? `${waterCost.toLocaleString()}.- ${waterUnitsUsed <= 3 ? "(ขั้นต่ำ)" : ""}` 
+                            : "-"}
                         </div>
                       </td>
 
@@ -1175,12 +1197,20 @@ export default function UnifiedBillingPage() {
                   <span>{rentPrice.toLocaleString()} บาท</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
-                  <span>ค่าไฟฟ้า ({elecUnitsManual} u. x 7.-):</span>
-                  <span>{(elecUnitsManual * elecRate).toLocaleString()} บาท</span>
+                  <span>ค่าไฟฟ้า ({elecUnitsManual} หน่วย):</span>
+                  <span>
+                    {elecUnitsManual <= 10 
+                      ? "80 บาท (ขั้นต่ำ 10 หน่วย)" 
+                      : `${(elecUnitsManual * elecRate).toLocaleString()} บาท (หน่วยละ 7.-)`}
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-400">
-                  <span>ค่าน้ำประปา ({waterUnitsManual} u. x 18.-):</span>
-                  <span>{(waterUnitsManual * waterRate).toLocaleString()} บาท</span>
+                  <span>ค่าน้ำประปา ({waterUnitsManual} หน่วย):</span>
+                  <span>
+                    {waterUnitsManual <= 3 
+                      ? "51 บาท (ขั้นต่ำ 3 หน่วย)" 
+                      : `${(waterUnitsManual * waterRate).toLocaleString()} บาท (หน่วยละ 18.-)`}
+                  </span>
                 </div>
                 <div className="h-px bg-slate-800 my-1.5" />
                 <div className="flex justify-between font-extrabold text-slate-200">
