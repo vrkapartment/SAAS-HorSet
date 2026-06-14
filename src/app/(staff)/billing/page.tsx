@@ -367,6 +367,34 @@ export default function UnifiedBillingPage() {
     setSelectedBill(null)
   }
 
+  // เปลี่ยนสถานะเป็นชำระเงินแล้วโดยตรง (สำหรับกรณีแอดมินรับเงินสด/โอนตรง)
+  const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
+    if (!confirm(`คุณต้องการเปลี่ยนสถานะบิลของห้อง ${roomNumber} เป็น "ชำระเงินแล้ว" ใช่หรือไม่? (โปรดยืนยันหากได้รับเงินแล้ว)`)) return
+
+    if (isDemo) {
+      const savedBills = localStorage.getItem("horset_bills")
+      if (savedBills) {
+        try {
+          const list = JSON.parse(savedBills)
+          const updated = list.map((b: any) => b.id === billId ? { ...b, status: "paid" } : b)
+          localStorage.setItem("horset_bills", JSON.stringify(updated))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
+      await loadData()
+    } else {
+      const res = await updateBillStatus(billId, "paid")
+      if (res.success) {
+        showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
+        await loadData()
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      }
+    }
+  }
+
   // บันทึกเฉพาะห้องและสร้างบิล
   const handleSaveRow = async (roomNumber: string) => {
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
@@ -1064,6 +1092,18 @@ export default function UnifiedBillingPage() {
                               >
                                 <Send className="w-3.5 h-3.5" />
                               </button>
+
+                              {/* บันทึกรับเงินโดยตรง (สำหรับค้างชำระ) */}
+                              {item.billStatus === "unpaid" && (
+                                <button
+                                  onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
+                                  className="p-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40 rounded-xl transition-all flex items-center gap-1 hover:scale-105 shadow-sm"
+                                  title="รับเงินสด/บันทึกชำระเงินตรง"
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="text-[10px] hidden xl:inline font-bold text-slate-300 hover:text-emerald-300">รับเงินแล้ว</span>
+                                </button>
+                              )}
                             </>
                           ) : null}
                         </div>
