@@ -6,16 +6,24 @@ import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Lo
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
 export default function FinanceSettingsPage() {
-  const [firstName, setFirstName] = useState("สมเจตน์")
-  const [lastName, setLastName] = useState("แสนสุข")
-  const [taxId, setTaxId] = useState("1100100222333")
-  const [address, setAddress] = useState("123/45 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310")
-  const [phone, setPhone] = useState("089-999-9999")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [taxId, setTaxId] = useState("")
+  const [address, setAddress] = useState("")
+  const [phone, setPhone] = useState("")
 
   const [promptPayType, setPromptPayType] = useState<"phone" | "national_id">("phone")
-  const [promptPayId, setPromptPayId] = useState("0899999999")
-  const [promptPayName, setPromptPayName] = useState("สมเจตน์ แสนสุข")
+  const [promptPayId, setPromptPayId] = useState("")
+  const [promptPayName, setPromptPayName] = useState("")
   const [commonFee, setCommonFee] = useState<number>(50)
 
   // สำหรับราคาหน่วย ค่าน้ำ ค่าไฟ และขั้นต่ำ
@@ -39,27 +47,33 @@ export default function FinanceSettingsPage() {
       setLoading(true)
       try {
         const userRes = await getCurrentUserProfileAction()
-        if (userRes.success && userRes.data && userRes.data.workspace_id) {
-          const currentWsId = userRes.data.workspace_id
+        
+        // 1. ดึง workspace ID จาก cookie ก่อนเพื่อให้สอดคล้องกับ Workspace Switcher แถบเมนูด้านบน
+        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+        
+        // 2. ถ้าไม่มีคุกกี้ ให้ใช้ของ profile
+        const currentWsId = cookieWsId || (userRes.success && userRes.data?.workspace_id)
+
+        if (currentWsId) {
           setWorkspaceId(currentWsId)
 
           const res = await getFinanceSettings(currentWsId)
           if (res.success && res.data) {
-            setFirstName(res.data.tax_firstname)
-            setLastName(res.data.tax_lastname)
-            setTaxId(res.data.tax_id)
-            setAddress(res.data.tax_address)
-            setPhone(res.data.tax_phone)
-            setPromptPayType(res.data.promptpay_type)
-            setPromptPayId(res.data.promptpay_id)
-            setPromptPayName(res.data.promptpay_name)
-            setCommonFee(res.data.common_fee)
-            setWaterRate(res.data.water_rate)
-            setElectricRate(res.data.electric_rate)
-            setWaterMinChecked(res.data.water_min_checked)
-            setWaterMinUnit(res.data.water_min_unit)
-            setElectricMinChecked(res.data.electric_min_checked)
-            setElectricMinUnit(res.data.electric_min_unit)
+            setFirstName(res.data.tax_firstname || "")
+            setLastName(res.data.tax_lastname || "")
+            setTaxId(res.data.tax_id || "")
+            setAddress(res.data.tax_address || "")
+            setPhone(res.data.tax_phone || "")
+            setPromptPayType(res.data.promptpay_type || "phone")
+            setPromptPayId(res.data.promptpay_id || "")
+            setPromptPayName(res.data.promptpay_name || "")
+            setCommonFee(res.data.common_fee !== undefined ? res.data.common_fee : 50)
+            setWaterRate(res.data.water_rate !== undefined ? res.data.water_rate : 18)
+            setElectricRate(res.data.electric_rate !== undefined ? res.data.electric_rate : 7)
+            setWaterMinChecked(res.data.water_min_checked !== undefined ? res.data.water_min_checked : true)
+            setWaterMinUnit(res.data.water_min_unit !== undefined ? res.data.water_min_unit : 3)
+            setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
+            setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
             setIsDatabaseBacked(true)
           }
         }
