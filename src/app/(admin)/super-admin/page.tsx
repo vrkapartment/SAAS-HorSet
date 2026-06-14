@@ -19,7 +19,9 @@ import {
   ShieldAlert,
   AlertCircle,
   Clock,
-  Lock
+  Lock,
+  Edit,
+  X
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { createWorkspaceUserAction } from "@/features/super-admin/actions"
@@ -68,6 +70,19 @@ export default function SuperAdminPage() {
   const [newUserRole, setNewUserRole] = useState<"admin" | "staff" | "tenant">("admin")
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("")
   const [addingUser, setAddingUser] = useState(false)
+
+  // แก้ไข Workspace
+  const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null)
+  const [editingWorkspaceName, setEditingWorkspaceName] = useState("")
+  const [updatingWorkspace, setUpdatingWorkspace] = useState(false)
+
+  // แก้ไข Profile (Role & Workspace Assignment)
+  const [editingProfile, setEditingProfile] = useState<ProfileItem | null>(null)
+  const [editingProfileRole, setEditingProfileRole] = useState<ProfileItem["role"]>("admin")
+  const [editingProfileWorkspaceId, setEditingProfileWorkspaceId] = useState<string | null>(null)
+  const [editingProfileFullName, setEditingProfileFullName] = useState("")
+  const [editingProfilePhone, setEditingProfilePhone] = useState("")
+  const [updatingProfile, setUpdatingProfile] = useState(false)
 
   // ตรวจสอบโหมดทดสอบ
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
@@ -340,6 +355,106 @@ export default function SuperAdminPage() {
     }
   }
 
+  // ฟังก์ชันอัปเดต Workspace (เช่น เปลี่ยนชื่อ)
+  const handleUpdateWorkspaceName = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingWorkspace || !editingWorkspaceName.trim()) return
+
+    setUpdatingWorkspace(true)
+    setError(null)
+    setResultSuccess(null)
+
+    const updatedName = editingWorkspaceName.trim()
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error: wsErr } = await supabase
+          .from("workspaces")
+          .update({ name: updatedName })
+          .eq("id", editingWorkspace.id)
+
+        if (wsErr) throw wsErr
+
+        setWorkspaces(workspaces.map((w) => w.id === editingWorkspace.id ? { ...w, name: updatedName } : w))
+        setResultSuccess(`✓ แก้ไขชื่อ Workspace เป็น "${updatedName}" สำเร็จ`)
+        setEditingWorkspace(null)
+      } catch (err: any) {
+        setError("ไม่สามารถแก้ไข Workspace ใน Supabase: " + err.message)
+      } finally {
+        setUpdatingWorkspace(false)
+      }
+    } else {
+      // โหมด Demo
+      const updated = workspaces.map((w) => w.id === editingWorkspace.id ? { ...w, name: updatedName } : w)
+      setWorkspaces(updated)
+      localStorage.setItem("horset_workspaces", JSON.stringify(updated))
+      setResultSuccess(`✓ [Demo] แก้ไขชื่อ Workspace เป็น "${updatedName}" สำเร็จ`)
+      setEditingWorkspace(null)
+      setUpdatingWorkspace(false)
+    }
+  }
+
+  // ฟังก์ชันอัปเดต Profile (เปลี่ยนสิทธิ์, สังกัดหอพัก, ชื่อ, เบอร์โทร)
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingProfile) return
+
+    setUpdatingProfile(true)
+    setError(null)
+    setResultSuccess(null)
+
+    const updatedRole = editingProfileRole
+    const updatedWorkspaceId = editingProfileWorkspaceId || null
+    const updatedFullName = editingProfileFullName.trim() || null
+    const updatedPhone = editingProfilePhone.trim() || null
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error: profErr } = await supabase
+          .from("profiles")
+          .update({
+            role: updatedRole,
+            workspace_id: updatedWorkspaceId,
+            full_name: updatedFullName,
+            phone: updatedPhone
+          })
+          .eq("id", editingProfile.id)
+
+        if (profErr) throw profErr
+
+        setProfiles(profiles.map((p) => p.id === editingProfile.id ? {
+          ...p,
+          role: updatedRole,
+          workspace_id: updatedWorkspaceId,
+          full_name: updatedFullName,
+          phone: updatedPhone
+        } : p))
+        setResultSuccess(`✓ อัปเดตข้อมูลและสิทธิ์ของผู้ใช้งาน ${editingProfile.email} สำเร็จ`)
+        setEditingProfile(null)
+      } catch (err: any) {
+        setError("ไม่สามารถอัปเดตสิทธิ์ผู้ใช้งานใน Supabase: " + err.message)
+      } finally {
+        setUpdatingProfile(false)
+      }
+    } else {
+      // โหมด Demo
+      const updated = profiles.map((p) => p.id === editingProfile.id ? {
+        ...p,
+        role: updatedRole,
+        workspace_id: updatedWorkspaceId,
+        full_name: updatedFullName,
+        phone: updatedPhone
+      } : p)
+      setProfiles(updated)
+      localStorage.setItem("horset_profiles", JSON.stringify(updated))
+      setResultSuccess(`✓ [Demo] อัปเดตข้อมูลและสิทธิ์ของผู้ใช้งาน ${editingProfile.email} สำเร็จ`)
+      setEditingProfile(null)
+      setUpdatingProfile(false)
+    }
+  }
+
   // คัดกรองข้อมูล
   const filteredWorkspaces = workspaces.filter((ws) =>
     ws.name.toLowerCase().includes(searchWorkspace.toLowerCase())
@@ -465,6 +580,17 @@ export default function SuperAdminPage() {
                             ✕ ไม่มีสิทธิ์
                           </span>
                         )}
+
+                        <button
+                          onClick={() => {
+                            setEditingWorkspace(ws)
+                            setEditingWorkspaceName(ws.name)
+                          }}
+                          className="p-2 py-1.5 text-[11px] font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-blue-400 hover:text-blue-300 rounded-lg flex items-center gap-1 transition-all"
+                          title="แก้ไขชื่อ Workspace"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> แก้ไข
+                        </button>
 
                         <button
                           onClick={() => handleEnterWorkspace(ws)}
@@ -733,15 +859,30 @@ export default function SuperAdminPage() {
                         {wsName}
                       </td>
                       <td className="p-4 text-center">
-                        {p.role !== "super_admin" && (
+                        <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => handleDeleteProfile(p.id, p.email)}
-                            className="p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-lg border border-red-500/10 transition-colors"
-                            title="ถอนสิทธิ์ผู้ใช้งาน"
+                            onClick={() => {
+                              setEditingProfile(p)
+                              setEditingProfileRole(p.role)
+                              setEditingProfileWorkspaceId(p.workspace_id)
+                              setEditingProfileFullName(p.full_name || "")
+                              setEditingProfilePhone(p.phone || "")
+                            }}
+                            className="p-1.5 text-purple-400 hover:text-purple-300 bg-purple-500/5 hover:bg-purple-500/15 rounded-lg border border-purple-500/10 transition-colors"
+                            title="แก้ไขโปรไฟล์ / สิทธิ์"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Edit className="w-4 h-4" />
                           </button>
-                        )}
+                          {p.role !== "super_admin" && (
+                            <button
+                              onClick={() => handleDeleteProfile(p.id, p.email)}
+                              className="p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-lg border border-red-500/10 transition-colors"
+                              title="ถอนสิทธิ์ผู้ใช้งาน"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -758,6 +899,185 @@ export default function SuperAdminPage() {
             </table>
           </div>
         </div>
+
+        {/* Workspace Edit Modal */}
+        {editingWorkspace && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
+            <div className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-blue-600/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-blue-600/10 text-blue-400 rounded-xl border border-blue-500/20">
+                    <Building className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-200">แก้ไขพื้นที่ทำงาน (Edit Workspace)</h3>
+                    <p className="text-[10px] text-slate-500">เปลี่ยนชื่อหอพักหรือตึกในระบบ</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingWorkspace(null)}
+                  className="p-1.5 hover:bg-slate-900 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800/80 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateWorkspaceName} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium">ชื่อพื้นที่ทำงาน/ชื่อตึก</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ระบุชื่อหอพัก..."
+                    className="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-xs transition-colors"
+                    value={editingWorkspaceName}
+                    onChange={(e) => setEditingWorkspaceName(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingWorkspace(null)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingWorkspace}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-blue-600/10"
+                  >
+                    {updatingWorkspace ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      "บันทึกการเปลี่ยนแปลง"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Profile Edit Modal */}
+        {editingProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
+            <div className="w-full max-w-lg glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-purple-600/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-purple-600/10 text-purple-400 rounded-xl border border-purple-500/20">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-200">แก้ไขข้อมูลผู้ใช้งานและสิทธิ์ (Edit Profile)</h3>
+                    <p className="text-[10px] text-slate-500">จัดการอีเมล: {editingProfile.email}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingProfile(null)}
+                  className="p-1.5 hover:bg-slate-900 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800/80 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">ชื่อ-นามสกุล</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น สมใจ รักษ์ดี"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      value={editingProfileFullName}
+                      onChange={(e) => setEditingProfileFullName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">เบอร์โทรศัพท์</label>
+                    <input
+                      type="text"
+                      placeholder="08xxxxxxxx"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      value={editingProfilePhone}
+                      onChange={(e) => setEditingProfilePhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">สังกัดหอพัก (Workspace)</label>
+                  <select
+                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-purple-500 text-xs transition-colors"
+                    value={editingProfileWorkspaceId || ""}
+                    onChange={(e) => setEditingProfileWorkspaceId(e.target.value || null)}
+                  >
+                    <option value="">ไม่มีสังกัด (Global / Super Admin)</option>
+                    {workspaces.map((ws) => (
+                      <option key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์ในระบบ (Role)</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { role: "super_admin", label: "Super Admin" },
+                      { role: "admin", label: "แอดมิน (เจ้าของ)" },
+                      { role: "staff", label: "ผู้ช่วย (สต๊าฟ)" },
+                      { role: "tenant", label: "ผู้เช่าตึก" }
+                    ].map((item) => (
+                      <button
+                        key={item.role}
+                        type="button"
+                        onClick={() => setEditingProfileRole(item.role as any)}
+                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold border transition-all ${
+                          editingProfileRole === item.role
+                            ? "bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/10"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingProfile(null)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingProfile}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-purple-600/10"
+                  >
+                    {updatingProfile ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      "บันทึกการเปลี่ยนแปลง"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
       </div>
     </DashboardLayout>
