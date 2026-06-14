@@ -61,6 +61,26 @@ interface RegistrationCode {
   used_by_email: string | null
 }
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
+function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return
+  const date = new Date()
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
+  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}`
+}
+
+function removeCookie(name: string) {
+  if (typeof document === "undefined") return
+  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC`
+}
+
 export default function SuperAdminPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -143,8 +163,8 @@ export default function SuperAdminPage() {
         setSupportGrants(grantMap)
 
         if (wsData.length > 0) {
-          const savedSelectedWs = localStorage.getItem("horset_super_admin_selected_ws")
-          const savedGenWs = localStorage.getItem("horset_super_admin_gen_ws")
+          const savedSelectedWs = getCookie("horset_super_admin_selected_ws")
+          const savedGenWs = getCookie("horset_super_admin_gen_ws")
 
           const matchedSelected = savedSelectedWs && wsData.some(w => w.id === savedSelectedWs)
           const matchedGen = savedGenWs && wsData.some(w => w.id === savedGenWs)
@@ -156,10 +176,10 @@ export default function SuperAdminPage() {
           setGenWorkspaceId(finalGenId)
 
           if (!savedSelectedWs) {
-            localStorage.setItem("horset_super_admin_selected_ws", finalSelectedId)
+            setCookie("horset_super_admin_selected_ws", finalSelectedId)
           }
           if (!savedGenWs) {
-            localStorage.setItem("horset_super_admin_gen_ws", finalGenId)
+            setCookie("horset_super_admin_gen_ws", finalGenId)
           }
         }
       } catch (err: any) {
@@ -176,18 +196,14 @@ export default function SuperAdminPage() {
   }
 
   const fallbackMock = () => {
-    // โหลดจาก localStorage
-    const localWorkspaces = localStorage.getItem("horset_workspaces")
-    const mockWs: Workspace[] = localWorkspaces
-      ? JSON.parse(localWorkspaces)
-      : [
-          { id: "d290f1ee-6c54-4b01-90e6-d701748f0851", name: "แสนสุข แมนชั่น (Default)", created_at: new Date().toISOString() },
-          { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์ (Demo 2)", created_at: new Date().toISOString() }
-        ]
+    const mockWs: Workspace[] = [
+      { id: "d290f1ee-6c54-4b01-90e6-d701748f0851", name: "แสนสุข แมนชั่น (Default)", created_at: new Date().toISOString() },
+      { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์ (Demo 2)", created_at: new Date().toISOString() }
+    ]
     setWorkspaces(mockWs)
 
-    const savedSelectedWs = localStorage.getItem("horset_super_admin_selected_ws")
-    const savedGenWs = localStorage.getItem("horset_super_admin_gen_ws")
+    const savedSelectedWs = getCookie("horset_super_admin_selected_ws")
+    const savedGenWs = getCookie("horset_super_admin_gen_ws")
 
     if (mockWs.length > 0) {
       const matchedSelected = savedSelectedWs && mockWs.some(w => w.id === savedSelectedWs)
@@ -200,57 +216,52 @@ export default function SuperAdminPage() {
       setGenWorkspaceId(finalGenId)
 
       if (!savedSelectedWs) {
-        localStorage.setItem("horset_super_admin_selected_ws", finalSelectedId)
+        setCookie("horset_super_admin_selected_ws", finalSelectedId)
       }
       if (!savedGenWs) {
-        localStorage.setItem("horset_super_admin_gen_ws", finalGenId)
+        setCookie("horset_super_admin_gen_ws", finalGenId)
       }
     }
 
-    const localProfiles = localStorage.getItem("horset_profiles")
-    const mockProfs: ProfileItem[] = localProfiles
-      ? JSON.parse(localProfiles)
-      : [
-          {
-            id: "u1",
-            email: "admin@horset.com",
-            full_name: "คุณสมเจตน์ (เจ้าของ)",
-            phone: "0812345678",
-            role: "admin",
-            workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
-            created_at: new Date().toISOString()
-          },
-          {
-            id: "u2",
-            email: "staff_somchai@horset.com",
-            full_name: "สมชาย (ผู้ช่วย)",
-            phone: "0898765432",
-            role: "staff",
-            workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
-            created_at: new Date().toISOString()
-          },
-          {
-            id: "u3",
-            email: "tenant_room101@horset.com",
-            full_name: "สมศรี ใจดี (ผู้เช่าห้อง 101)",
-            phone: "0855555555",
-            role: "tenant",
-            workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
-            created_at: new Date().toISOString()
-          }
-        ]
+    const mockProfs: ProfileItem[] = [
+      {
+        id: "u1",
+        email: "admin@horset.com",
+        full_name: "คุณสมเจตน์ (เจ้าของ)",
+        phone: "0812345678",
+        role: "admin",
+        workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+        created_at: new Date().toISOString()
+      },
+      {
+        id: "u2",
+        email: "staff_somchai@horset.com",
+        full_name: "สมชาย (ผู้ช่วย)",
+        phone: "0898765432",
+        role: "staff",
+        workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+        created_at: new Date().toISOString()
+      },
+      {
+        id: "u3",
+        email: "tenant_room101@horset.com",
+        full_name: "สมศรี ใจดี (ผู้เช่าห้อง 101)",
+        phone: "0855555555",
+        role: "tenant",
+        workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+        created_at: new Date().toISOString()
+      }
+    ]
     setProfiles(mockProfs)
 
     // โหลดสถานะแกรนท์ของแต่ละ Workspace
     const grantMap: { [key: string]: string } = {}
     mockWs.forEach((ws) => {
-      grantMap[ws.id] = localStorage.getItem(`horset_support_status_${ws.id}`) || "none"
+      grantMap[ws.id] = getCookie(`horset_support_status_${ws.id}`) || "none"
     })
     setSupportGrants(grantMap)
 
-    // โหลดข้อมูลรหัสเชิญชวนแบบจำลอง
-    const localCodes = localStorage.getItem("horset_registration_codes")
-    const mockCodes: RegistrationCode[] = localCodes ? JSON.parse(localCodes) : []
+    const mockCodes: RegistrationCode[] = []
     setRegistrationCodes(mockCodes)
   }
 
@@ -295,11 +306,10 @@ export default function SuperAdminPage() {
         setAddingWorkspace(false)
       }
     } else {
-      // โหมด Demo บันทึกลง localStorage
+      // โหมด Demo บันทึกใน memory state และ cookie
       const updated = [newWs, ...workspaces]
       setWorkspaces(updated)
-      localStorage.setItem("horset_workspaces", JSON.stringify(updated))
-      localStorage.setItem(`horset_support_status_${newId}`, "none")
+      setCookie(`horset_support_status_${newId}`, "none")
       setNewWorkspaceName("")
       setResultSuccess(`✓ [Demo] เพิ่ม Workspace "${newWs.name}" เรียบร้อยแล้ว`)
       setAddingWorkspace(false)
@@ -355,10 +365,9 @@ export default function SuperAdminPage() {
         setAddingUser(false)
       }
     } else {
-      // โหมด Demo บันทึกลง localStorage
+      // โหมด Demo บันทึกใน memory state
       const updated = [newProfile, ...profiles]
       setProfiles(updated)
-      localStorage.setItem("horset_profiles", JSON.stringify(updated))
       setNewUserEmail("")
       setNewUserPassword("")
       setNewUserFullName("")
@@ -370,8 +379,7 @@ export default function SuperAdminPage() {
 
   // ฟังก์ชันสลับไปจัดการสิทธิ์ของ Workspace นั้นๆ ทันที
   const handleEnterWorkspace = (ws: Workspace) => {
-    localStorage.setItem("horset_current_workspace_id", ws.id)
-    document.cookie = `horset_current_workspace_id=${ws.id}; path=/; max-age=86400`
+    setCookie("horset_current_workspace_id", ws.id)
     
     // ตั้งคุกกี้สิทธิ์เป็น admin ชั่วคราวหากได้รับการอนุมัติช่วยเหลือ เพื่อให้สามารถเปิดหน้า แดชบอร์ด, จัดการห้องพัก, จัดการบิล ได้ปกติ
     const status = supportGrants[ws.id] || "none"
@@ -400,7 +408,6 @@ export default function SuperAdminPage() {
     } else {
       const updated = profiles.filter((p) => p.id !== id)
       setProfiles(updated)
-      localStorage.setItem("horset_profiles", JSON.stringify(updated))
       setResultSuccess(`✓ [Demo] ถอนสิทธิ์บัญชี ${email} สำเร็จ`)
     }
   }
@@ -426,15 +433,13 @@ export default function SuperAdminPage() {
       // โหมด Demo
       const updatedWs = workspaces.filter((w) => w.id !== id)
       setWorkspaces(updatedWs)
-      localStorage.setItem("horset_workspaces", JSON.stringify(updatedWs))
 
       // ลบสิทธิ์ช่วยเหลือด้วยถ้ามี
-      localStorage.removeItem(`horset_support_status_${id}`)
+      removeCookie(`horset_support_status_${id}`)
 
       // ปรับโปรไฟล์ที่เกี่ยวข้องให้ไม่มีสังกัด
       const updatedProfs = profiles.map((p) => p.workspace_id === id ? { ...p, workspace_id: null } : p)
       setProfiles(updatedProfs)
-      localStorage.setItem("horset_profiles", JSON.stringify(updatedProfs))
 
       setResultSuccess(`✓ [Demo] ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
     }
@@ -468,7 +473,6 @@ export default function SuperAdminPage() {
       // โหมด Demo
       const updated = workspaces.map((w) => w.id === editingWorkspace.id ? { ...w, name: updatedName } : w)
       setWorkspaces(updated)
-      localStorage.setItem("horset_workspaces", JSON.stringify(updated))
       setResultSuccess(`✓ [Demo] แก้ไขชื่อ Workspace เป็น "${updatedName}" สำเร็จ`)
       setEditingWorkspace(null)
       setUpdatingWorkspace(false)
@@ -523,7 +527,6 @@ export default function SuperAdminPage() {
         phone: updatedPhone
       } : p)
       setProfiles(updated)
-      localStorage.setItem("horset_profiles", JSON.stringify(updated))
       setResultSuccess(`✓ [Demo] อัปเดตข้อมูลและสิทธิ์ของผู้ใช้งาน ${editingProfile.email} สำเร็จ`)
       setEditingProfile(null)
       setUpdatingProfile(false)
@@ -580,7 +583,6 @@ export default function SuperAdminPage() {
       // โหมด Demo
       const updated = [newCodeObj, ...registrationCodes]
       setRegistrationCodes(updated)
-      localStorage.setItem("horset_registration_codes", JSON.stringify(updated))
       setResultSuccess(`✓ [Demo] สร้าง Secret Code "${newCodeStr}" สำเร็จ (มีอายุใช้งาน 2 ชั่วโมง)`)
       setGeneratingCode(false)
     }
@@ -611,7 +613,6 @@ export default function SuperAdminPage() {
     } else {
       const updated = registrationCodes.filter((c) => c.code !== code)
       setRegistrationCodes(updated)
-      localStorage.setItem("horset_registration_codes", JSON.stringify(updated))
       setResultSuccess(`✓ [Demo] ลบ Secret Code ${code} สำเร็จ`)
     }
   }
@@ -841,7 +842,7 @@ export default function SuperAdminPage() {
                     onChange={(e) => {
                       const val = e.target.value
                       setSelectedWorkspaceId(val)
-                      localStorage.setItem("horset_super_admin_selected_ws", val)
+                      setCookie("horset_super_admin_selected_ws", val)
                     }}
                   >
                     {workspaces.map((ws) => (
@@ -969,7 +970,7 @@ export default function SuperAdminPage() {
                     onChange={(e) => {
                       const val = e.target.value
                       setGenWorkspaceId(val)
-                      localStorage.setItem("horset_super_admin_gen_ws", val)
+                      setCookie("horset_super_admin_gen_ws", val)
                     }}
                   >
                     {workspaces.map((ws) => (

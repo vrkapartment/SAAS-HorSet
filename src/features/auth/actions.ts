@@ -93,7 +93,7 @@ export async function getCurrentUserProfileAction() {
     // ดึงข้อมูลจากตาราง profiles
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, email, role, full_name, phone, tfa_enabled")
+      .select("id, email, role, full_name, phone, tfa_enabled, workspace_id")
       .eq("id", user.id)
       .single()
 
@@ -107,7 +107,8 @@ export async function getCurrentUserProfileAction() {
           role: "tenant",
           full_name: user.user_metadata?.full_name || "",
           phone: user.phone || "",
-          tfa_enabled: false
+          tfa_enabled: false,
+          workspace_id: null
         }
       }
     }

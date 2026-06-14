@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2, Droplet, Zap, Building, Sliders } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
 export default function FinanceSettingsPage() {
   const [firstName, setFirstName] = useState("สมเจตน์")
@@ -32,68 +33,35 @@ export default function FinanceSettingsPage() {
   const [isDatabaseBacked, setIsDatabaseBacked] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  // โหลดค่าเริ่มต้นจาก Database (ผูกตาม Workspace ID ปัจจุบัน) หรือ fallback ไปยัง localStorage
+  // โหลดค่าเริ่มต้นจาก Database (ผูกตาม Workspace ID ปัจจุบัน)
   useEffect(() => {
-    const currentWsId = localStorage.getItem("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
-    setWorkspaceId(currentWsId)
-
     async function loadData() {
       setLoading(true)
       try {
-        const res = await getFinanceSettings(currentWsId)
-        if (res.success && res.data) {
-          setFirstName(res.data.tax_firstname)
-          setLastName(res.data.tax_lastname)
-          setTaxId(res.data.tax_id)
-          setAddress(res.data.tax_address)
-          setPhone(res.data.tax_phone)
-          setPromptPayType(res.data.promptpay_type)
-          setPromptPayId(res.data.promptpay_id)
-          setPromptPayName(res.data.promptpay_name)
-          setCommonFee(res.data.common_fee)
-          setWaterRate(res.data.water_rate)
-          setElectricRate(res.data.electric_rate)
-          setWaterMinChecked(res.data.water_min_checked)
-          setWaterMinUnit(res.data.water_min_unit)
-          setElectricMinChecked(res.data.electric_min_checked)
-          setElectricMinUnit(res.data.electric_min_unit)
-          setIsDatabaseBacked(true)
-        } else {
-          // หากฐานข้อมูลไม่พบคอลัมน์ (fallback Mode) หรือล้มเหลว ให้ใช้ข้อมูลเก่าจาก localStorage
-          if (res.fallback) {
-            setIsDatabaseBacked(false)
-          }
-          const savedFirstName = localStorage.getItem("horset_tax_firstname")
-          const savedLastName = localStorage.getItem("horset_tax_lastname")
-          const savedTaxId = localStorage.getItem("horset_tax_id")
-          const savedAddress = localStorage.getItem("horset_tax_address")
-          const savedPhone = localStorage.getItem("horset_tax_phone")
-          const savedPPType = localStorage.getItem("horset_promptpay_type") as "phone" | "national_id" | null
-          const savedPPId = localStorage.getItem("horset_promptpay_id")
-          const savedPPName = localStorage.getItem("horset_promptpay_name")
-          const savedCommonFee = localStorage.getItem("horset_common_fee")
-          const savedWaterRate = localStorage.getItem("horset_water_rate")
-          const savedElectricRate = localStorage.getItem("horset_electric_rate")
-          const savedWaterMinChecked = localStorage.getItem("horset_water_min_checked")
-          const savedWaterMinUnit = localStorage.getItem("horset_water_min_unit")
-          const savedElectricMinChecked = localStorage.getItem("horset_electric_min_checked")
-          const savedElectricMinUnit = localStorage.getItem("horset_electric_min_unit")
+        const userRes = await getCurrentUserProfileAction()
+        if (userRes.success && userRes.data && userRes.data.workspace_id) {
+          const currentWsId = userRes.data.workspace_id
+          setWorkspaceId(currentWsId)
 
-          if (savedFirstName) setFirstName(savedFirstName)
-          if (savedLastName) setLastName(savedLastName)
-          if (savedTaxId) setTaxId(savedTaxId)
-          if (savedAddress) setAddress(savedAddress)
-          if (savedPhone) setPhone(savedPhone)
-          if (savedPPType) setPromptPayType(savedPPType)
-          if (savedPPId) setPromptPayId(savedPPId)
-          if (savedPPName) setPromptPayName(savedPPName)
-          if (savedCommonFee) setCommonFee(Number(savedCommonFee))
-          if (savedWaterRate) setWaterRate(Number(savedWaterRate))
-          if (savedElectricRate) setElectricRate(Number(savedElectricRate))
-          if (savedWaterMinChecked) setWaterMinChecked(savedWaterMinChecked === "true")
-          if (savedWaterMinUnit) setWaterMinUnit(Number(savedWaterMinUnit))
-          if (savedElectricMinChecked) setElectricMinChecked(savedElectricMinChecked === "true")
-          if (savedElectricMinUnit) setElectricMinUnit(Number(savedElectricMinUnit))
+          const res = await getFinanceSettings(currentWsId)
+          if (res.success && res.data) {
+            setFirstName(res.data.tax_firstname)
+            setLastName(res.data.tax_lastname)
+            setTaxId(res.data.tax_id)
+            setAddress(res.data.tax_address)
+            setPhone(res.data.tax_phone)
+            setPromptPayType(res.data.promptpay_type)
+            setPromptPayId(res.data.promptpay_id)
+            setPromptPayName(res.data.promptpay_name)
+            setCommonFee(res.data.common_fee)
+            setWaterRate(res.data.water_rate)
+            setElectricRate(res.data.electric_rate)
+            setWaterMinChecked(res.data.water_min_checked)
+            setWaterMinUnit(res.data.water_min_unit)
+            setElectricMinChecked(res.data.electric_min_checked)
+            setElectricMinUnit(res.data.electric_min_unit)
+            setIsDatabaseBacked(true)
+          }
         }
       } catch (err) {
         console.error("Failed to load settings:", err)
@@ -149,24 +117,7 @@ export default function FinanceSettingsPage() {
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
       const res = await saveFinanceSettings(workspaceId, payload)
       if (res.success) {
-        // อัปเดตฝั่ง Local Storage ด้วยเพื่อความปลอดภัยและโหลดได้ไวขึ้นในจุดอื่น
-        localStorage.setItem("horset_tax_firstname", firstName)
-        localStorage.setItem("horset_tax_lastname", lastName)
-        localStorage.setItem("horset_tax_id", taxId)
-        localStorage.setItem("horset_tax_address", address)
-        localStorage.setItem("horset_tax_phone", phone)
-        localStorage.setItem("horset_promptpay_type", promptPayType)
-        localStorage.setItem("horset_promptpay_id", cleanedPPId)
-        localStorage.setItem("horset_promptpay_name", promptPayName)
-        localStorage.setItem("horset_common_fee", commonFee.toString())
-        localStorage.setItem("horset_water_rate", waterRate.toString())
-        localStorage.setItem("horset_electric_rate", electricRate.toString())
-        localStorage.setItem("horset_water_min_checked", waterMinChecked.toString())
-        localStorage.setItem("horset_water_min_unit", waterMinUnit.toString())
-        localStorage.setItem("horset_electric_min_checked", electricMinChecked.toString())
-        localStorage.setItem("horset_electric_min_unit", electricMinUnit.toString())
-
-        showToast(res.fallback ? "บันทึกในอุปกรณ์นี้สำเร็จเรียบร้อยแล้ว!" : "บันทึกข้อมูลเข้าสู่เซิร์ฟเวอร์ระบบคลาวด์สำเร็จเรียบร้อย!")
+        showToast("บันทึกข้อมูลเข้าสู่เซิร์ฟเวอร์ระบบคลาวด์สำเร็จเรียบร้อย!")
       } else {
         setErrorMsg(res.error || "ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบสิทธิ์ผู้ใช้งาน")
       }

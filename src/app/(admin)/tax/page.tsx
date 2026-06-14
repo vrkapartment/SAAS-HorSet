@@ -35,6 +35,9 @@ import {
   deleteExpense, 
   ExpenseItem 
 } from "@/features/expenses/actions"
+import { getFinanceSettings } from "@/features/finance/actions"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { getBills } from "@/features/billing/actions"
 
 interface BillItem {
   id: string
@@ -90,51 +93,64 @@ export default function TaxPage() {
   const [bills, setBills] = useState<BillItem[]>([])
 
   useEffect(() => {
-    // 1. โหลดข้อมูลผู้เสียภาษี
-    const savedFirstName = localStorage.getItem("horset_tax_firstname")
-    const savedLastName = localStorage.getItem("horset_tax_lastname")
-    const savedTaxId = localStorage.getItem("horset_tax_id")
-    const savedAddress = localStorage.getItem("horset_tax_address")
-    const savedPhone = localStorage.getItem("horset_tax_phone")
-
-    if (savedFirstName) setFirstName(savedFirstName)
-    if (savedLastName) setLastName(savedLastName)
-    if (savedTaxId) setTaxId(savedTaxId)
-    if (savedAddress) setAddress(savedAddress)
-    if (savedPhone) setPhone(savedPhone)
-
-    // 2. โหลดบิลจากระบบ
-    const savedBills = localStorage.getItem("horset_bills")
-    if (savedBills) {
+    async function loadInitialData() {
       try {
-        setBills(JSON.parse(savedBills))
-      } catch (e) {
-        console.error("Failed to parse bills", e)
+        const userRes = await getCurrentUserProfileAction()
+        if (userRes.success && userRes.data && userRes.data.workspace_id) {
+          const currentWsId = userRes.data.workspace_id
+
+          // 1. โหลดข้อมูลผู้เสียภาษี
+          const res = await getFinanceSettings(currentWsId)
+          if (res.success && res.data) {
+            setFirstName(res.data.tax_firstname || "สมเจตน์")
+            setLastName(res.data.tax_lastname || "แสนสุข")
+            setTaxId(res.data.tax_id || "1100100222333")
+            setAddress(res.data.tax_address || "123/45 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310")
+            setPhone(res.data.tax_phone || "089-999-9999")
+          }
+
+          // 2. โหลดบิลจากระบบ
+          const billsRes = await getBills()
+          if (billsRes.success && billsRes.data) {
+            // Map any database bills to matching UI structure
+            const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
+              id: b.id,
+              roomNumber: b.roomNumber,
+              tenantName: b.tenantName || "ผู้เช่า",
+              amount: Number(b.amount),
+              status: b.status as "unpaid" | "pending" | "paid",
+              billingCycle: b.billingCycle,
+              slipUrl: b.slipUrl || null,
+              electricUnits: Number(b.electricUnits || 0),
+              waterUnits: Number(b.waterUnits || 0)
+            }))
+            setBills(mappedBills)
+          }
+
+          // 3. โหลดค่าใช้จ่าย
+          await loadExpensesData(taxYear, currentWsId)
+        }
+      } catch (err) {
+        console.error("Failed to load initial data in tax page:", err)
       }
     }
 
-    // 3. โหลดการตั้งค่าการคำนวณภาษี
-    const savedDataSource = localStorage.getItem("horset_tax_datasource") as "system" | "manual" | null
-    const savedManualRent = localStorage.getItem("horset_tax_manual_rent405")
-    const savedManualUtil = localStorage.getItem("horset_tax_manual_utilities408")
-    const savedDedMethod = localStorage.getItem("horset_tax_deduction_method_405") as any
-    const savedActExp405 = localStorage.getItem("horset_tax_actual_expense_405")
-    const savedActExp408 = localStorage.getItem("horset_tax_actual_expense_408")
-
-    if (savedDataSource) setDataSource(savedDataSource)
-    if (savedManualRent) setManualRent405(Number(savedManualRent))
-    if (savedManualUtil) setManualUtilities408(Number(savedManualUtil))
-    if (savedDedMethod) setDeductionMethod405(savedDedMethod)
-    if (savedActExp405) setActualExpense405(Number(savedActExp405))
-    if (savedActExp408) setActualExpense408(Number(savedActExp408))
-  }, [])
+    loadInitialData()
+  }, [taxYear])
 
   // ฟังก์ชันโหลดข้อมูลค่าใช้จ่ายจาก DB
-  const loadExpensesData = async (year: string) => {
+  const loadExpensesData = async (year: string, explicitWsId?: string) => {
     setLoadingExpenses(true)
     try {
-      const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
-      const res = await getExpenses(year, wsId)
+      let activeWsId = explicitWsId
+      if (!activeWsId) {
+        const userRes = await getCurrentUserProfileAction()
+        if (userRes.success && userRes.data && userRes.data.workspace_id) {
+          activeWsId = userRes.data.workspace_id
+        }
+      }
+      
+      const res = await getExpenses(year, activeWsId)
       if (res.success && res.data) {
         setExpenses(res.data)
         
@@ -149,11 +165,9 @@ export default function TaxPage() {
         setDbActualExpense405(sum405)
         setDbActualExpense408(sum408)
         
-        // อัปเดตตัวแปรจริงที่ใช้คำนวณและเก็บลง LocalStorage อัตโนมัติเพื่อแสดงผลแบบเรียลไทม์
+        // อัปเดตตัวแปรจริงที่ใช้คำนวณแบบเรียลไทม์
         setActualExpense405(sum405)
         setActualExpense408(sum408)
-        localStorage.setItem("horset_tax_actual_expense_405", String(sum405))
-        localStorage.setItem("horset_tax_actual_expense_408", String(sum408))
       }
     } catch (e) {
       console.error("Failed to load expenses:", e)
@@ -212,13 +226,11 @@ export default function TaxPage() {
           expenseCategory
         )
       } else {
-        const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
         res = await createExpense(
           expenseTitle.trim(),
           amt,
           taxYear,
-          expenseCategory,
-          wsId
+          expenseCategory
         )
       }
 
@@ -253,35 +265,29 @@ export default function TaxPage() {
     }
   }
 
-  // บันทึกการตั้งค่ากลับไปยัง localStorage เมื่อมีการเปลี่ยนแปลง
+  // บันทึกการตั้งค่าเมื่อมีการเปลี่ยนแปลง
   const handleDataSourceChange = (val: "system" | "manual") => {
     setDataSource(val)
-    localStorage.setItem("horset_tax_datasource", val)
   }
 
   const handleManualRentChange = (val: number) => {
     setManualRent405(val)
-    localStorage.setItem("horset_tax_manual_rent405", String(val))
   }
 
   const handleManualUtilChange = (val: number) => {
     setManualUtilities408(val)
-    localStorage.setItem("horset_tax_manual_utilities408", String(val))
   }
 
   const handleDeductionMethodChange = (val: "เหมา 60%" | "เหมา 30%" | "ตามจริง") => {
     setDeductionMethod405(val)
-    localStorage.setItem("horset_tax_deduction_method_405", val)
   }
 
   const handleActualExpense405Change = (val: number) => {
     setActualExpense405(val)
-    localStorage.setItem("horset_tax_actual_expense_405", String(val))
   }
 
   const handleActualExpense408Change = (val: number) => {
     setActualExpense408(val)
-    localStorage.setItem("horset_tax_actual_expense_408", String(val))
   }
 
   // อัตราการคำนวณบิล

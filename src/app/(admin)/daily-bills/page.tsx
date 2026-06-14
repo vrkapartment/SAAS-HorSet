@@ -56,6 +56,14 @@ const commonExpensesGuide = [
   { name: "ค่าถุงขยะสีดำและอุปกรณ์ล้างพื้น", category: "40_8", categoryText: "40(8) บริการ", desc: "ค่าวัสดุสิ้นเปลืองใช้ในการทำความสะอาดพื้นที่ส่วนกลางเพื่อรักษาระดับการบริการของหอพัก" }
 ]
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
 export default function DailyBillsPage() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -74,7 +82,7 @@ export default function DailyBillsPage() {
   const [activeGuideCategory, setActiveGuideCategory] = useState<"all" | "40_5" | "40_8">("all")
 
   // Adaptive Mobile Tab switcher: "bills" หรือ "guide"
-  const [activeTab, setActiveTab] = useState<"bills" | "guide">("bills")
+  const [activeTab, setActiveTab] = useState<"bills" | "guide">("guide")
 
   // สถานะ Custom Delete Confirm Modal (SaaS Premium UX)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -94,7 +102,7 @@ export default function DailyBillsPage() {
   const loadData = async (year: string) => {
     setLoading(true)
     try {
-      const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
+      const wsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") || undefined : undefined
       const res = await getExpenses(year, wsId)
       if (res.success && res.data) {
         setExpenses(res.data)
@@ -118,7 +126,7 @@ export default function DailyBillsPage() {
 
     const checkSupportStatus = async () => {
       if (mockRole === "super_admin") {
-        const activeWsId = localStorage.getItem("horset_current_workspace_id")
+        const activeWsId = getCookie("horset_current_workspace_id")
         if (!activeWsId) {
           setSupportApproved(false)
           return
@@ -142,12 +150,12 @@ export default function DailyBillsPage() {
               setSupportApproved(false)
             }
           } catch (e) {
-            // fallback เช็คจาก localStorage
-            const savedStatus = localStorage.getItem(`horset_support_status_${activeWsId}`) || "none"
+            // fallback เช็คจากคุกกี้
+            const savedStatus = getCookie(`horset_support_status_${activeWsId}`) || "none"
             setSupportApproved(savedStatus === "approved")
           }
         } else {
-          const savedStatus = localStorage.getItem(`horset_support_status_${activeWsId}`) || "none"
+          const savedStatus = getCookie(`horset_support_status_${activeWsId}`) || "none"
           setSupportApproved(savedStatus === "approved")
         }
       } else {
@@ -226,7 +234,7 @@ export default function DailyBillsPage() {
 
     try {
       let res
-      const wsId = typeof window !== "undefined" ? localStorage.getItem("horset_current_workspace_id") || undefined : undefined
+      const wsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") || undefined : undefined
       if (editingExpense) {
         res = await updateExpense(editingExpense.id, formTitle.trim(), amt, taxYear, formCategory)
       } else {

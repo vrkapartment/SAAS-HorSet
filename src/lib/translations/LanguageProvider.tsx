@@ -19,12 +19,27 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
+function setCookie(name: string, value: string, days = 365) {
+  if (typeof document === "undefined") return
+  const date = new Date()
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
+  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("th")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const savedLocale = localStorage.getItem("horset_locale") as Locale
+    const savedLocale = getCookie("horset_locale") as Locale
     if (savedLocale === "th" || savedLocale === "en") {
       setLocaleState(savedLocale)
     }
@@ -33,7 +48,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = (newLocale: Locale) => {
     setLocaleState(newLocale)
-    localStorage.setItem("horset_locale", newLocale)
+    setCookie("horset_locale", newLocale)
   }
 
   // Safe nested key lookup (e.g. t("common.login"))

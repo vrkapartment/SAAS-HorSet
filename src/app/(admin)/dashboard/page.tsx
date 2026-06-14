@@ -176,16 +176,8 @@ export default function AdminDashboard() {
   }
 
   const setupDemoFallback = (cycle: string) => {
-    const savedBillsStr = typeof window !== "undefined" ? localStorage.getItem("horset_bills") : null
-    const savedRoomsStr = typeof window !== "undefined" ? localStorage.getItem("horset_rooms") : null
-    
     let localBills: any[] = []
     let localRooms: any[] = []
-    
-    try {
-      if (savedBillsStr) localBills = JSON.parse(savedBillsStr)
-      if (savedRoomsStr) localRooms = JSON.parse(savedRoomsStr)
-    } catch (e) {}
 
     const cycleLabel = cycle === "2026-06" ? "มิ.ย." : cycle === "2026-05" ? "พ.ค." : "เม.ย."
 

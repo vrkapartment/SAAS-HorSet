@@ -5,6 +5,21 @@ import { useRouter } from "next/navigation"
 import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight, User, Phone, Sparkles, AlertCircle } from "lucide-react"
 import { registerWithSecretCodeAction } from "@/features/auth/actions"
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
+function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return
+  const date = new Date()
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
+  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}`
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -36,9 +51,9 @@ export default function RegisterPage() {
     const cleanedCode = secretCode.trim().toUpperCase()
 
     if (isDemo) {
-      // ค้นหารหัสใน LocalStorage
-      const localCodes = localStorage.getItem("horset_registration_codes")
-      const codes = localCodes ? JSON.parse(localCodes) : []
+      // ค้นหารหัสใน Cookies
+      const localCodes = getCookie("horset_registration_codes")
+      const codes = localCodes ? JSON.parse(decodeURIComponent(localCodes)) : []
       const foundCode = codes.find((c: any) => c.code === cleanedCode)
 
       if (!foundCode) {
@@ -96,8 +111,8 @@ export default function RegisterPage() {
         }
       ]
 
-      const localProfiles = localStorage.getItem("horset_profiles")
-      const profs = localProfiles ? JSON.parse(localProfiles) : defaultProfs
+      const localProfiles = getCookie("horset_profiles")
+      const profs = localProfiles ? JSON.parse(decodeURIComponent(localProfiles)) : defaultProfs
 
       const exists = profs.some((p: any) => p.email.toLowerCase() === email.trim().toLowerCase())
       if (exists) {
@@ -121,13 +136,13 @@ export default function RegisterPage() {
           created_at: new Date().toISOString()
         }
         profs.push(newProfile)
-        localStorage.setItem("horset_profiles", JSON.stringify(profs))
+        setCookie("horset_profiles", encodeURIComponent(JSON.stringify(profs)))
 
         // 2. ปรับปรุงสถานะรหัสเชิญชวนว่าใช้แล้ว
         const updatedCodes = codes.map((c: any) =>
           c.code === cleanedCode ? { ...c, is_used: true, used_by_email: email.trim() } : c
         )
-        localStorage.setItem("horset_registration_codes", JSON.stringify(updatedCodes))
+        setCookie("horset_registration_codes", encodeURIComponent(JSON.stringify(updatedCodes)))
 
         setLoading(false)
         setSuccess("✓ [Demo] สมัครสมาชิกและระบุสังกัดตึกเรียบร้อยแล้ว! กำลังนำทางไปหน้าเข้าสู่ระบบ...")
@@ -197,7 +212,7 @@ export default function RegisterPage() {
           {/* บาจแสดงสถานะระบบ */}
           {isDemo ? (
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-[11px] flex items-center gap-2">
-              <span>⚠️ โหมดจำลอง (ตรวจสอบรหัสผ่าน LocalStorage)</span>
+              <span>⚠️ โหมดจำลอง (ตรวจสอบรหัสผ่าน Cookies)</span>
             </div>
           ) : (
             <div className="p-3 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl text-[11px] flex items-center gap-2">

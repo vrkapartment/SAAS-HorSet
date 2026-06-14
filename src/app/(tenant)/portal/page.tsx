@@ -2,6 +2,21 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
+function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return
+  const date = new Date()
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
+  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}`
+}
 import {
   Building,
   Calendar,
@@ -47,6 +62,7 @@ export default function TenantPortal() {
   const [uploadedSlip, setUploadedSlip] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [promptPayId, setPromptPayId] = useState("0899999999")
+  const [promptPayName, setPromptPayName] = useState("สมเจตน์ แสนสุข")
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [history, setHistory] = useState<BillHistoryItem[]>([])
   const [baseRent, setBaseRent] = useState(4500)
@@ -79,12 +95,6 @@ export default function TenantPortal() {
 
   const loadPortalData = async () => {
     const res = await getTenantPortalData()
-    
-    // Save promptpay configs
-    const savedPPId = localStorage.getItem("horset_promptpay_id")
-    if (savedPPId) {
-      setPromptPayId(savedPPId)
-    }
 
     if (res.success && res.data) {
       setIsDemo(false)
@@ -92,6 +102,12 @@ export default function TenantPortal() {
       setRoomNumber(data.roomNumber || "ไม่มีห้อง")
       setTenantName(data.tenantName)
       setBaseRent(data.baseRent)
+      if (data.promptPayId) {
+        setPromptPayId(data.promptPayId)
+      }
+      if (data.promptPayName) {
+        setPromptPayName(data.promptPayName)
+      }
 
       const activeBills = data.bills as any[]
       if (activeBills && activeBills.length > 0) {
@@ -124,10 +140,10 @@ export default function TenantPortal() {
       setBaseRent(4500)
 
       const loadMyBill = () => {
-        const savedBills = localStorage.getItem("horset_bills")
+        const savedBills = getCookie("horset_bills")
         if (savedBills) {
           try {
-            const bills = JSON.parse(savedBills)
+            const bills = JSON.parse(decodeURIComponent(savedBills))
             const myBill = bills.find((b: any) => b.roomNumber === "105" && b.billingCycle === "2026-06")
             if (myBill) {
               setBill(myBill)
@@ -171,8 +187,8 @@ export default function TenantPortal() {
           console.error("Error loading user profile:", err)
         }
       } else {
-        const savedName = localStorage.getItem("horset_demo_tenant_profile_name")
-        const savedPhone = localStorage.getItem("horset_demo_tenant_profile_phone")
+        const savedName = getCookie("horset_demo_tenant_profile_name")
+        const savedPhone = getCookie("horset_demo_tenant_profile_phone")
         
         setProfileName(savedName || "คุณณัฐพล ใจดี")
         setProfilePhone(savedPhone || "089-999-9999")
@@ -227,8 +243,8 @@ export default function TenantPortal() {
     } else {
       // โหมดเดโม
       setTimeout(() => {
-        localStorage.setItem("horset_demo_tenant_profile_name", profileName)
-        localStorage.setItem("horset_demo_tenant_profile_phone", profilePhone)
+        setCookie("horset_demo_tenant_profile_name", profileName)
+        setCookie("horset_demo_tenant_profile_phone", profilePhone)
         setTenantName(profileName)
         setProfileSuccess("✓ [Demo Mode] อัปเดตข้อมูลและรหัสผ่านจำลองสำเร็จแล้ว!")
         setProfilePassword("")
@@ -254,7 +270,6 @@ export default function TenantPortal() {
     setDownloadingPdf(true)
     try {
       const { generateBillPdf } = await import("@/lib/pdfHelper")
-      const promptPayName = localStorage.getItem("horset_promptpay_name") || "สมเจตน์ แสนสุข"
       
       const blob = await generateBillPdf({
         roomNumber,
@@ -294,17 +309,17 @@ export default function TenantPortal() {
         setUploadedSlip(mockSlipUrl)
         setBillStatus("pending")
 
-        const savedBills = localStorage.getItem("horset_bills")
+        const savedBills = getCookie("horset_bills")
         if (savedBills) {
           try {
-            const bills = JSON.parse(savedBills)
+            const bills = JSON.parse(decodeURIComponent(savedBills))
             const updatedBills = bills.map((b: any) => {
               if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
                 return { ...b, status: "pending", slipUrl: mockSlipUrl }
               }
               return b
             })
-            localStorage.setItem("horset_bills", JSON.stringify(updatedBills))
+            setCookie("horset_bills", encodeURIComponent(JSON.stringify(updatedBills)))
           } catch (e) {
             console.error(e)
           }
@@ -542,17 +557,17 @@ export default function TenantPortal() {
                   if (isDemo) {
                     setBillStatus("unpaid")
                     setUploadedSlip(null)
-                    const savedBills = localStorage.getItem("horset_bills")
+                    const savedBills = getCookie("horset_bills")
                     if (savedBills) {
                       try {
-                        const bills = JSON.parse(savedBills)
+                        const bills = JSON.parse(decodeURIComponent(savedBills))
                         const updatedBills = bills.map((b: any) => {
                           if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
                             return { ...b, status: "unpaid", slipUrl: null }
                           }
                           return b
                         })
-                        localStorage.setItem("horset_bills", JSON.stringify(updatedBills))
+                        setCookie("horset_bills", encodeURIComponent(JSON.stringify(updatedBills)))
                       } catch (e) {
                         console.error(e)
                       }

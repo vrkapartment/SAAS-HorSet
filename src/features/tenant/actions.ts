@@ -255,6 +255,21 @@ export async function getTenantPortalData() {
 
     if (tenantError) throw tenantError
 
+    let promptPayId = ""
+    let promptPayName = ""
+
+    if (tenant && tenant.workspace_id) {
+      const { data: ws } = await supabase
+        .from("workspaces")
+        .select("promptpay_id, promptpay_name")
+        .eq("id", tenant.workspace_id)
+        .maybeSingle()
+      if (ws) {
+        promptPayId = ws.promptpay_id || ""
+        promptPayName = ws.promptpay_name || ""
+      }
+    }
+
     if (!tenant) {
       // Profile exists but not assigned as a tenant in any room yet
       return {
@@ -264,7 +279,9 @@ export async function getTenantPortalData() {
           roomNumber: null,
           tenantName: profile.full_name || profile.email,
           baseRent: 0,
-          bills: []
+          bills: [],
+          promptPayId,
+          promptPayName
         }
       }
     }
@@ -304,7 +321,9 @@ export async function getTenantPortalData() {
         roomNumber: roomNumber || null,
         tenantName: tenant.tenant_name || profile.full_name,
         baseRent: tenant.rooms?.room_types ? Number((tenant.rooms as any).room_types.default_rent) : (tenant.rooms?.base_rent ? Number(tenant.rooms.base_rent) : 0),
-        bills: formattedBills
+        bills: formattedBills,
+        promptPayId,
+        promptPayName
       }
     }
   } catch (error) {

@@ -25,6 +25,8 @@ import {
 import { getBills, createBill, updateBillStatus } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, saveMeterRecord } from "@/features/meter/actions"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { getFinanceSettings } from "@/features/finance/actions"
 
 interface UnifiedRoomBillingItem {
   roomNumber: string
@@ -63,6 +65,8 @@ export default function UnifiedBillingPage() {
   const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
   const [electricMinChecked, setElectricMinChecked] = useState<boolean>(true)
   const [electricMinUnit, setElectricMinUnit] = useState<number>(10)
+  const [promptPayId, setPromptPayId] = useState<string>("0899999999")
+  const [promptPayName, setPromptPayName] = useState<string>("สมเจตน์ แสนสุข")
   
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
@@ -184,21 +188,30 @@ export default function UnifiedBillingPage() {
   }, [billingCycle])
 
   useEffect(() => {
-    const savedCommonFee = localStorage.getItem("horset_common_fee")
-    const savedWaterRate = localStorage.getItem("horset_water_rate")
-    const savedElectricRate = localStorage.getItem("horset_electric_rate")
-    const savedWaterMinChecked = localStorage.getItem("horset_water_min_checked")
-    const savedWaterMinUnit = localStorage.getItem("horset_water_min_unit")
-    const savedElectricMinChecked = localStorage.getItem("horset_electric_min_checked")
-    const savedElectricMinUnit = localStorage.getItem("horset_electric_min_unit")
-
-    if (savedCommonFee) setCommonFee(Number(savedCommonFee))
-    if (savedWaterRate) setWaterRate(Number(savedWaterRate))
-    if (savedElectricRate) setElecRate(Number(savedElectricRate))
-    if (savedWaterMinChecked) setWaterMinChecked(savedWaterMinChecked === "true")
-    if (savedWaterMinUnit) setWaterMinUnit(Number(savedWaterMinUnit))
-    if (savedElectricMinChecked) setElectricMinChecked(savedElectricMinChecked === "true")
-    if (savedElectricMinUnit) setElectricMinUnit(Number(savedElectricMinUnit))
+    async function loadFinance() {
+      try {
+        const userRes = await getCurrentUserProfileAction()
+        if (userRes.success && userRes.data && userRes.data.workspace_id) {
+          const wsId = userRes.data.workspace_id
+          const financeRes = await getFinanceSettings(wsId)
+          if (financeRes.success && financeRes.data) {
+            const data = financeRes.data
+            if (data.common_fee) setCommonFee(data.common_fee)
+            if (data.water_rate) setWaterRate(data.water_rate)
+            if (data.electric_rate) setElecRate(data.electric_rate)
+            setWaterMinChecked(data.water_min_checked)
+            if (data.water_min_unit) setWaterMinUnit(data.water_min_unit)
+            setElectricMinChecked(data.electric_min_checked)
+            if (data.electric_min_unit) setElectricMinUnit(data.electric_min_unit)
+            if (data.promptpay_id) setPromptPayId(data.promptpay_id)
+            if (data.promptpay_name) setPromptPayName(data.promptpay_name)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load finance settings:", err)
+      }
+    }
+    loadFinance()
   }, [])
 
   const showToast = (msg: string) => {
@@ -407,9 +420,6 @@ export default function UnifiedBillingPage() {
     setDownloadingPdfId(item.roomNumber)
     try {
       const { generateBillPdf } = await import("@/lib/pdfHelper")
-      const promptPayId = localStorage.getItem("horset_promptpay_id") || "0899999999"
-      const promptPayName = localStorage.getItem("horset_promptpay_name") || "สมเจตน์ แสนสุข"
-      
       const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - item.elecPrev : 0
       const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - item.waterPrev : 0
 

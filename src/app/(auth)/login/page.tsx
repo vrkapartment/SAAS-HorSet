@@ -51,13 +51,16 @@ export default function LoginPage() {
     setError(null)
 
     if (isDemo) {
-      // ค้นหาผู้ใช้จาก localStorage ของ Demo Mode
-      const localProfiles = localStorage.getItem("horset_profiles")
-      const mockProfs = localProfiles ? JSON.parse(localProfiles) : []
+      // ค้นหาผู้ใช้จากรายการจำลอง
+      const mockProfs: any[] = [
+        { email: "admin@example.com", role: "admin", workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851" },
+        { email: "staff@example.com", role: "staff", workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851" },
+        { email: "tenant@example.com", role: "tenant", workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851" }
+      ]
       const foundProfile = mockProfs.find((p: any) => p.email.toLowerCase() === email.trim().toLowerCase())
 
       let role = selectedRole
-      let workspaceId = ""
+      let workspaceId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
 
       if (foundProfile) {
         role = foundProfile.role
@@ -85,7 +88,6 @@ export default function LoginPage() {
             document.cookie = `horset_user_role=${role}; path=/; max-age=86400`
           }
           if (workspaceId) {
-            localStorage.setItem("horset_current_workspace_id", workspaceId)
             document.cookie = `horset_current_workspace_id=${workspaceId}; path=/; max-age=86400`
           }
           navigateToDashboardWithRole(role)
@@ -103,7 +105,7 @@ export default function LoginPage() {
           if (role === "admin" && res.data.tfaEnabled && !show2FA) {
             setShow2FA(true)
           } else {
-            // ดึง workspace_id ล่าสุดของผู้ใช้ที่ล็อกอินจริงมาเก็บใน cookie/localStorage
+            // ดึง workspace_id ล่าสุดของผู้ใช้ที่ล็อกอินจริงมาเก็บใน cookie
             const supabase = createClient()
             const { data: profData } = await supabase
               .from("profiles")
@@ -112,7 +114,6 @@ export default function LoginPage() {
               .single()
             
             if (profData?.workspace_id) {
-              localStorage.setItem("horset_current_workspace_id", profData.workspace_id)
               document.cookie = `horset_current_workspace_id=${profData.workspace_id}; path=/; max-age=86400`
             }
             
@@ -139,15 +140,10 @@ export default function LoginPage() {
           document.cookie = `horset_user_role=${selectedRole}; path=/; max-age=86400`
         }
         
-        // ถ้าเป็น Demo Mode และมี profile ใน localStorage ให้ดึง workspace_id มาเซ็ตด้วย
+        // ถ้าเป็น Demo Mode ให้เซ็ต workspace_id ใน cookie เป็นแสนสุข แมนชั่น
         if (isDemo) {
-          const localProfiles = localStorage.getItem("horset_profiles")
-          const mockProfs = localProfiles ? JSON.parse(localProfiles) : []
-          const foundProfile = mockProfs.find((p: any) => p.email.toLowerCase() === email.trim().toLowerCase())
-          if (foundProfile?.workspace_id) {
-            localStorage.setItem("horset_current_workspace_id", foundProfile.workspace_id)
-            document.cookie = `horset_current_workspace_id=${foundProfile.workspace_id}; path=/; max-age=86400`
-          }
+          const defaultWs = "d290f1ee-6c54-4b01-90e6-d701748f0851"
+          document.cookie = `horset_current_workspace_id=${defaultWs}; path=/; max-age=86400`
         }
         
         navigateToDashboardWithRole(selectedRole)

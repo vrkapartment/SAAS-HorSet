@@ -43,6 +43,21 @@ interface Workspace {
   name: string
 }
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
+function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return
+  const date = new Date()
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
+  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`
+}
+
 export default function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -95,11 +110,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     const loadWorkspaceAndSupport = async () => {
       let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
       
-      const savedWsId = localStorage.getItem("horset_current_workspace_id")
+      const savedWsId = getCookie("horset_current_workspace_id")
       if (savedWsId) {
         activeWsId = savedWsId
       } else {
-        localStorage.setItem("horset_current_workspace_id", activeWsId)
+        setCookie("horset_current_workspace_id", activeWsId)
       }
 
       if (!isDemo) {
@@ -119,7 +134,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             } else {
               setCurrentWorkspace(wsData[0])
               activeWsId = wsData[0].id
-              localStorage.setItem("horset_current_workspace_id", activeWsId)
+              setCookie("horset_current_workspace_id", activeWsId)
             }
           }
 
@@ -140,7 +155,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             setSupportStatus("none")
           }
         } catch (err) {
-          console.error("Supabase load error, fallback to localStorage", err)
+          console.error("Supabase load error, fallback to cookie/mock", err)
           fallbackMock(activeWsId)
         }
       } else {
@@ -149,9 +164,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
 
     const fallbackMock = (activeWsId: string) => {
-      const localWorkspaces = localStorage.getItem("horset_workspaces")
+      const localWorkspaces = getCookie("horset_workspaces")
       const mockWs: Workspace[] = localWorkspaces
-        ? JSON.parse(localWorkspaces)
+        ? JSON.parse(decodeURIComponent(localWorkspaces))
         : [
             { id: "d290f1ee-6c54-4b01-90e6-d701748f0851", name: "แสนสุข แมนชั่น (Default)" },
             { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์ (Demo 2)" }
@@ -163,11 +178,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         setCurrentWorkspace(matched)
       } else if (mockWs.length > 0) {
         setCurrentWorkspace(mockWs[0])
-        localStorage.setItem("horset_current_workspace_id", mockWs[0].id)
+        setCookie("horset_current_workspace_id", mockWs[0].id)
       }
       
-      // ดึงสถานะ Support จาก localStorage
-      const savedStatus = localStorage.getItem(`horset_support_status_${activeWsId}`) || "none"
+      // ดึงสถานะ Support จาก cookie
+      const savedStatus = getCookie(`horset_support_status_${activeWsId}`) || "none"
       setSupportStatus(savedStatus)
       
       if (savedStatus === "pending" && mockRole === "admin") {
@@ -193,8 +208,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           console.error("Error loading user profile:", err)
         }
       } else {
-        const savedName = localStorage.getItem(`horset_demo_profile_name_${userRole}`)
-        const savedPhone = localStorage.getItem(`horset_demo_profile_phone_${userRole}`)
+        const savedName = getCookie(`horset_demo_profile_name_${userRole}`)
+        const savedPhone = getCookie(`horset_demo_profile_phone_${userRole}`)
         
         const defaultName = userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย"
         const defaultPhone = "089-999-9999"
@@ -253,8 +268,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     } else {
       // โหมดเดโม
       setTimeout(() => {
-        localStorage.setItem(`horset_demo_profile_name_${userRole}`, profileName)
-        localStorage.setItem(`horset_demo_profile_phone_${userRole}`, profilePhone)
+        setCookie(`horset_demo_profile_name_${userRole}`, profileName)
+        setCookie(`horset_demo_profile_phone_${userRole}`, profilePhone)
         setFullName(profileName)
         setProfileSuccess("✓ [Demo Mode] อัปเดตข้อมูลและรหัสผ่านจำลองสำเร็จแล้ว!")
         setProfilePassword("")
@@ -270,7 +285,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   // ฟังก์ชันสลับ Workspace
   const handleSwitchWorkspace = (ws: Workspace) => {
-    localStorage.setItem("horset_current_workspace_id", ws.id)
+    setCookie("horset_current_workspace_id", ws.id)
     // เก็บเป็นคุกกี้ด้วยเพื่อให้ server action อ่านได้สะดวก
     document.cookie = `horset_current_workspace_id=${ws.id}; path=/; max-age=86400`
     setCurrentWorkspace(ws)
@@ -301,7 +316,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         console.error(err)
       }
     } else {
-      localStorage.setItem(`horset_support_status_${currentWorkspace.id}`, "pending")
+      setCookie(`horset_support_status_${currentWorkspace.id}`, "pending")
       setSupportStatus("pending")
       alert("✓ [Demo] ส่งคำขอสิทธิ์สนับสนุนระบบเรียบร้อยแล้ว! (เมื่อเข้าสู่ระบบด้วยสิทธิ์ Admin ของห้องพักนี้ จะเห็นป๊อปอัปให้กดอนุมัติ)")
     }
@@ -328,7 +343,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         console.error(err)
       }
     } else {
-      localStorage.setItem(`horset_support_status_${currentWorkspace.id}`, nextStatus)
+      setCookie(`horset_support_status_${currentWorkspace.id}`, nextStatus)
       setSupportStatus(nextStatus)
       setShowSupportModal(false)
     }
@@ -357,7 +372,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         console.error(err)
       }
     } else {
-      localStorage.setItem(`horset_support_status_${currentWorkspace.id}`, "none")
+      setCookie(`horset_support_status_${currentWorkspace.id}`, "none")
       setSupportStatus("none")
       router.push("/super-admin")
     }
