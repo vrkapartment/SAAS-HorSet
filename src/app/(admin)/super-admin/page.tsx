@@ -25,7 +25,13 @@ import {
   Key
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { createWorkspaceUserAction } from "@/features/super-admin/actions"
+import { 
+  createWorkspaceUserAction,
+  updateUserProfileAdminAction,
+  deleteUserProfileAdminAction,
+  updateWorkspaceNameAdminAction,
+  deleteWorkspaceAdminAction
+} from "@/features/super-admin/actions"
 
 interface Workspace {
   id: string
@@ -402,13 +408,9 @@ export default function SuperAdminPage() {
 
     if (!isDemo) {
       try {
-        const supabase = createClient()
-        const { error: delErr } = await supabase
-          .from("profiles")
-          .delete()
-          .eq("id", id)
+        const res = await deleteUserProfileAdminAction(id)
+        if (!res.success) throw new Error(res.error)
 
-        if (delErr) throw delErr
         setProfiles(profiles.filter((p) => p.id !== id))
         setResultSuccess(`✓ ถอนสิทธิ์บัญชี ${email} เรียบร้อยแล้ว`)
       } catch (err: any) {
@@ -431,13 +433,8 @@ export default function SuperAdminPage() {
 
     if (!isDemo) {
       try {
-        const supabase = createClient()
-        const { error: wsErr } = await supabase
-          .from("workspaces")
-          .delete()
-          .eq("id", id)
-
-        if (wsErr) throw wsErr
+        const res = await deleteWorkspaceAdminAction(id)
+        if (!res.success) throw new Error(res.error)
 
         setWorkspaces(workspaces.filter((w) => w.id !== id))
         setResultSuccess(`✓ ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
@@ -475,13 +472,8 @@ export default function SuperAdminPage() {
 
     if (!isDemo) {
       try {
-        const supabase = createClient()
-        const { error: wsErr } = await supabase
-          .from("workspaces")
-          .update({ name: updatedName })
-          .eq("id", editingWorkspace.id)
-
-        if (wsErr) throw wsErr
+        const res = await updateWorkspaceNameAdminAction(editingWorkspace.id, updatedName)
+        if (!res.success) throw new Error(res.error)
 
         setWorkspaces(workspaces.map((w) => w.id === editingWorkspace.id ? { ...w, name: updatedName } : w))
         setResultSuccess(`✓ แก้ไขชื่อ Workspace เป็น "${updatedName}" สำเร็จ`)
@@ -518,18 +510,13 @@ export default function SuperAdminPage() {
 
     if (!isDemo) {
       try {
-        const supabase = createClient()
-        const { error: profErr } = await supabase
-          .from("profiles")
-          .update({
-            role: updatedRole,
-            workspace_id: updatedWorkspaceId,
-            full_name: updatedFullName,
-            phone: updatedPhone
-          })
-          .eq("id", editingProfile.id)
-
-        if (profErr) throw profErr
+        const res = await updateUserProfileAdminAction(editingProfile.id, {
+          role: updatedRole,
+          workspaceId: updatedWorkspaceId,
+          fullName: updatedFullName,
+          phone: updatedPhone
+        })
+        if (!res.success) throw new Error(res.error)
 
         setProfiles(profiles.map((p) => p.id === editingProfile.id ? {
           ...p,
