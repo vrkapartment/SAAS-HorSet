@@ -16,19 +16,19 @@ export async function updateSession(request: NextRequest) {
   const tenantPaths = ["/portal"]
 
   // ตรวจสอบความถูกต้องของเส้นทางกับสิทธิ์ผู้ใช้งาน
-  if (adminPaths.includes(path) && mockRole !== "admin") {
+  if (adminPaths.includes(path) && mockRole !== "admin" && mockRole !== "super_admin") {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
-  if (sharedPaths.includes(path) && mockRole !== "admin" && mockRole !== "staff") {
+  if (sharedPaths.includes(path) && mockRole !== "admin" && mockRole !== "staff" && mockRole !== "super_admin") {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
-  if (staffPaths.includes(path) && mockRole !== "staff" && mockRole !== "admin") {
+  if (staffPaths.includes(path) && mockRole !== "staff" && mockRole !== "admin" && mockRole !== "super_admin") {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
@@ -43,7 +43,7 @@ export async function updateSession(request: NextRequest) {
   // หากผู้ใช้อยู่ที่หน้า login แต่ล็อกอินแล้ว ให้นำทางไปแดชบอร์ดตามสิทธิ์ที่มี
   if (path === "/login" && mockRole) {
     const url = request.nextUrl.clone()
-    if (mockRole === "admin") {
+    if (mockRole === "admin" || mockRole === "super_admin") {
       url.pathname = "/dashboard"
       return NextResponse.redirect(url)
     } else if (mockRole === "staff") {

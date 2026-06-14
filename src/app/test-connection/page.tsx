@@ -62,7 +62,7 @@ export default function TestConnectionPage() {
       .find((row) => row.startsWith("horset_user_role="))
       ?.split("=")[1]
     
-    if (userRole !== "admin") {
+    if (userRole !== "admin" && userRole !== "super_admin") {
       router.push("/login")
       return
     }

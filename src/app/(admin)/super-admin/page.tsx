@@ -1,0 +1,765 @@
+"use client"
+
+import React, { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import DashboardLayout from "@/components/DashboardLayout"
+import {
+  Building,
+  Plus,
+  Users,
+  UserPlus,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  Trash2,
+  Search,
+  RefreshCw,
+  Mail,
+  Phone,
+  ShieldAlert,
+  AlertCircle,
+  Clock,
+  Lock
+} from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { createWorkspaceUserAction } from "@/features/super-admin/actions"
+
+interface Workspace {
+  id: string
+  name: string
+  created_at: string
+}
+
+interface ProfileItem {
+  id: string
+  email: string
+  full_name: string | null
+  phone: string | null
+  role: "admin" | "staff" | "tenant" | "super_admin"
+  workspace_id: string | null
+  workspace_name?: string
+  created_at: string
+}
+
+export default function SuperAdminPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setResultSuccess] = useState<string | null>(null)
+
+  // ข้อมูลจากฐานข้อมูล
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [profiles, setProfiles] = useState<ProfileItem[]>([])
+  const [supportGrants, setSupportGrants] = useState<{ [key: string]: string }>({})
+
+  // ค้นหาและคัดกรอง
+  const [searchWorkspace, setSearchWorkspace] = useState("")
+  const [searchProfile, setSearchProfile] = useState("")
+
+  // ฟอร์มเพิ่ม Workspace
+  const [newWorkspaceName, setNewWorkspaceName] = useState("")
+  const [addingWorkspace, setAddingWorkspace] = useState(false)
+
+  // ฟอร์มเพิ่มบัญชี / สิทธิ์ (Role) ประจำ Workspace
+  const [newUserEmail, setNewUserEmail] = useState("")
+  const [newUserPassword, setNewUserPassword] = useState("")
+  const [newUserFullName, setNewUserFullName] = useState("")
+  const [newUserPhone, setNewUserPhone] = useState("")
+  const [newUserRole, setNewUserRole] = useState<"admin" | "staff" | "tenant">("admin")
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("")
+  const [addingUser, setAddingUser] = useState(false)
+
+  // ตรวจสอบโหมดทดสอบ
+  const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+
+  // โหลดข้อมูลทั้งหมด
+  const loadData = async () => {
+    setLoading(true)
+    setError(null)
+    setResultSuccess(null)
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+
+        // 1. โหลดข้อมูล Workspaces
+        const { data: wsData, error: wsError } = await supabase
+          .from("workspaces")
+          .select("*")
+          .order("created_at", { ascending: false })
+
+        if (wsError) throw wsError
+        setWorkspaces(wsData || [])
+
+        if (wsData && wsData.length > 0 && !selectedWorkspaceId) {
+          setSelectedWorkspaceId(wsData[0].id)
+        }
+
+        // 2. โหลดข้อมูล Profiles
+        const { data: profData, error: profError } = await supabase
+          .from("profiles")
+          .select("*")
+          .order("created_at", { ascending: false })
+
+        if (profError) throw profError
+        setProfiles(profData || [])
+
+        // 3. โหลดข้อมูลการช่วยเหลือ (Support Access Grants)
+        const { data: grantData, error: grantError } = await supabase
+          .from("support_access_grants")
+          .select("*")
+
+        if (grantData) {
+          const grantMap: { [key: string]: string } = {}
+          grantData.forEach((g: any) => {
+            grantMap[g.workspace_id] = g.status
+          })
+          setSupportGrants(grantMap)
+        }
+      } catch (err) {
+        console.error(err)
+        setError("ไม่สามารถโหลดข้อมูลจาก Supabase ได้ กำลังดึงข้อมูลจากระบบจำลองแทน...")
+        fallbackMock()
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      fallbackMock()
+      setLoading(false)
+    }
+  }
+
+  const fallbackMock = () => {
+    // โหลดจาก localStorage
+    const localWorkspaces = localStorage.getItem("horset_workspaces")
+    const mockWs: Workspace[] = localWorkspaces
+      ? JSON.parse(localWorkspaces)
+      : [
+          { id: "d290f1ee-6c54-4b01-90e6-d701748f0851", name: "แสนสุข แมนชั่น (Default)", created_at: new Date().toISOString() },
+          { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์ (Demo 2)", created_at: new Date().toISOString() }
+        ]
+    setWorkspaces(mockWs)
+    if (mockWs.length > 0 && !selectedWorkspaceId) {
+      setSelectedWorkspaceId(mockWs[0].id)
+    }
+
+    const localProfiles = localStorage.getItem("horset_profiles")
+    const mockProfs: ProfileItem[] = localProfiles
+      ? JSON.parse(localProfiles)
+      : [
+          {
+            id: "u1",
+            email: "admin@horset.com",
+            full_name: "คุณสมเจตน์ (เจ้าของ)",
+            phone: "0812345678",
+            role: "admin",
+            workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            created_at: new Date().toISOString()
+          },
+          {
+            id: "u2",
+            email: "staff_somchai@horset.com",
+            full_name: "สมชาย (ผู้ช่วย)",
+            phone: "0898765432",
+            role: "staff",
+            workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            created_at: new Date().toISOString()
+          },
+          {
+            id: "u3",
+            email: "tenant_room101@horset.com",
+            full_name: "สมศรี ใจดี (ผู้เช่าห้อง 101)",
+            phone: "0855555555",
+            role: "tenant",
+            workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            created_at: new Date().toISOString()
+          }
+        ]
+    setProfiles(mockProfs)
+
+    // โหลดสถานะแกรนท์ของแต่ละ Workspace
+    const grantMap: { [key: string]: string } = {}
+    mockWs.forEach((ws) => {
+      grantMap[ws.id] = localStorage.getItem(`horset_support_status_${ws.id}`) || "none"
+    })
+    setSupportGrants(grantMap)
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  // ฟังก์ชันเพิ่ม Workspace ใหม่
+  const handleAddWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newWorkspaceName.trim()) return
+
+    setAddingWorkspace(true)
+    setError(null)
+    setResultSuccess(null)
+
+    const newId = crypto.randomUUID()
+    const newWs: Workspace = {
+      id: newId,
+      name: newWorkspaceName.trim(),
+      created_at: new Date().toISOString()
+    }
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error: wsErr } = await supabase
+          .from("workspaces")
+          .insert([newWs])
+
+        if (wsErr) throw wsErr
+
+        setWorkspaces([newWs, ...workspaces])
+        setNewWorkspaceName("")
+        setResultSuccess(`✓ เพิ่ม Workspace "${newWs.name}" เข้าระบบเรียบร้อยแล้ว`)
+        if (!selectedWorkspaceId) {
+          setSelectedWorkspaceId(newId)
+        }
+      } catch (err: any) {
+        setError("ไม่สามารถเพิ่ม Workspace ใน Supabase: " + err.message)
+      } finally {
+        setAddingWorkspace(false)
+      }
+    } else {
+      // โหมด Demo บันทึกลง localStorage
+      const updated = [newWs, ...workspaces]
+      setWorkspaces(updated)
+      localStorage.setItem("horset_workspaces", JSON.stringify(updated))
+      localStorage.setItem(`horset_support_status_${newId}`, "none")
+      setNewWorkspaceName("")
+      setResultSuccess(`✓ [Demo] เพิ่ม Workspace "${newWs.name}" เรียบร้อยแล้ว`)
+      setAddingWorkspace(false)
+    }
+  }
+
+  // ฟังก์ชันเพิ่มสิทธิ์/บัญชีผู้ใช้งานใหม่ประจำ Workspace
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newUserEmail || !selectedWorkspaceId) return
+
+    setAddingUser(true)
+    setError(null)
+    setResultSuccess(null)
+
+    const newId = crypto.randomUUID()
+    const newProfile: ProfileItem = {
+      id: newId,
+      email: newUserEmail.trim(),
+      full_name: newUserFullName.trim() || null,
+      phone: newUserPhone.trim() || null,
+      role: newUserRole,
+      workspace_id: selectedWorkspaceId,
+      created_at: new Date().toISOString()
+    }
+
+    if (!isDemo) {
+      try {
+        const result = await createWorkspaceUserAction({
+          email: newUserEmail.trim(),
+          password: newUserPassword || undefined,
+          fullName: newUserFullName.trim(),
+          phone: newUserPhone.trim(),
+          role: newUserRole,
+          workspaceId: selectedWorkspaceId
+        })
+
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+
+        setNewUserEmail("")
+        setNewUserPassword("")
+        setNewUserFullName("")
+        setNewUserPhone("")
+        setResultSuccess(`✓ สร้างบัญชีสำเร็จและมอบสิทธิ์ "${newUserRole.toUpperCase()}" ให้บัญชี ${newUserEmail.trim()} เรียบร้อยแล้ว สามารถเข้าใช้งานได้ทันที`)
+        
+        // โหลดข้อมูลรายชื่อใหม่เพื่อให้โปรไฟล์ที่ถูกสร้างผ่าน Trigger แสดงผลบนหน้าจอด้วย ID จริงจาก Auth
+        await loadData()
+      } catch (err: any) {
+        setError("ไม่สามารถเพิ่มบัญชีผู้ใช้ใน Supabase: " + err.message)
+      } finally {
+        setAddingUser(false)
+      }
+    } else {
+      // โหมด Demo บันทึกลง localStorage
+      const updated = [newProfile, ...profiles]
+      setProfiles(updated)
+      localStorage.setItem("horset_profiles", JSON.stringify(updated))
+      setNewUserEmail("")
+      setNewUserPassword("")
+      setNewUserFullName("")
+      setNewUserPhone("")
+      setResultSuccess(`✓ [Demo] มอบสิทธิ์ "${newUserRole.toUpperCase()}" ให้บัญชี ${newUserEmail} สำเร็จ`)
+      setAddingUser(false)
+    }
+  }
+
+  // ฟังก์ชันสลับไปจัดการสิทธิ์ของ Workspace นั้นๆ ทันที
+  const handleEnterWorkspace = (ws: Workspace) => {
+    localStorage.setItem("horset_current_workspace_id", ws.id)
+    document.cookie = `horset_current_workspace_id=${ws.id}; path=/; max-age=86400`
+    
+    // ตั้งคุกกี้สิทธิ์เป็น admin ชั่วคราวหากได้รับการอนุมัติช่วยเหลือ เพื่อให้สามารถเปิดหน้า แดชบอร์ด, จัดการห้องพัก, จัดการบิล ได้ปกติ
+    const status = supportGrants[ws.id] || "none"
+    if (status === "approved") {
+      alert(`✓ กำลังเปลี่ยนโหมดเข้าสลับช่วยเหลือหอพัก "${ws.name}" ด้วยสิทธิ์ตรวจสอบระบบ...`)
+      router.push("/dashboard")
+    } else {
+      alert(`⚠️ คุณยังไม่มีสิทธิ์เข้าถึงหอพักนี้! โปรดกด 'ส่งคำขอเข้าช่วยเหลือระบบ' ในเมนูด้านซ้ายและให้เจ้าของระบบกดอนุมัติก่อน`)
+    }
+  }
+
+  // ฟังก์ชันลบสิทธิ์ผู้ใช้งาน (ในหน้าควบคุม)
+  const handleDeleteProfile = async (id: string, email: string) => {
+    if (!confirm(`คุณต้องการถอนสิทธิ์การใช้งานบัญชี ${email} ใช่หรือไม่?`)) return
+
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error: delErr } = await supabase
+          .from("profiles")
+          .delete()
+          .eq("id", id)
+
+        if (delErr) throw delErr
+        setProfiles(profiles.filter((p) => p.id !== id))
+        setResultSuccess(`✓ ถอนสิทธิ์บัญชี ${email} เรียบร้อยแล้ว`)
+      } catch (err: any) {
+        setError("เกิดข้อผิดพลาดในการลบสิทธิ์: " + err.message)
+      }
+    } else {
+      const updated = profiles.filter((p) => p.id !== id)
+      setProfiles(updated)
+      localStorage.setItem("horset_profiles", JSON.stringify(updated))
+      setResultSuccess(`✓ [Demo] ถอนสิทธิ์บัญชี ${email} สำเร็จ`)
+    }
+  }
+
+  // คัดกรองข้อมูล
+  const filteredWorkspaces = workspaces.filter((ws) =>
+    ws.name.toLowerCase().includes(searchWorkspace.toLowerCase())
+  )
+
+  const filteredProfiles = profiles.filter((p) => {
+    const wsName = workspaces.find((w) => w.id === p.workspace_id)?.name || "ไม่มีสังกัด"
+    return (
+      p.email.toLowerCase().includes(searchProfile.toLowerCase()) ||
+      (p.full_name && p.full_name.toLowerCase().includes(searchProfile.toLowerCase())) ||
+      p.role.toLowerCase().includes(searchProfile.toLowerCase()) ||
+      wsName.toLowerCase().includes(searchProfile.toLowerCase())
+    )
+  })
+
+  return (
+    <DashboardLayout role="super_admin">
+      <div className="space-y-8 pb-12">
+        
+        {/* หัวข้อ แนะนำผู้ดูแลระบบ */}
+        <div className="relative p-8 rounded-3xl overflow-hidden glass-panel border border-purple-500/10 shadow-2xl">
+          <div className="absolute top-0 right-0 w-[400px] h-[200px] bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold rounded-full text-xs uppercase tracking-wider animate-pulse">
+                <ShieldCheck className="w-3.5 h-3.5" /> แผงควบคุมควบคุมระบบสูงสุด
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-purple-400">
+                Super Admin Console
+              </h1>
+              <p className="text-slate-400 text-sm max-w-xl">
+                ระบบจัดการผู้ใช้แบบรวมศูนย์กลาง มอบหมายพื้นที่ทำงาน (Workspace) ตั้งค่าบทบาท และสลับสิทธิ์การเข้าตรวจสอบข้อมูลเพื่อบริการช่วยเหลือลูกค้า
+              </p>
+            </div>
+            
+            <button
+              onClick={loadData}
+              className="px-5 py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg shrink-0 self-start md:self-center"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-purple-400" : ""}`} /> 
+              รีเฟรชข้อมูลระบบ
+            </button>
+          </div>
+        </div>
+
+        {/* แสดงผลแจ้งเตือนสถานะสำเร็จ / ข้อผิดพลาด */}
+        {error && (
+          <div className="p-4 bg-red-500/10 border border-red-500/25 text-red-400 rounded-2xl text-xs flex items-center gap-3 shadow-lg">
+            <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+        {success && (
+          <div className="p-4 bg-teal-500/10 border border-teal-500/25 text-teal-400 rounded-2xl text-xs flex items-center gap-3 shadow-lg">
+            <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0" />
+            <span>{success}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* คอลัมน์ซ้าย: จัดการพื้นที่ทำงาน (Workspace Management) */}
+          <div className="lg:col-span-7 space-y-8">
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-blue-600/10 text-blue-400 rounded-xl border border-blue-500/20">
+                    <Building className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-200">พื้นที่ทำงานทั้งหมด (Workspaces)</h2>
+                    <p className="text-[11px] text-slate-500">จำลองสิทธิ์การเข้าตรวจสอบดูแลข้อมูลแยกแต่ละตึก</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ค้นหา Workspace */}
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                  <Search className="w-4 h-4 text-slate-500" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อหอพัก/Workspace..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 transition-colors text-xs"
+                  value={searchWorkspace}
+                  onChange={(e) => setSearchWorkspace(e.target.value)}
+                />
+              </div>
+
+              {/* รายการพื้นที่ทำงาน */}
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                {filteredWorkspaces.map((ws) => {
+                  const status = supportGrants[ws.id] || "none"
+                  return (
+                    <div
+                      key={ws.id}
+                      className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/60 hover:border-slate-700/80 transition-all flex items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1.5 min-w-0">
+                        <h4 className="text-sm font-semibold text-slate-200 truncate">{ws.name}</h4>
+                        <div className="flex items-center gap-4 text-[10px] text-slate-500">
+                          <span className="font-mono">ID: {ws.id.substring(0, 8)}...</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> {new Date(ws.created_at).toLocaleDateString("th-TH")}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {/* ป้ายแสดงสิทธิ์การเข้าช่วยเหลือ */}
+                        {status === "approved" ? (
+                          <span className="text-[10px] bg-teal-500/10 border border-teal-500/25 text-teal-400 font-semibold px-2 py-0.5 rounded-lg flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-ping" />
+                            อนุมัติช่วยเหลือแล้ว
+                          </span>
+                        ) : status === "pending" ? (
+                          <span className="text-[10px] bg-amber-500/10 border border-amber-500/25 text-amber-400 font-semibold px-2 py-0.5 rounded-lg animate-pulse">
+                            ⏳ รอยืนยันคำขอ
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-red-500/10 border border-red-500/25 text-red-400 font-semibold px-2 py-0.5 rounded-lg">
+                            ✕ ไม่มีสิทธิ์
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => handleEnterWorkspace(ws)}
+                          className={`p-2 py-1.5 text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-all ${
+                            status === "approved"
+                              ? "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/10"
+                              : "bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          สลับหอ <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {filteredWorkspaces.length === 0 && (
+                  <div className="text-center py-8 text-slate-500 text-xs">
+                    ไม่พบข้อมูลหอพักที่ค้นหา
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ฟอร์มเพิ่ม Workspace */}
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl">
+              <form onSubmit={handleAddWorkspace} className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-blue-400" />
+                  <h3 className="text-sm font-semibold text-slate-200">สร้างพื้นที่ทำงานหอพักใหม่ (Add Workspace)</h3>
+                </div>
+                
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น ตึก บานเย็น คอร์ท, แสนสบาย เพลส..."
+                    className="flex-1 px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-xs transition-colors"
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={addingWorkspace}
+                    className="px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-blue-600/10 shrink-0"
+                  >
+                    {addingWorkspace ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" /> เพิ่มหอพัก
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* คอลัมน์ขวา: จัดการบัญชีและบทบาทผู้ใช้งาน (User & Role Provisoning) */}
+          <div className="lg:col-span-5 space-y-8">
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-purple-600/10 text-purple-400 rounded-xl border border-purple-500/20">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-200">มอบบทบาท/สิทธิ์ (Add User Role)</h2>
+                  <p className="text-[11px] text-slate-500">กำหนดบัญชีผู้ใช้งานระบุ Workspace และระดับสิทธิ์</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleAddUser} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium">สังกัดหอพัก (Workspace)</label>
+                  <select
+                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-purple-500 text-xs transition-colors"
+                    value={selectedWorkspaceId}
+                    onChange={(e) => setSelectedWorkspaceId(e.target.value)}
+                  >
+                    {workspaces.map((ws) => (
+                      <option key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">อีเมลใช้งานสำหรับเข้าสู่ระบบ</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="name@horset.com"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">รหัสผ่านสำหรับเข้าสู่ระบบ</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-500">
+                        <Lock className="w-3.5 h-3.5" />
+                      </span>
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        placeholder="รหัสผ่านอย่างน้อย 6 ตัว"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                        value={newUserPassword}
+                        onChange={(e) => setNewUserPassword(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">ชื่อ-นามสกุล</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น สมใจ รักษ์ดี"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      value={newUserFullName}
+                      onChange={(e) => setNewUserFullName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">เบอร์โทรศัพท์</label>
+                    <input
+                      type="text"
+                      placeholder="08xxxxxxxx"
+                      className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-xs transition-colors"
+                      value={newUserPhone}
+                      onChange={(e) => setNewUserPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์ในระบบ (Role)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { role: "admin", label: "แอดมิน (เจ้าของ)" },
+                      { role: "staff", label: "ผู้ช่วย (สต๊าฟ)" },
+                      { role: "tenant", label: "ผู้เช่าตึก" }
+                    ].map((item) => (
+                      <button
+                        key={item.role}
+                        type="button"
+                        onClick={() => setNewUserRole(item.role as any)}
+                        className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold border transition-all ${
+                          newUserRole === item.role
+                            ? "bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/10"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={addingUser || !selectedWorkspaceId}
+                  className="w-full mt-2 glow-btn bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-purple-600/10"
+                >
+                  {addingUser ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" /> สร้างบัญชีและมอบสิทธิ์
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+
+        </div>
+
+        {/* แผงตารางด้านล่าง: รายชื่อผู้ใช้งานสิทธิ์ต่างๆ */}
+        <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-200">บัญชีรายชื่อสิทธิ์ผู้ใช้งานทั้งหมด</h2>
+                <p className="text-[11px] text-slate-500">สแกนบทบาททั้งหมด แยกแต่ละตึก และจัดการถอนสิทธิ์ระบบหลัก</p>
+              </div>
+            </div>
+
+            {/* ค้นหาโปรไฟล์ */}
+            <div className="w-full md:w-80 relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                <Search className="w-4 h-4 text-slate-500" />
+              </span>
+              <input
+                type="text"
+                placeholder="ค้นหาด้วย อีเมล, ชื่อ-นามสกุล, หรือสิทธิ์..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-200 transition-colors text-xs"
+                value={searchProfile}
+                onChange={(e) => setSearchProfile(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* ตารางโปรไฟล์ */}
+          <div className="overflow-x-auto rounded-2xl border border-slate-900">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-900">
+                  <th className="p-4">อีเมลผู้ใช้งาน</th>
+                  <th className="p-4">ชื่อผู้เช่า/ผู้ช่วย</th>
+                  <th className="p-4">เบอร์โทร</th>
+                  <th className="p-4">สิทธิ์การเข้าถึง</th>
+                  <th className="p-4">สังกัดตึก (Workspace)</th>
+                  <th className="p-4 text-center">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-900/60 bg-slate-950/20">
+                {filteredProfiles.map((p) => {
+                  const wsName = workspaces.find((w) => w.id === p.workspace_id)?.name || "ไม่มีสังกัด (Global / Super Admin)"
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-900/25 transition-colors">
+                      <td className="p-4 font-semibold text-slate-200">
+                        <div className="flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-slate-500" />
+                          {p.email}
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-300">
+                        {p.full_name || "-"}
+                      </td>
+                      <td className="p-4 text-slate-400 font-mono">
+                        {p.phone ? (
+                          <div className="flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-slate-500" /> {p.phone}
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          p.role === "super_admin"
+                            ? "bg-purple-500/20 text-purple-400 border border-purple-500/10"
+                            : p.role === "admin"
+                            ? "bg-red-500/20 text-red-400 border border-red-500/10"
+                            : p.role === "staff"
+                            ? "bg-teal-500/20 text-teal-400 border border-teal-500/10"
+                            : "bg-blue-500/20 text-blue-400 border border-blue-500/10"
+                        }`}>
+                          {p.role.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-300 font-medium">
+                        {wsName}
+                      </td>
+                      <td className="p-4 text-center">
+                        {p.role !== "super_admin" && (
+                          <button
+                            onClick={() => handleDeleteProfile(p.id, p.email)}
+                            className="p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-lg border border-red-500/10 transition-colors"
+                            title="ถอนสิทธิ์ผู้ใช้งาน"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+
+                {filteredProfiles.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center p-8 text-slate-500 text-xs">
+                      ไม่พบข้อมูลรายชื่อบัญชีผู้ใช้ในระบบ
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </DashboardLayout>
+  )
+}
