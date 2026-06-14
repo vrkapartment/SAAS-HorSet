@@ -85,6 +85,30 @@ export default function UnifiedBillingPage() {
     }
   }
 
+  const getFallbackPrevReadings = (roomNumber: string, cycle: string) => {
+    // ฐานคำนวณตั้งต้นคือรอบ 2026-06
+    const baseCycleYear = 2026
+    const baseCycleMonth = 6
+    const [year, month] = cycle.split("-").map(Number)
+    // คำนวณหาจำนวนเดือนที่ห่างกันเพื่อปรับหน่วยถอยหลังหรือไปข้างหน้าตามจริง
+    const monthDiff = (year - baseCycleYear) * 12 + (month - baseCycleMonth)
+    
+    const baseElecPrev = 1000 + Number(roomNumber) * 3
+    const baseWaterPrev = 100 + Number(roomNumber)
+    
+    // ประมาณค่าเฉลี่ย: ไฟฟ้า 80 หน่วย, น้ำ 10 หน่วย ต่อเดือน
+    const estElecUsage = 80
+    const estWaterUsage = 10
+    
+    const elecPrev = baseElecPrev + (monthDiff * estElecUsage)
+    const waterPrev = baseWaterPrev + (monthDiff * estWaterUsage)
+    
+    return {
+      elecPrev: elecPrev > 0 ? elecPrev : 0,
+      waterPrev: waterPrev > 0 ? waterPrev : 0
+    }
+  }
+
   const loadData = async (cycle = billingCycle) => {
     setLoading(true)
     
@@ -174,9 +198,14 @@ export default function UnifiedBillingPage() {
         const roomMeter = localMeters.find((m: any) => m.roomNumber === r.roomNumber)
         const prevMeter = localPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
         
-        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบอัตโนมัติ
-        const elecPrev = roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? (Number(prevMeter.elecCurr) || Number(prevMeter.elecPrev)) : (1000 + Number(r.roomNumber) * 3))
-        const waterPrev = roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? (Number(prevMeter.waterCurr) || Number(prevMeter.waterPrev)) : (100 + Number(r.roomNumber)))
+        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
+        const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
+        const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
+          ? Number(prevMeter.elecCurr)
+          : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
+        const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
+          ? Number(prevMeter.waterCurr)
+          : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
         
         return {
           roomNumber: r.roomNumber,
@@ -208,9 +237,14 @@ export default function UnifiedBillingPage() {
         const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
         const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
         
-        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบอัตโนมัติ
-        const elecPrev = roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? (Number(prevMeter.elecCurr) || Number(prevMeter.elecPrev)) : (1000 + Number(r.roomNumber) * 3))
-        const waterPrev = roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? (Number(prevMeter.waterCurr) || Number(prevMeter.waterPrev)) : (100 + Number(r.roomNumber)))
+        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
+        const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
+        const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
+          ? Number(prevMeter.elecCurr)
+          : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
+        const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
+          ? Number(prevMeter.waterCurr)
+          : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
         
         return {
           roomNumber: r.roomNumber,
@@ -240,7 +274,7 @@ export default function UnifiedBillingPage() {
   }
 
   useEffect(() => {
-    loadData()
+    loadData(billingCycle)
   }, [billingCycle])
 
   useEffect(() => {

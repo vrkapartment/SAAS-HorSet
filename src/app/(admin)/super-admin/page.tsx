@@ -123,10 +123,6 @@ export default function SuperAdminPage() {
         if (wsError) throw wsError
         setWorkspaces(wsData || [])
 
-        if (wsData && wsData.length > 0 && !selectedWorkspaceId) {
-          setSelectedWorkspaceId(wsData[0].id)
-        }
-
         // 2. โหลดข้อมูล Profiles
         const { data: profData, error: profError } = await supabase
           .from("profiles")
@@ -160,8 +156,24 @@ export default function SuperAdminPage() {
         }
 
         if (wsData && wsData.length > 0) {
-          if (!selectedWorkspaceId) setSelectedWorkspaceId(wsData[0].id)
-          if (!genWorkspaceId) setGenWorkspaceId(wsData[0].id)
+          const savedSelectedWs = localStorage.getItem("horset_super_admin_selected_ws")
+          const savedGenWs = localStorage.getItem("horset_super_admin_gen_ws")
+
+          const matchedSelected = savedSelectedWs && wsData.some(w => w.id === savedSelectedWs)
+          const matchedGen = savedGenWs && wsData.some(w => w.id === savedGenWs)
+
+          const finalSelectedId = matchedSelected ? savedSelectedWs : wsData[0].id
+          const finalGenId = matchedGen ? savedGenWs : wsData[0].id
+
+          setSelectedWorkspaceId(finalSelectedId)
+          setGenWorkspaceId(finalGenId)
+
+          if (!savedSelectedWs) {
+            localStorage.setItem("horset_super_admin_selected_ws", finalSelectedId)
+          }
+          if (!savedGenWs) {
+            localStorage.setItem("horset_super_admin_gen_ws", finalGenId)
+          }
         }
       } catch (err) {
         console.error(err)
@@ -186,8 +198,26 @@ export default function SuperAdminPage() {
           { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์ (Demo 2)", created_at: new Date().toISOString() }
         ]
     setWorkspaces(mockWs)
-    if (mockWs.length > 0 && !selectedWorkspaceId) {
-      setSelectedWorkspaceId(mockWs[0].id)
+
+    const savedSelectedWs = localStorage.getItem("horset_super_admin_selected_ws")
+    const savedGenWs = localStorage.getItem("horset_super_admin_gen_ws")
+
+    if (mockWs.length > 0) {
+      const matchedSelected = savedSelectedWs && mockWs.some(w => w.id === savedSelectedWs)
+      const matchedGen = savedGenWs && mockWs.some(w => w.id === savedGenWs)
+
+      const finalSelectedId = matchedSelected ? savedSelectedWs : mockWs[0].id
+      const finalGenId = matchedGen ? savedGenWs : mockWs[0].id
+
+      setSelectedWorkspaceId(finalSelectedId)
+      setGenWorkspaceId(finalGenId)
+
+      if (!savedSelectedWs) {
+        localStorage.setItem("horset_super_admin_selected_ws", finalSelectedId)
+      }
+      if (!savedGenWs) {
+        localStorage.setItem("horset_super_admin_gen_ws", finalGenId)
+      }
     }
 
     const localProfiles = localStorage.getItem("horset_profiles")
@@ -235,9 +265,6 @@ export default function SuperAdminPage() {
     const localCodes = localStorage.getItem("horset_registration_codes")
     const mockCodes: RegistrationCode[] = localCodes ? JSON.parse(localCodes) : []
     setRegistrationCodes(mockCodes)
-    if (mockWs.length > 0 && !genWorkspaceId) {
-      setGenWorkspaceId(mockWs[0].id)
-    }
   }
 
   useEffect(() => {
@@ -843,7 +870,11 @@ export default function SuperAdminPage() {
                   <select
                     className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-purple-500 text-xs transition-colors"
                     value={selectedWorkspaceId}
-                    onChange={(e) => setSelectedWorkspaceId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setSelectedWorkspaceId(val)
+                      localStorage.setItem("horset_super_admin_selected_ws", val)
+                    }}
                   >
                     {workspaces.map((ws) => (
                       <option key={ws.id} value={ws.id}>
@@ -967,7 +998,11 @@ export default function SuperAdminPage() {
                   <select
                     className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-indigo-500 text-xs transition-colors"
                     value={genWorkspaceId}
-                    onChange={(e) => setGenWorkspaceId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setGenWorkspaceId(val)
+                      localStorage.setItem("horset_super_admin_gen_ws", val)
+                    }}
                   >
                     {workspaces.map((ws) => (
                       <option key={ws.id} value={ws.id}>

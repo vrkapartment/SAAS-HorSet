@@ -143,9 +143,21 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
 
     const fallbackMock = (activeWsId: string) => {
-      const matched = workspaces.find((w) => w.id === activeWsId)
+      const localWorkspaces = localStorage.getItem("horset_workspaces")
+      const mockWs: Workspace[] = localWorkspaces
+        ? JSON.parse(localWorkspaces)
+        : [
+            { id: "d290f1ee-6c54-4b01-90e6-d701748f0851", name: "แสนสุข แมนชั่น (Default)" },
+            { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์ (Demo 2)" }
+          ]
+      setWorkspaces(mockWs)
+
+      const matched = mockWs.find((w) => w.id === activeWsId)
       if (matched) {
         setCurrentWorkspace(matched)
+      } else if (mockWs.length > 0) {
+        setCurrentWorkspace(mockWs[0])
+        localStorage.setItem("horset_current_workspace_id", mockWs[0].id)
       }
       
       // ดึงสถานะ Support จาก localStorage
