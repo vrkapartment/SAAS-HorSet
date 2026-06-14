@@ -505,7 +505,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     router.push(item.path)
                   }
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
                   isActive
                     ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
                     : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-200"
@@ -544,7 +544,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
           >
             <LogOut className="w-4 h-4" />
             {t("common.logout") || "ออกจากระบบ"}
@@ -610,7 +610,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                       }
                       setMobileOpen(false)
                     }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
                       isActive
                         ? "bg-blue-600 text-white"
                         : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-200"
@@ -639,7 +639,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               </div>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-red-400"
+                className="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-left text-red-400"
               >
                 <LogOut className="w-4 h-4" />
                 {t("common.logout") || "ออกจากระบบ"}
