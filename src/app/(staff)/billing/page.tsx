@@ -51,6 +51,14 @@ interface UnifiedRoomBillingItem {
   waterUnits: number
 }
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
 export default function UnifiedBillingPage() {
   const [billingCycle, setBillingCycle] = useState("2026-06")
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
@@ -191,18 +199,20 @@ export default function UnifiedBillingPage() {
     async function loadFinance() {
       try {
         const userRes = await getCurrentUserProfileAction()
-        if (userRes.success && userRes.data && userRes.data.workspace_id) {
-          const wsId = userRes.data.workspace_id
+        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+        const wsId = cookieWsId || (userRes.success && userRes.data?.workspace_id)
+
+        if (wsId) {
           const financeRes = await getFinanceSettings(wsId)
           if (financeRes.success && financeRes.data) {
             const data = financeRes.data
-            if (data.common_fee) setCommonFee(data.common_fee)
-            if (data.water_rate) setWaterRate(data.water_rate)
-            if (data.electric_rate) setElecRate(data.electric_rate)
-            setWaterMinChecked(data.water_min_checked)
-            if (data.water_min_unit) setWaterMinUnit(data.water_min_unit)
-            setElectricMinChecked(data.electric_min_checked)
-            if (data.electric_min_unit) setElectricMinUnit(data.electric_min_unit)
+            if (data.common_fee !== undefined) setCommonFee(data.common_fee)
+            if (data.water_rate !== undefined) setWaterRate(data.water_rate)
+            if (data.electric_rate !== undefined) setElecRate(data.electric_rate)
+            setWaterMinChecked(!!data.water_min_checked)
+            if (data.water_min_unit !== undefined) setWaterMinUnit(data.water_min_unit)
+            setElectricMinChecked(!!data.electric_min_checked)
+            if (data.electric_min_unit !== undefined) setElectricMinUnit(data.electric_min_unit)
             if (data.promptpay_id) setPromptPayId(data.promptpay_id)
             if (data.promptpay_name) setPromptPayName(data.promptpay_name)
           }

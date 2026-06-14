@@ -51,15 +51,23 @@ interface BillItem {
   waterUnits: number
 }
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
 export default function TaxPage() {
   const [taxYear, setTaxYear] = useState("2026")
 
   // โหลดข้อมูลผู้เสียภาษีจากตั้งค่าการเงิน
-  const [firstName, setFirstName] = useState("สมเจตน์")
-  const [lastName, setLastName] = useState("แสนสุข")
-  const [taxId, setTaxId] = useState("1100100222333")
-  const [address, setAddress] = useState("123/45 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310")
-  const [phone, setPhone] = useState("089-999-9999")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [taxId, setTaxId] = useState("")
+  const [address, setAddress] = useState("")
+  const [phone, setPhone] = useState("")
   const [loadingPdf, setLoadingPdf] = useState<"90" | "94" | null>(null)
 
   // แหล่งที่มาของข้อมูลการคำนวณภาษี
@@ -96,17 +104,22 @@ export default function TaxPage() {
     async function loadInitialData() {
       try {
         const userRes = await getCurrentUserProfileAction()
-        if (userRes.success && userRes.data && userRes.data.workspace_id) {
-          const currentWsId = userRes.data.workspace_id
+        
+        // 1. ดึง workspace ID จากคุกกี้ปัจจุบันเพื่อให้ตรงกับ Workspace Switcher เมนูด้านบน
+        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+        
+        // 2. ถ้าไม่มีคุกกี้ ให้ใช้ของ profile
+        const currentWsId = cookieWsId || (userRes.success && userRes.data?.workspace_id)
 
+        if (currentWsId) {
           // 1. โหลดข้อมูลผู้เสียภาษี
           const res = await getFinanceSettings(currentWsId)
           if (res.success && res.data) {
-            setFirstName(res.data.tax_firstname || "สมเจตน์")
-            setLastName(res.data.tax_lastname || "แสนสุข")
-            setTaxId(res.data.tax_id || "1100100222333")
-            setAddress(res.data.tax_address || "123/45 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310")
-            setPhone(res.data.tax_phone || "089-999-9999")
+            setFirstName(res.data.tax_firstname || "")
+            setLastName(res.data.tax_lastname || "")
+            setTaxId(res.data.tax_id || "")
+            setAddress(res.data.tax_address || "")
+            setPhone(res.data.tax_phone || "")
           }
 
           // 2. โหลดบิลจากระบบ
@@ -145,9 +158,8 @@ export default function TaxPage() {
       let activeWsId = explicitWsId
       if (!activeWsId) {
         const userRes = await getCurrentUserProfileAction()
-        if (userRes.success && userRes.data && userRes.data.workspace_id) {
-          activeWsId = userRes.data.workspace_id
-        }
+        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+        activeWsId = cookieWsId || (userRes.success && userRes.data?.workspace_id) || undefined
       }
       
       const res = await getExpenses(year, activeWsId)
