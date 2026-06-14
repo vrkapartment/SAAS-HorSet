@@ -342,7 +342,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         const supabase = createClient()
         const { error } = await supabase
           .from("support_access_grants")
-          .update({ status: "none", updated_at: new Date().toISOString() })
+          .delete()
           .eq("workspace_id", currentWorkspace.id)
 
         if (!error) {
