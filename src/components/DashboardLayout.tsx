@@ -332,6 +332,35 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
   }
 
+  // ฟังก์ชันออกจากระบบ Workspace และยกเลิกสิทธิ์ช่วยเหลือ (สำหรับ Super Admin)
+  const handleExitSupport = async () => {
+    if (!confirm("คุณต้องการออกจากระบบและยกเลิกสิทธิ์เข้าช่วยเหลือสำหรับ Workspace นี้ใช่หรือไม่?")) {
+      return
+    }
+    if (!isDemo) {
+      try {
+        const supabase = createClient()
+        const { error } = await supabase
+          .from("support_access_grants")
+          .update({ status: "none", updated_at: new Date().toISOString() })
+          .eq("workspace_id", currentWorkspace.id)
+
+        if (!error) {
+          setSupportStatus("none")
+          router.push("/super-admin")
+        } else {
+          alert("เกิดข้อผิดพลาด: " + error.message)
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    } else {
+      localStorage.setItem(`horset_support_status_${currentWorkspace.id}`, "none")
+      setSupportStatus("none")
+      router.push("/super-admin")
+    }
+  }
+
   // เมนูนำทาง
   const menuItems = [
     {
@@ -395,7 +424,27 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
   ]
 
-  const filteredMenu = menuItems.filter(item => item.roles.includes(userRole))
+  const filteredMenu = menuItems.filter(item => {
+    // กรองตามสิทธิ์ปกติก่อน
+    if (!item.roles.includes(userRole)) return false
+
+    // หากเป็น Super Admin และไม่มีสิทธิ์ช่วยเหลือของ Workspace ปัจจุบัน ให้ซ่อนแท็บเกี่ยวกับตัวข้อมูลหอพัก/ผู้เช่า/บิล/ภาษี/การเงิน
+    if (userRole === "super_admin" && supportStatus !== "approved") {
+      const hiddenPaths = [
+        "/dashboard",
+        "/rooms",
+        "/tenants",
+        "/billing",
+        "/tax",
+        "/finance-settings"
+      ]
+      if (hiddenPaths.includes(item.path)) {
+        return false
+      }
+    }
+
+    return true
+  })
 
   const handleLogout = () => {
     document.cookie = "horset_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
@@ -485,6 +534,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 <div className="text-[9px] text-slate-500 text-left px-1 mt-1">
                   {t("dashboard.awaiting_admin_approval")}
                 </div>
+              )}
+
+              {supportStatus === "approved" && (
+                <button
+                  onClick={handleExitSupport}
+                  className="w-full mt-1.5 py-2 px-4 bg-red-600/90 hover:bg-red-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-red-600/10 flex items-center justify-between"
+                >
+                  <span>ออกจาก Workspace นี้</span>
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
           </div>
@@ -578,7 +637,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
                 {showDropdown && (
-                  <div className="mt-2 bg-slate-950 border border-slate-800 rounded-xl p-1.5 space-y-1">
+                  <div className="absolute left-0 right-0 mt-2 mx-4 bg-slate-950 border border-slate-800 rounded-xl p-1.5 space-y-1 z-30">
                     {workspaces.map((ws) => (
                       <button
                         key={ws.id}
@@ -592,6 +651,53 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     ))}
                   </div>
                 )}
+
+                {/* แสดงสถานะ Support Permission ของ Workspace ปัจจุบัน ในมือถือ */}
+                <div className="mt-3 pt-2.5 border-t border-slate-900 flex flex-col gap-1.5 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">{t("dashboard.support_access") || "สิทธิ์การช่วยเหลือ"}</span>
+                    {supportStatus === "approved" && (
+                      <span className="text-teal-400 font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3" /> {t("dashboard.approved") || "ได้รับสิทธิ์"}
+                      </span>
+                    )}
+                    {supportStatus === "pending" && (
+                      <span className="text-amber-400 font-semibold animate-pulse flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 animate-spin" /> {t("dashboard.pending") || "กำลังรอ"}
+                      </span>
+                    )}
+                    {(supportStatus === "revoked" || supportStatus === "none") && (
+                      <span className="text-red-400 font-semibold flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {t("dashboard.no_access") || "ไม่มีสิทธิ์"}
+                      </span>
+                    )}
+                  </div>
+
+                  {(supportStatus === "none" || supportStatus === "revoked") && (
+                    <button
+                      onClick={handleRequestSupport}
+                      className="w-full mt-1.5 py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-blue-600/10"
+                    >
+                      {t("dashboard.request_support") || "ส่งคำขอเข้าช่วยเหลือระบบ"}
+                    </button>
+                  )}
+
+                  {supportStatus === "pending" && (
+                    <div className="text-[9px] text-slate-500 text-left px-1 mt-1">
+                      {t("dashboard.awaiting_admin_approval") || "รอดำเนินการอนุมัติสิทธิ์"}
+                    </div>
+                  )}
+
+                  {supportStatus === "approved" && (
+                    <button
+                      onClick={handleExitSupport}
+                      className="w-full mt-1.5 py-2 px-4 bg-red-600/90 hover:bg-red-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-red-600/10 flex items-center justify-between"
+                    >
+                      <span>ออกจาก Workspace นี้</span>
+                      <LogOut className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
