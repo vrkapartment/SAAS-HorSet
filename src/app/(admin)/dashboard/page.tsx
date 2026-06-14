@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import {
   TrendingUp,
@@ -13,60 +14,172 @@ import {
   CheckCircle2,
   Clock
 } from "lucide-react"
+import { getRooms } from "@/features/room/actions"
+import { getTenants } from "@/features/tenant/actions"
+import { getBills } from "@/features/billing/actions"
 
 export default function AdminDashboard() {
-  // ข้อมูลจำลองสำหรับ UI แดชบอร์ด
-  const stats = [
-    {
-      title: "รายรับรอบเดือน มิ.ย.",
-      value: "148,250 บาท",
-      change: "+12.5% จากเดือนก่อน",
-      isPositive: true,
-      icon: DollarSign,
-      color: "text-blue-500",
-      bg: "bg-blue-500/10"
-    },
-    {
-      title: "จำนวนผู้เช่าปัจจุบัน",
-      value: "22 / 24 ห้อง",
-      change: "คิดเป็น 91.6% ของหอพัก",
-      isPositive: true,
-      icon: Users,
-      color: "text-teal-500",
-      bg: "bg-teal-500/10"
-    },
-    {
-      title: "ห้องว่างพร้อมเช่า",
-      value: "2 ห้อง",
-      change: "ห้อง 104, ห้อง 208",
-      isPositive: false,
-      icon: Home,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10"
-    },
-    {
-      title: "บิลค้างชำระเงิน",
-      value: "3 บิล",
-      change: "คิดเป็นเงิน 16,800 บาท",
-      isPositive: false,
-      icon: Clock,
-      color: "text-red-500",
-      bg: "bg-red-500/10"
+  const [isDemo, setIsDemo] = useState(false)
+  const [stats, setStats] = useState<any[]>([])
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+  const [recentActivities, setRecentActivities] = useState<any[]>([])
+
+  const loadDashboardData = async () => {
+    const roomsRes = await getRooms()
+    const tenantsRes = await getTenants()
+    const billsRes = await getBills()
+
+    const hasSupabase = roomsRes.success && tenantsRes.success && billsRes.success
+
+    if (hasSupabase && roomsRes.data && tenantsRes.data && billsRes.data) {
+      setIsDemo(false)
+      const rooms = roomsRes.data
+      const tenants = tenantsRes.data
+      const bills = billsRes.data as any[]
+
+      const totalRooms = rooms.length
+      const occupiedRooms = rooms.filter((r: any) => r.status === "occupied").length
+      const availableRooms = rooms.filter((r: any) => r.status === "available").length
+      
+      const currentMonthBills = bills.filter((b: any) => b.billingCycle === "2026-06")
+      const paidBills = currentMonthBills.filter((b: any) => b.status === "paid")
+      const unpaidBills = currentMonthBills.filter((b: any) => b.status === "unpaid" || b.status === "pending")
+      const pendingBills = currentMonthBills.filter((b: any) => b.status === "pending")
+
+      const totalRevenue = paidBills.reduce((sum, b) => sum + Number(b.amount), 0)
+      const unpaidAmount = unpaidBills.reduce((sum, b) => sum + Number(b.amount), 0)
+
+      setStats([
+        {
+          title: "รายรับรอบเดือน มิ.ย.",
+          value: `${totalRevenue.toLocaleString()} บาท`,
+          change: `จากที่จ่ายแล้ว ${paidBills.length} ห้อง`,
+          isPositive: true,
+          icon: DollarSign,
+          color: "text-blue-500",
+          bg: "bg-blue-500/10"
+        },
+        {
+          title: "จำนวนผู้เช่าปัจจุบัน",
+          value: `${occupiedRooms} / ${totalRooms} ห้อง`,
+          change: `คิดเป็น ${(totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0).toFixed(1)}% ของหอพัก`,
+          isPositive: true,
+          icon: Users,
+          color: "text-teal-500",
+          bg: "bg-teal-500/10"
+        },
+        {
+          title: "ห้องว่างพร้อมเช่า",
+          value: `${availableRooms} ห้อง`,
+          change: rooms.filter((r: any) => r.status === "available").slice(0, 2).map((r: any) => `ห้อง ${r.roomNumber}`).join(", ") || "ไม่มีห้องว่าง",
+          isPositive: false,
+          icon: Home,
+          color: "text-amber-500",
+          bg: "bg-amber-500/10"
+        },
+        {
+          title: "บิลค้างชำระเงิน",
+          value: `${unpaidBills.length} บิล`,
+          change: `คิดเป็นเงิน ${unpaidAmount.toLocaleString()} บาท (${pendingBills.length} รอยืนยัน)`,
+          isPositive: false,
+          icon: Clock,
+          color: "text-red-500",
+          bg: "bg-red-500/10"
+        }
+      ])
+
+      const formattedTxs = bills.slice(0, 4).map((b: any) => ({
+        room: `ห้อง ${b.roomNumber}`,
+        tenant: b.tenantName,
+        type: "โอนผ่านพร้อมเพย์",
+        amount: `${b.amount.toLocaleString()} บาท`,
+        status: b.status === "paid" ? "สำเร็จ" : b.status === "pending" ? "รอยืนยัน" : "ค้างชำระ",
+        time: "ล่าสุด"
+      }))
+      setRecentTransactions(formattedTxs)
+
+      const activities = []
+      if (tenants.length > 0) {
+        const latestTenant = tenants[0]
+        activities.push({
+          user: "ระบบอัตโนมัติ",
+          action: `ทำสัญญาเช่าใหม่ ห้อง ${latestTenant.roomNumber} (${latestTenant.fullName})`,
+          time: "ล่าสุด"
+        })
+      }
+      if (bills.length > 0) {
+        const pendingCount = bills.filter((b: any) => b.status === "pending").length
+        if (pendingCount > 0) {
+          activities.push({
+            user: "ผู้เช่า",
+            action: `มีบิลอัปโหลดสลิปรอการตรวจสอบจำนวน ${pendingCount} รายการ`,
+            time: "ล่าสุด"
+          })
+        }
+      }
+      activities.push({
+        user: "ระบบเชื่อมต่อ",
+        action: "เชื่อมต่อฐานข้อมูล Supabase สำเร็จ ทำการดึงข้อมูลสดเรียบร้อยแล้ว",
+        time: "เชื่อมต่อแล้ว"
+      })
+      setRecentActivities(activities)
+
+    } else {
+      setIsDemo(true)
+      
+      const savedBillsStr = localStorage.getItem("horset_bills")
+      const savedRoomsStr = localStorage.getItem("horset_rooms")
+      
+      let localBills = []
+      let localRooms = []
+      
+      try {
+        if (savedBillsStr) localBills = JSON.parse(savedBillsStr)
+        if (savedRoomsStr) localRooms = JSON.parse(savedRoomsStr)
+      } catch (e) {}
+
+      if (localRooms.length > 0 || localBills.length > 0) {
+        const totalRooms = localRooms.length || 24
+        const occupiedRooms = localRooms.filter((r: any) => r.status === "occupied").length || 22
+        const availableRooms = totalRooms - occupiedRooms
+        const paidBills = localBills.filter((b: any) => b.status === "paid")
+        const unpaidBills = localBills.filter((b: any) => b.status !== "paid")
+        const totalRevenue = paidBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0) || 148250
+        const unpaidAmount = unpaidBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0) || 16800
+
+        setStats([
+          { title: "รายรับรอบเดือน มิ.ย.", value: `${totalRevenue.toLocaleString()} บาท`, change: "+12.5% จากเดือนก่อน", isPositive: true, icon: DollarSign, color: "text-blue-500", bg: "bg-blue-500/10" },
+          { title: "จำนวนผู้เช่าปัจจุบัน", value: `${occupiedRooms} / ${totalRooms} ห้อง`, change: "คิดเป็น 91.6% ของหอพัก", isPositive: true, icon: Users, color: "text-teal-500", bg: "bg-teal-500/10" },
+          { title: "ห้องว่างพร้อมเช่า", value: `${availableRooms} ห้อง`, change: "ห้อง 104, ห้อง 208", isPositive: false, icon: Home, color: "text-amber-500", bg: "bg-amber-500/10" },
+          { title: "บิลค้างชำระเงิน", value: `${unpaidBills.length || 3} บิล`, change: `คิดเป็นเงิน ${unpaidAmount.toLocaleString()} บาท`, isPositive: false, icon: Clock, color: "text-red-500", bg: "bg-red-500/10" }
+        ])
+      } else {
+        setStats([
+          { title: "รายรับรอบเดือน มิ.ย.", value: "148,250 บาท", change: "+12.5% จากเดือนก่อน", isPositive: true, icon: DollarSign, color: "text-blue-500", bg: "bg-blue-500/10" },
+          { title: "จำนวนผู้เช่าปัจจุบัน", value: "22 / 24 ห้อง", change: "คิดเป็น 91.6% ของหอพัก", isPositive: true, icon: Users, color: "text-teal-500", bg: "bg-teal-500/10" },
+          { title: "ห้องว่างพร้อมเช่า", value: "2 ห้อง", change: "ห้อง 104, ห้อง 208", isPositive: false, icon: Home, color: "text-amber-500", bg: "bg-amber-500/10" },
+          { title: "บิลค้างชำระเงิน", value: "3 บิล", change: "คิดเป็นเงิน 16,800 บาท", isPositive: false, icon: Clock, color: "text-red-500", bg: "bg-red-500/10" }
+        ])
+      }
+
+      setRecentTransactions([
+        { room: "ห้อง 101", tenant: "คุณวิภาวี", type: "โอนผ่านพร้อมเพย์", amount: "5,400 บาท", status: "สำเร็จ", time: "10 นาทีที่แล้ว" },
+        { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: "โอนผ่านพร้อมเพย์", amount: "6,200 บาท", status: "สำเร็จ", time: "1 ชั่วโมงที่แล้ว" },
+        { room: "ห้อง 105", tenant: "คุณณัฐพล", type: "อัปโหลดสลิปค้างยืนยัน", amount: "5,800 บาท", status: "รอยืนยัน", time: "2 ชั่วโมงที่แล้ว" },
+        { room: "ห้อง 302", tenant: "คุณรภัสสร", type: "ยังไม่ได้ชำระ", amount: "5,600 บาท", status: "ค้างชำระ", time: "1 วันที่แล้ว" }
+      ])
+
+      setRecentActivities([
+        { user: "พนักงานสมชาย", action: "บันทึกตัวเลขมิเตอร์น้ำไฟรอบเดือน มิ.ย. ครบถ้วน", time: "เมื่อวานนี้" },
+        { user: "ระบบอัตโนมัติ", action: "ส่งใบแจ้งหนี้ PDF ไปยัง LINE OA ของผู้เช่าทั้งหมด 22 ห้อง", time: "2 วันก่อน" },
+        { user: "แอดมินสมเจตน์", action: "เพิ่มผู้เช่าใหม่สัญญา 1 ปี ห้อง 205 (คุณสุรศักดิ์)", time: "3 วันก่อน" }
+      ])
     }
-  ]
+  }
 
-  const recentTransactions = [
-    { room: "ห้อง 101", tenant: "คุณวิภาวี", type: "โอนผ่านพร้อมเพย์", amount: "5,400 บาท", status: "สำเร็จ", time: "10 นาทีที่แล้ว" },
-    { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: "โอนผ่านพร้อมเพย์", amount: "6,200 บาท", status: "สำเร็จ", time: "1 ชั่วโมงที่แล้ว" },
-    { room: "ห้อง 105", tenant: "คุณณัฐพล", type: "อัปโหลดสลิปค้างยืนยัน", amount: "5,800 บาท", status: "รอยืนยัน", time: "2 ชั่วโมงที่แล้ว" },
-    { room: "ห้อง 302", tenant: "คุณรภัสสร", type: "ยังไม่ได้ชำระ", amount: "5,600 บาท", status: "ค้างชำระ", time: "1 วันที่แล้ว" }
-  ]
-
-  const recentActivities = [
-    { user: "พนักงานสมชาย", action: "บันทึกตัวเลขมิเตอร์น้ำไฟรอบเดือน มิ.ย. ครบถ้วน", time: "เมื่อวานนี้" },
-    { user: "ระบบอัตโนมัติ", action: "ส่งใบแจ้งหนี้ PDF ไปยัง LINE OA ของผู้เช่าทั้งหมด 22 ห้อง", time: "2 วันก่อน" },
-    { user: "แอดมินสมเจตน์", action: "เพิ่มผู้เช่าใหม่สัญญา 1 ปี ห้อง 205 (คุณสุรศักดิ์)", time: "3 วันก่อน" }
-  ]
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
 
   return (
     <DashboardLayout role="admin">

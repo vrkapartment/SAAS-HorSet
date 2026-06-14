@@ -16,6 +16,8 @@ import {
   UserCheck,
   Download
 } from "lucide-react"
+import { getBills, createBill, updateBillStatus, deleteBill } from "@/features/billing/actions"
+import { getRooms } from "@/features/room/actions"
 
 interface BillItem {
   id: string
@@ -31,52 +33,76 @@ interface BillItem {
 
 export default function BillingPage() {
   const [billingCycle, setBillingCycle] = useState("2026-06")
+  const [bills, setBills] = useState<BillItem[]>([])
+  const [roomsList, setRoomsList] = useState<any[]>([])
+  const [isDemo, setIsDemo] = useState(false)
   
-  const initialBills: BillItem[] = [
-    { id: "1", roomNumber: "101", tenantName: "คุณวิภาวี สมบูรณ์", amount: 5400, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 60, waterUnits: 9 },
-    { id: "2", roomNumber: "102", tenantName: "คุณนพดล สุขศรี", amount: 6200, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 96, waterUnits: 12 },
-    { id: "3", roomNumber: "103", tenantName: "คุณวรรณภา ใสดี", amount: 5850, status: "unpaid", billingCycle: "2026-06", slipUrl: null, electricUnits: 85, waterUnits: 12 },
-    { id: "4", roomNumber: "105", tenantName: "คุณณัฐพล ใจดี", amount: 5760, status: "pending", billingCycle: "2026-06", slipUrl: "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=300", electricUnits: 84, waterUnits: 12 },
-    { id: "5", roomNumber: "201", tenantName: "คุณอรทัย มั่นคง", amount: 6100, status: "unpaid", billingCycle: "2026-06", slipUrl: null, electricUnits: 90, waterUnits: 10 },
-    { id: "6", roomNumber: "202", tenantName: "คุณสุชาติ เลิศรส", amount: 5310, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 67, waterUnits: 9 }
-  ]
-
-  // สเตตจำลองรายการบิลในระบบ
-  const [bills, setBills] = useState<BillItem[]>(initialBills)
-
-  // โหลดและบันทึกข้อมูลบิลจาก localStorage
-  useEffect(() => {
-    const savedBills = localStorage.getItem("horset_bills")
-    if (savedBills) {
-      try {
-        setBills(JSON.parse(savedBills))
-      } catch (e) {
-        console.error("Failed to parse bills from localStorage", e)
+  const loadData = async () => {
+    // 1. Load bills
+    const res = await getBills()
+    if (res.success && res.data) {
+      setBills(res.data as BillItem[])
+      setIsDemo(false)
+    } else if (res.fallback) {
+      setIsDemo(true)
+      const savedBills = localStorage.getItem("horset_bills")
+      if (savedBills) {
+        try {
+          setBills(JSON.parse(savedBills))
+        } catch (e) {
+          console.error("Failed to parse bills from localStorage", e)
+        }
+      } else {
+        const initialBills: BillItem[] = [
+          { id: "1", roomNumber: "101", tenantName: "คุณวิภาวี สมบูรณ์", amount: 5400, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 60, waterUnits: 9 },
+          { id: "2", roomNumber: "102", tenantName: "คุณนพดล สุขศรี", amount: 6200, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 96, waterUnits: 12 },
+          { id: "3", roomNumber: "103", tenantName: "คุณวรรณภา ใสดี", amount: 5850, status: "unpaid", billingCycle: "2026-06", slipUrl: null, electricUnits: 85, waterUnits: 12 },
+          { id: "4", roomNumber: "105", tenantName: "คุณณัฐพล ใจดี", amount: 5760, status: "pending", billingCycle: "2026-06", slipUrl: "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=300", electricUnits: 84, waterUnits: 12 },
+          { id: "5", roomNumber: "201", tenantName: "คุณอรทัย มั่นคง", amount: 6100, status: "unpaid", billingCycle: "2026-06", slipUrl: null, electricUnits: 90, waterUnits: 10 },
+          { id: "6", roomNumber: "202", tenantName: "คุณสุชาติ เลิศรส", amount: 5310, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 67, waterUnits: 9 }
+        ]
+        setBills(initialBills)
+        localStorage.setItem("horset_bills", JSON.stringify(initialBills))
       }
-    } else {
-      localStorage.setItem("horset_bills", JSON.stringify(initialBills))
     }
-  }, [])
 
-  const updateBills = (newBills: BillItem[]) => {
-    setBills(newBills)
-    localStorage.setItem("horset_bills", JSON.stringify(newBills))
+    // 2. Load rooms
+    const roomsRes = await getRooms()
+    if (roomsRes.success && roomsRes.data) {
+      setRoomsList(roomsRes.data)
+    }
   }
 
-  // ดึงข้อมูลค่าเช่าห้องพักปกติจากรายการห้องพักใน localStorage
-  const getRoomRentPrice = (roomNum: string): number => {
-    if (typeof window === "undefined") return 4500
-    const savedRooms = localStorage.getItem("horset_rooms")
-    if (savedRooms) {
-      try {
-        const rooms = JSON.parse(savedRooms)
-        const room = rooms.find((r: any) => r.roomNumber === roomNum)
-        if (room) return room.baseRent
-      } catch (e) {
-        console.error(e)
-      }
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const updateBillsState = (newBills: BillItem[]) => {
+    setBills(newBills)
+    if (isDemo) {
+      localStorage.setItem("horset_bills", JSON.stringify(newBills))
     }
-    return 4500 // ค่าเริ่มต้นหากหาไม่เจอ
+  }
+
+  // ดึงข้อมูลค่าเช่าห้องพักปกติจากรายการห้องพัก
+  const getRoomRentPrice = (roomNum: string): number => {
+    if (isDemo) {
+      if (typeof window === "undefined") return 4500
+      const savedRooms = localStorage.getItem("horset_rooms")
+      if (savedRooms) {
+        try {
+          const rooms = JSON.parse(savedRooms)
+          const room = rooms.find((r: any) => r.roomNumber === roomNum)
+          if (room) return room.baseRent
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      return 4500
+    } else {
+      const room = roomsList.find(r => r.roomNumber === roomNum)
+      return room ? room.baseRent : 4500
+    }
   }
 
   const [selectedBill, setSelectedBill] = useState<BillItem | null>(null)
@@ -98,35 +124,37 @@ export default function BillingPage() {
 
   // ดึงค่ามิเตอร์ที่เคยบันทึกไว้สำหรับห้องที่เลือกแบบอัตโนมัติ
   useEffect(() => {
-    const key = `horset_meter_records_${billingCycle}`
-    const savedRecords = localStorage.getItem(key)
-    if (savedRecords) {
-      try {
-        const records = JSON.parse(savedRecords)
-        const record = records.find((r: any) => r.roomNumber === newRoomNumber)
-        if (record) {
-          const prevE = Number(record.elecPrev)
-          const currE = Number(record.elecCurr)
-          const prevW = Number(record.waterPrev)
-          const currW = Number(record.waterCurr)
-          
-          if (!isNaN(currE) && currE > prevE) {
-            setElecUnits(currE - prevE)
-          } else {
-            setElecUnits(80)
-          }
+    if (isDemo) {
+      const key = `horset_meter_records_${billingCycle}`
+      const savedRecords = localStorage.getItem(key)
+      if (savedRecords) {
+        try {
+          const records = JSON.parse(savedRecords)
+          const record = records.find((r: any) => r.roomNumber === newRoomNumber)
+          if (record) {
+            const prevE = Number(record.elecPrev)
+            const currE = Number(record.elecCurr)
+            const prevW = Number(record.waterPrev)
+            const currW = Number(record.waterCurr)
+            
+            if (!isNaN(currE) && currE > prevE) {
+              setElecUnits(currE - prevE)
+            } else {
+              setElecUnits(80)
+            }
 
-          if (!isNaN(currW) && currW > prevW) {
-            setWaterUnits(currW - prevW)
-          } else {
-            setWaterUnits(10)
+            if (!isNaN(currW) && currW > prevW) {
+              setWaterUnits(currW - prevW)
+            } else {
+              setWaterUnits(10)
+            }
           }
+        } catch (e) {
+          console.error(e)
         }
-      } catch (e) {
-        console.error(e)
       }
     }
-  }, [newRoomNumber, billingCycle])
+  }, [newRoomNumber, billingCycle, isDemo])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -136,18 +164,38 @@ export default function BillingPage() {
   }
 
   // อนุมัติสลิปโอนเงิน
-  const handleApproveSlip = (id: string) => {
-    const updated = bills.map(b => b.id === id ? { ...b, status: "paid" as const } : b)
-    updateBills(updated)
+  const handleApproveSlip = async (id: string) => {
+    if (isDemo) {
+      const updated = bills.map(b => b.id === id ? { ...b, status: "paid" as const } : b)
+      updateBillsState(updated)
+    } else {
+      const res = await updateBillStatus(id, "paid")
+      if (res.success) {
+        await loadData()
+      } else {
+        alert(res.error || "อัปเดตไม่สำเร็จ")
+        return
+      }
+    }
     setSlipModalOpen(false)
     setSelectedBill(null)
     showToast("อนุมัติรายการโอนเงินเสร็จเรียบร้อยแล้ว!")
   }
 
   // ปฏิเสธสลิปโอนเงิน
-  const handleRejectSlip = (id: string) => {
-    const updated = bills.map(b => b.id === id ? { ...b, status: "unpaid" as const, slipUrl: null } : b)
-    updateBills(updated)
+  const handleRejectSlip = async (id: string) => {
+    if (isDemo) {
+      const updated = bills.map(b => b.id === id ? { ...b, status: "unpaid" as const, slipUrl: null } : b)
+      updateBillsState(updated)
+    } else {
+      const res = await updateBillStatus(id, "unpaid", null)
+      if (res.success) {
+        await loadData()
+      } else {
+        alert(res.error || "อัปเดตไม่สำเร็จ")
+        return
+      }
+    }
     setSlipModalOpen(false)
     setSelectedBill(null)
     showToast("ปฏิเสธสลิปแล้ว บิลจะกลับไปเป็นสถานะยังไม่จ่าย")
@@ -194,37 +242,54 @@ export default function BillingPage() {
     }
   }
 
-  const handleCreateBill = (e: React.FormEvent) => {
+  const handleCreateBillForm = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // ค้นหาชื่อผู้เช่าปัจจุบันของห้องนั้นๆ
     let targetTenant = "ผู้เช่าจำลอง"
-    const savedRooms = localStorage.getItem("horset_rooms")
-    if (savedRooms) {
-      try {
-        const rooms = JSON.parse(savedRooms)
-        const room = rooms.find((r: any) => r.roomNumber === newRoomNumber)
-        if (room && room.tenantName) {
-          targetTenant = room.tenantName
-        }
-      } catch (e) {}
+    if (isDemo) {
+      const savedRooms = localStorage.getItem("horset_rooms")
+      if (savedRooms) {
+        try {
+          const rooms = JSON.parse(savedRooms)
+          const room = rooms.find((r: any) => r.roomNumber === newRoomNumber)
+          if (room && room.tenantName) {
+            targetTenant = room.tenantName
+          }
+        } catch (e) {}
+      }
+
+      const newBill: BillItem = {
+        id: Date.now().toString(),
+        roomNumber: newRoomNumber,
+        tenantName: targetTenant,
+        amount: computedTotal,
+        status: "unpaid",
+        billingCycle,
+        slipUrl: null,
+        electricUnits: elecUnits,
+        waterUnits: waterUnits
+      }
+
+      const filtered = bills.filter(b => !(b.roomNumber === newRoomNumber && b.billingCycle === billingCycle))
+      updateBillsState([newBill, ...filtered])
+    } else {
+      const room = roomsList.find(r => r.roomNumber === newRoomNumber)
+      if (room && room.tenantName) {
+        targetTenant = room.tenantName
+      } else {
+        alert("ห้องพักนี้ยังไม่มีผู้เช่า หรือสัญญาหมดอายุ ไม่สามารถออกบิลได้")
+        return
+      }
+
+      const res = await createBill(newRoomNumber, targetTenant, computedTotal, "unpaid", billingCycle, elecUnits, waterUnits)
+      if (res.success) {
+        await loadData()
+      } else {
+        alert(res.error || "ออกใบแจ้งยอดไม่สำเร็จ")
+        return
+      }
     }
 
-    const newBill: BillItem = {
-      id: Date.now().toString(),
-      roomNumber: newRoomNumber,
-      tenantName: targetTenant,
-      amount: computedTotal,
-      status: "unpaid",
-      billingCycle,
-      slipUrl: null,
-      electricUnits: elecUnits,
-      waterUnits: waterUnits
-    }
-
-    // กรองบิลห้องนั้นในรอบบิลนั้นออกก่อน (เขียนทับ)
-    const filtered = bills.filter(b => !(b.roomNumber === newRoomNumber && b.billingCycle === billingCycle))
-    updateBills([newBill, ...filtered])
     setCreateBillModalOpen(false)
     showToast(`สร้างบิลและคำนวณเงินห้อง ${newRoomNumber} ยอดรวม ${computedTotal.toLocaleString()} บาท สำเร็จ!`)
   }
@@ -463,7 +528,7 @@ export default function BillingPage() {
               <Receipt className="w-5 h-5 text-blue-400" /> สร้างใบแจ้งหนี้ประจำเดือน
             </h3>
 
-            <form onSubmit={handleCreateBill} className="space-y-4">
+            <form onSubmit={handleCreateBillForm} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-slate-400 font-medium">หมายเลขห้อง</label>

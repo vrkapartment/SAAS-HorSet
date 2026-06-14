@@ -17,6 +17,8 @@ import {
   Image as ImageIcon
 } from "lucide-react"
 import { generatePromptPayPayload } from "@/lib/promptpay"
+import { getTenantPortalData } from "@/features/tenant/actions"
+import { updateBillStatus } from "@/features/billing/actions"
 
 interface BillHistoryItem {
   cycle: string
@@ -27,9 +29,10 @@ interface BillHistoryItem {
 export default function TenantPortal() {
   const router = useRouter()
   
-  const roomNumber = "105"
-  const tenantName = "คุณณัฐพล ใจดี"
-  const billingCycle = "มิถุนายน 2026"
+  const [isDemo, setIsDemo] = useState(false)
+  const [roomNumber, setRoomNumber] = useState("")
+  const [tenantName, setTenantName] = useState("")
+  const [billingCycle, setBillingCycle] = useState("")
   
   const [bill, setBill] = useState<any>(null)
   const [billStatus, setBillStatus] = useState<"unpaid" | "pending" | "paid">("unpaid")
@@ -37,50 +40,112 @@ export default function TenantPortal() {
   const [uploading, setUploading] = useState(false)
   const [promptPayId, setPromptPayId] = useState("0899999999")
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [history, setHistory] = useState<BillHistoryItem[]>([])
+  const [baseRent, setBaseRent] = useState(4500)
 
-  // ดึงข้อมูลบิลห้องตนเอง (ห้อง 105) จาก localStorage
-  useEffect(() => {
+  const formatCycle = (cycleStr: string) => {
+    if (!cycleStr) return ""
+    if (cycleStr.includes("-")) {
+      const [year, month] = cycleStr.split("-")
+      const monthsThai = [
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+      ]
+      const monthIdx = parseInt(month, 10) - 1
+      if (monthIdx >= 0 && monthIdx < 12) {
+        return `${monthsThai[monthIdx]} ${year}`
+      }
+    }
+    return cycleStr
+  }
+
+  const loadPortalData = async () => {
+    const res = await getTenantPortalData()
+    
+    // Save promptpay configs
     const savedPPId = localStorage.getItem("horset_promptpay_id")
     if (savedPPId) {
       setPromptPayId(savedPPId)
     }
 
-    const loadMyBill = () => {
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          const bills = JSON.parse(savedBills)
-          const myBill = bills.find((b: any) => b.roomNumber === "105" && b.billingCycle === "2026-06")
-          if (myBill) {
-            setBill(myBill)
-            setBillStatus(myBill.status)
-            setUploadedSlip(myBill.slipUrl)
+    if (res.success && res.data) {
+      setIsDemo(false)
+      const data = res.data
+      setRoomNumber(data.roomNumber || "ไม่มีห้อง")
+      setTenantName(data.tenantName)
+      setBaseRent(data.baseRent)
+
+      const activeBills = data.bills as any[]
+      if (activeBills && activeBills.length > 0) {
+        // Latest bill is current bill
+        const latest = activeBills[0]
+        setBill(latest)
+        setBillStatus(latest.status)
+        setUploadedSlip(latest.slipUrl)
+        setBillingCycle(formatCycle(latest.billingCycle))
+
+        // Rest are history
+        const hist: BillHistoryItem[] = activeBills.slice(1).map(b => ({
+          cycle: formatCycle(b.billingCycle),
+          amount: b.amount,
+          status: b.status === "paid" ? "paid" : "unpaid"
+        }))
+        setHistory(hist)
+      } else {
+        setBill(null)
+        setBillStatus("paid") // default to clean state if no bills
+        setUploadedSlip(null)
+        setBillingCycle("ยังไม่มีรอบบิล")
+        setHistory([])
+      }
+    } else if (res.fallback) {
+      setIsDemo(true)
+      setRoomNumber("105")
+      setTenantName("คุณณัฐพล ใจดี")
+      setBillingCycle("มิถุนายน 2026")
+      setBaseRent(4500)
+
+      const loadMyBill = () => {
+        const savedBills = localStorage.getItem("horset_bills")
+        if (savedBills) {
+          try {
+            const bills = JSON.parse(savedBills)
+            const myBill = bills.find((b: any) => b.roomNumber === "105" && b.billingCycle === "2026-06")
+            if (myBill) {
+              setBill(myBill)
+              setBillStatus(myBill.status)
+              setUploadedSlip(myBill.slipUrl)
+            }
+          } catch (e) {
+            console.error(e)
           }
-        } catch (e) {
-          console.error(e)
         }
       }
+      loadMyBill()
+
+      const demoHistory: BillHistoryItem[] = [
+        { cycle: "พฤษภาคม 2026", amount: 5120, status: "paid" },
+        { cycle: "เมษายน 2026", amount: 4950, status: "paid" },
+        { cycle: "มีนาคม 2026", amount: 5310, status: "paid" }
+      ]
+      setHistory(demoHistory)
     }
-    loadMyBill()
-    // ตั้ง interval เผื่อแอดมินกดอนุมัติหลังล็อกอินสลับกัน
-    const timer = setInterval(loadMyBill, 3000)
+  }
+
+  useEffect(() => {
+    loadPortalData()
+    // Poll updates every 5s if logged in to auto-reflect approval
+    const timer = setInterval(loadPortalData, 5000)
     return () => clearInterval(timer)
   }, [])
 
   // ค่าใช้จ่ายต่างๆ (ใช้ค่าของบิลจริง หรือค่าจำลองหากยังไม่มีบิลในระบบ)
-  const rentPrice = bill ? (bill.amount - (bill.electricUnits * 7) - (bill.waterUnits * 18)) : 4500
-  const elecUnits = bill ? bill.electricUnits : 84
+  const rentPrice = bill ? (bill.amount - (bill.electricUnits * 7) - (bill.waterUnits * 18)) : baseRent
+  const elecUnits = bill ? bill.electricUnits : 0
   const elecAmount = elecUnits * 7
-  const waterUnits = bill ? bill.waterUnits : 12
+  const waterUnits = bill ? bill.waterUnits : 0
   const waterAmount = waterUnits * 18
-  const totalAmount = bill ? bill.amount : (rentPrice + elecAmount + waterAmount)
-
-  // ประวัติบิลย้อนหลัง
-  const history: BillHistoryItem[] = [
-    { cycle: "พฤษภาคม 2026", amount: 5120, status: "paid" },
-    { cycle: "เมษายน 2026", amount: 4950, status: "paid" },
-    { cycle: "มีนาคม 2026", amount: 5310, status: "paid" }
-  ]
+  const totalAmount = bill ? bill.amount : rentPrice
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
@@ -91,7 +156,7 @@ export default function TenantPortal() {
       const blob = await generateBillPdf({
         roomNumber,
         tenantName,
-        billingCycle: "มิถุนายน 2026",
+        billingCycle,
         baseRent: rentPrice,
         electricUnits: elecUnits,
         electricRate: 7,
@@ -104,7 +169,7 @@ export default function TenantPortal() {
 
       const link = document.createElement("a")
       link.href = URL.createObjectURL(blob)
-      link.download = `bill_room${roomNumber}_2026-06.pdf`
+      link.download = `bill_room${roomNumber}_${bill ? bill.billingCycle : "invoice"}.pdf`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -116,34 +181,53 @@ export default function TenantPortal() {
     }
   }
 
-  // จำลองการอัปโหลดสลิปธนาคารและบันทึกลงใน localStorage
-  const handleUploadSlip = () => {
+  const handleUploadSlip = async () => {
     setUploading(true)
-    setTimeout(() => {
-      setUploading(false)
-      const mockSlipUrl = "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=300"
-      setUploadedSlip(mockSlipUrl)
-      setBillStatus("pending")
+    const mockSlipUrl = "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=300"
+    
+    if (isDemo) {
+      setTimeout(() => {
+        setUploading(false)
+        setUploadedSlip(mockSlipUrl)
+        setBillStatus("pending")
 
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          const bills = JSON.parse(savedBills)
-          const updatedBills = bills.map((b: any) => {
-            if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
-              return { ...b, status: "pending", slipUrl: mockSlipUrl }
-            }
-            return b
-          })
-          localStorage.setItem("horset_bills", JSON.stringify(updatedBills))
-        } catch (e) {
-          console.error(e)
+        const savedBills = localStorage.getItem("horset_bills")
+        if (savedBills) {
+          try {
+            const bills = JSON.parse(savedBills)
+            const updatedBills = bills.map((b: any) => {
+              if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
+                return { ...b, status: "pending", slipUrl: mockSlipUrl }
+              }
+              return b
+            })
+            localStorage.setItem("horset_bills", JSON.stringify(updatedBills))
+          } catch (e) {
+            console.error(e)
+          }
         }
+        alert("อัปโหลดสลิปของคุณเรียบร้อยแล้ว! ระบบกำลังส่งข้อมูลไปยังผู้ดูแลเพื่อตรวจสอบและปรับสถานะบิลของคุณ")
+      }, 1500)
+    } else {
+      if (!bill) {
+        setUploading(false)
+        alert("ไม่พบบิลของท่านในเดือนนี้")
+        return
       }
-
-      alert("อัปโหลดสลิปของคุณเรียบร้อยแล้ว! ระบบกำลังส่งข้อมูลไปยังผู้ดูแลเพื่อตรวจสอบและปรับสถานะบิลของคุณ")
-    }, 1500)
+      
+      const res = await updateBillStatus(bill.id, "pending", mockSlipUrl)
+      setUploading(false)
+      if (res.success) {
+        setUploadedSlip(mockSlipUrl)
+        setBillStatus("pending")
+        alert("อัปโหลดสลิปของคุณเรียบร้อยแล้ว! ระบบกำลังส่งข้อมูลไปยังผู้ดูแลเพื่อตรวจสอบและปรับสถานะบิลของคุณ")
+        loadPortalData()
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการส่งสลิป")
+      }
+    }
   }
+
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-12">
@@ -335,22 +419,32 @@ export default function TenantPortal() {
             </div>
             <div className="pt-2">
               <button
-                onClick={() => {
-                  setBillStatus("unpaid")
-                  setUploadedSlip(null)
-                  const savedBills = localStorage.getItem("horset_bills")
-                  if (savedBills) {
-                    try {
-                      const bills = JSON.parse(savedBills)
-                      const updatedBills = bills.map((b: any) => {
-                        if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
-                          return { ...b, status: "unpaid", slipUrl: null }
-                        }
-                        return b
-                      })
-                      localStorage.setItem("horset_bills", JSON.stringify(updatedBills))
-                    } catch (e) {
-                      console.error(e)
+                onClick={async () => {
+                  if (isDemo) {
+                    setBillStatus("unpaid")
+                    setUploadedSlip(null)
+                    const savedBills = localStorage.getItem("horset_bills")
+                    if (savedBills) {
+                      try {
+                        const bills = JSON.parse(savedBills)
+                        const updatedBills = bills.map((b: any) => {
+                          if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
+                            return { ...b, status: "unpaid", slipUrl: null }
+                          }
+                          return b
+                        })
+                        localStorage.setItem("horset_bills", JSON.stringify(updatedBills))
+                      } catch (e) {
+                        console.error(e)
+                      }
+                    }
+                  } else {
+                    if (!bill) return
+                    const res = await updateBillStatus(bill.id, "unpaid", null)
+                    if (res.success) {
+                      setBillStatus("unpaid")
+                      setUploadedSlip(null)
+                      loadPortalData()
                     }
                   }
                 }}

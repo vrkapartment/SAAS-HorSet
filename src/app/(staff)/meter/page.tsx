@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { Gauge, Save, AlertCircle, Check, Play } from "lucide-react"
+import { getMeterRecords, saveMeterRecord } from "@/features/meter/actions"
+import { getRooms } from "@/features/room/actions"
 
 interface MeterRecordItem {
   id: string
@@ -17,6 +19,8 @@ interface MeterRecordItem {
 
 export default function MeterPage() {
   const [billingCycle, setBillingCycle] = useState("2026-06")
+  const [records, setRecords] = useState<MeterRecordItem[]>([])
+  const [isDemo, setIsDemo] = useState(false)
 
   const initialRecords: MeterRecordItem[] = [
     { id: "1", roomNumber: "101", tenantName: "คุณวิภาวี สมบูรณ์", elecPrev: 1042, elecCurr: 1102, waterPrev: 342, waterCurr: 351, isSaved: true },
@@ -26,58 +30,104 @@ export default function MeterPage() {
     { id: "5", roomNumber: "201", tenantName: "คุณอรทัย มั่นคง", elecPrev: 3120, elecCurr: "", waterPrev: 755, waterCurr: "", isSaved: false },
     { id: "6", roomNumber: "202", tenantName: "คุณสุชาติ เลิศรส", elecPrev: 1845, elecCurr: 1912, waterPrev: 399, waterCurr: 408, isSaved: true }
   ]
-  
-  // สเตตจำลองรายการบันทึกมิเตอร์ในรอบบิลปัจจุบัน
-  const [records, setRecords] = useState<MeterRecordItem[]>(initialRecords)
 
-  // โหลดและบันทึกข้อมูลมิเตอร์จาก localStorage ตามรอบบิล
-  useEffect(() => {
-    const key = `horset_meter_records_${billingCycle}`
-    const savedRecords = localStorage.getItem(key)
-    if (savedRecords) {
-      try {
-        setRecords(JSON.parse(savedRecords))
-      } catch (e) {
-        console.error("Failed to parse meter records from localStorage", e)
-      }
-    } else {
-      // ดึงข้อมูลห้องจาก localStorage มาสร้างรายการบันทึก
-      const savedRooms = localStorage.getItem("horset_rooms")
-      if (savedRooms) {
-        try {
-          const rooms = JSON.parse(savedRooms)
-          const occupiedRooms = rooms.filter((r: any) => r.status === "occupied")
-          if (occupiedRooms.length > 0) {
-            const generatedRecords: MeterRecordItem[] = occupiedRooms.map((r: any, idx: number) => {
-              // พยายามหาค่าย้อนหลังของห้องเดิมในรอบบิลอื่น หรือสุ่มเลขขึ้นมาเป็นค่าเริ่มต้น
-              return {
-                id: r.id || String(idx + 1),
-                roomNumber: r.roomNumber,
-                tenantName: r.tenantName || "ผู้เช่า",
-                elecPrev: 1000 + Math.floor(Math.random() * 2000),
-                elecCurr: "",
-                waterPrev: 100 + Math.floor(Math.random() * 500),
-                waterCurr: "",
-                isSaved: false
-              }
-            })
-            setRecords(generatedRecords)
-            localStorage.setItem(key, JSON.stringify(generatedRecords))
-            return
+  const loadRecords = async () => {
+    const res = await getMeterRecords(billingCycle)
+    if (res.success && res.data) {
+      if (res.data.length > 0) {
+        // Fetch rooms to map tenantName
+        const roomsRes = await getRooms()
+        const rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
+
+        const mapped: MeterRecordItem[] = res.data.map((m: any) => {
+          const room = rooms.find((r: any) => r.roomNumber === m.roomNumber)
+          return {
+            id: m.id,
+            roomNumber: m.roomNumber,
+            tenantName: room?.tenantName || "ผู้เช่า",
+            elecPrev: m.elecPrev,
+            elecCurr: m.elecCurr,
+            waterPrev: m.waterPrev,
+            waterCurr: m.waterCurr,
+            isSaved: true
           }
-        } catch (e) {
-          console.error(e)
+        })
+        setRecords(mapped)
+      } else {
+        // Fetch occupied rooms from Supabase and generate draft records
+        const roomsRes = await getRooms()
+        if (roomsRes.success && roomsRes.data) {
+          const occupiedRooms = roomsRes.data.filter((r: any) => r.status === "occupied")
+          const generated: MeterRecordItem[] = occupiedRooms.map((r: any, idx: number) => ({
+            id: r.id || String(idx + 1),
+            roomNumber: r.roomNumber,
+            tenantName: r.tenantName || "ผู้เช่า",
+            elecPrev: 1000 + Math.floor(Math.random() * 2000),
+            elecCurr: "",
+            waterPrev: 100 + Math.floor(Math.random() * 500),
+            waterCurr: "",
+            isSaved: false
+          }))
+          setRecords(generated)
+        } else {
+          setRecords([])
         }
       }
+      setIsDemo(false)
+    } else if (res.fallback) {
+      setIsDemo(true)
+      const key = `horset_meter_records_${billingCycle}`
+      const savedRecords = localStorage.getItem(key)
+      if (savedRecords) {
+        try {
+          setRecords(JSON.parse(savedRecords))
+        } catch (e) {
+          console.error("Failed to parse meter records from localStorage", e)
+        }
+      } else {
+        // ดึงข้อมูลห้องจาก localStorage มาสร้างรายการบันทึก
+        const savedRooms = localStorage.getItem("horset_rooms")
+        if (savedRooms) {
+          try {
+            const rooms = JSON.parse(savedRooms)
+            const occupiedRooms = rooms.filter((r: any) => r.status === "occupied")
+            if (occupiedRooms.length > 0) {
+              const generatedRecords: MeterRecordItem[] = occupiedRooms.map((r: any, idx: number) => {
+                return {
+                  id: r.id || String(idx + 1),
+                  roomNumber: r.roomNumber,
+                  tenantName: r.tenantName || "ผู้เช่า",
+                  elecPrev: 1000 + Math.floor(Math.random() * 2000),
+                  elecCurr: "",
+                  waterPrev: 100 + Math.floor(Math.random() * 500),
+                  waterCurr: "",
+                  isSaved: false
+                }
+              })
+              setRecords(generatedRecords)
+              localStorage.setItem(key, JSON.stringify(generatedRecords))
+              return
+            }
+          } catch (e) {
+            console.error(e)
+          }
+        }
 
-      setRecords(initialRecords)
-      localStorage.setItem(key, JSON.stringify(initialRecords))
+        setRecords(initialRecords)
+        localStorage.setItem(key, JSON.stringify(initialRecords))
+      }
     }
+  }
+
+  useEffect(() => {
+    loadRecords()
   }, [billingCycle])
 
-  const updateRecords = (newRecords: MeterRecordItem[]) => {
+  const updateRecordsState = (newRecords: MeterRecordItem[]) => {
     setRecords(newRecords)
-    localStorage.setItem(`horset_meter_records_${billingCycle}`, JSON.stringify(newRecords))
+    if (isDemo) {
+      localStorage.setItem(`horset_meter_records_${billingCycle}`, JSON.stringify(newRecords))
+    }
   }
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -90,7 +140,7 @@ export default function MeterPage() {
       }
       return rec
     })
-    updateRecords(updated)
+    updateRecordsState(updated)
   }
 
   // เปลี่ยนแปลงค่าน้ำประปา
@@ -101,11 +151,11 @@ export default function MeterPage() {
       }
       return rec
     })
-    updateRecords(updated)
+    updateRecordsState(updated)
   }
 
   // บันทึกเฉพาะแถว
-  const handleSaveRow = (id: string) => {
+  const handleSaveRow = async (id: string) => {
     const record = records.find(r => r.id === id)
     if (!record) return
 
@@ -122,20 +172,29 @@ export default function MeterPage() {
       return
     }
 
-    const updated = records.map(rec => {
-      if (rec.id === id) {
-        return { ...rec, elecCurr: elecVal, waterCurr: waterVal, isSaved: true }
+    if (isDemo) {
+      const updated = records.map(rec => {
+        if (rec.id === id) {
+          return { ...rec, elecCurr: elecVal, waterCurr: waterVal, isSaved: true }
+        }
+        return rec
+      })
+      updateRecordsState(updated)
+    } else {
+      const res = await saveMeterRecord(record.roomNumber, billingCycle, record.elecPrev, elecVal, record.waterPrev, waterVal)
+      if (res.success) {
+        await loadRecords()
+      } else {
+        alert(res.error || "บันทึกข้อมูลไม่สำเร็จ")
+        return
       }
-      return rec
-    })
-    updateRecords(updated)
+    }
 
     showToast(`บันทึกมิเตอร์ห้อง ${record.roomNumber} เรียบร้อยแล้ว`)
   }
 
   // บันทึกทั้งหมด
-  const handleSaveAll = () => {
-    // กรองตรวจสอบความถูกต้อง
+  const handleSaveAll = async () => {
     const hasError = records.some(rec => {
       const eVal = Number(rec.elecCurr)
       const wVal = Number(rec.waterCurr)
@@ -147,13 +206,24 @@ export default function MeterPage() {
       return
     }
 
-    const updated = records.map(rec => ({
-      ...rec,
-      elecCurr: Number(rec.elecCurr),
-      waterCurr: Number(rec.waterCurr),
-      isSaved: true
-    }))
-    updateRecords(updated)
+    if (isDemo) {
+      const updated = records.map(rec => ({
+        ...rec,
+        elecCurr: Number(rec.elecCurr),
+        waterCurr: Number(rec.waterCurr),
+        isSaved: true
+      }))
+      updateRecordsState(updated)
+    } else {
+      for (const rec of records) {
+        const res = await saveMeterRecord(rec.roomNumber, billingCycle, rec.elecPrev, rec.elecCurr, rec.waterPrev, rec.waterCurr)
+        if (!res.success) {
+          alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูลของห้อง ${rec.roomNumber}: ${res.error}`)
+          return
+        }
+      }
+      await loadRecords()
+    }
 
     showToast("บันทึกค่ามิเตอร์ของทุกห้องในระบบเรียบร้อยแล้ว!")
   }

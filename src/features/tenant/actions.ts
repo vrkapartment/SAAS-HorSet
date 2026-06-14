@@ -210,3 +210,103 @@ export async function updateTenant(
     return { success: false, error: errorMessage }
   }
 }
+
+export async function getTenantPortalData() {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    // 1. Get the current logged-in auth user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: "กรุณาเข้าสู่ระบบก่อนใช้งาน" }
+    }
+
+    // 2. Get profile details of the user
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return { success: false, error: "ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน" }
+    }
+
+    // 3. Find tenant by matching phone number
+    const { data: tenant, error: tenantError } = await supabase
+      .from("tenants")
+      .select(`
+        *,
+        rooms (
+          id,
+          room_number,
+          base_rent
+        )
+      `)
+      .eq("tenant_phone", profile.phone)
+      .maybeSingle()
+
+    if (tenantError) throw tenantError
+
+    if (!tenant) {
+      // Profile exists but not assigned as a tenant in any room yet
+      return {
+        success: true,
+        data: {
+          profile,
+          roomNumber: null,
+          tenantName: profile.full_name || profile.email,
+          baseRent: 0,
+          bills: []
+        }
+      }
+    }
+
+    // 4. Get bills for this room number
+    const roomNumber = tenant.rooms?.room_number
+    let formattedBills: any[] = []
+
+    if (roomNumber) {
+      const { data: bills, error: billsError } = await supabase
+        .from("bills")
+        .select("*")
+        .eq("room_number", roomNumber)
+        .order("billing_cycle", { ascending: false })
+
+      if (billsError) throw billsError
+
+      if (bills) {
+        formattedBills = bills.map((b: any) => ({
+          id: b.id,
+          roomNumber: b.room_number,
+          tenantName: b.tenant_name,
+          amount: Number(b.amount),
+          status: b.status,
+          billingCycle: b.billing_cycle,
+          slipUrl: b.slip_url,
+          electricUnits: Number(b.electric_units),
+          waterUnits: Number(b.water_units)
+        }))
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        profile,
+        roomNumber: roomNumber || null,
+        tenantName: tenant.tenant_name || profile.full_name,
+        baseRent: tenant.rooms?.base_rent ? Number(tenant.rooms.base_rent) : 0,
+        bills: formattedBills
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการโหลดข้อมูล Tenant Portal"
+    return { success: false, error: errorMessage }
+  }
+}
+
