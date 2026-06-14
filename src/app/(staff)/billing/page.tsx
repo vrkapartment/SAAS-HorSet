@@ -57,6 +57,7 @@ export default function UnifiedBillingPage() {
   const [isDemo, setIsDemo] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
+  const [commonFee, setCommonFee] = useState<number>(50)
   
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
@@ -72,7 +73,7 @@ export default function UnifiedBillingPage() {
   const waterRate = 18 // 18 บาทต่อหน่วย
   const computedElecCost = elecUnitsManual <= 10 ? 80 : elecUnitsManual * elecRate
   const computedWaterCost = waterUnitsManual <= 3 ? 51 : waterUnitsManual * waterRate
-  const computedTotal = rentPrice + computedElecCost + computedWaterCost
+  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee
 
   const getPreviousCycle = (cycle: string) => {
     const [year, month] = cycle.split("-").map(Number)
@@ -242,6 +243,13 @@ export default function UnifiedBillingPage() {
     loadData()
   }, [billingCycle])
 
+  useEffect(() => {
+    const savedCommonFee = localStorage.getItem("horset_common_fee")
+    if (savedCommonFee) {
+      setCommonFee(Number(savedCommonFee))
+    }
+  }, [])
+
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => {
@@ -347,7 +355,7 @@ export default function UnifiedBillingPage() {
     const wUnits = (waterVal as number) - item.waterPrev
     const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
     const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
-    const totalAmount = item.baseRent + elecCost + waterCost
+    const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
     if (isDemo) {
       // 1. บันทึกเลขมิเตอร์
@@ -489,7 +497,7 @@ export default function UnifiedBillingPage() {
         const wUnits = waterVal - item.waterPrev
         const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
         const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
-        const totalAmount = item.baseRent + elecCost + waterCost
+        const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
         // 1. มิเตอร์
         const existingMeterIdx = localMeters.findIndex((m: any) => m.roomNumber === item.roomNumber)
@@ -543,7 +551,7 @@ export default function UnifiedBillingPage() {
         const wUnits = waterVal - item.waterPrev
         const elecCost = eUnits <= 10 ? 80 : eUnits * elecRate
         const waterCost = wUnits <= 3 ? 51 : wUnits * waterRate
-        const totalAmount = item.baseRent + elecCost + waterCost
+        const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
         // 1. บันทึกเลขมิเตอร์
         const meterRes = await saveMeterRecord(
@@ -605,10 +613,11 @@ export default function UnifiedBillingPage() {
         electricRate: 7,
         waterUnits: waterUnitsUsed,
         waterRate: 18,
+        commonFee,
         amount: item.billAmount || (() => {
           const elecCost = elecUnitsUsed <= 10 ? 80 : elecUnitsUsed * 7
           const waterCost = waterUnitsUsed <= 3 ? 51 : waterUnitsUsed * 18
-          return item.baseRent + elecCost + waterCost
+          return item.baseRent + elecCost + waterCost + commonFee
         })(),
         promptPayId,
         promptPayName
@@ -852,7 +861,7 @@ export default function UnifiedBillingPage() {
                     : 0
                   
                   // คำนวณยอดเงินเรียลไทม์
-                  const calculatedAmount = item.baseRent + elecCost + waterCost
+                  const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
 
                   const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
 
@@ -867,7 +876,7 @@ export default function UnifiedBillingPage() {
                           {item.tenantName || <span className="text-slate-600 italic">ไม่มีข้อมูลผู้เช่า</span>}
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                          ค่าเช่าคงที่ {item.baseRent.toLocaleString()}.-
+                          ค่าเช่า {item.baseRent.toLocaleString()}.- + ส่วนกลาง {commonFee}.-
                         </div>
                       </td>
                       
@@ -1195,6 +1204,10 @@ export default function UnifiedBillingPage() {
                 <div className="flex justify-between text-slate-400">
                   <span>ค่าห้องแอร์/พัดลมปกติ:</span>
                   <span>{rentPrice.toLocaleString()} บาท</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>ค่าส่วนกลาง (Fixed Common Fee):</span>
+                  <span>{commonFee.toLocaleString()} บาท</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>ค่าไฟฟ้า ({elecUnitsManual} หน่วย):</span>

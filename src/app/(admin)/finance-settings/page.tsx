@@ -14,6 +14,7 @@ export default function FinanceSettingsPage() {
   const [promptPayType, setPromptPayType] = useState<"phone" | "national_id">("phone")
   const [promptPayId, setPromptPayId] = useState("0899999999")
   const [promptPayName, setPromptPayName] = useState("สมเจตน์ แสนสุข")
+  const [commonFee, setCommonFee] = useState<number>(50)
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
@@ -27,6 +28,7 @@ export default function FinanceSettingsPage() {
     const savedPPType = localStorage.getItem("horset_promptpay_type") as "phone" | "national_id" | null
     const savedPPId = localStorage.getItem("horset_promptpay_id")
     const savedPPName = localStorage.getItem("horset_promptpay_name")
+    const savedCommonFee = localStorage.getItem("horset_common_fee")
 
     if (savedFirstName) setFirstName(savedFirstName)
     if (savedLastName) setLastName(savedLastName)
@@ -36,6 +38,7 @@ export default function FinanceSettingsPage() {
     if (savedPPType) setPromptPayType(savedPPType)
     if (savedPPId) setPromptPayId(savedPPId)
     if (savedPPName) setPromptPayName(savedPPName)
+    if (savedCommonFee) setCommonFee(Number(savedCommonFee))
   }, [])
 
   const handleSave = (e: React.FormEvent) => {
@@ -66,6 +69,7 @@ export default function FinanceSettingsPage() {
     localStorage.setItem("horset_promptpay_type", promptPayType)
     localStorage.setItem("horset_promptpay_id", cleanedPPId)
     localStorage.setItem("horset_promptpay_name", promptPayName)
+    localStorage.setItem("horset_common_fee", commonFee.toString())
 
     showToast("บันทึกการตั้งค่าการเงินและพร้อมเพย์เรียบร้อยแล้ว!")
   }
@@ -229,6 +233,24 @@ export default function FinanceSettingsPage() {
                 value={promptPayName}
                 onChange={(e) => setPromptPayName(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-900/60 pt-4 mt-4">
+              <label className="text-xs text-slate-300 font-bold block">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-200 font-mono text-sm tracking-wide"
+                  value={commonFee}
+                  onChange={(e) => setCommonFee(Number(e.target.value))}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                ค่าส่วนกลางคงที่รายเดือน สำหรับนำไปบวกเพิ่มในใบแจ้งหนี้ทุกห้องพักอัตโนมัติ
+              </p>
             </div>
 
             <div className="p-4 bg-teal-500/5 border border-teal-500/10 rounded-xl flex items-start gap-3">

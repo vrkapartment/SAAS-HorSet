@@ -229,6 +229,7 @@ export interface BillPdfData {
   amount: number
   promptPayId: string
   promptPayName: string
+  commonFee?: number
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -284,6 +285,7 @@ export async function generateBillPdf(data: BillPdfData) {
 
   // เนื้อหาในตาราง
   let y = 600
+  const commonFee = data.commonFee !== undefined ? data.commonFee : 50
   const isElecMin = data.electricUnits <= 10
   const isWaterMin = data.waterUnits <= 3
   const elecAmount = isElecMin ? 80 : data.electricUnits * data.electricRate
@@ -311,6 +313,13 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText(data.waterUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(isWaterMin ? "-" : data.waterRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(waterAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+
+  y -= 25
+  // รายการ 4: ค่าบริการส่วนกลาง
+  drawText("4. ค่าบริการส่วนกลาง (Common Area Fee)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(commonFee.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(commonFee.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   // ขีดเส้นใต้ตาราง
   page.drawLine({
