@@ -538,21 +538,6 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 </span>
               </div>
             </div>
-
-            {/* ปุ่มแก้ไขรหัสผ่านและโปรไฟล์ */}
-            <LanguageToggle />
-            <ThemeToggle />
-            <button
-              onClick={() => {
-                setProfileError(null)
-                setProfileSuccess(null)
-                setShowProfileModal(true)
-              }}
-              className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-900/60 rounded-xl transition-all"
-              title="ตั้งค่าโปรไฟล์ & รหัสผ่าน"
-            >
-              <KeyRound className="w-4 h-4" />
-            </button>
           </div>
 
           <button
@@ -649,18 +634,6 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     <span className="text-[9px] text-slate-500 uppercase font-bold">{userRole}</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setMobileOpen(false)
-                    setProfileError(null)
-                    setProfileSuccess(null)
-                    setShowProfileModal(true)
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-900/60 rounded-lg transition-all"
-                  title="ตั้งค่าโปรไฟล์ & รหัสผ่าน"
-                >
-                  <KeyRound className="w-4 h-4" />
-                </button>
               </div>
               <button
                 onClick={handleLogout}
