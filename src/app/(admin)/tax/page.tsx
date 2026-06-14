@@ -105,11 +105,20 @@ export default function TaxPage() {
       try {
         const userRes = await getCurrentUserProfileAction()
         
-        // 1. ดึง workspace ID จากคุกกี้ปัจจุบันเพื่อให้ตรงกับ Workspace Switcher เมนูด้านบน
-        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+        let currentWsId: string | undefined = undefined
         
-        // 2. ถ้าไม่มีคุกกี้ ให้ใช้ของ profile
-        const currentWsId = cookieWsId || (userRes.success && userRes.data?.workspace_id)
+        if (userRes.success && userRes.data) {
+          const isSuperAdmin = userRes.data.role === "super_admin"
+          
+          if (!isSuperAdmin && userRes.data.workspace_id) {
+            // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
+            currentWsId = userRes.data.workspace_id
+          } else {
+            // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
+            const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+            currentWsId = cookieWsId || userRes.data.workspace_id || undefined
+          }
+        }
 
         if (currentWsId) {
           // 1. โหลดข้อมูลผู้เสียภาษี
@@ -158,8 +167,15 @@ export default function TaxPage() {
       let activeWsId = explicitWsId
       if (!activeWsId) {
         const userRes = await getCurrentUserProfileAction()
-        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
-        activeWsId = cookieWsId || (userRes.success && userRes.data?.workspace_id) || undefined
+        if (userRes.success && userRes.data) {
+          const isSuperAdmin = userRes.data.role === "super_admin"
+          if (!isSuperAdmin && userRes.data.workspace_id) {
+            activeWsId = userRes.data.workspace_id
+          } else {
+            const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+            activeWsId = cookieWsId || userRes.data.workspace_id || undefined
+          }
+        }
       }
       
       const res = await getExpenses(year, activeWsId)

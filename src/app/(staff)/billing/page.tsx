@@ -199,8 +199,21 @@ export default function UnifiedBillingPage() {
     async function loadFinance() {
       try {
         const userRes = await getCurrentUserProfileAction()
-        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
-        const wsId = cookieWsId || (userRes.success && userRes.data?.workspace_id)
+        
+        let wsId: string | undefined = undefined
+        
+        if (userRes.success && userRes.data) {
+          const isSuperAdmin = userRes.data.role === "super_admin"
+          
+          if (!isSuperAdmin && userRes.data.workspace_id) {
+            // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
+            wsId = userRes.data.workspace_id
+          } else {
+            // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
+            const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+            wsId = cookieWsId || userRes.data.workspace_id || undefined
+          }
+        }
 
         if (wsId) {
           const financeRes = await getFinanceSettings(wsId)

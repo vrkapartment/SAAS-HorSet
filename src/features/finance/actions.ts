@@ -27,47 +27,61 @@ export async function getFinanceSettings(workspaceId: string) {
   try {
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    // 1. ดึงข้อมูลส่วนข้อมูลหลัก (ที่รับประกันว่ามีอยู่ในตารางแน่ๆ)
+    const { data: coreData, error: coreError } = await supabase
       .from("workspaces")
-      .select("tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
+      .select("tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee")
       .eq("id", workspaceId)
       .single()
 
-    if (error) {
-      // ตรวจสอบว่าคอลัมน์ไม่มีอยู่ในตารางหรือไม่ (undefined_column)
-      const isMissingColumn = 
-        error.message.includes("column") || 
-        error.code === "42703"
+    if (coreError) {
+      throw coreError
+    }
 
-      if (isMissingColumn) {
-        return { 
-          success: true, 
-          fallback: true,
-          data: null,
-          message: "Database columns not created yet. Falling back to local storage." 
-        }
-      }
-      throw error
+    // 2. ดึงข้อมูลค่าน้ำค่าไฟเพิ่มเติม (ซึ่งอาจจะยังไม่ได้รัน SQL เพิ่มคอลัมน์)
+    let utilityData: any = null
+    const { data: utData, error: utError } = await supabase
+      .from("workspaces")
+      .select("water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
+      .eq("id", workspaceId)
+      .single()
+
+    if (!utError) {
+      utilityData = utData
+    } else {
+      console.warn("Utility columns (water_rate, etc.) not available yet in table workspaces. Using defaults.")
+    }
+
+    const merged = {
+      ...coreData,
+      ...(utilityData || {
+        water_rate: 18,
+        electric_rate: 7,
+        water_min_checked: true,
+        water_min_unit: 3,
+        electric_min_checked: true,
+        electric_min_unit: 10
+      })
     }
 
     return { 
       success: true, 
       data: {
-        tax_firstname: data.tax_firstname || "",
-        tax_lastname: data.tax_lastname || "",
-        tax_id: data.tax_id || "",
-        tax_address: data.tax_address || "",
-        tax_phone: data.tax_phone || "",
-        promptpay_type: (data.promptpay_type as "phone" | "national_id") || "phone",
-        promptpay_id: data.promptpay_id || "",
-        promptpay_name: data.promptpay_name || "",
-        common_fee: Number(data.common_fee || 50),
-        water_rate: Number(data.water_rate !== null && data.water_rate !== undefined ? data.water_rate : 18),
-        electric_rate: Number(data.electric_rate !== null && data.electric_rate !== undefined ? data.electric_rate : 7),
-        water_min_checked: Boolean(data.water_min_checked !== null && data.water_min_checked !== undefined ? data.water_min_checked : true),
-        water_min_unit: Number(data.water_min_unit !== null && data.water_min_unit !== undefined ? data.water_min_unit : 3),
-        electric_min_checked: Boolean(data.electric_min_checked !== null && data.electric_min_checked !== undefined ? data.electric_min_checked : true),
-        electric_min_unit: Number(data.electric_min_unit !== null && data.electric_min_unit !== undefined ? data.electric_min_unit : 10)
+        tax_firstname: merged.tax_firstname || "",
+        tax_lastname: merged.tax_lastname || "",
+        tax_id: merged.tax_id || "",
+        tax_address: merged.tax_address || "",
+        tax_phone: merged.tax_phone || "",
+        promptpay_type: (merged.promptpay_type as "phone" | "national_id") || "phone",
+        promptpay_id: merged.promptpay_id || "",
+        promptpay_name: merged.promptpay_name || "",
+        common_fee: Number(merged.common_fee || 50),
+        water_rate: Number(merged.water_rate !== null && merged.water_rate !== undefined ? merged.water_rate : 18),
+        electric_rate: Number(merged.electric_rate !== null && merged.electric_rate !== undefined ? merged.electric_rate : 7),
+        water_min_checked: Boolean(merged.water_min_checked !== null && merged.water_min_checked !== undefined ? merged.water_min_checked : true),
+        water_min_unit: Number(merged.water_min_unit !== null && merged.water_min_unit !== undefined ? merged.water_min_unit : 3),
+        electric_min_checked: Boolean(merged.electric_min_checked !== null && merged.electric_min_checked !== undefined ? merged.electric_min_checked : true),
+        electric_min_unit: Number(merged.electric_min_unit !== null && merged.electric_min_unit !== undefined ? merged.electric_min_unit : 10)
       } as FinanceSettings 
     }
   } catch (error) {
@@ -107,7 +121,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
       return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
     }
 
-    // 2. ทำการอัปเดตข้อมูลตาราง workspaces
+    // 2. พยายามอัปเดตข้อมูลทั้งหมดรวมทั้งค่าน้ำค่าไฟในตาราง workspaces
     const { error: updateError } = await supabase
       .from("workspaces")
       .update({
@@ -135,10 +149,30 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         updateError.code === "42703"
 
       if (isMissingColumn) {
+        // หากคอลัมน์ค่าน้ำค่าไฟไม่มี ให้บันทึกเฉพาะส่วนโครงสร้างหลักที่รับประกันว่ามีแน่นอน
+        const { error: coreUpdateError } = await supabase
+          .from("workspaces")
+          .update({
+            tax_firstname: settings.tax_firstname.trim(),
+            tax_lastname: settings.tax_lastname.trim(),
+            tax_id: settings.tax_id.trim(),
+            tax_address: settings.tax_address.trim(),
+            tax_phone: settings.tax_phone.trim(),
+            promptpay_type: settings.promptpay_type,
+            promptpay_id: settings.promptpay_id.trim(),
+            promptpay_name: settings.promptpay_name.trim(),
+            common_fee: Number(settings.common_fee)
+          })
+          .eq("id", workspaceId)
+
+        if (coreUpdateError) {
+          throw coreUpdateError
+        }
+
         return { 
           success: true, 
           fallback: true,
-          message: "Database columns not created yet. Simulating save using local storage fallback." 
+          message: "บันทึกเฉพาะข้อมูลภาษีและพร้อมเพย์สำเร็จแล้ว! (เนื่องจากคอลัมน์ค่าน้ำค่าไฟยังไม่ได้เปิดใช้งานในระบบฐานข้อมูลของคุณ)" 
         }
       }
       throw updateError

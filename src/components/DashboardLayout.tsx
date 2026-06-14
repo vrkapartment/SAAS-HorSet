@@ -55,7 +55,9 @@ function setCookie(name: string, value: string, days = 7) {
   if (typeof document === "undefined") return
   const date = new Date()
   date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
-  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`
+  // On localhost/HTTP, we must not include Secure attribute or browsers will reject the cookie
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:"
+  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}${isSecure ? "; Secure" : ""}; SameSite=Lax`
 }
 
 export default function DashboardLayout({ children, role }: DashboardLayoutProps) {
@@ -109,12 +111,36 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     // 2. โหลดรายการ Workspace และอันที่เลือกอยู่
     const loadWorkspaceAndSupport = async () => {
       let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
-      
-      const savedWsId = getCookie("horset_current_workspace_id")
-      if (savedWsId) {
-        activeWsId = savedWsId
-      } else {
+      let currentRole = mockRole || role
+      let profileWsId: string | null = null
+
+      if (!isDemo) {
+        try {
+          const profileRes = await getCurrentUserProfileAction()
+          if (profileRes.success && profileRes.data) {
+            profileWsId = profileRes.data.workspace_id || null
+            if (profileRes.data.role) {
+              currentRole = profileRes.data.role
+              setUserRole(profileRes.data.role as any)
+            }
+          }
+        } catch (e) {
+          console.error("Error loading user profile in DashboardLayout:", e)
+        }
+      }
+
+      // ถ้าไม่ใช่ Super Admin และมี profileWsId ให้ใช้ของ Profile เสมอ
+      if (currentRole !== "super_admin" && profileWsId) {
+        activeWsId = profileWsId
         setCookie("horset_current_workspace_id", activeWsId)
+      } else {
+        // สำหรับ Super Admin หรือโหมด Demo ให้ใช้จากคุกกี้
+        const savedWsId = getCookie("horset_current_workspace_id")
+        if (savedWsId) {
+          activeWsId = savedWsId
+        } else {
+          setCookie("horset_current_workspace_id", activeWsId)
+        }
       }
 
       if (!isDemo) {
@@ -148,7 +174,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           if (grantData) {
             setSupportStatus(grantData.status)
             // สำหรับสิทธิ์ Admin: ถ้าเป็น Pending ให้เด้ง Pop-up
-            if (grantData.status === "pending" && mockRole === "admin") {
+            if (grantData.status === "pending" && currentRole === "admin") {
               setShowSupportModal(true)
             }
           } else {
@@ -185,7 +211,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       const savedStatus = getCookie(`horset_support_status_${activeWsId}`) || "none"
       setSupportStatus(savedStatus)
       
-      if (savedStatus === "pending" && mockRole === "admin") {
+      if (savedStatus === "pending" && (mockRole || role) === "admin") {
         setShowSupportModal(true)
       }
     }

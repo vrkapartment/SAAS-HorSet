@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/DashboardLayout"
 import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2, Droplet, Zap, Building, Sliders } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { createClient } from "@/lib/supabase/client"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -12,6 +13,14 @@ function getCookie(name: string): string | undefined {
   const parts = value.split(`; ${name}=`)
   if (parts.length === 2) return parts.pop()?.split(";").shift()
   return undefined
+}
+
+function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return
+  const date = new Date()
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:"
+  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}${isSecure ? "; Secure" : ""}; SameSite=Lax`
 }
 
 export default function FinanceSettingsPage() {
@@ -45,14 +54,41 @@ export default function FinanceSettingsPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true)
+      setErrorMsg(null)
       try {
         const userRes = await getCurrentUserProfileAction()
         
-        // 1. ดึง workspace ID จาก cookie ก่อนเพื่อให้สอดคล้องกับ Workspace Switcher แถบเมนูด้านบน
-        const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+        let currentWsId: string | undefined = undefined
         
-        // 2. ถ้าไม่มีคุกกี้ ให้ใช้ของ profile
-        const currentWsId = cookieWsId || (userRes.success && userRes.data?.workspace_id)
+        if (userRes.success && userRes.data) {
+          const isSuperAdmin = userRes.data.role === "super_admin"
+          
+          if (!isSuperAdmin && userRes.data.workspace_id) {
+            // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
+            currentWsId = userRes.data.workspace_id
+          } else {
+            // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
+            const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+            currentWsId = cookieWsId || userRes.data.workspace_id || undefined
+          }
+        }
+
+        // --- แก้ไขปัญหา Race Condition ตอน Mount เมื่อ Cookie ยังเป็น Mock ID ---
+        const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+        if (!isDemo && (!currentWsId || currentWsId === "d290f1ee-6c54-4b01-90e6-d701748f0851")) {
+          try {
+            const supabase = createClient()
+            const { data: wsData } = await supabase.from("workspaces").select("id").limit(1)
+            if (wsData && wsData.length > 0) {
+              const fallbackId = wsData[0].id
+              currentWsId = fallbackId
+              setCookie("horset_current_workspace_id", fallbackId)
+            }
+          } catch (wsErr) {
+            console.error("Failed to fallback real workspace ID:", wsErr)
+          }
+        }
+        // -------------------------------------------------------------------
 
         if (currentWsId) {
           setWorkspaceId(currentWsId)
@@ -75,10 +111,15 @@ export default function FinanceSettingsPage() {
             setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
             setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
             setIsDatabaseBacked(true)
+          } else if (res.error) {
+            setErrorMsg(res.error)
           }
+        } else {
+          setErrorMsg("ไม่พบข้อมูล Workspace ID ของบัญชีผู้ใช้งานนี้")
         }
       } catch (err) {
         console.error("Failed to load settings:", err)
+        setErrorMsg("เกิดข้อผิดพลาดในการโหลดข้อมูลการเงิน")
       } finally {
         setLoading(false)
       }

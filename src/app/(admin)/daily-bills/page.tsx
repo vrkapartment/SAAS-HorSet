@@ -35,6 +35,7 @@ import {
   deleteExpense, 
   ExpenseItem 
 } from "@/features/expenses/actions"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
 // คู่มือรายจ่ายยอดนิยมและคำอธิบายประเภทภาษี
 const commonExpensesGuide = [
@@ -102,7 +103,22 @@ export default function DailyBillsPage() {
   const loadData = async (year: string) => {
     setLoading(true)
     try {
-      const wsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") || undefined : undefined
+      const userRes = await getCurrentUserProfileAction()
+      let wsId: string | undefined = undefined
+      
+      if (userRes.success && userRes.data) {
+        const isSuperAdmin = userRes.data.role === "super_admin"
+        
+        if (!isSuperAdmin && userRes.data.workspace_id) {
+          // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
+          wsId = userRes.data.workspace_id
+        } else {
+          // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
+          const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+          wsId = cookieWsId || userRes.data.workspace_id || undefined
+        }
+      }
+
       const res = await getExpenses(year, wsId)
       if (res.success && res.data) {
         setExpenses(res.data)
@@ -234,7 +250,22 @@ export default function DailyBillsPage() {
 
     try {
       let res
-      const wsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") || undefined : undefined
+      const userRes = await getCurrentUserProfileAction()
+      let wsId: string | undefined = undefined
+      
+      if (userRes.success && userRes.data) {
+        const isSuperAdmin = userRes.data.role === "super_admin"
+        
+        if (!isSuperAdmin && userRes.data.workspace_id) {
+          // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
+          wsId = userRes.data.workspace_id
+        } else {
+          // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
+          const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+          wsId = cookieWsId || userRes.data.workspace_id || undefined
+        }
+      }
+
       if (editingExpense) {
         res = await updateExpense(editingExpense.id, formTitle.trim(), amt, taxYear, formCategory)
       } else {
