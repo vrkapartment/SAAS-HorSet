@@ -77,3 +77,94 @@ export async function logoutAction() {
   }
 }
 
+/**
+ * ดึงข้อมูลโปรไฟล์ของผู้ใช้ปัจจุบัน
+ */
+export async function getCurrentUserProfileAction() {
+  try {
+    const supabase = await createClient()
+    
+    // ดึงข้อมูล User ปัจจุบัน
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
+    }
+
+    // ดึงข้อมูลจากตาราง profiles
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, email, role, full_name, phone, tfa_enabled")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile) {
+      // คืนข้อมูลเบื้องต้นจาก auth.user ถ้าไม่มี profile ในตาราง db
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          email: user.email,
+          role: "tenant",
+          full_name: user.user_metadata?.full_name || "",
+          phone: user.phone || "",
+          tfa_enabled: false
+        }
+      }
+    }
+
+    return { success: true, data: profile }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาด" }
+  }
+}
+
+/**
+ * อัปเดตข้อมูลโปรไฟล์และรหัสผ่านของผู้ใช้ปัจจุบัน
+ */
+export async function updateUserProfileAction(data: {
+  fullName?: string
+  phone?: string
+  password?: string
+}) {
+  try {
+    const supabase = await createClient()
+    
+    // 1. ตรวจสอบผู้ใช้ปัจจุบัน
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
+    }
+
+    // 2. อัปเดตรหัสผ่านถ้ามีการกรอกมา
+    if (data.password && data.password.trim() !== "") {
+      const { error: passwordError } = await supabase.auth.updateUser({
+        password: data.password
+      })
+      if (passwordError) {
+        return { success: false, error: `ไม่สามารถเปลี่ยนรหัสผ่านได้: ${passwordError.message}` }
+      }
+    }
+
+    // 3. อัปเดตข้อมูลตาราง profiles
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    }
+    if (data.fullName !== undefined) updateData.full_name = data.fullName
+    if (data.phone !== undefined) updateData.phone = data.phone
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update(updateData)
+      .eq("id", user.id)
+
+    if (profileError) {
+      return { success: false, error: `อัปเดตข้อมูลโปรไฟล์ล้มเหลว: ${profileError.message}` }
+    }
+
+    return { success: true, message: "อัปเดตข้อมูลโปรไฟล์สำเร็จเรียบร้อยแล้ว" }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ" }
+  }
+}
+
+
