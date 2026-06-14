@@ -475,14 +475,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               {(supportStatus === "none" || supportStatus === "revoked") && (
                 <button
                   onClick={handleRequestSupport}
-                  className="w-full mt-1.5 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-[10px] text-center transition-colors shadow-lg shadow-blue-600/10"
+                  className="w-full mt-1.5 py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-blue-600/10"
                 >
                   {t("dashboard.request_support")}
                 </button>
               )}
 
               {supportStatus === "pending" && (
-                <div className="text-[9px] text-slate-500 text-center mt-1">
+                <div className="text-[9px] text-slate-500 text-left px-1 mt-1">
                   {t("dashboard.awaiting_admin_approval")}
                 </div>
               )}
