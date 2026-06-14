@@ -42,6 +42,7 @@ alter table public.tenants add column if not exists workspace_id uuid references
 alter table public.meter_records add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.bills add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.expenses add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.expenses add column if not exists category text check (category in ('40_5', '40_8'));
 
 -- Associate existing rows with Default Workspace
 update public.room_types set workspace_id = 'd290f1ee-6c54-4b01-90e6-d701748f0851' where workspace_id is null;

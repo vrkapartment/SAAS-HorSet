@@ -85,6 +85,7 @@ create table public.expenses (
   title text not null,
   amount numeric not null default 0,
   tax_year text not null,
+  category text check (category in ('40_5', '40_8')),
   created_at timestamptz not null default now()
 );
 
