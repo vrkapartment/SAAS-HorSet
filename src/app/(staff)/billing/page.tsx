@@ -813,7 +813,7 @@ export default function UnifiedBillingPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
             <Gauge className="w-5 h-5 text-blue-500" />
@@ -824,10 +824,10 @@ export default function UnifiedBillingPage() {
           </p>
         </div>
         
-        <div className="flex flex-wrap gap-2.5 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className="px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-xs font-semibold"
+            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs font-semibold transition-all cursor-pointer"
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
           >
@@ -838,17 +838,17 @@ export default function UnifiedBillingPage() {
           {/* บันทึกทั้งหมด */}
           <button
             onClick={handleSaveAll}
-            className="glow-btn bg-teal-600 hover:bg-teal-500 text-white font-semibold py-2 px-4 rounded-xl flex items-center gap-1.5 text-xs shadow-lg shadow-teal-600/15"
+            className="w-full md:w-auto h-12 md:h-9 glow-btn bg-teal-600 hover:bg-teal-500 text-white font-semibold px-4 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs shadow-lg shadow-teal-600/15 transition-all cursor-pointer"
           >
-            <Save className="w-3.5 h-3.5" /> บันทึกและออกบิลทุกห้อง
+            <Save className="w-4 h-4 md:w-3.5 md:h-3.5" /> บันทึกและออกบิลทุกห้อง
           </button>
 
           {/* ปุ่มบิลกำหนดเอง (สำหรับแอดมินหรือกรณีฉุกเฉิน) */}
           <button
             onClick={() => setCreateBillModalOpen(true)}
-            className="py-2 px-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl flex items-center gap-1.5 text-xs font-medium"
+            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs font-semibold transition-all cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-blue-500" /> บิลจำลองพิเศษ
+            <Plus className="w-4 h-4 md:w-3.5 md:h-3.5 text-blue-500" /> บิลจำลองพิเศษ
           </button>
         </div>
       </div>
@@ -910,8 +910,242 @@ export default function UnifiedBillingPage() {
       </div>
 
       {/* ตารางควบคุมหลัก */}
-      <div className="glass-card rounded-2xl border border-slate-900/60 p-5 bg-slate-950/10 backdrop-blur-md">
-        <div className="overflow-x-auto">
+      <div className="p-0 md:p-5 bg-transparent md:bg-slate-950/10 md:border md:border-slate-900/60 md:glass-card md:rounded-2xl md:backdrop-blur-md">
+        {/* Mobile View: Card List (< 768px) */}
+        <div className="block md:hidden space-y-4">
+          {loading ? (
+            <div className="py-12 text-center text-slate-500 bg-slate-950/10 border border-slate-900/60 rounded-2xl glass-card backdrop-blur-md">
+              <div className="flex flex-col items-center justify-center gap-3">
+                <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+                <span>กำลังโหลดข้อมูลรวม...</span>
+              </div>
+            </div>
+          ) : unifiedItems.length > 0 ? (
+            unifiedItems.map((item) => {
+              const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
+              const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - item.elecPrev : 0
+              const elecCost = hasElecCurr && elecUnitsUsed >= 0
+                ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
+                : 0
+
+              const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
+              const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - item.waterPrev : 0
+              const waterCost = hasWaterCurr && waterUnitsUsed >= 0
+                ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
+                : 0
+              
+              const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
+              const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
+
+              return (
+                <div key={item.roomNumber} className="glass-card rounded-2xl border border-slate-900/60 p-4 bg-slate-950/35 backdrop-blur-md space-y-4">
+                  {/* Card Header: Room, Tenant, Status */}
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-black text-slate-100 bg-slate-900/80 px-3 py-1 rounded-xl border border-slate-800">
+                          {item.roomNumber}
+                        </span>
+                        <span className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
+                          item.billStatus === "paid" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                          item.billStatus === "pending" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" :
+                          item.billStatus === "unpaid" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
+                          "bg-slate-900 text-slate-500 border border-slate-800"
+                        }`}>
+                          {item.billStatus === "paid" ? "ชำระเงินแล้ว" :
+                           item.billStatus === "pending" ? "รอตรวจสลิป" :
+                           item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
+                        </span>
+                      </div>
+                      <div className="font-bold text-slate-300 mt-2">
+                        {item.tenantName || <span className="text-slate-600 italic">ไม่มีข้อมูลผู้เช่า</span>}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        ค่าเช่า {item.baseRent.toLocaleString()}.- | ส่วนกลาง {commonFee}.-
+                      </div>
+                    </div>
+                    
+                    {/* Total Display */}
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ยอดรวมสุทธิ</div>
+                      <div className="text-lg font-black text-teal-400 font-mono">
+                        {calculatedAmount.toLocaleString()}.-
+                      </div>
+                      {isModified && (
+                        <span className="inline-block text-[9px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1">
+                          ยอดเงินเปลี่ยน
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-slate-900/60" />
+
+                  {/* Meter Inputs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Electricity Meter Card Section */}
+                    <div className="bg-blue-500/5 rounded-xl p-3 border border-blue-500/10 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-blue-400 flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
+                          ก่อนหน้า: <strong className="text-slate-200">{item.elecPrev}</strong>
+                        </span>
+                      </div>
+                      
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="จดเลขมิเตอร์ไฟฟ้า..."
+                          className="w-full h-12 px-3 text-base bg-slate-950 border border-slate-800 rounded-xl text-slate-100 font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-600"
+                          value={item.elecCurr}
+                          onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
+                        />
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
+                          kWh
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-xs font-mono">
+                        <span className="text-slate-500">หน่วยไฟที่ใช้:</span>
+                        <span className={`font-bold ${!hasElecCurr ? "text-slate-500" : elecUnitsUsed < 0 ? "text-red-400" : "text-blue-400"}`}>
+                          {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs font-mono">
+                        <span className="text-slate-500">รวมเงินค่าไฟ:</span>
+                        <span className="font-bold text-slate-300">
+                          {hasElecCurr && elecUnitsUsed >= 0 
+                            ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                            : "-"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Water Meter Card Section */}
+                    <div className="bg-teal-500/5 rounded-xl p-3 border border-teal-500/10 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-teal-400 flex items-center gap-1">
+                          <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
+                          ก่อนหน้า: <strong className="text-slate-200">{item.waterPrev}</strong>
+                        </span>
+                      </div>
+                      
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="จดเลขมิเตอร์น้ำประปา..."
+                          className="w-full h-12 px-3 text-base bg-slate-950 border border-slate-800 rounded-xl text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-600"
+                          value={item.waterCurr}
+                          onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
+                        />
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
+                          m³
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-xs font-mono">
+                        <span className="text-slate-500">หน่วยน้ำที่ใช้:</span>
+                        <span className={`font-bold ${!hasWaterCurr ? "text-slate-500" : waterUnitsUsed < 0 ? "text-red-400" : "text-teal-400"}`}>
+                          {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs font-mono">
+                        <span className="text-slate-500">รวมเงินค่าน้ำ:</span>
+                        <span className="font-bold text-slate-300">
+                          {hasWaterCurr && waterUnitsUsed >= 0 
+                            ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                            : "-"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Section */}
+                  <div className="pt-2 space-y-2">
+                    {/* Save Button (Primary Action) */}
+                    <button
+                      onClick={() => handleSaveRow(item.roomNumber)}
+                      disabled={item.isMeterSaved && item.billStatus !== "not_created" && !isModified}
+                      className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        item.isMeterSaved && item.billStatus !== "not_created" && !isModified
+                          ? "bg-slate-950/40 border border-slate-900 text-slate-600 cursor-not-allowed"
+                          : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
+                      }`}
+                    >
+                      <Save className="w-4 h-4" /> บันทึกและออกบิลห้อง {item.roomNumber}
+                    </button>
+
+                    {/* Sub/Secondary Actions Grid */}
+                    {item.billStatus === "pending" ? (
+                      <button
+                        onClick={() => {
+                          setSelectedBill(item)
+                          setSlipModalOpen(true)
+                        }}
+                        className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/10 cursor-pointer"
+                      >
+                        <Eye className="w-4 h-4" /> ตรวจสอบสลิปโอนเงิน
+                      </button>
+                    ) : item.billStatus !== "not_created" ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Download PDF */}
+                          <button
+                            onClick={() => handleDownloadBillPdf(item)}
+                            disabled={downloadingPdfId !== null}
+                            className="h-12 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-200 hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          >
+                            {downloadingPdfId === item.roomNumber ? (
+                              <div className="w-4 h-4 border border-slate-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>
+                                <Download className="w-4 h-4 text-blue-400" />
+                                <span>ดาวน์โหลด PDF</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Send Line OA */}
+                          <button
+                            onClick={() => handleSendLine(item.roomNumber)}
+                            className="h-12 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-200 hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          >
+                            <Send className="w-4 h-4 text-teal-400" />
+                            <span>ส่ง LINE OA</span>
+                          </button>
+                        </div>
+
+                        {/* If unpaid, direct payment record (Cash/Manual) */}
+                        {item.billStatus === "unpaid" && (
+                          <button
+                            onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
+                            className="w-full h-12 bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                          >
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            <span>รับเงินสด / บันทึกชำระเงินตรง</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="py-12 text-center text-slate-500 bg-slate-950/10 border border-slate-900/60 rounded-2xl glass-card backdrop-blur-md">
+              ไม่มีรายการห้องพักที่ใช้งานหรือจ้างเช่าอยู่ในขณะนี้
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View: Standard Dense Table (>= 768px) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-slate-900/80 text-slate-500 font-semibold">
@@ -1080,7 +1314,7 @@ export default function UnifiedBillingPage() {
                           <button
                             onClick={() => handleSaveRow(item.roomNumber)}
                             disabled={item.isMeterSaved && item.billStatus !== "not_created" && !isModified}
-                            className={`p-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all ${
+                            className={`p-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                               item.isMeterSaved && item.billStatus !== "not_created" && !isModified
                                 ? "border-slate-900 bg-slate-950/20 text-slate-600 cursor-not-allowed"
                                 : "border-teal-500/30 bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white hover:scale-105 shadow-sm"
@@ -1098,7 +1332,7 @@ export default function UnifiedBillingPage() {
                                 setSelectedBill(item)
                                 setSlipModalOpen(true)
                               }}
-                              className="p-1.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl hover:bg-amber-500 hover:text-white transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105"
+                              className="p-1.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl hover:bg-amber-500 hover:text-white transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer"
                             >
                               <Eye className="w-3.5 h-3.5" />
                               <span className="text-[10px]">ตรวจสลิป</span>
@@ -1109,7 +1343,7 @@ export default function UnifiedBillingPage() {
                               <button
                                 onClick={() => handleDownloadBillPdf(item)}
                                 disabled={downloadingPdfId !== null}
-                                className="p-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/40 rounded-xl transition-all"
+                                className="p-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/40 rounded-xl transition-all cursor-pointer"
                                 title="ดาวน์โหลดบิล PDF"
                               >
                                 {downloadingPdfId === item.roomNumber ? (
@@ -1122,7 +1356,7 @@ export default function UnifiedBillingPage() {
                               {/* ส่ง LINE OA */}
                               <button
                                 onClick={() => handleSendLine(item.roomNumber)}
-                                className="p-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-teal-400 hover:border-teal-500/40 rounded-xl transition-all"
+                                className="p-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-teal-400 hover:border-teal-500/40 rounded-xl transition-all cursor-pointer"
                                 title="ส่งเข้า LINE OA"
                               >
                                 <Send className="w-3.5 h-3.5" />
@@ -1132,7 +1366,7 @@ export default function UnifiedBillingPage() {
                               {item.billStatus === "unpaid" && (
                                 <button
                                   onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                                  className="p-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40 rounded-xl transition-all flex items-center gap-1 hover:scale-105 shadow-sm"
+                                  className="p-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40 rounded-xl transition-all flex items-center gap-1 hover:scale-105 shadow-sm cursor-pointer"
                                   title="รับเงินสด/บันทึกชำระเงินตรง"
                                 >
                                   <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
@@ -1161,13 +1395,13 @@ export default function UnifiedBillingPage() {
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}
       {slipModalOpen && selectedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="glass-panel w-full max-w-2xl p-6 rounded-3xl relative shadow-2xl animate-scale-up grid grid-cols-1 md:grid-cols-2 gap-6 border border-slate-800/80">
+          <div className="glass-panel w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up grid grid-cols-1 md:grid-cols-2 gap-6 border border-slate-800/80">
             <button
               onClick={() => {
                 setSlipModalOpen(false)
                 setSelectedBill(null)
               }}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-white hover:bg-slate-900/50 rounded-lg transition-all"
+              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-white hover:bg-slate-900/50 rounded-lg transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1224,13 +1458,13 @@ export default function UnifiedBillingPage() {
               <div className="space-y-2 pt-6">
                 <button
                   onClick={() => handleApproveSlip(selectedBill.billId)}
-                  className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-lg shadow-teal-600/10 transition-all hover:-translate-y-0.5"
+                  className="w-full h-12 md:h-10 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-lg shadow-teal-600/10 transition-all hover:-translate-y-0.5 cursor-pointer"
                 >
                   <UserCheck className="w-4 h-4" /> อนุมัติยอดและปิดบัญชีบิล
                 </button>
                 <button
                   onClick={() => handleRejectSlip(selectedBill.billId)}
-                  className="w-full py-2.5 bg-red-600/15 hover:bg-red-600 text-red-400 hover:text-white rounded-xl text-xs font-semibold border border-red-500/20 transition-colors"
+                  className="w-full h-12 md:h-10 bg-red-600/15 hover:bg-red-600 text-red-400 hover:text-white rounded-xl text-xs font-semibold border border-red-500/20 transition-colors cursor-pointer"
                 >
                   ปฏิเสธสลิป / ข้อมูลการโอนผิดพลาด
                 </button>
@@ -1243,10 +1477,10 @@ export default function UnifiedBillingPage() {
       {/* Modal สร้างบิลพิเศษกำหนดเอง */}
       {createBillModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="glass-panel w-full max-w-md p-6 rounded-3xl relative shadow-2xl animate-scale-up border border-slate-800/80">
+          <div className="glass-panel w-full max-w-md max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up border border-slate-800/80">
             <button
               onClick={() => setCreateBillModalOpen(false)}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-white hover:bg-slate-900/50 rounded-lg transition-all"
+              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-white hover:bg-slate-900/50 rounded-lg transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1260,7 +1494,7 @@ export default function UnifiedBillingPage() {
                 <div className="space-y-1">
                   <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ห้องพัก</label>
                   <select
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-xs font-semibold"
+                    className="w-full h-11 md:h-10 px-3 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs font-semibold cursor-pointer"
                     value={newRoomNumber}
                     onChange={(e) => setNewRoomNumber(e.target.value)}
                   >
@@ -1274,7 +1508,7 @@ export default function UnifiedBillingPage() {
                   <input
                     type="text"
                     disabled
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 text-xs font-mono font-bold"
+                    className="w-full h-11 md:h-10 px-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 text-sm md:text-xs font-mono font-bold"
                     value={billingCycle}
                   />
                 </div>
@@ -1287,11 +1521,11 @@ export default function UnifiedBillingPage() {
                   <div className="relative">
                     <input
                       type="number"
-                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500"
+                      className="w-full h-11 md:h-10 px-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
                       value={elecUnitsManual}
                       onChange={(e) => setElecUnitsManual(Number(e.target.value))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 font-bold">หน่วย</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 font-black">หน่วย</span>
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -1299,17 +1533,17 @@ export default function UnifiedBillingPage() {
                   <div className="relative">
                     <input
                       type="number"
-                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-xs font-mono focus:outline-none focus:border-teal-500"
+                      className="w-full h-11 md:h-10 px-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-teal-500"
                       value={waterUnitsManual}
                       onChange={(e) => setWaterUnitsManual(Number(e.target.value))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 font-bold">หน่วย</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 font-black">หน่วย</span>
                   </div>
                 </div>
               </div>
 
               {/* สรุปยอดราคาจำลอง */}
-              <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-500/10 text-[11px] space-y-2 font-medium">
+              <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-500/10 text-xs space-y-2 font-medium">
                 <div className="flex justify-between text-slate-400">
                   <span>ค่าห้องแอร์/พัดลมปกติ:</span>
                   <span>{rentPrice.toLocaleString()} บาท</span>
@@ -1337,13 +1571,13 @@ export default function UnifiedBillingPage() {
                 <div className="h-px bg-slate-800 my-1.5" />
                 <div className="flex justify-between font-extrabold text-slate-200">
                   <span>ยอดสุทธิที่ต้องชำระ:</span>
-                  <span className="text-blue-400 text-xs font-black">{computedTotal.toLocaleString()} บาท</span>
+                  <span className="text-blue-400 text-sm font-black">{computedTotal.toLocaleString()} บาท</span>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/15 hover:-translate-y-0.5 transition-all"
+                className="w-full h-12 md:h-10 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm md:text-xs font-bold shadow-lg shadow-blue-600/15 active:scale-[0.98] transition-all flex items-center justify-center cursor-pointer"
               >
                 คำนวณเงินและออกบิลค้างชำระ
               </button>
