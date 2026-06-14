@@ -30,7 +30,8 @@ import {
   updateUserProfileAdminAction,
   deleteUserProfileAdminAction,
   updateWorkspaceNameAdminAction,
-  deleteWorkspaceAdminAction
+  deleteWorkspaceAdminAction,
+  getSuperAdminDataAction
 } from "@/features/super-admin/actions"
 
 interface Workspace {
@@ -118,50 +119,30 @@ export default function SuperAdminPage() {
 
     if (!isDemo) {
       try {
-        const supabase = createClient()
+        const res = await getSuperAdminDataAction()
+        if (!res.success) throw new Error(res.error)
 
-        // 1. โหลดข้อมูล Workspaces
-        const { data: wsData, error: wsError } = await supabase
-          .from("workspaces")
-          .select("*")
-          .order("created_at", { ascending: false })
-
-        if (wsError) throw wsError
-        setWorkspaces(wsData || [])
-
-        // 2. โหลดข้อมูล Profiles
-        const { data: profData, error: profError } = await supabase
-          .from("profiles")
-          .select("*")
-          .order("created_at", { ascending: false })
-
-        if (profError) throw profError
-        setProfiles(profData || [])
-
-        // 3. โหลดข้อมูลการช่วยเหลือ (Support Access Grants)
-        const { data: grantData, error: grantError } = await supabase
-          .from("support_access_grants")
-          .select("*")
-
-        if (grantData) {
-          const grantMap: { [key: string]: string } = {}
-          grantData.forEach((g: any) => {
-            grantMap[g.workspace_id] = g.status
-          })
-          setSupportGrants(grantMap)
+        if (res.isDemo) {
+          fallbackMock()
+          return
         }
 
-        // 4. โหลดข้อมูลรหัสเชิญชวน (Registration Secret Codes)
-        const { data: codeData, error: codeError } = await supabase
-          .from("registration_codes")
-          .select("*")
-          .order("created_at", { ascending: false })
+        const wsData = res.data?.workspaces || []
+        const profData = res.data?.profiles || []
+        const grantData = res.data?.supportGrants || []
+        const codeData = res.data?.registrationCodes || []
 
-        if (!codeError && codeData) {
-          setRegistrationCodes(codeData)
-        }
+        setWorkspaces(wsData)
+        setProfiles(profData)
+        setRegistrationCodes(codeData)
 
-        if (wsData && wsData.length > 0) {
+        const grantMap: { [key: string]: string } = {}
+        grantData.forEach((g: any) => {
+          grantMap[g.workspace_id] = g.status
+        })
+        setSupportGrants(grantMap)
+
+        if (wsData.length > 0) {
           const savedSelectedWs = localStorage.getItem("horset_super_admin_selected_ws")
           const savedGenWs = localStorage.getItem("horset_super_admin_gen_ws")
 
@@ -181,9 +162,9 @@ export default function SuperAdminPage() {
             localStorage.setItem("horset_super_admin_gen_ws", finalGenId)
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error(err)
-        setError("ไม่สามารถโหลดข้อมูลจาก Supabase ได้ กำลังดึงข้อมูลจากระบบจำลองแทน...")
+        setError("ไม่สามารถโหลดข้อมูลจาก Supabase ได้: " + err.message + " กำลังใช้ระบบจำลองแทน...")
         fallbackMock()
       } finally {
         setLoading(false)

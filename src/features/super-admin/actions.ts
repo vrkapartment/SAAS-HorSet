@@ -116,6 +116,20 @@ export async function updateUserProfileAdminAction(profileId: string, data: {
 
     if (error) throw error
 
+    // อัปเดตข้อมูลในระบบ Auth ด้วยเพื่อความสอดคล้องกัน (เช่น metadata)
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(profileId, {
+        user_metadata: {
+          role: data.role,
+          workspace_id: data.workspaceId,
+          full_name: data.fullName,
+          phone: data.phone
+        }
+      })
+    } catch (authErr) {
+      console.warn("Auth user metadata update warning:", authErr)
+    }
+
     return { success: true }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปเดตข้อมูลผู้ใช้" }
@@ -227,5 +241,72 @@ export async function deleteWorkspaceAdminAction(workspaceId: string) {
     return { success: true }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบ Workspace" }
+  }
+}
+
+/**
+ * ดึงข้อมูลทั้งหมดสำหรับหน้า Super Admin ผ่าน Admin API ฝั่งเซิร์ฟเวอร์แบบข้าม RLS
+ */
+export async function getSuperAdminDataAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) {
+      return { success: true, isDemo: true }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!serviceKey || serviceKey.includes("placeholder")) {
+      return { success: false, error: "กรุณาตั้งค่า SUPABASE_SERVICE_ROLE_KEY" }
+    }
+
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
+
+    // 1. โหลดข้อมูล Workspaces
+    const { data: workspaces, error: wsError } = await supabaseAdmin
+      .from("workspaces")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (wsError) throw wsError
+
+    // 2. โหลดข้อมูล Profiles
+    const { data: profiles, error: profError } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (profError) throw profError
+
+    // 3. โหลดข้อมูลการช่วยเหลือ (Support Access Grants)
+    const { data: grants, error: grantError } = await supabaseAdmin
+      .from("support_access_grants")
+      .select("*")
+
+    if (grantError) throw grantError
+
+    // 4. โหลดข้อมูลรหัสเชิญชวน (Registration Secret Codes)
+    const { data: codes, error: codeError } = await supabaseAdmin
+      .from("registration_codes")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (codeError) throw codeError
+
+    return {
+      success: true,
+      isDemo: false,
+      data: {
+        workspaces: workspaces || [],
+        profiles: profiles || [],
+        supportGrants: grants || [],
+        registrationCodes: codes || []
+      }
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบ" }
   }
 }
