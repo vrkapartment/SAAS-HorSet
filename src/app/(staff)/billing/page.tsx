@@ -54,7 +54,6 @@ export default function UnifiedBillingPage() {
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [isDemo, setIsDemo] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
   const [commonFee, setCommonFee] = useState<number>(50)
@@ -138,145 +137,44 @@ export default function UnifiedBillingPage() {
     const prevMeterRes = await getMeterRecords(prevCycle)
     const dbPrevMeters = prevMeterRes.success && prevMeterRes.data ? prevMeterRes.data : []
     
-    const isSupabaseFallback = billsRes.fallback || meterRes.fallback
-    setIsDemo(!!isSupabaseFallback)
-    
-    if (isSupabaseFallback) {
-      // โหมด Demo (LocalStorage Fallback)
-      let localBills: any[] = []
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          localBills = JSON.parse(savedBills)
-        } catch (e) {
-          console.error(e)
-        }
-      } else {
-        localBills = [
-          { id: "1", roomNumber: "101", tenantName: "คุณวิภาวี สมบูรณ์", amount: 5400, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 60, waterUnits: 9 },
-          { id: "2", roomNumber: "102", tenantName: "คุณนพดล สุขศรี", amount: 6200, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 96, waterUnits: 12 },
-          { id: "3", roomNumber: "103", tenantName: "คุณวรรณภา ใสดี", amount: 5850, status: "unpaid", billingCycle: "2026-06", slipUrl: null, electricUnits: 85, waterUnits: 12 },
-          { id: "4", roomNumber: "105", tenantName: "คุณณัฐพล ใจดี", amount: 5760, status: "pending", slipUrl: "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=300", billingCycle: "2026-06", electricUnits: 84, waterUnits: 12 },
-          { id: "5", roomNumber: "201", tenantName: "คุณอรทัย มั่นคง", amount: 6100, status: "unpaid", billingCycle: "2026-06", slipUrl: null, electricUnits: 90, waterUnits: 10 },
-          { id: "6", roomNumber: "202", tenantName: "คุณสุชาติ เลิศรส", amount: 5310, status: "paid", billingCycle: "2026-06", slipUrl: "/slip-mock.jpg", electricUnits: 67, waterUnits: 9 }
-        ]
-        localStorage.setItem("horset_bills", JSON.stringify(localBills))
-      }
+    // โหมด Supabase ดั้งเดิมและถาวร
+    const activeRooms = rooms.filter((r: any) => r.status === "occupied" || dbBills.some((b: any) => b.roomNumber === r.roomNumber))
+    const compiled = activeRooms.map((r: any) => {
+      const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
+      const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
+      const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
       
-      let localMeters: any[] = []
-      const savedMeters = localStorage.getItem(`horset_meter_records_${cycle}`)
-      if (savedMeters) {
-        try {
-          localMeters = JSON.parse(savedMeters)
-        } catch (e) {
-          console.error(e)
-        }
-      }
+      // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
+      const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
+      const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
+        ? Number(prevMeter.elecCurr)
+        : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
+      const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
+        ? Number(prevMeter.waterCurr)
+        : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
       
-      let localPrevMeters: any[] = []
-      const savedPrevMeters = localStorage.getItem(`horset_meter_records_${prevCycle}`)
-      if (savedPrevMeters) {
-        try {
-          localPrevMeters = JSON.parse(savedPrevMeters)
-        } catch (e) {}
+      return {
+        roomNumber: r.roomNumber,
+        tenantName: r.tenantName,
+        baseRent: Number(r.baseRent) || 4500,
+        status: r.status,
+        
+        meterRecordId: roomMeter?.id || undefined,
+        elecPrev,
+        elecCurr: roomMeter ? (roomMeter.elecCurr === null || roomMeter.elecCurr === undefined ? "" : roomMeter.elecCurr) : "",
+        waterPrev,
+        waterCurr: roomMeter ? (roomMeter.waterCurr === null || roomMeter.waterCurr === undefined ? "" : roomMeter.waterCurr) : "",
+        isMeterSaved: roomMeter ? true : false,
+        
+        billId: roomBill?.id || undefined,
+        billAmount: roomBill ? Number(roomBill.amount) : 0,
+        billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created",
+        slipUrl: roomBill ? roomBill.slipUrl : null,
+        electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
+        waterUnits: roomBill ? Number(roomBill.waterUnits) : 0
       }
-      
-      let localRooms: any[] = []
-      const savedRooms = localStorage.getItem("horset_rooms")
-      if (savedRooms) {
-        try {
-          localRooms = JSON.parse(savedRooms)
-        } catch (e) {}
-      } else {
-        localRooms = [
-          { id: "1", roomNumber: "101", status: "occupied", baseRent: 4500, tenantName: "คุณวิภาวี สมบูรณ์" },
-          { id: "2", roomNumber: "102", status: "occupied", baseRent: 4500, tenantName: "คุณนพดล สุขศรี" },
-          { id: "3", roomNumber: "103", status: "occupied", baseRent: 4500, tenantName: "คุณวรรณภา ใสดี" },
-          { id: "4", roomNumber: "105", status: "occupied", baseRent: 4500, tenantName: "คุณณัฐพล ใจดี" },
-          { id: "5", roomNumber: "201", status: "occupied", baseRent: 4500, tenantName: "คุณอรทัย มั่นคง" },
-          { id: "6", roomNumber: "202", status: "occupied", baseRent: 4500, tenantName: "คุณสุชาติ เลิศรส" }
-        ]
-        localStorage.setItem("horset_rooms", JSON.stringify(localRooms))
-      }
-      setRoomsList(localRooms)
-      
-      const activeRooms = localRooms.filter((r: any) => r.status === "occupied")
-      const compiled = activeRooms.map((r: any) => {
-        const roomBill = localBills.find((b: any) => b.roomNumber === r.roomNumber && b.billingCycle === cycle)
-        const roomMeter = localMeters.find((m: any) => m.roomNumber === r.roomNumber)
-        const prevMeter = localPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
-        
-        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
-        const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
-        const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
-          ? Number(prevMeter.elecCurr)
-          : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
-        const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
-          ? Number(prevMeter.waterCurr)
-          : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
-        
-        return {
-          roomNumber: r.roomNumber,
-          tenantName: r.tenantName,
-          baseRent: Number(r.baseRent) || 4500,
-          status: r.status,
-          
-          meterRecordId: roomMeter?.id || undefined,
-          elecPrev,
-          elecCurr: roomMeter ? (roomMeter.elecCurr === null || roomMeter.elecCurr === undefined ? "" : roomMeter.elecCurr) : "",
-          waterPrev,
-          waterCurr: roomMeter ? (roomMeter.waterCurr === null || roomMeter.waterCurr === undefined ? "" : roomMeter.waterCurr) : "",
-          isMeterSaved: roomMeter ? !!roomMeter.isSaved : false,
-          
-          billId: roomBill?.id || undefined,
-          billAmount: roomBill ? Number(roomBill.amount) : 0,
-          billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created",
-          slipUrl: roomBill ? roomBill.slipUrl : null,
-          electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
-          waterUnits: roomBill ? Number(roomBill.waterUnits) : 0
-        }
-      })
-      setUnifiedItems(compiled)
-    } else {
-      // โหมด Supabase
-      const activeRooms = rooms.filter((r: any) => r.status === "occupied" || dbBills.some((b: any) => b.roomNumber === r.roomNumber))
-      const compiled = activeRooms.map((r: any) => {
-        const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
-        const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
-        const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
-        
-        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
-        const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
-        const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
-          ? Number(prevMeter.elecCurr)
-          : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
-        const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
-          ? Number(prevMeter.waterCurr)
-          : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
-        
-        return {
-          roomNumber: r.roomNumber,
-          tenantName: r.tenantName,
-          baseRent: Number(r.baseRent) || 4500,
-          status: r.status,
-          
-          meterRecordId: roomMeter?.id || undefined,
-          elecPrev,
-          elecCurr: roomMeter ? (roomMeter.elecCurr === null || roomMeter.elecCurr === undefined ? "" : roomMeter.elecCurr) : "",
-          waterPrev,
-          waterCurr: roomMeter ? (roomMeter.waterCurr === null || roomMeter.waterCurr === undefined ? "" : roomMeter.waterCurr) : "",
-          isMeterSaved: roomMeter ? true : false,
-          
-          billId: roomBill?.id || undefined,
-          billAmount: roomBill ? Number(roomBill.amount) : 0,
-          billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created",
-          slipUrl: roomBill ? roomBill.slipUrl : null,
-          electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
-          waterUnits: roomBill ? Number(roomBill.waterUnits) : 0
-        }
-      })
-      setUnifiedItems(compiled)
-    }
+    })
+    setUnifiedItems(compiled)
     
     setLoading(false)
   }
@@ -330,28 +228,13 @@ export default function UnifiedBillingPage() {
 
   // อนุมัติสลิปโอนเงิน
   const handleApproveSlip = async (id: string) => {
-    if (isDemo) {
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          const list = JSON.parse(savedBills)
-          const updated = list.map((b: any) => b.id === id ? { ...b, status: "paid" } : b)
-          localStorage.setItem("horset_bills", JSON.stringify(updated))
-        } catch (e) {
-          console.error(e)
-        }
-      }
+    const res = await updateBillStatus(id, "paid")
+    if (res.success) {
       showToast("อนุมัติรายการชำระเงินเรียบร้อยแล้ว!")
       await loadData()
     } else {
-      const res = await updateBillStatus(id, "paid")
-      if (res.success) {
-        showToast("อนุมัติรายการชำระเงินเรียบร้อยแล้ว!")
-        await loadData()
-      } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
-        return
-      }
+      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      return
     }
     setSlipModalOpen(false)
     setSelectedBill(null)
@@ -359,28 +242,13 @@ export default function UnifiedBillingPage() {
 
   // ปฏิเสธสลิปโอนเงิน
   const handleRejectSlip = async (id: string) => {
-    if (isDemo) {
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          const list = JSON.parse(savedBills)
-          const updated = list.map((b: any) => b.id === id ? { ...b, status: "unpaid", slipUrl: null } : b)
-          localStorage.setItem("horset_bills", JSON.stringify(updated))
-        } catch (e) {
-          console.error(e)
-        }
-      }
+    const res = await updateBillStatus(id, "unpaid", null)
+    if (res.success) {
       showToast("ปฏิเสธสลิปแล้ว บิลจะกลับเป็นสถานะค้างชำระ")
       await loadData()
     } else {
-      const res = await updateBillStatus(id, "unpaid", null)
-      if (res.success) {
-        showToast("ปฏิเสธสลิปแล้ว บิลจะกลับเป็นสถานะค้างชำระ")
-        await loadData()
-      } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
-        return
-      }
+      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      return
     }
     setSlipModalOpen(false)
     setSelectedBill(null)
@@ -390,27 +258,12 @@ export default function UnifiedBillingPage() {
   const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
     if (!confirm(`คุณต้องการเปลี่ยนสถานะบิลของห้อง ${roomNumber} เป็น "ชำระเงินแล้ว" ใช่หรือไม่? (โปรดยืนยันหากได้รับเงินแล้ว)`)) return
 
-    if (isDemo) {
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          const list = JSON.parse(savedBills)
-          const updated = list.map((b: any) => b.id === billId ? { ...b, status: "paid" } : b)
-          localStorage.setItem("horset_bills", JSON.stringify(updated))
-        } catch (e) {
-          console.error(e)
-        }
-      }
+    const res = await updateBillStatus(billId, "paid")
+    if (res.success) {
       showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
       await loadData()
     } else {
-      const res = await updateBillStatus(billId, "paid")
-      if (res.success) {
-        showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
-        await loadData()
-      } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
-      }
+      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
     }
   }
 
@@ -442,99 +295,37 @@ export default function UnifiedBillingPage() {
       : wUnits * waterRate
     const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
-    if (isDemo) {
-      // 1. บันทึกเลขมิเตอร์
-      let localMeters: any[] = []
-      const savedMeters = localStorage.getItem(`horset_meter_records_${billingCycle}`)
-      if (savedMeters) {
-        try {
-          localMeters = JSON.parse(savedMeters)
-        } catch (e) {}
-      }
-      
-      const existingMeterIdx = localMeters.findIndex((m: any) => m.roomNumber === roomNumber)
-      const updatedMeter = {
-        id: item.meterRecordId || Date.now().toString(),
-        roomNumber,
-        billingCycle,
-        elecPrev: item.elecPrev,
-        elecCurr: elecVal,
-        waterPrev: item.waterPrev,
-        waterCurr: waterVal,
-        isSaved: true
-      }
-      if (existingMeterIdx >= 0) {
-        localMeters[existingMeterIdx] = updatedMeter
-      } else {
-        localMeters.push(updatedMeter)
-      }
-      localStorage.setItem(`horset_meter_records_${billingCycle}`, JSON.stringify(localMeters))
-
-      // 2. ออกบิล / อัปเดตบิล
-      let localBills: any[] = []
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          localBills = JSON.parse(savedBills)
-        } catch (e) {}
-      }
-
-      const existingBillIdx = localBills.findIndex((b: any) => b.roomNumber === roomNumber && b.billingCycle === billingCycle)
-      const updatedBill = {
-        id: item.billId || (Date.now() + 1).toString(),
-        roomNumber,
-        tenantName: item.tenantName || "ผู้เช่าจำลอง",
-        amount: totalAmount,
-        status: (item.billStatus === "not_created" ? "unpaid" : item.billStatus) as any,
-        billingCycle,
-        slipUrl: item.slipUrl,
-        electricUnits: eUnits,
-        waterUnits: wUnits
-      }
-
-      if (existingBillIdx >= 0) {
-        localBills[existingBillIdx] = updatedBill
-      } else {
-        localBills.push(updatedBill)
-      }
-      localStorage.setItem("horset_bills", JSON.stringify(localBills))
-
-      showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
-      await loadData()
-    } else {
-      // โหมด Supabase
-      // 1. บันทึกมิเตอร์ใน DB
-      const meterRes = await saveMeterRecord(
-        roomNumber,
-        billingCycle,
-        item.elecPrev,
-        elecVal,
-        item.waterPrev,
-        waterVal
-      )
-      if (!meterRes.success) {
-        alert(meterRes.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์")
-        return
-      }
-
-      // 2. สร้าง/อัปเดตบิลใน DB
-      const billRes = await createBill(
-        roomNumber,
-        item.tenantName || "ผู้เช่า",
-        totalAmount,
-        item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
-        billingCycle,
-        eUnits,
-        wUnits
-      )
-      if (!billRes.success) {
-        alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
-        return
-      }
-
-      showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
-      await loadData()
+    // 1. บันทึกมิเตอร์ใน DB
+    const meterRes = await saveMeterRecord(
+      roomNumber,
+      billingCycle,
+      item.elecPrev,
+      elecVal,
+      item.waterPrev,
+      waterVal
+    )
+    if (!meterRes.success) {
+      alert(meterRes.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์")
+      return
     }
+
+    // 2. สร้าง/อัปเดตบิลใน DB
+    const billRes = await createBill(
+      roomNumber,
+      item.tenantName || "ผู้เช่า",
+      totalAmount,
+      item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
+      billingCycle,
+      eUnits,
+      wUnits
+    )
+    if (!billRes.success) {
+      alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
+      return
+    }
+
+    showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
+    await loadData()
   }
 
   // บันทึกและออกบิลให้ทุกห้องที่ข้อมูลสมบูรณ์
@@ -558,127 +349,52 @@ export default function UnifiedBillingPage() {
       return
     }
 
-    if (isDemo) {
-      let localMeters: any[] = []
-      const savedMeters = localStorage.getItem(`horset_meter_records_${billingCycle}`)
-      if (savedMeters) {
-        try {
-          localMeters = JSON.parse(savedMeters)
-        } catch (e) {}
+    // โหมด Supabase
+    for (const item of unifiedItems) {
+      const elecVal = Number(item.elecCurr)
+      const waterVal = Number(item.waterCurr)
+      const eUnits = elecVal - item.elecPrev
+      const wUnits = waterVal - item.waterPrev
+      const elecCost = electricMinChecked && eUnits <= electricMinUnit
+        ? electricMinUnit * elecRate
+        : eUnits * elecRate
+      const waterCost = waterMinChecked && wUnits <= waterMinUnit
+        ? waterMinUnit * waterRate
+        : wUnits * waterRate
+      const totalAmount = item.baseRent + elecCost + waterCost + commonFee
+
+      // 1. บันทึกเลขมิเตอร์
+      const meterRes = await saveMeterRecord(
+        item.roomNumber,
+        billingCycle,
+        item.elecPrev,
+        elecVal,
+        item.waterPrev,
+        waterVal
+      )
+      if (!meterRes.success) {
+        alert(`เกิดข้อผิดพลาดในการบันทึกมิเตอร์ห้อง ${item.roomNumber}: ${meterRes.error}`)
+        return
       }
 
-      let localBills: any[] = []
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          localBills = JSON.parse(savedBills)
-        } catch (e) {}
+      // 2. บันทึกและออกบิล
+      const billRes = await createBill(
+        item.roomNumber,
+        item.tenantName || "ผู้เช่า",
+        totalAmount,
+        item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
+        billingCycle,
+        eUnits,
+        wUnits
+      )
+      if (!billRes.success) {
+        alert(`เกิดข้อผิดพลาดในการสร้างบิลห้อง ${item.roomNumber}: ${billRes.error}`)
+        return
       }
-
-      unifiedItems.forEach((item, idx) => {
-        const elecVal = Number(item.elecCurr)
-        const waterVal = Number(item.waterCurr)
-        const eUnits = elecVal - item.elecPrev
-        const wUnits = waterVal - item.waterPrev
-        const elecCost = electricMinChecked && eUnits <= electricMinUnit
-          ? electricMinUnit * elecRate
-          : eUnits * elecRate
-        const waterCost = waterMinChecked && wUnits <= waterMinUnit
-          ? waterMinUnit * waterRate
-          : wUnits * waterRate
-        const totalAmount = item.baseRent + elecCost + waterCost + commonFee
-
-        // 1. มิเตอร์
-        const existingMeterIdx = localMeters.findIndex((m: any) => m.roomNumber === item.roomNumber)
-        const updatedMeter = {
-          id: item.meterRecordId || (Date.now() + idx).toString(),
-          roomNumber: item.roomNumber,
-          billingCycle,
-          elecPrev: item.elecPrev,
-          elecCurr: elecVal,
-          waterPrev: item.waterPrev,
-          waterCurr: waterVal,
-          isSaved: true
-        }
-        if (existingMeterIdx >= 0) {
-          localMeters[existingMeterIdx] = updatedMeter
-        } else {
-          localMeters.push(updatedMeter)
-        }
-
-        // 2. บิล
-        const existingBillIdx = localBills.findIndex((b: any) => b.roomNumber === item.roomNumber && b.billingCycle === billingCycle)
-        const updatedBill = {
-          id: item.billId || (Date.now() + idx + 100).toString(),
-          roomNumber: item.roomNumber,
-          tenantName: item.tenantName || "ผู้เช่าจำลอง",
-          amount: totalAmount,
-          status: (item.billStatus === "not_created" ? "unpaid" : item.billStatus) as any,
-          billingCycle,
-          slipUrl: item.slipUrl,
-          electricUnits: eUnits,
-          waterUnits: wUnits
-        }
-        if (existingBillIdx >= 0) {
-          localBills[existingBillIdx] = updatedBill
-        } else {
-          localBills.push(updatedBill)
-        }
-      })
-
-      localStorage.setItem(`horset_meter_records_${billingCycle}`, JSON.stringify(localMeters))
-      localStorage.setItem("horset_bills", JSON.stringify(localBills))
-      
-      showToast("บันทึกเลขมิเตอร์และคำนวณบิลให้ทุกห้องสำเร็จ!")
-      await loadData()
-    } else {
-      // โหมด Supabase
-      for (const item of unifiedItems) {
-        const elecVal = Number(item.elecCurr)
-        const waterVal = Number(item.waterCurr)
-        const eUnits = elecVal - item.elecPrev
-        const wUnits = waterVal - item.waterPrev
-        const elecCost = electricMinChecked && eUnits <= electricMinUnit
-          ? electricMinUnit * elecRate
-          : eUnits * elecRate
-        const waterCost = waterMinChecked && wUnits <= waterMinUnit
-          ? waterMinUnit * waterRate
-          : wUnits * waterRate
-        const totalAmount = item.baseRent + elecCost + waterCost + commonFee
-
-        // 1. บันทึกเลขมิเตอร์
-        const meterRes = await saveMeterRecord(
-          item.roomNumber,
-          billingCycle,
-          item.elecPrev,
-          elecVal,
-          item.waterPrev,
-          waterVal
-        )
-        if (!meterRes.success) {
-          alert(`เกิดข้อผิดพลาดในการบันทึกมิเตอร์ห้อง ${item.roomNumber}: ${meterRes.error}`)
-          return
-        }
-
-        // 2. บันทึกและออกบิล
-        const billRes = await createBill(
-          item.roomNumber,
-          item.tenantName || "ผู้เช่า",
-          totalAmount,
-          item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
-          billingCycle,
-          eUnits,
-          wUnits
-        )
-        if (!billRes.success) {
-          alert(`เกิดข้อผิดพลาดในการสร้างบิลห้อง ${item.roomNumber}: ${billRes.error}`)
-          return
-        }
-      }
-
-      showToast("บันทึกเลขมิเตอร์และคำนวณบิลให้ทุกห้องสำเร็จ!")
-      await loadData()
     }
+
+    showToast("บันทึกเลขมิเตอร์และคำนวณบิลให้ทุกห้องสำเร็จ!")
+    await loadData()
   }
 
   // ส่งข้อมูลเข้า LINE OA
@@ -739,58 +455,30 @@ export default function UnifiedBillingPage() {
   const handleCreateBillManual = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    let targetTenant = "ผู้เช่าจำลอง"
+    let targetTenant = ""
     const room = roomsList.find(r => r.roomNumber === newRoomNumber)
     if (room && room.tenantName) {
       targetTenant = room.tenantName
-    } else if (!isDemo) {
+    } else {
       alert("ห้องพักนี้ยังไม่มีผู้เช่า หรือสัญญาหมดอายุ ไม่สามารถออกบิลได้")
       return
     }
 
-    if (isDemo) {
-      let localBills: any[] = []
-      const savedBills = localStorage.getItem("horset_bills")
-      if (savedBills) {
-        try {
-          localBills = JSON.parse(savedBills)
-        } catch (e) {}
-      }
-
-      const newBill = {
-        id: Date.now().toString(),
-        roomNumber: newRoomNumber,
-        tenantName: targetTenant,
-        amount: computedTotal,
-        status: "unpaid" as const,
-        billingCycle,
-        slipUrl: null,
-        electricUnits: elecUnitsManual,
-        waterUnits: waterUnitsManual
-      }
-
-      const filtered = localBills.filter(b => !(b.roomNumber === newRoomNumber && b.billingCycle === billingCycle))
-      localStorage.setItem("horset_bills", JSON.stringify([newBill, ...filtered]))
-      
+    const res = await createBill(
+      newRoomNumber,
+      targetTenant,
+      computedTotal,
+      "unpaid",
+      billingCycle,
+      elecUnitsManual,
+      waterUnitsManual
+    )
+    if (res.success) {
       showToast(`สร้างบิลแบบกำหนดเองห้อง ${newRoomNumber} สำเร็จ!`)
       await loadData()
     } else {
-      const res = await createBill(
-        newRoomNumber,
-        targetTenant,
-        computedTotal,
-        "unpaid",
-        billingCycle,
-        elecUnitsManual,
-        waterUnitsManual
-      )
-      if (res.success) {
-        showToast(`สร้างบิลแบบกำหนดเองห้อง ${newRoomNumber} สำเร็จ!`)
-        await loadData()
-      } else {
-        alert(res.error || "ออกใบแจ้งยอดไม่สำเร็จ")
-        return
-      }
+      alert(res.error || "ออกใบแจ้งยอดไม่สำเร็จ")
+      return
     }
 
     setCreateBillModalOpen(false)
