@@ -90,6 +90,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const [profilePassword, setProfilePassword] = useState("")
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("")
   const [fullName, setFullName] = useState("")
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -226,12 +227,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         try {
           const res = await getCurrentUserProfileAction()
           if (res.success && res.data) {
-            setFullName(res.data.full_name || "")
+            setFullName(res.data.full_name || res.data.email || "ผู้ดูแลระบบ")
             setProfileName(res.data.full_name || "")
             setProfilePhone(res.data.phone || "")
           }
         } catch (err) {
           console.error("Error loading user profile:", err)
+        } finally {
+          setIsProfileLoaded(true)
         }
       } else {
         const savedName = getCookie(`horset_demo_profile_name_${userRole}`)
@@ -243,6 +246,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         setFullName(savedName || defaultName)
         setProfileName(savedName || defaultName)
         setProfilePhone(savedPhone || defaultPhone)
+        setIsProfileLoaded(true)
       }
     }
     loadUserProfile()
@@ -635,8 +639,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 <User className="w-5 h-5 text-slate-300" />
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-slate-200 truncate max-w-[100px]" title={fullName}>
-                  {fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")}
+                <h4 className="text-xs font-semibold text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
+                  {!isProfileLoaded && !isDemo ? (
+                    <span className="inline-block bg-slate-800 rounded w-16 h-3 animate-pulse" />
+                  ) : (
+                    fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
+                  )}
                 </h4>
                 <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold mt-1 ${
                   userRole === "super_admin"
@@ -786,8 +794,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     <User className="w-4 h-4 text-slate-300" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-slate-200 truncate max-w-[100px]" title={fullName}>
-                      {fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")}
+                    <h4 className="text-xs font-semibold text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
+                      {!isProfileLoaded && !isDemo ? (
+                        <span className="inline-block bg-slate-800 rounded w-16 h-3 animate-pulse" />
+                      ) : (
+                        fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
+                      )}
                     </h4>
                     <span className="text-[9px] text-slate-500 uppercase font-bold">{userRole}</span>
                   </div>

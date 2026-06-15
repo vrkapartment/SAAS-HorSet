@@ -45,7 +45,7 @@ export default function AdminDashboard() {
   const [showMonthDropdown, setShowMonthDropdown] = useState(false)
 
   // Dynamic Welcome Name
-  const [welcomeName, setWelcomeName] = useState<string>("แอดมินสมเจตน์")
+  const [welcomeName, setWelcomeName] = useState<string>("")
 
   // Cache raw data client-side for dynamic billing cycle filtering without database refetches
   const [rawRooms, setRawRooms] = useState<any[]>([])
@@ -362,8 +362,12 @@ export default function AdminDashboard() {
       {/* ส่วนหัวข้อต้อนรับแบบพรีเมียม (Adaptive layout) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-            ยินดีต้อนรับกลับ {welcomeName}!
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight min-h-[36px] flex items-center">
+            {welcomeName ? (
+              `ยินดีต้อนรับกลับ ${welcomeName}!`
+            ) : (
+              <span className="inline-block bg-slate-200 dark:bg-slate-700 rounded-lg w-64 h-8 animate-pulse" />
+            )}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
             ข้อมูลสรุปและสถานะภาพรวมของหอพัก แสนสุข แมนชั่น ประจำวันนี้ ติดตามความเคลื่อนไหวได้แบบเรียลไทม์
