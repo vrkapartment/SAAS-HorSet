@@ -59,69 +59,24 @@ export function drawThaiText(
     clusters.push(currentCluster)
   }
 
-  // วาดข้อความทีละกลุ่มอักขระ (Cluster) และเคลื่อนพิกัดตามความกว้างพยัญชนะฐานเท่านั้น
+  // วาดข้อความทีละกลุ่มอักขระ (Cluster) โดยวาดพร้อมกันเพื่อให้ฟอนต์จัดเรียงแนวตั้งและแนวนอนได้อย่างถูกต้องสมบูรณ์
   let currentX = x
   for (const cluster of clusters) {
-    if (cluster.length === 1) {
-      // มีแค่ตัวเดียว วาดปกติ
-      page.drawText(cluster, {
-        x: currentX,
-        y,
-        size,
-        font,
-        color,
-      })
-    } else {
-      // มีสระ/วรรณยุกต์ปนอยู่ด้วย
-      const baseChar = cluster[0]
-      // วาดพยัญชนะฐานก่อน
-      page.drawText(baseChar, {
-        x: currentX,
-        y,
-        size,
-        font,
-        color,
-      })
-
-      // เช็คว่ามีสระบนหรือไม่
-      const upperVowels = new Set(["\u0e31", "\u0e34", "\u0e35", "\u0e36", "\u0e37", "\u0e47", "\u0e4d"])
-      let hasUpperVowel = false
-      for (let i = 1; i < cluster.length; i++) {
-        if (upperVowels.has(cluster[i])) {
-          hasUpperVowel = true
-          break
-        }
-      }
-
-      // วาดสระและวรรณยุกต์ที่เหลือทีละตัวที่ x เดียวกัน แต่ปรับ y หากจำเป็น
-      for (let i = 1; i < cluster.length; i++) {
-        const char = cluster[i]
-        let charY = y
-
-        // ถ้าเป็นวรรณยุกต์ และในกลุ่มนี้มีสระบนอยู่ด้วย ให้ขยับ y ขึ้นเพื่อหลีกเลี่ยงการซ้อนทับกัน
-        const toneMarks = new Set(["\u0e48", "\u0e49", "\u0e4a", "\u0e4b", "\u0e4c"])
-        if (toneMarks.has(char) && hasUpperVowel) {
-          // เลื่อนวรรณยุกต์ขึ้นเมื่อมีสระบน เช่น สระอิ สระอี ไม้หันอากาศ
-          // ระยะประมาณ 0.18 - 0.22 ของขนาดฟอนต์จะพอดีและสวยงาม
-          charY = y + size * 0.19
-        }
-
-        page.drawText(char, {
-          x: currentX,
-          y: charY,
-          size,
-          font,
-          color,
-        })
-      }
-    }
+    page.drawText(cluster, {
+      x: currentX,
+      y,
+      size,
+      font,
+      color,
+    })
 
     // เลื่อนตำแหน่ง X ถัดไป โดยอ้างอิงความกว้างของพยัญชนะตัวฐานตัวแรกเท่านั้น (ละทิ้งความกว้างสระลอยตัว)
-    const baseChar = cluster[0]
+    const baseChar = cluster[0] || ""
     const baseWidth = font.widthOfTextAtSize(baseChar, size)
     currentX += baseWidth
   }
 }
+
 
 export interface PndData {
   firstName: string
@@ -163,8 +118,8 @@ export async function generatePndPdf(type: "90" | "94", data: PndData) {
   const pages = pdfDoc.getPages()
   const firstPage = pages[0]
 
-  // 4. ฝังฟอนต์ไทยลงใน PDF
-  const customFont = await pdfDoc.embedFont(fontBytes)
+  // 4. ฝังฟอนต์ไทยลงใน PDF (กำหนด subset: false เพื่อคงตารางตระกูลอักษร GSUB/GPOS ให้สมบูรณ์ ป้องกันวรรณยุกต์เพี้ยนบน iOS)
+  const customFont = await pdfDoc.embedFont(fontBytes, { subset: false })
 
   // ดึงฟอร์ม PDF
   const form = pdfDoc.getForm()
@@ -299,7 +254,7 @@ export async function generateBillPdf(data: BillPdfData) {
   const pdfDoc = await PDFDocument.create()
   pdfDoc.registerFontkit(fontkit)
   const page = pdfDoc.addPage([595, 842]) // ขนาด A4
-  const customFont = await pdfDoc.embedFont(fontBytes)
+  const customFont = await pdfDoc.embedFont(fontBytes, { subset: false })
 
   // ฟังก์ชันช่วยเขียนข้อความภาษาไทยในใบแจ้งหนี้
   const drawText = (text: string, x: number, y: number, size = 9, color = rgb(0.2, 0.2, 0.2)) => {
