@@ -30,6 +30,7 @@ import {
 import { getRooms } from "@/features/room/actions"
 import { getTenants } from "@/features/tenant/actions"
 import { getBills } from "@/features/billing/actions"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -42,6 +43,9 @@ export default function AdminDashboard() {
   // Dynamic Month / Billing cycle
   const [selectedCycle, setSelectedCycle] = useState("2026-06")
   const [showMonthDropdown, setShowMonthDropdown] = useState(false)
+
+  // Dynamic Welcome Name
+  const [welcomeName, setWelcomeName] = useState<string>("แอดมินสมเจตน์")
 
   // Cache raw data client-side for dynamic billing cycle filtering without database refetches
   const [rawRooms, setRawRooms] = useState<any[]>([])
@@ -149,6 +153,31 @@ export default function AdminDashboard() {
   const loadDashboardData = async () => {
     setLoading(true)
     try {
+      // ดึงข้อมูลโปรไฟล์เพื่อนำมาแสดงชื่อผู้ใช้แบบ Dynamic
+      try {
+        const userRes = await getCurrentUserProfileAction()
+        if (userRes.success && userRes.data) {
+          const profile = userRes.data
+          const role = profile.role
+          const name = profile.full_name || profile.email || "ผู้ดูแลระบบ"
+          
+          if (role === "super_admin") {
+            setWelcomeName(`Super Admin ${name}`)
+          } else if (role === "admin") {
+            setWelcomeName(name.startsWith("คุณ") || name.startsWith("แอดมิน") ? name : `แอดมิน ${name}`)
+          } else if (role === "staff") {
+            setWelcomeName(name.startsWith("คุณ") ? name : `คุณ ${name}`)
+          } else {
+            setWelcomeName(name)
+          }
+        } else {
+          setWelcomeName("แอดมินสมเจตน์")
+        }
+      } catch (err) {
+        console.error("Failed to load user profile for dashboard greeting:", err)
+        setWelcomeName("แอดมินสมเจตน์")
+      }
+
       const roomsRes = await getRooms()
       const tenantsRes = await getTenants()
       const billsRes = await getBills()
@@ -334,7 +363,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-            ยินดีต้อนรับกลับ แอดมินสมเจตน์!
+            ยินดีต้อนรับกลับ {welcomeName}!
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
             ข้อมูลสรุปและสถานะภาพรวมของหอพัก แสนสุข แมนชั่น ประจำวันนี้ ติดตามความเคลื่อนไหวได้แบบเรียลไทม์
