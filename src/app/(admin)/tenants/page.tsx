@@ -17,7 +17,8 @@ import {
   Phone, 
   Info,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown
 } from "lucide-react"
 import { 
   getTenants, 
@@ -25,6 +26,7 @@ import {
   updateTenant, 
   deleteTenant 
 } from "@/features/tenant/actions"
+import { getRooms } from "@/features/room/actions"
 
 interface TenantItem {
   id: string
@@ -39,6 +41,7 @@ interface TenantItem {
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<TenantItem[]>([])
+  const [rooms, setRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -76,12 +79,22 @@ export default function TenantsPage() {
     setLoading(false)
   }
 
+  // โหลดข้อมูลห้องพักสำหรับทำ Dropdown
+  const loadRooms = async () => {
+    const res = await getRooms()
+    if (res.success && res.data) {
+      setRooms(res.data)
+    }
+  }
+
   useEffect(() => {
     loadTenants()
+    loadRooms()
   }, [])
 
   // เปิดสำหรับเพิ่มผู้เช่าใหม่
   const handleAddClick = () => {
+    loadRooms()
     setEditingTenant(null)
     setRoomNumber("")
     setFullName("")
@@ -101,6 +114,7 @@ export default function TenantsPage() {
 
   // เปิดสำหรับแก้ไขผู้เช่าเดิม
   const handleEditClick = (tenant: TenantItem) => {
+    loadRooms()
     setEditingTenant(tenant)
     setRoomNumber(tenant.roomNumber)
     setFullName(tenant.fullName)
@@ -538,14 +552,37 @@ export default function TenantsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">หมายเลขห้องพัก (Room No.)</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ระบุหมายเลขห้อง เช่น 101, 102..."
-                      className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-850 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-bold"
-                      value={roomNumber}
-                      onChange={(e) => setRoomNumber(e.target.value)}
-                    />
+                    <div className="relative">
+                      <select
+                        required
+                        className="w-full h-12 md:h-10 pl-4 pr-10 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-850 dark:text-slate-100 text-base md:text-xs transition-colors font-bold cursor-pointer appearance-none"
+                        value={roomNumber}
+                        onChange={(e) => setRoomNumber(e.target.value)}
+                      >
+                        <option value="" disabled className="text-slate-400">-- เลือกหมายเลขห้องพัก --</option>
+                        {rooms.map((room) => {
+                          const isRoomOccupied = room.status === "occupied"
+                          const isCurrentTenantRoom = editingTenant && editingTenant.roomNumber === room.roomNumber
+                          
+                          // ปิดการเลือกห้องที่ไม่ว่าง ยกเว้นแต่ว่าเป็นห้องของผู้เช่าปัจจุบันที่เรากำลังแก้ไขสัญญาอยู่
+                          const isOptionDisabled = isRoomOccupied && !isCurrentTenantRoom
+
+                          return (
+                            <option 
+                              key={room.id} 
+                              value={room.roomNumber}
+                              disabled={isOptionDisabled}
+                              className={isOptionDisabled ? "text-slate-400 dark:text-slate-500 line-through font-normal" : "text-slate-850 dark:text-slate-100 font-bold"}
+                            >
+                              ห้อง {room.roomNumber} ({room.roomTypeName || "ไม่มีประเภท"}) {isRoomOccupied ? " [ไม่ว่าง / มีผู้เช่าอยู่]" : " [ว่าง]"}
+                            </option>
+                          )
+                        })}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400 dark:text-slate-500">
+                        <ChevronDown className="w-4.5 h-4.5" />
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="space-y-1.5">
