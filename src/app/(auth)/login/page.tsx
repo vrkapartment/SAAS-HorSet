@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedRole, setSelectedRole] = useState<"admin" | "staff" | "tenant" | null>(null)
+  const [selectedRole, setSelectedRole] = useState<"admin" | "staff" | "tenant" | "super_admin" | null>(null)
 
   // ตรวจสอบว่าระบบอยู่ในโหมดจำลอง (Demo Mode) หรือไม่
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
@@ -99,7 +99,7 @@ export default function LoginPage() {
         const res = await loginAction(email, password)
         setLoading(false)
         if (res.success && res.data) {
-          const role = res.data.role as "admin" | "staff" | "tenant"
+          const role = res.data.role as "admin" | "staff" | "tenant" | "super_admin"
           setSelectedRole(role)
           
           if (role === "admin" && res.data.tfaEnabled && !show2FA) {
@@ -151,9 +151,11 @@ export default function LoginPage() {
     }, 1200)
   }
 
-  const navigateToDashboardWithRole = (role: "admin" | "staff" | "tenant" | null) => {
+  const navigateToDashboardWithRole = (role: "admin" | "staff" | "tenant" | "super_admin" | null) => {
     const targetRole = role || selectedRole
-    if (targetRole === "admin") {
+    if (targetRole === "super_admin") {
+      router.push("/super-admin")
+    } else if (targetRole === "admin") {
       router.push("/dashboard")
     } else if (targetRole === "staff") {
       router.push("/meter")

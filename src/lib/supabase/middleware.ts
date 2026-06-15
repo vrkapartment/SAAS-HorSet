@@ -50,7 +50,10 @@ export async function updateSession(request: NextRequest) {
   // หากผู้ใช้อยู่ที่หน้า login แต่ล็อกอินแล้ว ให้นำทางไปแดชบอร์ดตามสิทธิ์ที่มี
   if (path === "/login" && mockRole) {
     const url = request.nextUrl.clone()
-    if (mockRole === "admin" || mockRole === "super_admin") {
+    if (mockRole === "super_admin") {
+      url.pathname = "/super-admin"
+      return NextResponse.redirect(url)
+    } else if (mockRole === "admin") {
       url.pathname = "/dashboard"
       return NextResponse.redirect(url)
     } else if (mockRole === "staff") {
