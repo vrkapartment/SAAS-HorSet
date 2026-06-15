@@ -63,6 +63,10 @@ export default function TenantPortal() {
   const [uploading, setUploading] = useState(false)
   const [promptPayId, setPromptPayId] = useState("0899999999")
   const [promptPayName, setPromptPayName] = useState("สมเจตน์ แสนสุข")
+  const [workspaceName, setWorkspaceName] = useState("")
+  const [workspaceAddress, setWorkspaceAddress] = useState("")
+  const [workspacePhone, setWorkspacePhone] = useState("")
+  const [workspaceTaxId, setWorkspaceTaxId] = useState("")
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [history, setHistory] = useState<BillHistoryItem[]>([])
   const [baseRent, setBaseRent] = useState(4500)
@@ -107,6 +111,18 @@ export default function TenantPortal() {
       }
       if (data.promptPayName) {
         setPromptPayName(data.promptPayName)
+      }
+      if (data.workspaceName) {
+        setWorkspaceName(data.workspaceName)
+      }
+      if (data.workspaceAddress) {
+        setWorkspaceAddress(data.workspaceAddress)
+      }
+      if (data.workspacePhone) {
+        setWorkspacePhone(data.workspacePhone)
+      }
+      if (data.workspaceTaxId) {
+        setWorkspaceTaxId(data.workspaceTaxId)
       }
 
       const activeBills = data.bills as any[]
@@ -283,6 +299,10 @@ export default function TenantPortal() {
         amount: totalAmount,
         promptPayId,
         promptPayName,
+        workspaceName,
+        workspaceAddress,
+        workspacePhone,
+        workspaceTaxId
       })
 
       const link = document.createElement("a")

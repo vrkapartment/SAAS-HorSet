@@ -66,6 +66,7 @@ export default function UnifiedBillingPage() {
   const [loading, setLoading] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
+  const [downloadingAllPdf, setDownloadingAllPdf] = useState(false)
   const [commonFee, setCommonFee] = useState<number>(50)
   const [elecRate, setElecRate] = useState<number>(7)
   const [waterRate, setWaterRate] = useState<number>(18)
@@ -75,6 +76,10 @@ export default function UnifiedBillingPage() {
   const [electricMinUnit, setElectricMinUnit] = useState<number>(10)
   const [promptPayId, setPromptPayId] = useState<string>("0899999999")
   const [promptPayName, setPromptPayName] = useState<string>("สมเจตน์ แสนสุข")
+  const [workspaceName, setWorkspaceName] = useState<string>("")
+  const [workspaceAddress, setWorkspaceAddress] = useState<string>("")
+  const [workspacePhone, setWorkspacePhone] = useState<string>("")
+  const [workspaceTaxId, setWorkspaceTaxId] = useState<string>("")
   
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
@@ -228,6 +233,10 @@ export default function UnifiedBillingPage() {
             if (data.electric_min_unit !== undefined) setElectricMinUnit(data.electric_min_unit)
             if (data.promptpay_id) setPromptPayId(data.promptpay_id)
             if (data.promptpay_name) setPromptPayName(data.promptpay_name)
+            if (data.name) setWorkspaceName(data.name)
+            if (data.tax_address) setWorkspaceAddress(data.tax_address)
+            if (data.tax_phone) setWorkspacePhone(data.tax_phone)
+            if (data.tax_id) setWorkspaceTaxId(data.tax_id)
           }
         }
       } catch (err) {
@@ -466,7 +475,11 @@ export default function UnifiedBillingPage() {
           return item.baseRent + elecCost + waterCost + commonFee
         })(),
         promptPayId,
-        promptPayName
+        promptPayName,
+        workspaceName,
+        workspaceAddress,
+        workspacePhone,
+        workspaceTaxId
       })
 
       const link = document.createElement("a")
@@ -481,6 +494,84 @@ export default function UnifiedBillingPage() {
       alert("เกิดข้อผิดพลาดในการสร้างไฟล์ PDF บิลค่าเช่า")
     } finally {
       setDownloadingPdfId(null)
+    }
+  }
+
+  // ดาวน์โหลดบิล PDF ทุกห้องพร้อมกันเป็นไฟล์ ZIP
+  const handleDownloadAllBillsPdf = async () => {
+    if (unifiedItems.length === 0) {
+      alert("ไม่มีรายการบิลที่จะดาวน์โหลด")
+      return
+    }
+
+    setDownloadingAllPdf(true)
+    try {
+      const { generateBillPdf } = await import("@/lib/pdfHelper")
+      const JSZip = (await import("jszip")).default
+      const zip = new JSZip()
+
+      let addedCount = 0
+
+      for (const item of unifiedItems) {
+        // เฉพาะห้องที่มีผู้เช่าและข้อมูลครบถ้วนสำหรับการทำบิล
+        if (!item.tenantName) continue
+
+        const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - item.elecPrev : 0
+        const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - item.waterPrev : 0
+
+        const blob = await generateBillPdf({
+          roomNumber: item.roomNumber,
+          tenantName: item.tenantName || "ผู้เช่า",
+          billingCycle: billingCycle === "2026-06" ? "มิถุนายน 2026" : "พฤษภาคม 2026",
+          baseRent: item.baseRent,
+          electricUnits: elecUnitsUsed,
+          electricRate: elecRate,
+          waterUnits: waterUnitsUsed,
+          waterRate: waterRate,
+          commonFee,
+          waterMinChecked,
+          waterMinUnit,
+          electricMinChecked,
+          electricMinUnit,
+          amount: item.billAmount || (() => {
+            const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+            const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+            return item.baseRent + elecCost + waterCost + commonFee
+          })(),
+          promptPayId,
+          promptPayName,
+          workspaceName,
+          workspaceAddress,
+          workspacePhone,
+          workspaceTaxId
+        })
+
+        const fileName = `bill_room${item.roomNumber}_${billingCycle}.pdf`
+        zip.file(fileName, blob)
+        addedCount++
+      }
+
+      if (addedCount === 0) {
+        alert("ไม่มีข้อมูลบิลสำหรับผู้เช่าห้องใดๆ")
+        setDownloadingAllPdf(false)
+        return
+      }
+
+      // สร้างไฟล์ zip และทริกเกอร์ดาวน์โหลด
+      const content = await zip.generateAsync({ type: "blob" })
+      const link = document.createElement("a")
+      link.href = URL.createObjectURL(content)
+      link.download = `bills_${workspaceName || "rooms"}_${billingCycle}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      showToast(`ดาวน์โหลดบิล PDF ครบทุกห้องเรียบร้อยแล้ว (${addedCount} บิล)!`)
+    } catch (e) {
+      console.error(e)
+      alert("เกิดข้อผิดพลาดในการดาวน์โหลดบิลทั้งหมด")
+    } finally {
+      setDownloadingAllPdf(false)
     }
   }
 
@@ -562,6 +653,27 @@ export default function UnifiedBillingPage() {
             className="w-full md:w-auto h-12 md:h-9 glow-btn bg-teal-600 hover:bg-teal-500 text-white font-semibold px-4 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs shadow-lg shadow-teal-600/15 transition-all cursor-pointer"
           >
             <Save className="w-4 h-4 md:w-3.5 md:h-3.5" /> บันทึกและออกบิลทุกห้อง
+          </button>
+
+          {/* ดาวน์โหลด PDF ทั้งหมด */}
+          <button
+            onClick={handleDownloadAllBillsPdf}
+            disabled={downloadingAllPdf}
+            className={`w-full md:w-auto h-12 md:h-9 text-white font-semibold px-4 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs transition-all cursor-pointer ${
+              downloadingAllPdf
+                ? "bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed"
+                : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-600/20 active:scale-95"
+            }`}
+          >
+            {downloadingAllPdf ? (
+              <>
+                <RefreshCw className="w-4 h-4 md:w-3.5 md:h-3.5 animate-spin text-blue-300" /> กำลังสร้าง PDF...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 md:w-3.5 md:h-3.5" /> เซฟบิล PDF ทั้งหมด
+              </>
+            )}
           </button>
 
           {/* ปุ่มบิลกำหนดเอง (สำหรับแอดมินหรือกรณีฉุกเฉิน) */}

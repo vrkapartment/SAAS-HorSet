@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 
 export interface FinanceSettings {
+  name?: string
   tax_firstname: string
   tax_lastname: string
   tax_id: string
@@ -30,7 +31,7 @@ export async function getFinanceSettings(workspaceId: string) {
     // 1. ดึงข้อมูลส่วนข้อมูลหลัก (ที่รับประกันว่ามีอยู่ในตารางแน่ๆ)
     const { data: coreData, error: coreError } = await supabase
       .from("workspaces")
-      .select("tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee")
+      .select("name, tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee")
       .eq("id", workspaceId)
       .single()
 
@@ -67,6 +68,7 @@ export async function getFinanceSettings(workspaceId: string) {
     return { 
       success: true, 
       data: {
+        name: merged.name || "",
         tax_firstname: merged.tax_firstname || "",
         tax_lastname: merged.tax_lastname || "",
         tax_id: merged.tax_id || "",

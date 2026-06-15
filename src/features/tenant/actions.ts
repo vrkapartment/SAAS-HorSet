@@ -257,16 +257,24 @@ export async function getTenantPortalData() {
 
     let promptPayId = ""
     let promptPayName = ""
+    let workspaceName = ""
+    let workspaceAddress = ""
+    let workspacePhone = ""
+    let workspaceTaxId = ""
 
     if (tenant && tenant.workspace_id) {
       const { data: ws } = await supabase
         .from("workspaces")
-        .select("promptpay_id, promptpay_name")
+        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id")
         .eq("id", tenant.workspace_id)
         .maybeSingle()
       if (ws) {
         promptPayId = ws.promptpay_id || ""
         promptPayName = ws.promptpay_name || ""
+        workspaceName = ws.name || ""
+        workspaceAddress = ws.tax_address || ""
+        workspacePhone = ws.tax_phone || ""
+        workspaceTaxId = ws.tax_id || ""
       }
     }
 
@@ -281,7 +289,11 @@ export async function getTenantPortalData() {
           baseRent: 0,
           bills: [],
           promptPayId,
-          promptPayName
+          promptPayName,
+          workspaceName,
+          workspaceAddress,
+          workspacePhone,
+          workspaceTaxId
         }
       }
     }
@@ -323,7 +335,11 @@ export async function getTenantPortalData() {
         baseRent: tenant.rooms?.room_types ? Number((tenant.rooms as any).room_types.default_rent) : (tenant.rooms?.base_rent ? Number(tenant.rooms.base_rent) : 0),
         bills: formattedBills,
         promptPayId,
-        promptPayName
+        promptPayName,
+        workspaceName,
+        workspaceAddress,
+        workspacePhone,
+        workspaceTaxId
       }
     }
   } catch (error) {

@@ -62,13 +62,59 @@ export function drawThaiText(
   // วาดข้อความทีละกลุ่มอักขระ (Cluster) และเคลื่อนพิกัดตามความกว้างพยัญชนะฐานเท่านั้น
   let currentX = x
   for (const cluster of clusters) {
-    page.drawText(cluster, {
-      x: currentX,
-      y,
-      size,
-      font,
-      color,
-    })
+    if (cluster.length === 1) {
+      // มีแค่ตัวเดียว วาดปกติ
+      page.drawText(cluster, {
+        x: currentX,
+        y,
+        size,
+        font,
+        color,
+      })
+    } else {
+      // มีสระ/วรรณยุกต์ปนอยู่ด้วย
+      const baseChar = cluster[0]
+      // วาดพยัญชนะฐานก่อน
+      page.drawText(baseChar, {
+        x: currentX,
+        y,
+        size,
+        font,
+        color,
+      })
+
+      // เช็คว่ามีสระบนหรือไม่
+      const upperVowels = new Set(["\u0e31", "\u0e34", "\u0e35", "\u0e36", "\u0e37", "\u0e47", "\u0e4d"])
+      let hasUpperVowel = false
+      for (let i = 1; i < cluster.length; i++) {
+        if (upperVowels.has(cluster[i])) {
+          hasUpperVowel = true
+          break
+        }
+      }
+
+      // วาดสระและวรรณยุกต์ที่เหลือทีละตัวที่ x เดียวกัน แต่ปรับ y หากจำเป็น
+      for (let i = 1; i < cluster.length; i++) {
+        const char = cluster[i]
+        let charY = y
+
+        // ถ้าเป็นวรรณยุกต์ และในกลุ่มนี้มีสระบนอยู่ด้วย ให้ขยับ y ขึ้นเพื่อหลีกเลี่ยงการซ้อนทับกัน
+        const toneMarks = new Set(["\u0e48", "\u0e49", "\u0e4a", "\u0e4b", "\u0e4c"])
+        if (toneMarks.has(char) && hasUpperVowel) {
+          // เลื่อนวรรณยุกต์ขึ้นเมื่อมีสระบน เช่น สระอิ สระอี ไม้หันอากาศ
+          // ระยะประมาณ 0.18 - 0.22 ของขนาดฟอนต์จะพอดีและสวยงาม
+          charY = y + size * 0.19
+        }
+
+        page.drawText(char, {
+          x: currentX,
+          y: charY,
+          size,
+          font,
+          color,
+        })
+      }
+    }
 
     // เลื่อนตำแหน่ง X ถัดไป โดยอ้างอิงความกว้างของพยัญชนะตัวฐานตัวแรกเท่านั้น (ละทิ้งความกว้างสระลอยตัว)
     const baseChar = cluster[0]
@@ -234,6 +280,10 @@ export interface BillPdfData {
   waterMinUnit?: number
   electricMinChecked?: boolean
   electricMinUnit?: number
+  workspaceName?: string
+  workspaceAddress?: string
+  workspacePhone?: string
+  workspaceTaxId?: string
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -256,6 +306,12 @@ export async function generateBillPdf(data: BillPdfData) {
     drawThaiText(page, text, x, y, { font: customFont, size, color })
   }
 
+  // ดึงข้อมูลหลักจาก workspace
+  const workspaceName = data.workspaceName || "หอพักแสนสุขแมนชั่น"
+  const workspaceAddress = data.workspaceAddress || ""
+  const workspacePhone = data.workspacePhone || ""
+  const workspaceTaxId = data.workspaceTaxId || ""
+
   // วาดหัวเอกสาร
   page.drawRectangle({
     x: 40,
@@ -265,8 +321,19 @@ export async function generateBillPdf(data: BillPdfData) {
     color: rgb(0.06, 0.09, 0.16), // สไตล์โมเดิร์นหรูหราสีน้ำเงินเข้ม
   })
 
-  drawText("ใบแจ้งยอดค่าใช้จ่ายและใบแจ้งหนี้ (Invoice / Billing)", 60, 765, 14, rgb(1, 1, 1))
-  drawText("หอพัก แสนสุข แมนชั่น (SANSOOK MANSION)", 60, 748, 9, rgb(0.8, 0.8, 0.8))
+  drawText("ใบแจ้งยอดค่าใช้จ่ายและใบแจ้งหนี้ (Invoice / Billing)", 55, 772, 11, rgb(1, 1, 1))
+  drawText(workspaceName, 55, 754, 9, rgb(0.85, 0.9, 1))
+
+  // ข้อมูล workspace ขวาบน (แสดงที่อยู่, เบอร์โทร, เลขภาษี)
+  if (workspaceAddress) {
+    drawText(`ที่อยู่: ${workspaceAddress.length > 55 ? workspaceAddress.slice(0, 52) + "..." : workspaceAddress}`, 310, 776, 6.5, rgb(0.8, 0.8, 0.8))
+  }
+  if (workspacePhone) {
+    drawText(`เบอร์โทร: ${workspacePhone}`, 310, 763, 6.5, rgb(0.8, 0.8, 0.8))
+  }
+  if (workspaceTaxId) {
+    drawText(`เลขประจำตัวผู้เสียภาษี: ${workspaceTaxId}`, 310, 750, 6.5, rgb(0.8, 0.8, 0.8))
+  }
 
   // รายละเอียดบิล
   drawText(`หมายเลขห้อง (Room No.): ${data.roomNumber}`, 50, 700, 10, rgb(0.1, 0.1, 0.1))
@@ -396,7 +463,7 @@ export async function generateBillPdf(data: BillPdfData) {
   }
 
   // ท้ายบิล
-  drawText("ขอขอบคุณที่ใช้บริการหอพักแสนสุขแมนชั่น หากมีข้อสงสัยติดต่อเจ้าหน้าที่หอพักโดยตรง", 120, 45, 7.5, rgb(0.5, 0.5, 0.5))
+  drawText(`ขอขอบคุณที่ใช้บริการ${workspaceName} หากมีข้อสงสัยติดต่อเจ้าหน้าที่หอพักโดยตรง`, 60, 45, 7.5, rgb(0.5, 0.5, 0.5))
 
   // เซฟและบันทึกไฟล์เป็น Blob
   const pdfBytes = await pdfDoc.save()
