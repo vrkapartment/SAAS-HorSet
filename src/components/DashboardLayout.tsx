@@ -821,17 +821,17 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         
         {/* Header แถบด้านบน */}
-        <header className="flex items-center justify-between px-6 py-4 glass-panel border-b border-slate-900/60 shrink-0">
-          <div className="flex items-center gap-4">
+        <header className="flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-900/60 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => setMobileOpen(true)}
               className="md:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-900/50"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div>
-              <h1 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                <span>
+            <div className="min-w-0">
+              <h1 className="text-xs sm:text-sm font-semibold text-slate-200 flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <span className="truncate max-w-[130px] sm:max-w-none">
                   {pathname === "/dashboard" && (t("nav.dashboard") || "หน้าแรกภาพรวมสถิติ")}
                   {pathname === "/rooms" && (t("nav.rooms") || "ระบบจัดการห้องพัก")}
                   {pathname === "/tenants" && (t("nav.tenants") || "ระบบจัดการข้อมูลสัญญาผู้เช่า")}
@@ -844,7 +844,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 </span>
                 
                 {userRole === "super_admin" && (
-                  <span className="text-[10px] bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="text-[10px] bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap shrink-0">
                     {t("dashboard.support_mode")}
                   </span>
                 )}
