@@ -9,13 +9,20 @@ export async function updateSession(request: NextRequest) {
   const mockRole = request.cookies.get("horset_user_role")?.value
   const path = request.nextUrl.pathname
 
-  // รายการเส้นทางแต่ละสิทธิ์ในระเบบ (ตาม Next.js Route Groups ใน src/app)
-  const adminPaths = ["/dashboard", "/tax"]
+  // รายการเส้นทางแต่ละสิทธิ์ในระบบ (ตาม Next.js Route Groups ใน src/app)
+  const superAdminPaths = ["/super-admin"]
+  const adminPaths = ["/dashboard", "/tax", "/daily-bills", "/finance-settings", "/test-connection"]
   const sharedPaths = ["/rooms", "/tenants"]
   const staffPaths = ["/meter", "/billing"]
   const tenantPaths = ["/portal"]
 
   // ตรวจสอบความถูกต้องของเส้นทางกับสิทธิ์ผู้ใช้งาน
+  if (superAdminPaths.includes(path) && mockRole !== "super_admin") {
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    return NextResponse.redirect(url)
+  }
+
   if (adminPaths.includes(path) && mockRole !== "admin" && mockRole !== "super_admin") {
     const url = request.nextUrl.clone()
     url.pathname = "/login"

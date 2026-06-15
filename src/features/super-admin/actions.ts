@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
 interface CreateUserParams {
   email: string
@@ -18,6 +19,13 @@ interface CreateUserParams {
 export async function createWorkspaceUserAction(data: CreateUserParams) {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (!isDemo) {
+      const profileRes = await getCurrentUserProfileAction()
+      if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+        return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+      }
+    }
+
     if (isDemo) {
       return { 
         success: true, 
@@ -88,6 +96,13 @@ export async function updateUserProfileAdminAction(profileId: string, data: {
 }) {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (!isDemo) {
+      const profileRes = await getCurrentUserProfileAction()
+      if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+        return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+      }
+    }
+
     if (isDemo) {
       return { success: true }
     }
@@ -142,6 +157,13 @@ export async function updateUserProfileAdminAction(profileId: string, data: {
 export async function deleteUserProfileAdminAction(profileId: string) {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (!isDemo) {
+      const profileRes = await getCurrentUserProfileAction()
+      if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+        return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+      }
+    }
+
     if (isDemo) {
       return { success: true }
     }
@@ -182,6 +204,13 @@ export async function deleteUserProfileAdminAction(profileId: string) {
 export async function updateWorkspaceNameAdminAction(workspaceId: string, name: string) {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (!isDemo) {
+      const profileRes = await getCurrentUserProfileAction()
+      if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+        return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+      }
+    }
+
     if (isDemo) {
       return { success: true }
     }
@@ -216,6 +245,13 @@ export async function updateWorkspaceNameAdminAction(workspaceId: string, name: 
 export async function deleteWorkspaceAdminAction(workspaceId: string) {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (!isDemo) {
+      const profileRes = await getCurrentUserProfileAction()
+      if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+        return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+      }
+    }
+
     if (isDemo) {
       return { success: true }
     }
@@ -250,6 +286,13 @@ export async function deleteWorkspaceAdminAction(workspaceId: string) {
 export async function getSuperAdminDataAction() {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (!isDemo) {
+      const profileRes = await getCurrentUserProfileAction()
+      if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+        return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+      }
+    }
+
     if (isDemo) {
       return { success: true, isDemo: true }
     }
