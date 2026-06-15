@@ -3,6 +3,7 @@ import { Prompt } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider } from "@/lib/translations/LanguageProvider";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const promptFont = Prompt({
   variable: "--font-prompt",
@@ -32,6 +33,7 @@ export default function RootLayout({
             {children}
           </LanguageProvider>
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
