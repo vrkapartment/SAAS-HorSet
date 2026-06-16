@@ -679,27 +679,27 @@ export default function TenantsPage() {
                   </div>
                 </div>
 
-                {/* Submit / Cancel Action Row - Touch target friendly heights & high contrast premium colors */}
-                <div className="flex flex-col sm:flex-row gap-3.5 pt-4 shrink-0">
+                {/* Submit / Cancel Action Row - Enhanced touch target (h-16) and larger typography for ultimate clickability */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-4 shrink-0">
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
                     disabled={formSubmitting}
-                    className="order-2 sm:order-1 flex-1 h-14 md:h-12 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:from-red-750 active:to-rose-750 text-white text-base md:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-500/20 hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
+                    className="order-2 sm:order-1 flex-1 h-16 md:h-14 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:from-red-750 active:to-rose-750 text-white text-lg md:text-base font-black rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-red-500/25 hover:shadow-red-500/35 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
                   >
-                    <X className="w-5 h-5 md:w-4.5 md:h-4.5 stroke-[2.5]" />
-                    ยกเลิกสัญญา
+                    <X className="w-6 h-6 md:w-5.5 md:h-5.5 stroke-[3]" />
+                    ยกเลิกการแก้ไข
                   </button>
                   <button
                     type="submit"
                     disabled={formSubmitting}
-                    className="order-1 sm:order-2 flex-1 h-14 md:h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:from-blue-700 active:to-indigo-700 text-white text-base md:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
+                    className="order-1 sm:order-2 flex-1 h-16 md:h-14 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:from-blue-700 active:to-indigo-700 text-white text-lg md:text-base font-black rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/35 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
                   >
                     {formSubmitting ? (
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                       <>
-                        <Check className="w-5 h-5 md:w-4.5 md:h-4.5 stroke-[2.5]" />
+                        <Check className="w-6 h-6 md:w-5.5 md:h-5.5 stroke-[3]" />
                         {editingTenant ? "บันทึกอัปเดตสัญญา" : "จัดทำสัญญาเช่าใหม่"}
                       </>
                     )}
