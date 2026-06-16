@@ -37,9 +37,9 @@ interface UnifiedRoomBillingItem {
   
   // Meter Record fields for current cycle
   meterRecordId?: string
-  elecPrev: number
+  elecPrev: string | number
   elecCurr: string | number
-  waterPrev: number
+  waterPrev: string | number
   waterCurr: string | number
   isMeterSaved: boolean
   
@@ -112,26 +112,9 @@ export default function UnifiedBillingPage() {
   }
 
   const getFallbackPrevReadings = (roomNumber: string, cycle: string) => {
-    // ฐานคำนวณตั้งต้นคือรอบ 2026-06
-    const baseCycleYear = 2026
-    const baseCycleMonth = 6
-    const [year, month] = cycle.split("-").map(Number)
-    // คำนวณหาจำนวนเดือนที่ห่างกันเพื่อปรับหน่วยถอยหลังหรือไปข้างหน้าตามจริง
-    const monthDiff = (year - baseCycleYear) * 12 + (month - baseCycleMonth)
-    
-    const baseElecPrev = 1000 + Number(roomNumber) * 3
-    const baseWaterPrev = 100 + Number(roomNumber)
-    
-    // ประมาณค่าเฉลี่ย: ไฟฟ้า 80 หน่วย, น้ำ 10 หน่วย ต่อเดือน
-    const estElecUsage = 80
-    const estWaterUsage = 10
-    
-    const elecPrev = baseElecPrev + (monthDiff * estElecUsage)
-    const waterPrev = baseWaterPrev + (monthDiff * estWaterUsage)
-    
     return {
-      elecPrev: elecPrev > 0 ? elecPrev : 0,
-      waterPrev: waterPrev > 0 ? waterPrev : 0
+      elecPrev: 0,
+      waterPrev: 0
     }
   }
 
@@ -333,6 +316,24 @@ export default function UnifiedBillingPage() {
     )
   }
 
+  // อัปเดตช่องอินพุตเลขมิเตอร์ไฟฟ้าก่อนหน้าในหน้าจอ
+  const handleElecPrevChange = (roomNumber: string, value: string) => {
+    setUnifiedItems(prev =>
+      prev.map(item =>
+        item.roomNumber === roomNumber ? { ...item, elecPrev: value, isMeterSaved: false } : item
+      )
+    )
+  }
+
+  // อัปเดตช่องอินพุตเลขมิเตอร์น้ำก่อนหน้าในหน้าจอ
+  const handleWaterPrevChange = (roomNumber: string, value: string) => {
+    setUnifiedItems(prev =>
+      prev.map(item =>
+        item.roomNumber === roomNumber ? { ...item, waterPrev: value, isMeterSaved: false } : item
+      )
+    )
+  }
+
   // อนุมัติสลิปโอนเงิน
   const handleApproveSlip = async (id: string) => {
     const res = await updateBillStatus(id, "paid")
@@ -381,19 +382,26 @@ export default function UnifiedBillingPage() {
 
     const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
     const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
+    const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
+    const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
     if (elecVal === "" || waterVal === "" || isNaN(elecVal as number) || isNaN(waterVal as number)) {
       alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
       return
     }
 
-    if ((elecVal as number) < item.elecPrev || (waterVal as number) < item.waterPrev) {
+    if (isNaN(elecPrevVal) || isNaN(waterPrevVal)) {
+      alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+      return
+    }
+
+    if ((elecVal as number) < elecPrevVal || (waterVal as number) < waterPrevVal) {
       alert("⚠️ ตัวเลขมิเตอร์ปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
       return
     }
 
-    const eUnits = (elecVal as number) - item.elecPrev
-    const wUnits = (waterVal as number) - item.waterPrev
+    const eUnits = (elecVal as number) - elecPrevVal
+    const wUnits = (waterVal as number) - waterPrevVal
     const elecCost = electricMinChecked && eUnits <= electricMinUnit
       ? electricMinUnit * elecRate
       : eUnits * elecRate
@@ -406,9 +414,9 @@ export default function UnifiedBillingPage() {
     const meterRes = await saveMeterRecord(
       roomNumber,
       billingCycle,
-      item.elecPrev,
+      elecPrevVal,
       elecVal,
-      item.waterPrev,
+      waterPrevVal,
       waterVal
     )
     if (!meterRes.success) {
@@ -441,13 +449,17 @@ export default function UnifiedBillingPage() {
     const invalidItems = unifiedItems.filter(item => {
       const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
       const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
+      const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
+      const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
       return (
         elecVal === "" ||
         waterVal === "" ||
         isNaN(elecVal as number) ||
         isNaN(waterVal as number) ||
-        (elecVal as number) < item.elecPrev ||
-        (waterVal as number) < item.waterPrev
+        isNaN(elecPrevVal) ||
+        isNaN(waterPrevVal) ||
+        (elecVal as number) < elecPrevVal ||
+        (waterVal as number) < waterPrevVal
       )
     })
 
@@ -460,8 +472,11 @@ export default function UnifiedBillingPage() {
     for (const item of unifiedItems) {
       const elecVal = Number(item.elecCurr)
       const waterVal = Number(item.waterCurr)
-      const eUnits = elecVal - item.elecPrev
-      const wUnits = waterVal - item.waterPrev
+      const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
+      const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
+
+      const eUnits = elecVal - elecPrevVal
+      const wUnits = waterVal - waterPrevVal
       const elecCost = electricMinChecked && eUnits <= electricMinUnit
         ? electricMinUnit * elecRate
         : eUnits * elecRate
@@ -474,9 +489,9 @@ export default function UnifiedBillingPage() {
       const meterRes = await saveMeterRecord(
         item.roomNumber,
         billingCycle,
-        item.elecPrev,
+        elecPrevVal,
         elecVal,
-        item.waterPrev,
+        waterPrevVal,
         waterVal
       )
       if (!meterRes.success) {
@@ -514,8 +529,8 @@ export default function UnifiedBillingPage() {
     setDownloadingPdfId(item.roomNumber)
     try {
       const { generateBillPdf } = await import("@/lib/pdfHelper")
-      const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - item.elecPrev : 0
-      const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - item.waterPrev : 0
+      const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+      const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
 
       const blob = await generateBillPdf({
         roomNumber: item.roomNumber,
@@ -578,8 +593,8 @@ export default function UnifiedBillingPage() {
         // เฉพาะห้องที่มีผู้เช่าและข้อมูลครบถ้วนสำหรับการทำบิล
         if (!item.tenantName) continue
 
-        const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - item.elecPrev : 0
-        const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - item.waterPrev : 0
+        const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+        const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
 
         const blob = await generateBillPdf({
           roomNumber: item.roomNumber,
@@ -818,13 +833,13 @@ export default function UnifiedBillingPage() {
           ) : unifiedItems.length > 0 ? (
             unifiedItems.map((item) => {
               const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-              const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - item.elecPrev : 0
+              const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
               const elecCost = hasElecCurr && elecUnitsUsed >= 0
                 ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                 : 0
 
               const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-              const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - item.waterPrev : 0
+              const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
               const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                 ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
@@ -880,13 +895,27 @@ export default function UnifiedBillingPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Electricity Meter Card Section */}
                     <div className="bg-blue-500/5 rounded-xl p-3 border border-blue-500/10 space-y-3">
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center gap-2">
                         <span className="text-xs font-bold text-blue-400 flex items-center gap-1">
                           <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
                         </span>
-                        <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
-                          ก่อนหน้า: <strong className="text-slate-200">{item.elecPrev}</strong>
-                        </span>
+                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-500 font-bold">ก่อนหน้า:</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="กรอก"
+                              className="w-16 h-6.5 text-center bg-slate-950 border border-slate-800 rounded text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-blue-500 transition-all"
+                              value={item.elecPrev}
+                              onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
+                            ก่อนหน้า: <strong className="text-slate-200">{item.elecPrev}</strong>
+                          </span>
+                        )}
                       </div>
                       
                       <div className="relative">
@@ -921,13 +950,27 @@ export default function UnifiedBillingPage() {
 
                     {/* Water Meter Card Section */}
                     <div className="bg-teal-500/5 rounded-xl p-3 border border-teal-500/10 space-y-3">
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center gap-2">
                         <span className="text-xs font-bold text-teal-400 flex items-center gap-1">
                           <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
                         </span>
-                        <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
-                          ก่อนหน้า: <strong className="text-slate-200">{item.waterPrev}</strong>
-                        </span>
+                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-500 font-bold">ก่อนหน้า:</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="กรอก"
+                              className="w-16 h-6.5 text-center bg-slate-950 border border-slate-800 rounded text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
+                              value={item.waterPrev}
+                              onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
+                            ก่อนหน้า: <strong className="text-slate-200">{item.waterPrev}</strong>
+                          </span>
+                        )}
                       </div>
                       
                       <div className="relative">
@@ -1075,13 +1118,13 @@ export default function UnifiedBillingPage() {
               ) : unifiedItems.length > 0 ? (
                 unifiedItems.map((item) => {
                   const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                  const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - item.elecPrev : 0
+                  const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
                   const elecCost = hasElecCurr && elecUnitsUsed >= 0
                     ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                     : 0
 
                   const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                  const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - item.waterPrev : 0
+                  const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
                   const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                     ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
@@ -1107,10 +1150,21 @@ export default function UnifiedBillingPage() {
                       </td>
                       
                       {/* ไฟฟ้า - ก่อนหน้า */}
-                      <td className="py-4 text-center bg-blue-500/5 border-l border-slate-900/30">
-                        <span className="font-mono text-slate-400 font-semibold bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-800/40">
-                          {item.elecPrev}
-                        </span>
+                      <td className="py-4 text-center bg-blue-500/5 border-l border-slate-900/30 px-2">
+                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="กรอกเลข"
+                            className="w-20 text-center py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-100 font-mono text-xs focus:outline-none focus:border-blue-500/80 transition-all font-semibold"
+                            value={item.elecPrev}
+                            onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
+                          />
+                        ) : (
+                          <span className="font-mono text-slate-400 font-semibold bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-800/40">
+                            {item.elecPrev}
+                          </span>
+                        )}
                       </td>
 
                       {/* ไฟฟ้า - อินพุตปัจจุบัน */}
@@ -1142,10 +1196,21 @@ export default function UnifiedBillingPage() {
                       </td>
 
                       {/* น้ำประปา - ก่อนหน้า */}
-                      <td className="py-4 text-center bg-teal-500/5">
-                        <span className="font-mono text-slate-400 font-semibold bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-800/40">
-                          {item.waterPrev}
-                        </span>
+                      <td className="py-4 text-center bg-teal-500/5 px-2">
+                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="กรอกเลข"
+                            className="w-20 text-center py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-100 font-mono text-xs focus:outline-none focus:border-teal-500/80 transition-all font-semibold"
+                            value={item.waterPrev}
+                            onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
+                          />
+                        ) : (
+                          <span className="font-mono text-slate-400 font-semibold bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-800/40">
+                            {item.waterPrev}
+                          </span>
+                        )}
                       </td>
 
                       {/* น้ำประปา - อินพุตปัจจุบัน */}
