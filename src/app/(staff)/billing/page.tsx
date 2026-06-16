@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import {
   Receipt,
   FileText,
@@ -60,6 +61,7 @@ function getCookie(name: string): string | undefined {
 }
 
 export default function UnifiedBillingPage() {
+  const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [billingCycle, setBillingCycle] = useState("2026-06")
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
@@ -133,67 +135,113 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  const loadData = async (cycle = billingCycle) => {
+  const loadData = async (cycle = billingCycle, forceRefresh = false) => {
     setLoading(true)
     
-    // 1. ดึงข้อมูลห้องพักทั้งหมด
-    const roomsRes = await getRooms()
-    const rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
-    setRoomsList(rooms)
-    
-    // 2. ดึงข้อมูลบิลทั้งหมดประจำรอบบิลนี้
-    const billsRes = await getBills(cycle)
-    const dbBills = billsRes.success && billsRes.data ? billsRes.data : []
-    
-    // 3. ดึงข้อมูลมิเตอร์น้ำไฟรอบนี้
-    const meterRes = await getMeterRecords(cycle)
-    const dbMeters = meterRes.success && meterRes.data ? meterRes.data : []
-    
-    // 4. ดึงข้อมูลมิเตอร์น้ำไฟรอบก่อน เพื่อใช้อ้างอิงเป็นเลขมิเตอร์ครั้งก่อนหน้า
-    const prevCycle = getPreviousCycle(cycle)
-    const prevMeterRes = await getMeterRecords(prevCycle)
-    const dbPrevMeters = prevMeterRes.success && prevMeterRes.data ? prevMeterRes.data : []
-    
-    // โหมด Supabase ดั้งเดิมและถาวร
-    const activeRooms = rooms.filter((r: any) => r.status === "occupied" || dbBills.some((b: any) => b.roomNumber === r.roomNumber))
-    const compiled = activeRooms.map((r: any) => {
-      const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
-      const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
-      const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
-      
-      // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
-      const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
-      const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
-        ? Number(prevMeter.elecCurr)
-        : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
-      const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
-        ? Number(prevMeter.waterCurr)
-        : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
-      
-      return {
-        roomNumber: r.roomNumber,
-        tenantName: r.tenantName,
-        baseRent: Number(r.baseRent) || 4500,
-        status: r.status,
-        
-        meterRecordId: roomMeter?.id || undefined,
-        elecPrev,
-        elecCurr: roomMeter ? (roomMeter.elecCurr === null || roomMeter.elecCurr === undefined ? "" : roomMeter.elecCurr) : "",
-        waterPrev,
-        waterCurr: roomMeter ? (roomMeter.waterCurr === null || roomMeter.waterCurr === undefined ? "" : roomMeter.waterCurr) : "",
-        isMeterSaved: roomMeter ? true : false,
-        
-        billId: roomBill?.id || undefined,
-        billAmount: roomBill ? Number(roomBill.amount) : 0,
-        billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created",
-        slipUrl: roomBill ? roomBill.slipUrl : null,
-        electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
-        waterUnits: roomBill ? Number(roomBill.waterUnits) : 0
+    try {
+      // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
+      let userProfile = getCachedData("global", "profile")
+      if (!userProfile || forceRefresh) {
+        const userRes = await getCurrentUserProfileAction()
+        if (userRes.success && userRes.data) {
+          userProfile = userRes.data
+          setCachedData("global", "profile", userRes.data)
+        }
       }
-    })
-    setUnifiedItems(compiled)
-    
-    setLoading(false)
+
+      let wsId = ""
+      if (userProfile) {
+        const isSuperAdmin = userProfile.role === "super_admin"
+        if (!isSuperAdmin && userProfile.workspace_id) {
+          wsId = userProfile.workspace_id
+        } else {
+          const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+          wsId = cookieWsId || userProfile.workspace_id || ""
+        }
+      }
+
+      // ถ้าเป็นการ Force Refresh (เช่น มีการบันทึกมิเตอร์สำเร็จ หรือกดปุ่มอัปเดต) ให้ล้างแคชเก่าออก
+      if (forceRefresh && wsId) {
+        clearWorkspaceCache(wsId)
+      }
+
+      // 1. ดึงข้อมูลห้องพักทั้งหมด
+      let rooms = wsId ? getCachedData(wsId, "rooms") : null
+      if (!rooms || forceRefresh) {
+        const roomsRes = await getRooms()
+        rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
+        if (wsId) setCachedData(wsId, "rooms", rooms)
+      }
+      setRoomsList(rooms)
+      
+      // 2. ดึงข้อมูลบิลทั้งหมดประจำรอบบิลนี้
+      let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
+      if (!dbBills || forceRefresh) {
+        const billsRes = await getBills(cycle)
+        dbBills = billsRes.success && billsRes.data ? billsRes.data : []
+        if (wsId) setCachedData(wsId, `bills_${cycle}`, dbBills)
+      }
+      
+      // 3. ดึงข้อมูลมิเตอร์น้ำไฟรอบนี้
+      let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
+      if (!dbMeters || forceRefresh) {
+        const meterRes = await getMeterRecords(cycle)
+        dbMeters = meterRes.success && meterRes.data ? meterRes.data : []
+        if (wsId) setCachedData(wsId, `meters_${cycle}`, dbMeters)
+      }
+      
+      // 4. ดึงข้อมูลมิเตอร์น้ำไฟรอบก่อน เพื่อใช้อ้างอิงเป็นเลขมิเตอร์ครั้งก่อนหน้า
+      const prevCycle = getPreviousCycle(cycle)
+      let dbPrevMeters = wsId ? getCachedData(wsId, `meters_${prevCycle}`) : null
+      if (!dbPrevMeters || forceRefresh) {
+        const prevMeterRes = await getMeterRecords(prevCycle)
+        dbPrevMeters = prevMeterRes.success && prevMeterRes.data ? prevMeterRes.data : []
+        if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
+      }
+      
+      // โหมด Supabase ดั้งเดิมและถาวร
+      const activeRooms = rooms.filter((r: any) => r.status === "occupied" || dbBills.some((b: any) => b.roomNumber === r.roomNumber))
+      const compiled = activeRooms.map((r: any) => {
+        const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
+        const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
+        const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
+        
+        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
+        const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
+        const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
+          ? Number(prevMeter.elecCurr)
+          : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
+        const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
+          ? Number(prevMeter.waterCurr)
+          : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
+        
+        return {
+          roomNumber: r.roomNumber,
+          tenantName: r.tenantName,
+          baseRent: Number(r.baseRent) || 4500,
+          status: r.status,
+          
+          meterRecordId: roomMeter?.id || undefined,
+          elecPrev,
+          elecCurr: roomMeter ? (roomMeter.elecCurr === null || roomMeter.elecCurr === undefined ? "" : roomMeter.elecCurr) : "",
+          waterPrev,
+          waterCurr: roomMeter ? (roomMeter.waterCurr === null || roomMeter.waterCurr === undefined ? "" : roomMeter.waterCurr) : "",
+          isMeterSaved: roomMeter ? true : false,
+          
+          billId: roomBill?.id || undefined,
+          billAmount: roomBill ? Number(roomBill.amount) : 0,
+          billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created",
+          slipUrl: roomBill ? roomBill.slipUrl : null,
+          electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
+          waterUnits: roomBill ? Number(roomBill.waterUnits) : 0
+        }
+      })
+      setUnifiedItems(compiled)
+    } catch (err) {
+      console.error("Failed to load billing unified items with cache:", err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -201,46 +249,60 @@ export default function UnifiedBillingPage() {
   }, [billingCycle])
 
   useEffect(() => {
-    async function loadFinance() {
+    async function loadFinance(forceRefresh = false) {
       try {
-        const userRes = await getCurrentUserProfileAction()
+        let userProfile = getCachedData("global", "profile")
+        if (!userProfile || forceRefresh) {
+          const userRes = await getCurrentUserProfileAction()
+          if (userRes.success && userRes.data) {
+            userProfile = userRes.data
+            setCachedData("global", "profile", userRes.data)
+          }
+        }
         
         let wsId: string | undefined = undefined
         
-        if (userRes.success && userRes.data) {
-          const isSuperAdmin = userRes.data.role === "super_admin"
+        if (userProfile) {
+          const isSuperAdmin = userProfile.role === "super_admin"
           
-          if (!isSuperAdmin && userRes.data.workspace_id) {
+          if (!isSuperAdmin && userProfile.workspace_id) {
             // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
-            wsId = userRes.data.workspace_id
+            wsId = userProfile.workspace_id
           } else {
             // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
             const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
-            wsId = cookieWsId || userRes.data.workspace_id || undefined
+            wsId = cookieWsId || userProfile.workspace_id || undefined
           }
         }
 
         if (wsId) {
-          const financeRes = await getFinanceSettings(wsId)
-          if (financeRes.success && financeRes.data) {
-            const data = financeRes.data
-            if (data.common_fee !== undefined) setCommonFee(data.common_fee)
-            if (data.water_rate !== undefined) setWaterRate(data.water_rate)
-            if (data.electric_rate !== undefined) setElecRate(data.electric_rate)
-            setWaterMinChecked(!!data.water_min_checked)
-            if (data.water_min_unit !== undefined) setWaterMinUnit(data.water_min_unit)
-            setElectricMinChecked(!!data.electric_min_checked)
-            if (data.electric_min_unit !== undefined) setElectricMinUnit(data.electric_min_unit)
-            if (data.promptpay_id) setPromptPayId(data.promptpay_id)
-            if (data.promptpay_name) setPromptPayName(data.promptpay_name)
-            if (data.name) setWorkspaceName(data.name)
-            if (data.tax_address) setWorkspaceAddress(data.tax_address)
-            if (data.tax_phone) setWorkspacePhone(data.tax_phone)
-            if (data.tax_id) setWorkspaceTaxId(data.tax_id)
+          let financeData = getCachedData(wsId, "finance_settings")
+          if (!financeData || forceRefresh) {
+            const financeRes = await getFinanceSettings(wsId)
+            if (financeRes.success && financeRes.data) {
+              financeData = financeRes.data
+              setCachedData(wsId, "finance_settings", financeData)
+            }
+          }
+
+          if (financeData) {
+            if (financeData.common_fee !== undefined) setCommonFee(financeData.common_fee)
+            if (financeData.water_rate !== undefined) setWaterRate(financeData.water_rate)
+            if (financeData.electric_rate !== undefined) setElecRate(financeData.electric_rate)
+            setWaterMinChecked(!!financeData.water_min_checked)
+            if (financeData.water_min_unit !== undefined) setWaterMinUnit(financeData.water_min_unit)
+            setElectricMinChecked(!!financeData.electric_min_checked)
+            if (financeData.electric_min_unit !== undefined) setElectricMinUnit(financeData.electric_min_unit)
+            if (financeData.promptpay_id) setPromptPayId(financeData.promptpay_id)
+            if (financeData.promptpay_name) setPromptPayName(financeData.promptpay_name)
+            if (financeData.name) setWorkspaceName(financeData.name)
+            if (financeData.tax_address) setWorkspaceAddress(financeData.tax_address)
+            if (financeData.tax_phone) setWorkspacePhone(financeData.tax_phone)
+            if (financeData.tax_id) setWorkspaceTaxId(financeData.tax_id)
           }
         }
       } catch (err) {
-        console.error("Failed to load finance settings:", err)
+        console.error("Failed to load finance settings with cache:", err)
       }
     }
     loadFinance()
@@ -276,7 +338,7 @@ export default function UnifiedBillingPage() {
     const res = await updateBillStatus(id, "paid")
     if (res.success) {
       showToast("อนุมัติรายการชำระเงินเรียบร้อยแล้ว!")
-      await loadData()
+      await loadData(billingCycle, true)
     } else {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
@@ -290,7 +352,7 @@ export default function UnifiedBillingPage() {
     const res = await updateBillStatus(id, "unpaid", null)
     if (res.success) {
       showToast("ปฏิเสธสลิปแล้ว บิลจะกลับเป็นสถานะค้างชำระ")
-      await loadData()
+      await loadData(billingCycle, true)
     } else {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
@@ -306,7 +368,7 @@ export default function UnifiedBillingPage() {
     const res = await updateBillStatus(billId, "paid")
     if (res.success) {
       showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
-      await loadData()
+      await loadData(billingCycle, true)
     } else {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
     }
@@ -370,7 +432,7 @@ export default function UnifiedBillingPage() {
     }
 
     showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
-    await loadData()
+    await loadData(billingCycle, true)
   }
 
   // บันทึกและออกบิลให้ทุกห้องที่ข้อมูลสมบูรณ์
@@ -439,7 +501,7 @@ export default function UnifiedBillingPage() {
     }
 
     showToast("บันทึกเลขมิเตอร์และคำนวณบิลให้ทุกห้องสำเร็จ!")
-    await loadData()
+    await loadData(billingCycle, true)
   }
 
   // ส่งข้อมูลเข้า LINE OA
@@ -599,7 +661,7 @@ export default function UnifiedBillingPage() {
     )
     if (res.success) {
       showToast(`สร้างบิลแบบกำหนดเองห้อง ${newRoomNumber} สำเร็จ!`)
-      await loadData()
+      await loadData(billingCycle, true)
     } else {
       alert(res.error || "ออกใบแจ้งยอดไม่สำเร็จ")
       return

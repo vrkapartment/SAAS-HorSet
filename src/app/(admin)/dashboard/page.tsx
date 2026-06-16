@@ -31,9 +31,19 @@ import { getRooms } from "@/features/room/actions"
 import { getTenants } from "@/features/tenant/actions"
 import { getBills } from "@/features/billing/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [isDemo, setIsDemo] = useState(false)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<any[]>([])
@@ -150,47 +160,81 @@ export default function AdminDashboard() {
     setRecentActivities(activities)
   }
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (forceRefresh = false) => {
     setLoading(true)
     try {
-      // ดึงข้อมูลโปรไฟล์เพื่อนำมาแสดงชื่อผู้ใช้แบบ Dynamic
-      try {
+      // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
+      let userProfile = getCachedData("global", "profile")
+      if (!userProfile || forceRefresh) {
         const userRes = await getCurrentUserProfileAction()
         if (userRes.success && userRes.data) {
-          const profile = userRes.data
-          const role = profile.role
-          const name = profile.full_name || profile.email || "ผู้ดูแลระบบ"
-          
-          if (role === "super_admin") {
-            setWelcomeName(`Super Admin ${name}`)
-          } else if (role === "admin") {
-            setWelcomeName(name.startsWith("คุณ") || name.startsWith("แอดมิน") ? name : `แอดมิน ${name}`)
-          } else if (role === "staff") {
-            setWelcomeName(name.startsWith("คุณ") ? name : `คุณ ${name}`)
-          } else {
-            setWelcomeName(name)
-          }
-        } else {
-          setWelcomeName("แอดมินสมเจตน์")
+          userProfile = userRes.data
+          setCachedData("global", "profile", userRes.data)
         }
-      } catch (err) {
-        console.error("Failed to load user profile for dashboard greeting:", err)
+      }
+
+      let wsId = ""
+      if (userProfile) {
+        const isSuperAdmin = userProfile.role === "super_admin"
+        if (!isSuperAdmin && userProfile.workspace_id) {
+          wsId = userProfile.workspace_id
+        } else {
+          const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
+          wsId = cookieWsId || userProfile.workspace_id || ""
+        }
+
+        const name = userProfile.full_name || userProfile.email || "ผู้ดูแลระบบ"
+        if (userProfile.role === "super_admin") {
+          setWelcomeName(`Super Admin ${name}`)
+        } else if (userProfile.role === "admin") {
+          setWelcomeName(name.startsWith("คุณ") || name.startsWith("แอดมิน") ? name : `แอดมิน ${name}`)
+        } else if (userProfile.role === "staff") {
+          setWelcomeName(name.startsWith("คุณ") ? name : `คุณ ${name}`)
+        } else {
+          setWelcomeName(name)
+        }
+      } else {
         setWelcomeName("แอดมินสมเจตน์")
       }
 
-      const roomsRes = await getRooms()
-      const tenantsRes = await getTenants()
-      const billsRes = await getBills()
+      // ถ้าเป็นการ Force Refresh ให้ล้างแคชเก่าออก
+      if (forceRefresh && wsId) {
+        clearWorkspaceCache(wsId)
+      }
 
-      const hasSupabase = roomsRes.success && tenantsRes.success && billsRes.success
+      // 1. ดึงข้อมูลห้องพักทั้งหมด
+      let rooms = wsId ? getCachedData(wsId, "rooms") : null
+      if (!rooms || forceRefresh) {
+        const roomsRes = await getRooms()
+        rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
+        if (wsId) setCachedData(wsId, "rooms", rooms)
+      }
 
-      if (hasSupabase && roomsRes.data && tenantsRes.data && billsRes.data) {
+      // 2. ดึงข้อมูลผู้เช่าทั้งหมด
+      let tenants = wsId ? getCachedData(wsId, "tenants") : null
+      if (!tenants || forceRefresh) {
+        const tenantsRes = await getTenants()
+        tenants = tenantsRes.success && tenantsRes.data ? tenantsRes.data : []
+        if (wsId) setCachedData(wsId, "tenants", tenants)
+      }
+
+      // 3. ดึงข้อมูลบิลทั้งหมด (แบบไม่ระบุรอบ เพื่อแสดงสถิติประวัติและกราฟภาพรวมในแดชบอร์ด)
+      let bills = wsId ? getCachedData(wsId, "bills_all") : null
+      if (!bills || forceRefresh) {
+        const billsRes = await getBills()
+        bills = billsRes.success && billsRes.data ? billsRes.data : []
+        if (wsId) setCachedData(wsId, "bills_all", bills)
+      }
+
+      const hasSupabase = rooms.length > 0 || tenants.length > 0 || bills.length > 0
+
+      if (hasSupabase) {
         setIsDemo(false)
-        setRawRooms(roomsRes.data)
-        setRawTenants(tenantsRes.data)
-        setRawBills(billsRes.data)
+        setRawRooms(rooms)
+        setRawTenants(tenants)
+        setRawBills(bills)
         
-        calculateStats(roomsRes.data, tenantsRes.data, billsRes.data, selectedCycle)
+        calculateStats(rooms, tenants, bills, selectedCycle)
       } else {
         setIsDemo(true)
         setupDemoFallback(selectedCycle)

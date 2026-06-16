@@ -3,6 +3,7 @@ import { Prompt } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider } from "@/lib/translations/LanguageProvider";
+import { WorkspaceDataProvider } from "@/context/WorkspaceDataContext";
 
 const promptFont = Prompt({
   variable: "--font-prompt",
@@ -29,12 +30,15 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans antialiased">
         <ThemeProvider>
           <LanguageProvider>
-            {children}
+            <WorkspaceDataProvider>
+              {children}
+            </WorkspaceDataProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>
   );
 }
+
 
 
