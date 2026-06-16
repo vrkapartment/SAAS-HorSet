@@ -62,9 +62,54 @@ function getCookie(name: string): string | undefined {
   return undefined
 }
 
+function formatBillingCycleThai(cycleStr: string): string {
+  if (!cycleStr) return ""
+  if (cycleStr.includes("-")) {
+    const [year, month] = cycleStr.split("-")
+    const monthsThai = [
+      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ]
+    const monthIdx = parseInt(month, 10) - 1
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${monthsThai[monthIdx]} ${year}`
+    }
+  }
+  return cycleStr
+}
+
+function getCurrentBillingCycle(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  return `${y}-${m}`
+}
+
+function getBillingCycleOptions(): { value: string; label: string }[] {
+  const options = []
+  const d = new Date()
+  // เจนรอบบิลล่วงหน้า 1 เดือน, เดือนปัจจุบัน และย้อนหลัง 11 เดือน (รวม 13 ตัวเลือก)
+  for (let i = -1; i < 12; i++) {
+    const targetDate = new Date(d.getFullYear(), d.getMonth() - i, 1)
+    const y = targetDate.getFullYear()
+    const m = String(targetDate.getMonth() + 1).padStart(2, "0")
+    const val = `${y}-${m}`
+    options.push({
+      value: val,
+      label: `รอบบิล ${formatBillingCycleThai(val)}`
+    })
+  }
+  return options
+}
+
 export default function UnifiedBillingPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [billingCycle, setBillingCycle] = useState("2026-06")
+
+  useEffect(() => {
+    // ปรับรอบบิลตามเดือนปฏิทินปัจจุบันเมื่อเรนเดอร์ฝั่ง Client สำเร็จเพื่อความไหลลื่นและป้องกัน Hydration Mismatch
+    setBillingCycle(getCurrentBillingCycle())
+  }, [])
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -542,7 +587,7 @@ export default function UnifiedBillingPage() {
       const blob = await generateBillPdf({
         roomNumber: item.roomNumber,
         tenantName: item.tenantName || "ผู้เช่า",
-        billingCycle: billingCycle === "2026-06" ? "มิถุนายน 2026" : "พฤษภาคม 2026",
+        billingCycle: formatBillingCycleThai(billingCycle),
         baseRent: item.baseRent,
         electricUnits: elecUnitsUsed,
         electricRate: elecRate,
@@ -606,7 +651,7 @@ export default function UnifiedBillingPage() {
         const blob = await generateBillPdf({
           roomNumber: item.roomNumber,
           tenantName: item.tenantName || "ผู้เช่า",
-          billingCycle: billingCycle === "2026-06" ? "มิถุนายน 2026" : "พฤษภาคม 2026",
+          billingCycle: formatBillingCycleThai(billingCycle),
           baseRent: item.baseRent,
           electricUnits: elecUnitsUsed,
           electricRate: elecRate,
@@ -727,8 +772,9 @@ export default function UnifiedBillingPage() {
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
           >
-            <option value="2026-06">รอบบิล มิถุนายน 2026</option>
-            <option value="2026-05">รอบบิล พฤษภาคม 2026</option>
+            {getBillingCycleOptions().map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
 
           {/* บันทึกทั้งหมด */}
