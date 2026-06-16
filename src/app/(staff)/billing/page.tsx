@@ -85,7 +85,19 @@ function getCurrentBillingCycle(): string {
   return `${y}-${m}`
 }
 
-function getBillingCycleOptions(): { value: string; label: string }[] {
+function getCycleFromTimestamp(timestampStr: string): string {
+  try {
+    const d = new Date(timestampStr)
+    if (isNaN(d.getTime())) return ""
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    return `${y}-${m}`
+  } catch {
+    return ""
+  }
+}
+
+function getBillingCycleOptions(registrationCycle?: string): { value: string; label: string }[] {
   const options = []
   const d = new Date()
   // เจนรอบบิลล่วงหน้า 1 เดือน, เดือนปัจจุบัน และย้อนหลัง 11 เดือน (รวม 13 ตัวเลือก)
@@ -94,6 +106,12 @@ function getBillingCycleOptions(): { value: string; label: string }[] {
     const y = targetDate.getFullYear()
     const m = String(targetDate.getMonth() + 1).padStart(2, "0")
     const val = `${y}-${m}`
+    
+    // กรองไม่ให้แสดงรอบบิลก่อนเดือนที่สมัครใช้งาน
+    if (registrationCycle && val < registrationCycle) {
+      continue
+    }
+
     options.push({
       value: val,
       label: `รอบบิล ${formatBillingCycleThai(val)}`
@@ -105,11 +123,23 @@ function getBillingCycleOptions(): { value: string; label: string }[] {
 export default function UnifiedBillingPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [billingCycle, setBillingCycle] = useState("2026-06")
+  const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
   useEffect(() => {
     // ปรับรอบบิลตามเดือนปฏิทินปัจจุบันเมื่อเรนเดอร์ฝั่ง Client สำเร็จเพื่อความไหลลื่นและป้องกัน Hydration Mismatch
-    setBillingCycle(getCurrentBillingCycle())
-  }, [])
+    const current = getCurrentBillingCycle()
+    if (registrationCycle && current < registrationCycle) {
+      setBillingCycle(registrationCycle)
+    } else {
+      setBillingCycle(current)
+    }
+  }, [registrationCycle])
+
+  useEffect(() => {
+    if (registrationCycle && billingCycle < registrationCycle) {
+      setBillingCycle(registrationCycle)
+    }
+  }, [registrationCycle, billingCycle])
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -180,7 +210,12 @@ export default function UnifiedBillingPage() {
       }
 
       let wsId = ""
+      let regCycleVal = ""
       if (userProfile) {
+        if (userProfile.created_at) {
+          regCycleVal = getCycleFromTimestamp(userProfile.created_at)
+          setRegistrationCycle(regCycleVal)
+        }
         const isSuperAdmin = userProfile.role === "super_admin"
         if (!isSuperAdmin && userProfile.workspace_id) {
           wsId = userProfile.workspace_id
@@ -248,6 +283,11 @@ export default function UnifiedBillingPage() {
           ? Number(prevMeter.waterCurr)
           : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
         
+        // กำหนดความสามารถในการแก้ไขเลขหน่วยครั้งก่อนหน้า (เฉพาะเดือนแรกที่สมัครใช้บริการเท่านั้น เดือนถัดไปจะถูกล็อกถาวร)
+        const isFirstMonth = regCycleVal ? (cycle === regCycleVal) : true
+        const isElecPrevEditable = isFirstMonth ? !hasPrevMeterElec : false
+        const isWaterPrevEditable = isFirstMonth ? !hasPrevMeterWater : false
+
         return {
           roomNumber: r.roomNumber,
           tenantName: r.tenantName,
@@ -260,8 +300,8 @@ export default function UnifiedBillingPage() {
           waterPrev,
           waterCurr: roomMeter ? (roomMeter.waterCurr === null || roomMeter.waterCurr === undefined ? "" : roomMeter.waterCurr) : "",
           isMeterSaved: roomMeter ? true : false,
-          isElecPrevEditable: !hasPrevMeterElec,
-          isWaterPrevEditable: !hasPrevMeterWater,
+          isElecPrevEditable,
+          isWaterPrevEditable,
           
           billId: roomBill?.id || undefined,
           billAmount: roomBill ? Number(roomBill.amount) : 0,
@@ -772,7 +812,7 @@ export default function UnifiedBillingPage() {
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
           >
-            {getBillingCycleOptions().map(opt => (
+            {getBillingCycleOptions(registrationCycle).map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
