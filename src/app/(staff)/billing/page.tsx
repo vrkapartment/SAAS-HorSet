@@ -42,6 +42,8 @@ interface UnifiedRoomBillingItem {
   waterPrev: string | number
   waterCurr: string | number
   isMeterSaved: boolean
+  isElecPrevEditable: boolean
+  isWaterPrevEditable: boolean
   
   // Bill fields for current cycle
   billId?: string
@@ -191,10 +193,13 @@ export default function UnifiedBillingPage() {
         
         // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
         const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
-        const elecPrev = (prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
+        const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
+        const hasPrevMeterWater = !!(prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
+
+        const elecPrev = hasPrevMeterElec
           ? Number(prevMeter.elecCurr)
           : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
-        const waterPrev = (prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
+        const waterPrev = hasPrevMeterWater
           ? Number(prevMeter.waterCurr)
           : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
         
@@ -210,6 +215,8 @@ export default function UnifiedBillingPage() {
           waterPrev,
           waterCurr: roomMeter ? (roomMeter.waterCurr === null || roomMeter.waterCurr === undefined ? "" : roomMeter.waterCurr) : "",
           isMeterSaved: roomMeter ? true : false,
+          isElecPrevEditable: !hasPrevMeterElec,
+          isWaterPrevEditable: !hasPrevMeterWater,
           
           billId: roomBill?.id || undefined,
           billAmount: roomBill ? Number(roomBill.amount) : 0,
@@ -899,7 +906,7 @@ export default function UnifiedBillingPage() {
                         <span className="text-xs font-bold text-blue-400 flex items-center gap-1">
                           <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
                         </span>
-                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] text-slate-500 font-bold">ก่อนหน้า:</span>
                             <input
@@ -954,7 +961,7 @@ export default function UnifiedBillingPage() {
                         <span className="text-xs font-bold text-teal-400 flex items-center gap-1">
                           <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
                         </span>
-                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] text-slate-500 font-bold">ก่อนหน้า:</span>
                             <input
@@ -1151,7 +1158,7 @@ export default function UnifiedBillingPage() {
                       
                       {/* ไฟฟ้า - ก่อนหน้า */}
                       <td className="py-4 text-center bg-blue-500/5 border-l border-slate-900/30 px-2">
-                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
                           <input
                             type="text"
                             inputMode="decimal"
@@ -1197,7 +1204,7 @@ export default function UnifiedBillingPage() {
 
                       {/* น้ำประปา - ก่อนหน้า */}
                       <td className="py-4 text-center bg-teal-500/5 px-2">
-                        {item.billStatus === "not_created" || item.billStatus === "unpaid" ? (
+                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
                           <input
                             type="text"
                             inputMode="decimal"
