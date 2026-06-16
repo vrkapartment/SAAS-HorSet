@@ -164,17 +164,17 @@ drop policy if exists "Manage expenses in workspace or support approved" on publ
 create or replace function public.get_current_user_workspace_id()
 returns uuid as $$
   select workspace_id from public.profiles where id = auth.uid();
-$$ language sql security definer;
+$$ language sql stable security definer parallel safe;
 
 create or replace function public.get_current_user_role()
 returns text as $$
   select role from public.profiles where id = auth.uid();
-$$ language sql security definer;
+$$ language sql stable security definer parallel safe;
 
 create or replace function public.get_current_user_phone()
 returns text as $$
   select phone from public.profiles where id = auth.uid();
-$$ language sql security definer;
+$$ language sql stable security definer parallel safe;
 
 
 -- ==================== PROFILES POLICIES ====================
@@ -473,5 +473,22 @@ using (
   id = public.get_current_user_workspace_id()
   and public.get_current_user_role() in ('admin', 'super_admin')
 );
+
+-- =========================================================================
+-- 10. Performance Optimization Indexes
+-- =========================================================================
+-- Index on workspace_id columns across all tables (prevent Full Table Scan in RLS)
+create index if not exists idx_profiles_workspace_id on public.profiles (workspace_id);
+create index if not exists idx_room_types_workspace_id on public.room_types (workspace_id);
+create index if not exists idx_rooms_workspace_id on public.rooms (workspace_id);
+create index if not exists idx_tenants_workspace_id on public.tenants (workspace_id);
+create index if not exists idx_meter_records_workspace_id on public.meter_records (workspace_id);
+create index if not exists idx_bills_workspace_id on public.bills (workspace_id);
+create index if not exists idx_expenses_workspace_id on public.expenses (workspace_id);
+
+-- Indexes for join relationships and lookups
+create index if not exists idx_tenants_room_id on public.tenants (room_id);
+create index if not exists idx_tenants_phone on public.tenants (tenant_phone);
+create index if not exists idx_rooms_room_type_id on public.rooms (room_type_id);
 
 
