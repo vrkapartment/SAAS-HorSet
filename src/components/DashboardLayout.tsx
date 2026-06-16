@@ -31,7 +31,14 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
-import { getCurrentUserProfileAction, updateUserProfileAction } from "@/features/auth/actions"
+import { updateUserProfileAction } from "@/features/auth/actions"
+import { getCurrentUserProfileClient, setCachedUserProfile } from "@/features/auth/client"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { getRooms, getRoomTypes } from "@/features/room/actions"
+import { getTenants } from "@/features/tenant/actions"
+import { getFinanceSettings } from "@/features/finance/actions"
+import { getBills } from "@/features/billing/actions"
+import { getExpenses } from "@/features/expenses/actions"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -65,6 +72,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { t } = useLanguage()
+  const { getCachedData, setCachedData } = useWorkspaceData()
 
   // ดึงบทบาทจริงจากคุกกี้ หรือใช้ค่า prop เป็นค่าเริ่มต้น
   const [userRole, setUserRole] = useState<"admin" | "staff" | "super_admin">(role)
@@ -115,7 +123,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
       if (!isDemo) {
         try {
-          const profileRes = await getCurrentUserProfileAction()
+          const profileRes = await getCurrentUserProfileClient()
           if (profileRes.success && profileRes.data) {
             profileWsId = profileRes.data.workspace_id || null
             if (profileRes.data.role) {
@@ -226,7 +234,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     const loadUserProfile = async () => {
       if (!isDemo) {
         try {
-          const res = await getCurrentUserProfileAction()
+          const res = await getCurrentUserProfileClient()
           if (res.success && res.data) {
             setFullName(res.data.full_name || res.data.email || "ผู้ดูแลระบบ")
             setProfileName(res.data.full_name || "")
@@ -253,6 +261,155 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     loadUserProfile()
   }, [userRole, isDemo])
 
+  // ฟังก์ชันช่วยสำหรับการทำ prefetch ข้อมูลรายหน้าเมื่อเอาเมาส์ไปชี้ปุ่ม (Hover-Triggered Prefetching)
+  const handlePrefetchPage = (path: string) => {
+    if (!currentWorkspace.id || isDemo) return
+    const wsId = currentWorkspace.id
+
+    switch (path) {
+      case "/rooms":
+        if (!getCachedData(wsId, "rooms")) {
+          getRooms().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
+          }).catch(() => {})
+        }
+        if (!getCachedData(wsId, "room_types")) {
+          getRoomTypes().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "room_types", res.data)
+          }).catch(() => {})
+        }
+        break
+      case "/tenants":
+        if (!getCachedData(wsId, "tenants")) {
+          getTenants().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "tenants", res.data)
+          }).catch(() => {})
+        }
+        if (!getCachedData(wsId, "rooms")) {
+          getRooms().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
+          }).catch(() => {})
+        }
+        break
+      case "/billing":
+        if (!getCachedData(wsId, "bills_all")) {
+          getBills().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+          }).catch(() => {})
+        }
+        break
+      case "/daily-bills":
+        if (!getCachedData(wsId, "expenses_2026")) {
+          getExpenses("2026", wsId).then(res => {
+            if (res.success && res.data) setCachedData(wsId, "expenses_2026", res.data)
+          }).catch(() => {})
+        }
+        break
+      case "/tax":
+        if (!getCachedData(wsId, "expenses_2026")) {
+          getExpenses("2026", wsId).then(res => {
+            if (res.success && res.data) setCachedData(wsId, "expenses_2026", res.data)
+          }).catch(() => {})
+        }
+        if (!getCachedData(wsId, "finance_settings")) {
+          getFinanceSettings(wsId).then(res => {
+            if (res.success && res.data) setCachedData(wsId, "finance_settings", res.data)
+          }).catch(() => {})
+        }
+        if (!getCachedData(wsId, "bills_all")) {
+          getBills().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+          }).catch(() => {})
+        }
+        break
+      case "/finance-settings":
+        if (!getCachedData(wsId, "finance_settings")) {
+          getFinanceSettings(wsId).then(res => {
+            if (res.success && res.data) setCachedData(wsId, "finance_settings", res.data)
+          }).catch(() => {})
+        }
+        break
+      case "/dashboard":
+        if (!getCachedData(wsId, "rooms")) {
+          getRooms().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
+          }).catch(() => {})
+        }
+        if (!getCachedData(wsId, "tenants")) {
+          getTenants().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "tenants", res.data)
+          }).catch(() => {})
+        }
+        if (!getCachedData(wsId, "bills_all")) {
+          getBills().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+          }).catch(() => {})
+        }
+        break
+      default:
+        break
+    }
+  }
+
+  // ระบบ Background Prefetching (RAM Preloader) เพื่อโหลดข้อมูลล่วงหน้าของหน้าหลักๆ ทั้งหมดมาไว้ใน RAM
+  // ซึ่งจะเริ่มทำงานแบบอัสซิงโครนัส 1.5 วินาทีหลังจาก Workspace โหลดเสร็จ เพื่อไม่ให้กีดกันการแสดงผลแรกเริ่มของหน้าจอ
+  useEffect(() => {
+    if (!currentWorkspace.id || isDemo) return
+    const wsId = currentWorkspace.id
+
+    const prefetchEverything = async () => {
+      try {
+        // 1. โหลดข้อมูลห้องพัก & ประเภทห้องล่วงหน้า
+        if (!getCachedData(wsId, "rooms")) {
+          getRooms().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
+          }).catch(() => {})
+        }
+        if (!getCachedData(wsId, "room_types")) {
+          getRoomTypes().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "room_types", res.data)
+          }).catch(() => {})
+        }
+
+        // 2. โหลดข้อมูลสัญญาผู้เช่าล่วงหน้า
+        if (!getCachedData(wsId, "tenants")) {
+          getTenants().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "tenants", res.data)
+          }).catch(() => {})
+        }
+
+        // 3. โหลดตั้งค่าการเงินล่วงหน้า
+        if (!getCachedData(wsId, "finance_settings")) {
+          getFinanceSettings(wsId).then(res => {
+            if (res.success && res.data) setCachedData(wsId, "finance_settings", res.data)
+          }).catch(() => {})
+        }
+
+        // 4. โหลดข้อมูลบิลทั้งหมดล่วงหน้า
+        if (!getCachedData(wsId, "bills_all")) {
+          getBills().then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+          }).catch(() => {})
+        }
+
+        // 5. โหลดข้อมูลค่าใช้จ่ายล่วงหน้า
+        if (!getCachedData(wsId, "expenses_2026")) {
+          getExpenses("2026", wsId).then(res => {
+            if (res.success && res.data) setCachedData(wsId, "expenses_2026", res.data)
+          }).catch(() => {})
+        }
+      } catch (err) {
+        console.error("Background prefetching failed:", err)
+      }
+    }
+
+    const prefetchTimer = setTimeout(() => {
+      prefetchEverything()
+    }, 1500)
+
+    return () => clearTimeout(prefetchTimer)
+  }, [currentWorkspace.id, isDemo])
+
   // จัดการบันทึกโปรไฟล์ & รหัสผ่านใหม่
   const handleUpdateProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -273,14 +430,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
     if (!isDemo) {
       try {
-        const res = await updateUserProfileAction({
+        const res = (await updateUserProfileAction({
           fullName: profileName,
           phone: profilePhone,
           password: profilePassword || undefined
-        })
+        })) as any
 
         if (res.success) {
           setFullName(profileName)
+          if (res.data) {
+            setCachedUserProfile(res.data)
+          } else {
+            await getCurrentUserProfileClient(true)
+          }
           setProfileSuccess("✓ บันทึกข้อมูลโปรไฟล์และเปลี่ยนรหัสผ่านสำเร็จ!")
           setProfilePassword("")
           setProfileConfirmPassword("")
@@ -629,6 +791,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     router.push(item.path)
                   }
                 }}
+                onMouseEnter={() => handlePrefetchPage(item.path)}
+                onTouchStart={() => handlePrefetchPage(item.path)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
                   isActive
                     ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
@@ -795,6 +959,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                       }
                       setMobileOpen(false)
                     }}
+                    onMouseEnter={() => handlePrefetchPage(item.path)}
+                    onTouchStart={() => handlePrefetchPage(item.path)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
                       isActive
                         ? "bg-blue-600 text-white"

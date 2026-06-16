@@ -36,8 +36,9 @@ import {
   ExpenseItem 
 } from "@/features/expenses/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
-import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getBills } from "@/features/billing/actions"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 interface BillItem {
   id: string
@@ -60,6 +61,7 @@ function getCookie(name: string): string | undefined {
 }
 
 export default function TaxPage() {
+  const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [taxYear, setTaxYear] = useState("2026")
 
   // โหลดข้อมูลผู้เสียภาษีจากตั้งค่าการเงิน
@@ -103,7 +105,7 @@ export default function TaxPage() {
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const userRes = await getCurrentUserProfileAction()
+        const userRes = await getCurrentUserProfileClient()
         
         let currentWsId: string | undefined = undefined
         
@@ -122,20 +124,31 @@ export default function TaxPage() {
 
         if (currentWsId) {
           // 1. โหลดข้อมูลผู้เสียภาษี
-          const res = await getFinanceSettings(currentWsId)
-          if (res.success && res.data) {
-            setFirstName(res.data.tax_firstname || "")
-            setLastName(res.data.tax_lastname || "")
-            setTaxId(res.data.tax_id || "")
-            setAddress(res.data.tax_address || "")
-            setPhone(res.data.tax_phone || "")
+          const financeCacheKey = "finance_settings"
+          const cachedFinance = getCachedData<any>(currentWsId, financeCacheKey)
+          if (cachedFinance) {
+            setFirstName(cachedFinance.tax_firstname || "")
+            setLastName(cachedFinance.tax_lastname || "")
+            setTaxId(cachedFinance.tax_id || "")
+            setAddress(cachedFinance.tax_address || "")
+            setPhone(cachedFinance.tax_phone || "")
+          } else {
+            const res = await getFinanceSettings(currentWsId)
+            if (res.success && res.data) {
+              setFirstName(res.data.tax_firstname || "")
+              setLastName(res.data.tax_lastname || "")
+              setTaxId(res.data.tax_id || "")
+              setAddress(res.data.tax_address || "")
+              setPhone(res.data.tax_phone || "")
+              setCachedData(currentWsId, financeCacheKey, res.data)
+            }
           }
 
           // 2. โหลดบิลจากระบบ
-          const billsRes = await getBills()
-          if (billsRes.success && billsRes.data) {
-            // Map any database bills to matching UI structure
-            const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
+          const billsCacheKey = "bills_all"
+          const cachedBills = getCachedData<any[]>(currentWsId, billsCacheKey)
+          if (cachedBills) {
+            const mappedBills: BillItem[] = cachedBills.map((b: any) => ({
               id: b.id,
               roomNumber: b.roomNumber,
               tenantName: b.tenantName || "ผู้เช่า",
@@ -147,6 +160,23 @@ export default function TaxPage() {
               waterUnits: Number(b.waterUnits || 0)
             }))
             setBills(mappedBills)
+          } else {
+            const billsRes = await getBills()
+            if (billsRes.success && billsRes.data) {
+              const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
+                id: b.id,
+                roomNumber: b.roomNumber,
+                tenantName: b.tenantName || "ผู้เช่า",
+                amount: Number(b.amount),
+                status: b.status as "unpaid" | "pending" | "paid",
+                billingCycle: b.billingCycle,
+                slipUrl: b.slipUrl || null,
+                electricUnits: Number(b.electricUnits || 0),
+                waterUnits: Number(b.waterUnits || 0)
+              }))
+              setBills(mappedBills)
+              setCachedData(currentWsId, billsCacheKey, billsRes.data)
+            }
           }
 
           // 3. โหลดค่าใช้จ่าย
@@ -161,12 +191,12 @@ export default function TaxPage() {
   }, [taxYear])
 
   // ฟังก์ชันโหลดข้อมูลค่าใช้จ่ายจาก DB
-  const loadExpensesData = async (year: string, explicitWsId?: string) => {
+  const loadExpensesData = async (year: string, explicitWsId?: string, forceRefresh = false) => {
     setLoadingExpenses(true)
     try {
       let activeWsId = explicitWsId
       if (!activeWsId) {
-        const userRes = await getCurrentUserProfileAction()
+        const userRes = await getCurrentUserProfileClient()
         if (userRes.success && userRes.data) {
           const isSuperAdmin = userRes.data.role === "super_admin"
           if (!isSuperAdmin && userRes.data.workspace_id) {
@@ -178,9 +208,36 @@ export default function TaxPage() {
         }
       }
       
+      if (activeWsId && !forceRefresh) {
+        const cached = getCachedData<ExpenseItem[]>(activeWsId, `expenses_${year}`)
+        if (cached) {
+          setExpenses(cached)
+          
+          const sum405 = cached
+            .filter(e => e.category === "40_5")
+            .reduce((sum, e) => sum + e.amount, 0)
+          
+          const sum408 = cached
+            .filter(e => e.category === "40_8")
+            .reduce((sum, e) => sum + e.amount, 0)
+            
+          setDbActualExpense405(sum405)
+          setDbActualExpense408(sum408)
+          
+          // อัปเดตตัวแปรจริงที่ใช้คำนวณแบบเรียลไทม์
+          setActualExpense405(sum405)
+          setActualExpense408(sum408)
+          setLoadingExpenses(false)
+          return
+        }
+      }
+      
       const res = await getExpenses(year, activeWsId)
       if (res.success && res.data) {
         setExpenses(res.data)
+        if (activeWsId) {
+          setCachedData(activeWsId, `expenses_${year}`, res.data)
+        }
         
         const sum405 = res.data
           .filter(e => e.category === "40_5")
@@ -264,7 +321,17 @@ export default function TaxPage() {
 
       if (res.success) {
         setExpenseModalOpen(false)
-        await loadExpensesData(taxYear)
+        const userRes = await getCurrentUserProfileClient()
+        if (userRes.success && userRes.data) {
+          const isSuperAdmin = userRes.data.role === "super_admin"
+          const activeWsId = isSuperAdmin 
+            ? (getCookie("horset_current_workspace_id") || userRes.data.workspace_id)
+            : userRes.data.workspace_id
+          if (activeWsId) {
+            clearWorkspaceCache(activeWsId)
+          }
+        }
+        await loadExpensesData(taxYear, undefined, true)
       } else {
         setExpenseError(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล")
       }
@@ -282,7 +349,17 @@ export default function TaxPage() {
     try {
       const res = await deleteExpense(id)
       if (res.success) {
-        await loadExpensesData(taxYear)
+        const userRes = await getCurrentUserProfileClient()
+        if (userRes.success && userRes.data) {
+          const isSuperAdmin = userRes.data.role === "super_admin"
+          const activeWsId = isSuperAdmin 
+            ? (getCookie("horset_current_workspace_id") || userRes.data.workspace_id)
+            : userRes.data.workspace_id
+          if (activeWsId) {
+            clearWorkspaceCache(activeWsId)
+          }
+        }
+        await loadExpensesData(taxYear, undefined, true)
       } else {
         alert(res.error || "เกิดข้อผิดพลาดในการลบรายการ")
       }

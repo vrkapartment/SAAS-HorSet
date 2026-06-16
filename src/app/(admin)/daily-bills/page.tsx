@@ -36,6 +36,8 @@ import {
   ExpenseItem 
 } from "@/features/expenses/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { getCurrentUserProfileClient } from "@/features/auth/client"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 // คู่มือรายจ่ายยอดนิยมและคำอธิบายประเภทภาษี
 const commonExpensesGuide = [
@@ -66,6 +68,7 @@ function getCookie(name: string): string | undefined {
 }
 
 export default function DailyBillsPage() {
+  const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
   const [loading, setLoading] = useState(true)
   const [taxYear, setTaxYear] = useState("2026")
@@ -100,10 +103,10 @@ export default function DailyBillsPage() {
   const [submitting, setSubmitting] = useState(false)
 
   // ดึงข้อมูล
-  const loadData = async (year: string) => {
+  const loadData = async (year: string, forceRefresh = false) => {
     setLoading(true)
     try {
-      const userRes = await getCurrentUserProfileAction()
+      const userRes = await getCurrentUserProfileClient(forceRefresh)
       let wsId: string | undefined = undefined
       
       if (userRes.success && userRes.data) {
@@ -119,9 +122,24 @@ export default function DailyBillsPage() {
         }
       }
 
-      const res = await getExpenses(year, wsId)
-      if (res.success && res.data) {
-        setExpenses(res.data)
+      if (wsId) {
+        if (forceRefresh) {
+          clearWorkspaceCache(wsId)
+        }
+
+        const cacheKey = `expenses_${year}`
+        const cached = getCachedData<ExpenseItem[]>(wsId, cacheKey)
+        if (cached) {
+          setExpenses(cached)
+          setLoading(false)
+          return
+        }
+
+        const res = await getExpenses(year, wsId)
+        if (res.success && res.data) {
+          setExpenses(res.data)
+          setCachedData(wsId, cacheKey, res.data)
+        }
       }
     } catch (e) {
       console.error("Failed to load daily bills:", e)
@@ -250,7 +268,7 @@ export default function DailyBillsPage() {
 
     try {
       let res
-      const userRes = await getCurrentUserProfileAction()
+      const userRes = await getCurrentUserProfileClient()
       let wsId: string | undefined = undefined
       
       if (userRes.success && userRes.data) {
@@ -274,7 +292,10 @@ export default function DailyBillsPage() {
 
       if (res.success) {
         setModalOpen(false)
-        await loadData(taxYear)
+        if (wsId) {
+          clearWorkspaceCache(wsId)
+        }
+        await loadData(taxYear, true)
       } else {
         setFormError(res.error || "เกิดข้อผิดพลาดในการบันทึกรายการ")
       }
@@ -299,7 +320,18 @@ export default function DailyBillsPage() {
       if (res.success) {
         setDeleteConfirmOpen(false)
         setDeleteTarget(null)
-        await loadData(taxYear)
+        
+        const userRes = await getCurrentUserProfileClient()
+        if (userRes.success && userRes.data) {
+          const isSuperAdmin = userRes.data.role === "super_admin"
+          const wsId = !isSuperAdmin && userRes.data.workspace_id
+            ? userRes.data.workspace_id
+            : (typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined) || userRes.data.workspace_id
+          if (wsId) {
+            clearWorkspaceCache(wsId)
+          }
+        }
+        await loadData(taxYear, true)
       } else {
         alert(res.error || "เกิดข้อผิดพลาดในการลบรายการ")
       }

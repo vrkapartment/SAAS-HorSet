@@ -27,6 +27,15 @@ import {
   deleteTenant 
 } from "@/features/tenant/actions"
 import { getRooms } from "@/features/room/actions"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
 
 interface TenantItem {
   id: string
@@ -40,6 +49,7 @@ interface TenantItem {
 }
 
 export default function TenantsPage() {
+  const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [tenants, setTenants] = useState<TenantItem[]>([])
   const [rooms, setRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -66,35 +76,54 @@ export default function TenantsPage() {
   const [contractEnd, setContractEnd] = useState("")
   const [formSubmitting, setFormSubmitting] = useState(false)
 
-  // โหลดข้อมูลผู้เช่าจาก Supabase
-  const loadTenants = async () => {
+  // โหลดข้อมูลสัญญาผู้เช่าและห้องพักโดยใช้ In-Memory Cache เพื่อประสิทธิภาพสูงสุด
+  const loadData = async (forceRefresh = false) => {
     setLoading(true)
     setError(null)
-    const res = await getTenants()
-    if (res.success && res.data) {
-      setTenants(res.data as TenantItem[])
-    } else {
-      setError(res.error || "ไม่สามารถโหลดข้อมูลสัญญาผู้เช่าได้")
-    }
-    setLoading(false)
-  }
+    try {
+      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      
+      if (forceRefresh && wsId) {
+        clearWorkspaceCache(wsId)
+      }
 
-  // โหลดข้อมูลห้องพักสำหรับทำ Dropdown
-  const loadRooms = async () => {
-    const res = await getRooms()
-    if (res.success && res.data) {
-      setRooms(res.data)
+      let cachedTenants = forceRefresh ? null : getCachedData(wsId, "tenants")
+      let cachedRooms = forceRefresh ? null : getCachedData(wsId, "rooms")
+
+      if (cachedTenants && cachedRooms) {
+        setTenants(cachedTenants)
+        setRooms(cachedRooms)
+        setLoading(false)
+        return
+      }
+
+      const [tenantsRes, roomsRes] = await Promise.all([getTenants(), getRooms()])
+
+      if (tenantsRes.success && tenantsRes.data) {
+        const tenantsData = tenantsRes.data as TenantItem[]
+        setTenants(tenantsData)
+        if (wsId) setCachedData(wsId, "tenants", tenantsData)
+      } else {
+        setError(tenantsRes.error || "ไม่สามารถโหลดข้อมูลสัญญาผู้เช่าได้")
+      }
+
+      if (roomsRes.success && roomsRes.data) {
+        setRooms(roomsRes.data)
+        if (wsId) setCachedData(wsId, "rooms", roomsRes.data)
+      }
+    } catch (err) {
+      setError("เกิดข้อผิดพลาดในการโหลดข้อมูลผู้เช่าและห้องพัก")
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadTenants()
-    loadRooms()
+    loadData()
   }, [])
 
   // เปิดสำหรับเพิ่มผู้เช่าใหม่
   const handleAddClick = () => {
-    loadRooms()
     setEditingTenant(null)
     setRoomNumber("")
     setFullName("")
@@ -114,7 +143,6 @@ export default function TenantsPage() {
 
   // เปิดสำหรับแก้ไขผู้เช่าเดิม
   const handleEditClick = (tenant: TenantItem) => {
-    loadRooms()
     setEditingTenant(tenant)
     setRoomNumber(tenant.roomNumber)
     setFullName(tenant.fullName)
@@ -139,7 +167,7 @@ export default function TenantsPage() {
     
     const res = await deleteTenant(deleteTarget.id, deleteTarget.roomNumber)
     if (res.success) {
-      await loadTenants()
+      await loadData(true) // เคลียร์แคชและรีเซ็ตข้อมูลใหม่ทั้งหมด
     } else {
       alert(res.error || "ยกเลิกและลบข้อมูลสัญญาผู้เช่าไม่สำเร็จ")
       setLoading(false)
@@ -166,7 +194,7 @@ export default function TenantsPage() {
           contractEnd
         )
         if (res.success) {
-          await loadTenants()
+          await loadData(true) // ล้างแคชและโหลดข้อมูลสด
           setModalOpen(false)
         } else {
           alert(res.error || "แก้ไขข้อมูลสัญญาผู้เช่าไม่สำเร็จ")
@@ -182,7 +210,7 @@ export default function TenantsPage() {
           contractEnd
         )
         if (res.success) {
-          await loadTenants()
+          await loadData(true) // ล้างแคชและโหลดข้อมูลสด
           setModalOpen(false)
         } else {
           alert(res.error || "สร้างสัญญาผู้เช่าไม่สำเร็จ")
@@ -269,7 +297,7 @@ export default function TenantsPage() {
           {/* Desktop Actions Row (hidden on mobile, uses sticky bottom bar on mobile) */}
           <div className="hidden md:flex items-center gap-2.5 relative z-10 shrink-0">
             <button
-              onClick={loadTenants}
+              onClick={() => loadData(true)}
               disabled={loading}
               className="p-2.5 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center cursor-pointer hover:-translate-y-0.5 active:scale-95 duration-200 h-10 w-10"
               title="รีเฟรชข้อมูลระบบ"
@@ -288,7 +316,7 @@ export default function TenantsPage() {
           {/* Quick Refresh action for Mobile in Header */}
           <div className="md:hidden absolute top-4 right-4 z-10">
             <button
-              onClick={loadTenants}
+              onClick={() => loadData(true)}
               disabled={loading}
               className="p-3 bg-slate-100 active:bg-slate-200 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 text-slate-600 dark:text-slate-400 rounded-xl flex items-center justify-center transition-all duration-250 cursor-pointer animate-in fade-in"
             >
@@ -513,7 +541,7 @@ export default function TenantsPage() {
         {/* MOBILE STICKY BOTTOM ACTION BAR (Strictly Adaptive, handles notches with pb-safe) */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 p-3.5 flex items-center justify-between gap-3.5 z-45 pb-safe shadow-[0_-4px_16px_rgba(0,0,0,0.08)] animate-in slide-in-from-bottom">
           <button
-            onClick={loadTenants}
+            onClick={() => loadData(true)}
             className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 active:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 dark:active:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm transition-all duration-200 active:scale-95 cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-500" : ""}`} /> ดึงข้อมูลใหม่

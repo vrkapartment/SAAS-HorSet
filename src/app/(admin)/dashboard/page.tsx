@@ -30,7 +30,7 @@ import {
 import { getRooms } from "@/features/room/actions"
 import { getTenants } from "@/features/tenant/actions"
 import { getBills } from "@/features/billing/actions"
-import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 function getCookie(name: string): string | undefined {
@@ -168,7 +168,7 @@ export default function AdminDashboard() {
       // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
       let userProfile = getCachedData("global", "profile")
       if (!userProfile || forceRefresh) {
-        const userRes = await getCurrentUserProfileAction()
+        const userRes = (await getCurrentUserProfileClient(forceRefresh)) as any
         if (userRes.success && userRes.data) {
           userProfile = userRes.data
           setCachedData("global", "profile", userRes.data)

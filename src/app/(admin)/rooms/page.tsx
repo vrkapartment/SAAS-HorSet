@@ -29,6 +29,15 @@ import {
   updateRoomType,
   deleteRoomType
 } from "@/features/room/actions"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
 
 interface RoomItem {
   id: string
@@ -48,6 +57,7 @@ interface RoomTypeItem {
 }
 
 export default function RoomsPage() {
+  const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -81,21 +91,42 @@ export default function RoomsPage() {
   const [editingType, setEditingType] = useState<RoomTypeItem | null>(null)
   const [typeSubmitting, setTypeSubmitting] = useState(false)
 
-  // โหลดข้อมูลทั้งหมดจาก Supabase
-  const loadData = async () => {
+  // โหลดข้อมูลทั้งหมดจาก Supabase ร่วมกับการใช้งาน Cache ความเร็วสูง
+  const loadData = async (forceRefresh = false) => {
     setLoading(true)
     setError(null)
     try {
+      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      
+      if (forceRefresh && wsId) {
+        clearWorkspaceCache(wsId)
+      }
+
+      // ดึงข้อมูลจาก In-Memory Cache เพื่อความเร็วระดับ 0ms และป้องกันการยุ่งเกี่ยวกับ local storage
+      let cachedRooms = forceRefresh ? null : getCachedData(wsId, "rooms")
+      let cachedTypes = forceRefresh ? null : getCachedData(wsId, "room_types")
+
+      if (cachedRooms && cachedTypes) {
+        setRooms(cachedRooms)
+        setRoomTypes(cachedTypes)
+        setLoading(false)
+        return
+      }
+
       const [roomsRes, typesRes] = await Promise.all([getRooms(), getRoomTypes()])
       
       if (roomsRes.success && roomsRes.data) {
-        setRooms(roomsRes.data as RoomItem[])
+        const roomsData = roomsRes.data as RoomItem[]
+        setRooms(roomsData)
+        if (wsId) setCachedData(wsId, "rooms", roomsData)
       } else {
         setError(roomsRes.error || "ไม่สามารถโหลดข้อมูลห้องพักได้")
       }
       
       if (typesRes.success && typesRes.data) {
-        setRoomTypes(typesRes.data as RoomTypeItem[])
+        const typesData = typesRes.data as RoomTypeItem[]
+        setRoomTypes(typesData)
+        if (wsId) setCachedData(wsId, "room_types", typesData)
       }
     } catch (err) {
       setError("เกิดข้อผิดพลาดในการโหลดข้อมูลระบบห้องพัก")
@@ -164,7 +195,7 @@ export default function RoomsPage() {
     if (deleteTarget.type === "room") {
       const res = await deleteRoom(deleteTarget.id)
       if (res.success) {
-        await loadData()
+        await loadData(true) // รีเฟรชข้อมูลและเคลียร์แคช
       } else {
         alert(res.error || "ลบห้องพักไม่สำเร็จ")
         setLoading(false)
@@ -173,9 +204,13 @@ export default function RoomsPage() {
       setTypeSubmitting(true)
       const res = await deleteRoomType(deleteTarget.id)
       if (res.success) {
+        const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+        clearWorkspaceCache(wsId)
         const typesRes = await getRoomTypes()
         if (typesRes.success && typesRes.data) {
-          setRoomTypes(typesRes.data as RoomTypeItem[])
+          const typesData = typesRes.data as RoomTypeItem[]
+          setRoomTypes(typesData)
+          setCachedData(wsId, "room_types", typesData)
         }
       } else {
         alert(res.error || "ไม่สามารถลบประเภทห้องนี้ได้ เนื่องจากมีห้องพักอื่นอ้างอิงใช้งานประเภทนี้อยู่")
@@ -202,7 +237,7 @@ export default function RoomsPage() {
         editingRoom.status
       )
       if (res.success) {
-        await loadData()
+        await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
         alert(res.error || "แก้ไขข้อมูลห้องพักไม่สำเร็จ")
@@ -211,7 +246,7 @@ export default function RoomsPage() {
       // เพิ่มห้องพักใหม่
       const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent))
       if (res.success) {
-        await loadData()
+        await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
         alert(res.error || "สร้างห้องพักไม่สำเร็จ")
@@ -226,16 +261,21 @@ export default function RoomsPage() {
     if (!newTypeName) return
     setTypeSubmitting(true)
 
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+
     if (editingType) {
       const res = await updateRoomType(editingType.id, newTypeName, Number(newTypeRent))
       if (res.success) {
         setNewTypeName("")
         setNewTypeRent(4000)
         setEditingType(null)
+        clearWorkspaceCache(wsId)
         // โหลดข้อมูลประเภทห้องใหม่
         const typesRes = await getRoomTypes()
         if (typesRes.success && typesRes.data) {
-          setRoomTypes(typesRes.data as RoomTypeItem[])
+          const typesData = typesRes.data as RoomTypeItem[]
+          setRoomTypes(typesData)
+          setCachedData(wsId, "room_types", typesData)
         }
       } else {
         alert(res.error || "แก้ไขประเภทห้องไม่สำเร็จ")
@@ -245,9 +285,12 @@ export default function RoomsPage() {
       if (res.success) {
         setNewTypeName("")
         setNewTypeRent(4000)
+        clearWorkspaceCache(wsId)
         const typesRes = await getRoomTypes()
         if (typesRes.success && typesRes.data) {
-          setRoomTypes(typesRes.data as RoomTypeItem[])
+          const typesData = typesRes.data as RoomTypeItem[]
+          setRoomTypes(typesData)
+          setCachedData(wsId, "room_types", typesData)
         }
       } else {
         alert(res.error || "เพิ่มประเภทห้องไม่สำเร็จ")
@@ -338,7 +381,7 @@ export default function RoomsPage() {
           {/* Desktop inline action items (hidden on mobile to prevent clutter; mobile will use sticky bottom bar) */}
           <div className="hidden md:flex items-center gap-2.5 relative z-10 shrink-0">
             <button
-              onClick={loadData}
+              onClick={() => loadData(true)}
               disabled={loading}
               className="p-2.5 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center cursor-pointer hover:-translate-y-0.5 active:scale-95 duration-200 h-10 w-10"
               title="รีเฟรชข้อมูลระบบ"
@@ -364,7 +407,7 @@ export default function RoomsPage() {
           {/* Quick Refresh action for Mobile in Header */}
           <div className="md:hidden absolute top-4 right-4 z-10">
             <button
-              onClick={loadData}
+              onClick={() => loadData(true)}
               disabled={loading}
               className="p-3 bg-slate-100 active:bg-slate-200 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 text-slate-600 dark:text-slate-400 rounded-xl flex items-center justify-center transition-all duration-250 cursor-pointer"
             >

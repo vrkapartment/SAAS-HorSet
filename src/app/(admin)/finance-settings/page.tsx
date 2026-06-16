@@ -4,8 +4,9 @@ import { useState, useEffect } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2, Droplet, Zap, Building, Sliders } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
-import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -24,6 +25,7 @@ function setCookie(name: string, value: string, days = 7) {
 }
 
 export default function FinanceSettingsPage() {
+  const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [taxId, setTaxId] = useState("")
@@ -56,7 +58,7 @@ export default function FinanceSettingsPage() {
       setLoading(true)
       setErrorMsg(null)
       try {
-        const userRes = await getCurrentUserProfileAction()
+        const userRes = await getCurrentUserProfileClient()
         
         let currentWsId: string | undefined = undefined
         
@@ -93,6 +95,29 @@ export default function FinanceSettingsPage() {
         if (currentWsId) {
           setWorkspaceId(currentWsId)
 
+          const cacheKey = "finance_settings"
+          const cached = getCachedData<FinanceSettings>(currentWsId, cacheKey)
+          if (cached) {
+            setFirstName(cached.tax_firstname || "")
+            setLastName(cached.tax_lastname || "")
+            setTaxId(cached.tax_id || "")
+            setAddress(cached.tax_address || "")
+            setPhone(cached.tax_phone || "")
+            setPromptPayType(cached.promptpay_type || "phone")
+            setPromptPayId(cached.promptpay_id || "")
+            setPromptPayName(cached.promptpay_name || "")
+            setCommonFee(cached.common_fee !== undefined ? cached.common_fee : 50)
+            setWaterRate(cached.water_rate !== undefined ? cached.water_rate : 18)
+            setElectricRate(cached.electric_rate !== undefined ? cached.electric_rate : 7)
+            setWaterMinChecked(cached.water_min_checked !== undefined ? cached.water_min_checked : true)
+            setWaterMinUnit(cached.water_min_unit !== undefined ? cached.water_min_unit : 3)
+            setElectricMinChecked(cached.electric_min_checked !== undefined ? cached.electric_min_checked : true)
+            setElectricMinUnit(cached.electric_min_unit !== undefined ? cached.electric_min_unit : 10)
+            setIsDatabaseBacked(true)
+            setLoading(false)
+            return
+          }
+
           const res = await getFinanceSettings(currentWsId)
           if (res.success && res.data) {
             setFirstName(res.data.tax_firstname || "")
@@ -111,6 +136,7 @@ export default function FinanceSettingsPage() {
             setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
             setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
             setIsDatabaseBacked(true)
+            setCachedData(currentWsId, cacheKey, res.data)
           } else if (res.error) {
             setErrorMsg(res.error)
           }
@@ -172,6 +198,8 @@ export default function FinanceSettingsPage() {
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
       const res = await saveFinanceSettings(workspaceId, payload)
       if (res.success) {
+        clearWorkspaceCache(workspaceId)
+        setCachedData(workspaceId, "finance_settings", payload)
         showToast("บันทึกข้อมูลเข้าสู่เซิร์ฟเวอร์ระบบคลาวด์สำเร็จเรียบร้อย!")
       } else {
         setErrorMsg(res.error || "ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบสิทธิ์ผู้ใช้งาน")
