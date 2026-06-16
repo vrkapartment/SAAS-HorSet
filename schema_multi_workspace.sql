@@ -70,8 +70,8 @@ create or replace function public.populate_workspace_id()
 returns trigger as $$
 begin
   if new.workspace_id is null then
-    -- Find the creator's workspace_id from profiles
-    new.workspace_id := (select workspace_id from public.profiles where id = auth.uid() limit 1);
+    -- Find the creator's workspace_id using helper
+    new.workspace_id := public.get_current_user_workspace_id();
   end if;
   return new;
 end;
@@ -171,6 +171,11 @@ returns text as $$
   select role from public.profiles where id = auth.uid();
 $$ language sql security definer;
 
+create or replace function public.get_current_user_phone()
+returns text as $$
+  select phone from public.profiles where id = auth.uid();
+$$ language sql security definer;
+
 
 -- ==================== PROFILES POLICIES ====================
 create policy "Read profiles in same workspace or own profile or super_admin"
@@ -194,36 +199,38 @@ using (
 create policy "Super Admins can manage all workspaces" 
 on public.workspaces for all 
 using (
-  exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+  public.get_current_user_role() = 'super_admin'
 );
 
 create policy "Users can view their own workspace" 
 on public.workspaces for select 
 using (
-  id = (select workspace_id from public.profiles where id = auth.uid())
+  id = public.get_current_user_workspace_id()
 );
+
 
 -- ==================== SUPPORT GRANTS POLICIES ====================
 create policy "Super Admins can manage all support grants" 
 on public.support_access_grants for all 
 using (
-  exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+  public.get_current_user_role() = 'super_admin'
 );
 
 create policy "Workspace admins can manage support grants for their workspace" 
 on public.support_access_grants for all 
 using (
-  workspace_id = (select workspace_id from public.profiles where id = auth.uid())
-  and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  workspace_id = public.get_current_user_workspace_id()
+  and public.get_current_user_role() = 'admin'
 );
+
 
 -- ==================== ROOM TYPES POLICIES ====================
 create policy "Read room_types in workspace or support approved" 
 on public.room_types for select 
 using (
-  workspace_id = (select workspace_id from public.profiles where id = auth.uid())
+  workspace_id = public.get_current_user_workspace_id()
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = room_types.workspace_id and status = 'approved')
   )
 );
@@ -231,20 +238,21 @@ using (
 create policy "Manage room_types in workspace or support approved" 
 on public.room_types for all 
 using (
-  (workspace_id = (select workspace_id from public.profiles where id = auth.uid()) and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() = 'admin')
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = room_types.workspace_id and status = 'approved')
   )
 );
+
 
 -- ==================== ROOMS POLICIES ====================
 create policy "Read rooms in workspace or support approved" 
 on public.rooms for select 
 using (
-  workspace_id = (select workspace_id from public.profiles where id = auth.uid())
+  workspace_id = public.get_current_user_workspace_id()
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = rooms.workspace_id and status = 'approved')
   )
   or (
@@ -252,7 +260,7 @@ using (
     exists (
       select 1 from public.tenants 
       where tenants.room_id = rooms.id 
-        and tenants.tenant_phone = (select phone from public.profiles where profiles.id = auth.uid() limit 1)
+        and tenants.tenant_phone = public.get_current_user_phone()
     )
   )
 );
@@ -260,45 +268,47 @@ using (
 create policy "Manage rooms in workspace or support approved" 
 on public.rooms for all 
 using (
-  (workspace_id = (select workspace_id from public.profiles where id = auth.uid()) and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff')))
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() in ('admin', 'staff'))
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = rooms.workspace_id and status = 'approved')
   )
 );
+
 
 -- ==================== TENANTS POLICIES ====================
 create policy "Read tenants in workspace or support approved" 
 on public.tenants for select 
 using (
-  workspace_id = (select workspace_id from public.profiles where id = auth.uid())
+  workspace_id = public.get_current_user_workspace_id()
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = tenants.workspace_id and status = 'approved')
   )
   or (
     -- Tenants can view their own tenant profile
-    tenant_phone = (select phone from public.profiles where profiles.id = auth.uid() limit 1)
+    tenant_phone = public.get_current_user_phone()
   )
 );
 
 create policy "Manage tenants in workspace or support approved" 
 on public.tenants for all 
 using (
-  (workspace_id = (select workspace_id from public.profiles where id = auth.uid()) and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff')))
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() in ('admin', 'staff'))
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = tenants.workspace_id and status = 'approved')
   )
 );
+
 
 -- ==================== METER RECORDS POLICIES ====================
 create policy "Read meter_records in workspace or support approved" 
 on public.meter_records for select 
 using (
-  workspace_id = (select workspace_id from public.profiles where id = auth.uid())
+  workspace_id = public.get_current_user_workspace_id()
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = meter_records.workspace_id and status = 'approved')
   )
   or (
@@ -307,8 +317,7 @@ using (
       select r.room_number 
       from public.rooms r 
       join public.tenants t on t.room_id = r.id
-      join public.profiles p on p.phone = t.tenant_phone
-      where p.id = auth.uid() 
+      where t.tenant_phone = public.get_current_user_phone()
       limit 1
     )
   )
@@ -317,20 +326,21 @@ using (
 create policy "Manage meter_records in workspace or support approved" 
 on public.meter_records for all 
 using (
-  (workspace_id = (select workspace_id from public.profiles where id = auth.uid()) and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff')))
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() in ('admin', 'staff'))
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = meter_records.workspace_id and status = 'approved')
   )
 );
+
 
 -- ==================== BILLS POLICIES ====================
 create policy "Read bills in workspace or support approved" 
 on public.bills for select 
 using (
-  workspace_id = (select workspace_id from public.profiles where id = auth.uid())
+  workspace_id = public.get_current_user_workspace_id()
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = bills.workspace_id and status = 'approved')
   )
   or (
@@ -339,8 +349,7 @@ using (
       select r.room_number 
       from public.rooms r 
       join public.tenants t on t.room_id = r.id
-      join public.profiles p on p.phone = t.tenant_phone
-      where p.id = auth.uid() 
+      where t.tenant_phone = public.get_current_user_phone()
       limit 1
     )
   )
@@ -349,20 +358,21 @@ using (
 create policy "Manage bills in workspace or support approved" 
 on public.bills for all 
 using (
-  (workspace_id = (select workspace_id from public.profiles where id = auth.uid()) and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'staff')))
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() in ('admin', 'staff'))
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = bills.workspace_id and status = 'approved')
   )
 );
+
 
 -- ==================== EXPENSES POLICIES ====================
 create policy "Read expenses in workspace or support approved" 
 on public.expenses for select 
 using (
-  workspace_id = (select workspace_id from public.profiles where id = auth.uid())
+  workspace_id = public.get_current_user_workspace_id()
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = expenses.workspace_id and status = 'approved')
   )
 );
@@ -370,9 +380,9 @@ using (
 create policy "Manage expenses in workspace or support approved" 
 on public.expenses for all 
 using (
-  (workspace_id = (select workspace_id from public.profiles where id = auth.uid()) and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() = 'admin')
   or (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'super_admin')
+    public.get_current_user_role() = 'super_admin'
     and exists (select 1 from public.support_access_grants where workspace_id = expenses.workspace_id and status = 'approved')
   )
 );
@@ -460,8 +470,8 @@ drop policy if exists "Workspace admins can update their own workspace" on publi
 create policy "Workspace admins can update their own workspace"
 on public.workspaces for update
 using (
-  id = (select workspace_id from public.profiles where id = auth.uid())
-  and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'super_admin'))
+  id = public.get_current_user_workspace_id()
+  and public.get_current_user_role() in ('admin', 'super_admin')
 );
 
 

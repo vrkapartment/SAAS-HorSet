@@ -16,8 +16,8 @@ export async function getRoomTypes() {
 
     if (error) throw error
     return { success: true, data }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงประเภทห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงประเภทห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
@@ -32,8 +32,8 @@ export async function createRoomType(name: string, defaultRent: number) {
 
     if (error) throw error
     return { success: true, data: data[0] }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างประเภทห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างประเภทห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
@@ -49,8 +49,8 @@ export async function updateRoomType(id: string, name: string, defaultRent: numb
 
     if (error) throw error
     return { success: true, data: data[0] }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการแก้ไขประเภทห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการแก้ไขประเภทห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
@@ -65,8 +65,8 @@ export async function deleteRoomType(id: string) {
 
     if (error) throw error
     return { success: true }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบประเภทห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบประเภทห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
@@ -111,8 +111,8 @@ export async function getRooms() {
     })
 
     return { success: true, data: formatted }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
@@ -132,8 +132,8 @@ export async function createRoom(roomNumber: string, roomTypeId: string, baseRen
 
     if (error) throw error
     return { success: true, data: data[0] }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
@@ -161,8 +161,8 @@ export async function updateRoom(
 
     if (error) throw error
     return { success: true, data: data[0] }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการแก้ไขห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการแก้ไขห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
@@ -177,8 +177,8 @@ export async function deleteRoom(id: string) {
 
     if (error) throw error
     return { success: true }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบห้องพัก"
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบห้องพัก")
     return { success: false, error: errorMessage }
   }
 }
