@@ -7,27 +7,30 @@
   --foreground: #0f172a; /* Light mode foreground */
   --font-prompt: var(--font-prompt);
 
-  /* Slate colors for Light Mode (Inverted for stunning readability) */
-  --slate-50: #0f172a;   /* Maps slate-50 (normally white text) to dark text */
-  --slate-100: #0f172a;  /* Maps slate-100 (normally light text) to dark text */
-  --slate-200: #1e293b;  /* Maps slate-200 to dark text */
-  --slate-300: #334155;  /* Maps slate-300 to dark text */
-  --slate-400: #475569;  /* Maps slate-400 to dark text */
-  --slate-500: #64748b;  /* Maps slate-500 to standard muted text */
-  --slate-600: #94a3b8;  /* Maps slate-600 to light border/accent */
-  --slate-700: #cbd5e1;  /* Maps slate-700 to light border */
-  --slate-800: #cbd5e1;  /* Maps slate-800 to light border */
-  --slate-850: #f1f5f9;  /* Maps slate-850 to light panel bg */
-  --slate-900: #f1f5f9;  /* Maps slate-900 to light container bg */
-  --slate-950: #ffffff;  /* Maps slate-950 to pure white card bg */
+  /* Slate colors for Light Mode (Standard beautiful deep light slate palette) */
+  --slate-50: #f8fafc;   /* Softest background gray */
+  --slate-100: #f1f5f9;  /* Panel and secondary background */
+  --slate-150: #eef2f6;  /* Custom light grey for skeletons/loading */
+  --slate-200: #e2e8f0;  /* Standard border color */
+  --slate-300: #cbd5e1;  /* Stronger borders/disabled states */
+  --slate-400: #94a3b8;  /* Muted icons and placeholder text */
+  --slate-450: #7e8ea2;  /* Custom intermediate muted text */
+  --slate-500: #64748b;  /* Secondary text color */
+  --slate-550: #556579;  /* Custom medium dark muted text */
+  --slate-600: #475569;  /* Readable medium slate text */
+  --slate-700: #334155;  /* Dark slate text */
+  --slate-800: #1e293b;  /* Deep dark text */
+  --slate-850: #1e293b;  /* Beautiful visible slate for text fallback in Light Mode */
+  --slate-900: #0f172a;  /* Primary dark text color */
+  --slate-950: #090e1a;  /* Maximum dark text/background */
 
-  /* Inverted brand colors for better contrast in Light Mode */
-  --teal-400: #0d9488;   /* Maps teal-400 to teal-600 */
-  --teal-500: #0f766e;   /* Maps teal-500 to teal-700 */
-  --blue-400: #2563eb;   /* Maps blue-400 to blue-600 */
-  --blue-500: #1d4ed8;   /* Maps blue-500 to blue-700 */
-  --red-400: #dc2626;    /* Maps red-400 to red-600 */
-  --amber-400: #d97706;  /* Maps amber-400 to amber-600 */
+  /* Standard brand colors for Light Mode (with adjusted contrast for maximum visibility) */
+  --teal-400: #0d9488;   /* Maps teal-400 to teal-600 for contrast */
+  --teal-500: #0f766e;   /* Maps teal-500 to teal-700 for contrast */
+  --blue-400: #2563eb;   /* Maps blue-400 to blue-600 for contrast */
+  --blue-500: #1d4ed8;   /* Maps blue-500 to blue-700 for contrast */
+  --red-400: #dc2626;    /* Maps red-400 to red-600 for contrast */
+  --amber-400: #d97706;  /* Maps amber-400 to amber-600 for contrast */
 }
 
 .dark {
@@ -37,10 +40,13 @@
   /* Slate colors for Dark Mode (Standard beautiful deep dark slate palette) */
   --slate-50: #f8fafc;
   --slate-100: #f1f5f9;
+  --slate-150: #1e293b;  /* Custom dark grey for skeletons/loading */
   --slate-200: #e2e8f0;
   --slate-300: #cbd5e1;
   --slate-400: #94a3b8;
+  --slate-450: #8295a9;  /* Custom dark intermediate muted text */
   --slate-500: #64748b;
+  --slate-550: #4f6176;  /* Custom dark medium muted text */
   --slate-600: #475569;
   --slate-700: #334155;
   --slate-800: #1e293b;
@@ -65,10 +71,13 @@
   /* Slate overrides */
   --color-slate-50: var(--slate-50);
   --color-slate-100: var(--slate-100);
+  --color-slate-150: var(--slate-150);
   --color-slate-200: var(--slate-200);
   --color-slate-300: var(--slate-300);
   --color-slate-400: var(--slate-400);
+  --color-slate-450: var(--slate-450);
   --color-slate-500: var(--slate-500);
+  --color-slate-550: var(--slate-550);
   --color-slate-600: var(--slate-600);
   --color-slate-700: var(--slate-700);
   --color-slate-800: var(--slate-800);

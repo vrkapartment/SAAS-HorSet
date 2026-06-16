@@ -230,8 +230,8 @@ export default function FinanceSettingsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
         <div>
-          <h2 className="text-xl font-bold text-slate-100 font-sans">ตั้งค่าการเงินและบัญชีรับเงิน</h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">ตั้งค่าการเงินและบัญชีรับเงิน</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             ระบุข้อมูลผู้เสียภาษีและพร้อมเพย์เพื่อสร้างบิลสแกนจ่ายจริงและออกใบยื่นแบบภาษี ภ.ง.ด. รายหอพัก
           </p>
         </div>
@@ -256,8 +256,8 @@ export default function FinanceSettingsPage() {
       ) : (
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
           {/* คอลัมน์ซ้าย: ข้อมูลผู้เสียภาษี */}
-          <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-6">
-            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-900 pb-3">
+          <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
               <User className="w-4 h-4 text-blue-400" /> ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา
             </h3>
 
@@ -275,7 +275,7 @@ export default function FinanceSettingsPage() {
                   type="text"
                   required
                   placeholder="ชื่อจริง (เช่น สมเจตน์)"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm transition-all"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                 />
@@ -285,7 +285,7 @@ export default function FinanceSettingsPage() {
                 <input
                   type="text"
                   placeholder="นามสกุล (เช่น แสนสุข)"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm transition-all"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                 />
@@ -299,7 +299,7 @@ export default function FinanceSettingsPage() {
                 required
                 maxLength={13}
                 placeholder="1100100222333"
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 font-mono text-sm tracking-wide transition-all"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
                 value={taxId}
                 onChange={(e) => setTaxId(e.target.value)}
               />
@@ -312,7 +312,7 @@ export default function FinanceSettingsPage() {
                   type="text"
                   required
                   placeholder="089-999-9999"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm transition-all"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                 />
@@ -325,7 +325,7 @@ export default function FinanceSettingsPage() {
                 rows={3}
                 required
                 placeholder="บ้านเลขที่, ถนน, ตำบล, อำเภอ, จังหวัด, รหัสไปรษณีย์"
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm leading-relaxed transition-all resize-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm leading-relaxed transition-all resize-none"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
@@ -334,8 +334,8 @@ export default function FinanceSettingsPage() {
 
           {/* คอลัมน์ขวา: พร้อมเพย์และอัตราส่วนกลาง */}
           <div className="flex flex-col gap-6">
-            <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-6">
-              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-900 pb-3">
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
                 <CreditCard className="w-4 h-4 text-teal-400" /> ตั้งค่าระบบรับเงินพร้อมเพย์ (PromptPay QR)
               </h3>
 
@@ -351,7 +351,7 @@ export default function FinanceSettingsPage() {
                     className={`py-2.5 px-4 text-xs font-semibold rounded-xl transition-all border ${
                       promptPayType === "phone"
                         ? "bg-teal-600/10 border-teal-500 text-teal-400"
-                        : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                        : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700"
                     }`}
                   >
                     เบอร์โทรศัพท์มือถือ
@@ -365,7 +365,7 @@ export default function FinanceSettingsPage() {
                     className={`py-2.5 px-4 text-xs font-semibold rounded-xl transition-all border ${
                       promptPayType === "national_id"
                         ? "bg-teal-600/10 border-teal-500 text-teal-400"
-                        : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                        : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700"
                     }`}
                   >
                     เลขบัตรประชาชน (13 หลัก)
@@ -381,7 +381,7 @@ export default function FinanceSettingsPage() {
                   type="text"
                   required
                   placeholder={promptPayType === "phone" ? "0899999999" : "1100100222333"}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-200 font-mono text-sm tracking-wide transition-all"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
                   value={promptPayId}
                   onChange={(e) => setPromptPayId(e.target.value)}
                 />
@@ -393,7 +393,7 @@ export default function FinanceSettingsPage() {
                   type="text"
                   required
                   placeholder="เช่น นายสมเจตน์ แสนสุข"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-200 text-sm transition-all"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
                   value={promptPayName}
                   onChange={(e) => setPromptPayName(e.target.value)}
                 />
@@ -401,21 +401,21 @@ export default function FinanceSettingsPage() {
 
               <div className="p-4 bg-teal-500/5 border border-teal-500/10 rounded-xl flex items-start gap-3">
                 <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
-                <div className="text-[10px] text-slate-400 leading-relaxed">
-                  <span className="font-bold text-slate-300">สแกนจ่ายได้จริง:</span> ข้อมูลนี้จะนำไปประกอบการสร้าง QR Code ด้วยรูปแบบมาตรฐาน EMVCo ของประเทศไทยโดยตรง เพื่อให้ผู้เช่าสามารถนำโทรศัพท์ไปสแกนและชำระค่าเช่าเข้าบัญชีคุณได้ทันทีในยอดสุทธิที่ถูกต้อง
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">สแกนจ่ายได้จริง:</span> ข้อมูลนี้จะนำไปประกอบการสร้าง QR Code ด้วยรูปแบบมาตรฐาน EMVCo ของประเทศไทยโดยตรง เพื่อให้ผู้เช่าสามารถนำโทรศัพท์ไปสแกนและชำระค่าเช่าเข้าบัญชีคุณได้ทันทีในยอดสุทธิที่ถูกต้อง
                 </div>
               </div>
             </div>
 
             {/* กล่องอัตราค่าสาธารณูปโภคและค่าบริการส่วนกลาง */}
-            <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-6">
-              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-900 pb-3">
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
                 <Sliders className="w-4 h-4 text-blue-400" /> อัตราสาธารณูปโภคและค่าบริการส่วนกลาง
               </h3>
 
               {/* ค่าน้ำประปา */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                   <Droplet className="w-4 h-4 text-blue-400" /> ค่าน้ำประปา (Water Utility)
                 </div>
 
@@ -429,7 +429,7 @@ export default function FinanceSettingsPage() {
                         min={0}
                         step="0.01"
                         placeholder="18"
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
                         value={waterRate}
                         onChange={(e) => setWaterRate(Number(e.target.value))}
                       />
@@ -441,24 +441,24 @@ export default function FinanceSettingsPage() {
                     <label className="flex items-center gap-2 cursor-pointer select-none py-1">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
+                        className="w-4 h-4 rounded border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
                         checked={waterMinChecked}
                         onChange={(e) => setWaterMinChecked(e.target.checked)}
                       />
-                      <span className="text-xs text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                      <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
                     </label>
                   </div>
                 </div>
 
                 {waterMinChecked && (
-                  <div className="p-3 bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-2 animate-fade-in">
-                    <label className="text-[11px] text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่าน้ำประปา</label>
+                  <div className="p-3 bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่าน้ำประปา</label>
                     <div className="relative max-w-[200px]">
                       <input
                         type="number"
                         required
                         min={1}
-                        className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
                         value={waterMinUnit}
                         onChange={(e) => setWaterMinUnit(Number(e.target.value))}
                       />
@@ -472,8 +472,8 @@ export default function FinanceSettingsPage() {
               </div>
 
               {/* ค่าไฟฟ้า */}
-              <div className="space-y-4 border-t border-slate-900/40 pt-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+              <div className="space-y-4 border-t border-slate-200 dark:border-slate-900/40 pt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                   <Zap className="w-4 h-4 text-amber-400" /> ค่ากระแสไฟฟ้า (Electricity Utility)
                 </div>
 
@@ -487,7 +487,7 @@ export default function FinanceSettingsPage() {
                         min={0}
                         step="0.01"
                         placeholder="7"
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
                         value={electricRate}
                         onChange={(e) => setElectricRate(Number(e.target.value))}
                       />
@@ -499,24 +499,24 @@ export default function FinanceSettingsPage() {
                     <label className="flex items-center gap-2 cursor-pointer select-none py-1">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
+                        className="w-4 h-4 rounded border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
                         checked={electricMinChecked}
                         onChange={(e) => setElectricMinChecked(e.target.checked)}
                       />
-                      <span className="text-xs text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                      <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
                     </label>
                   </div>
                 </div>
 
                 {electricMinChecked && (
-                  <div className="p-3 bg-amber-950/20 border border-amber-500/10 rounded-xl space-y-2 animate-fade-in">
-                    <label className="text-[11px] text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่ากระแสไฟฟ้า</label>
+                  <div className="p-3 bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/10 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่ากระแสไฟฟ้า</label>
                     <div className="relative max-w-[200px]">
                       <input
                         type="number"
                         required
                         min={1}
-                        className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
                         value={electricMinUnit}
                         onChange={(e) => setElectricMinUnit(Number(e.target.value))}
                       />
@@ -530,8 +530,8 @@ export default function FinanceSettingsPage() {
               </div>
 
               {/* ค่าบริการส่วนกลาง */}
-              <div className="space-y-2 border-t border-slate-900/40 pt-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+              <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/40 pt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                   <Building className="w-4 h-4 text-teal-400" /> ค่าบริการส่วนกลางคงที่
                 </div>
                 <div className="space-y-1.5">
@@ -542,7 +542,7 @@ export default function FinanceSettingsPage() {
                       required
                       min={0}
                       placeholder="50"
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       value={commonFee}
                       onChange={(e) => setCommonFee(Number(e.target.value))}
                     />

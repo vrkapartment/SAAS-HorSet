@@ -678,10 +678,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100 font-sans">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
       
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 glass-panel border-r border-slate-900/60 p-6 z-20 shrink-0">
+      <aside className="hidden md:flex flex-col w-64 glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0">
         <div className="flex items-center gap-3 mb-8">
           <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-lg shadow-blue-500/10">
             <Building className="w-5 h-5 text-white" />
@@ -690,24 +690,24 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <h2 className="text-lg font-bold tracking-wide flex items-center gap-1">
               {t("common.app_name")}
             </h2>
-            <p className="text-[10px] text-slate-400">{t("dashboard.system_subtitle")}</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("dashboard.system_subtitle")}</p>
           </div>
         </div>
 
         {/* ส่วนจัดการ Workspace สำหรับ Super Admin */}
         {userRole === "super_admin" && (
-          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-tr from-slate-950 to-slate-900 border border-slate-800 relative">
-            <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
+          <div className="mb-6 p-4 rounded-2xl bg-slate-100 dark:bg-gradient-to-tr dark:from-slate-950 dark:to-slate-900 border border-slate-200 dark:border-slate-800 relative">
+            <label className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
             
             <button
               onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
               disabled={workspaceLoading}
-              className={`w-full flex items-center justify-between text-xs font-semibold bg-slate-900 text-slate-200 py-2.5 px-3 rounded-xl border border-slate-800 transition-all ${
-                workspaceLoading ? 'opacity-75 cursor-not-allowed' : 'hover:bg-slate-800'
+              className={`w-full flex items-center justify-between text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 transition-all ${
+                workspaceLoading ? 'opacity-75 cursor-not-allowed' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
               {workspaceLoading && !isDemo ? (
-                <span className="truncate max-w-[140px] flex items-center gap-1.5 text-slate-400">
+                <span className="truncate max-w-[140px] flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                   กำลังโหลด...
                 </span>
@@ -718,7 +718,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             </button>
 
             {showDropdown && (
-              <div className="absolute left-0 right-0 mt-2 mx-4 bg-slate-950 border border-slate-800 rounded-xl shadow-xl z-30 p-1.5 space-y-1">
+              <div className="absolute left-0 right-0 mt-2 mx-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-30 p-1.5 space-y-1">
                 {workspaces.map((ws) => (
                   <button
                     key={ws.id}
@@ -726,7 +726,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     className={`w-full text-left text-xs py-2 px-3 rounded-lg transition-colors ${
                       currentWorkspace.id === ws.id
                         ? "bg-blue-600 text-white font-medium"
-                        : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-200"
                     }`}
                   >
                     {ws.name}
@@ -801,13 +801,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 }}
                 onMouseEnter={() => handlePrefetchPage(item.path)}
                 onTouchStart={() => handlePrefetchPage(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left ${
                   isActive
                     ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                    : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-200"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400"}`} />
+                <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
                 {item.name}
               </button>
             )
@@ -815,16 +815,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         </nav>
 
         {/* ข้อมูลโปรไฟล์ด้านล่าง */}
-        <div className="pt-6 border-t border-slate-900 space-y-4">
+        <div className="pt-6 border-t border-slate-200 dark:border-slate-900 space-y-4">
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shadow-inner">
-                <User className="w-5 h-5 text-slate-300" />
+              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-inner">
+                <User className="w-5 h-5 text-slate-500 dark:text-slate-300" />
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
                   {!isProfileLoaded && !isDemo ? (
-                    <span className="inline-block bg-slate-800 rounded w-16 h-3 animate-pulse" />
+                    <span className="inline-block bg-slate-200 dark:bg-slate-800 rounded w-16 h-3 animate-pulse" />
                   ) : (
                     fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
                   )}
@@ -868,17 +868,17 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             </div>
 
             {userRole === "super_admin" && (
-              <div className="mb-6 p-4 rounded-2xl bg-slate-950 border border-slate-900">
-                <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase">{t("dashboard.select_workspace")}</label>
+              <div className="mb-6 p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900">
+                <label className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block mb-1.5 uppercase">{t("dashboard.select_workspace")}</label>
                 <button
                   onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
                   disabled={workspaceLoading}
-                  className={`w-full flex items-center justify-between text-xs bg-slate-900 text-slate-200 py-2.5 px-3 rounded-xl border border-slate-800 transition-all ${
+                  className={`w-full flex items-center justify-between text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 transition-all ${
                     workspaceLoading ? 'opacity-75 cursor-not-allowed' : ''
                   }`}
                 >
                   {workspaceLoading && !isDemo ? (
-                    <span className="truncate flex items-center gap-1.5 text-slate-400">
+                    <span className="truncate flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                       กำลังโหลด...
                     </span>
@@ -888,13 +888,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
                 {showDropdown && (
-                  <div className="absolute left-0 right-0 mt-2 mx-4 bg-slate-950 border border-slate-800 rounded-xl p-1.5 space-y-1 z-30">
+                  <div className="absolute left-0 right-0 mt-2 mx-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 space-y-1 z-30">
                     {workspaces.map((ws) => (
                       <button
                         key={ws.id}
                         onClick={() => handleSwitchWorkspace(ws)}
                         className={`w-full text-left text-xs py-2 px-3 rounded-lg ${
-                          currentWorkspace.id === ws.id ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-900"
+                          currentWorkspace.id === ws.id ? "bg-blue-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
                         }`}
                       >
                         {ws.name}
@@ -969,10 +969,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     }}
                     onMouseEnter={() => handlePrefetchPage(item.path)}
                     onTouchStart={() => handlePrefetchPage(item.path)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left ${
                       isActive
                         ? "bg-blue-600 text-white"
-                        : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-200"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -982,16 +982,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               })}
             </nav>
 
-            <div className="pt-6 border-t border-slate-900 space-y-4">
+            <div className="pt-6 border-t border-slate-200 dark:border-slate-900 space-y-4">
               <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
-                    <User className="w-4 h-4 text-slate-300" />
+                  <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                    <User className="w-4 h-4 text-slate-500 dark:text-slate-300" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
                       {!isProfileLoaded && !isDemo ? (
-                        <span className="inline-block bg-slate-800 rounded w-16 h-3 animate-pulse" />
+                        <span className="inline-block bg-slate-200 dark:bg-slate-800 rounded w-16 h-3 animate-pulse" />
                       ) : (
                         fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
                       )}
@@ -1016,16 +1016,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
         
         {/* Header แถบด้านบน */}
-        <header className="flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-900/60 shrink-0">
+        <header className="flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-200/80 dark:border-slate-900/60 shrink-0">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-900/50"
+              className="md:hidden p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50"
             >
               <Menu className="w-5 h-5" />
             </button>
             <div className="min-w-0">
-              <h1 className="text-xs sm:text-sm font-semibold text-slate-200 flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <h1 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <span className="truncate max-w-[130px] sm:max-w-none">
                   {pathname === "/dashboard" && (t("nav.dashboard") || "หน้าแรกภาพรวมสถิติ")}
                   {pathname === "/rooms" && (t("nav.rooms") || "ระบบจัดการห้องพัก")}
@@ -1050,19 +1050,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           <div className="flex items-center gap-4">
             {/* แสดงสถานะสิทธิ์เข้าช่วยเหลือสำหรับ Admin เพื่อความโปร่งใส */}
             {userRole === "admin" && (
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-slate-900/40 rounded-xl border border-slate-800">
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800">
                 <span className="text-[11px] text-slate-500">{t("dashboard.support_access")}</span>
                 {supportStatus === "approved" ? (
                   <button
                     onClick={() => handleDecideSupport(false)}
-                    className="text-[10px] bg-teal-500/10 border border-teal-500/20 hover:bg-red-500/10 hover:border-red-500/20 text-teal-400 hover:text-red-400 font-bold px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[10px] bg-teal-500/10 border border-teal-500/20 hover:bg-red-500/10 hover:border-red-500/20 text-teal-600 dark:text-teal-400 hover:text-red-600 dark:hover:text-red-400 font-bold px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1"
                     title="คลิกเพื่อสั่งระงับสิทธิ์ชั่วคราว"
                   >
                     <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse" />
                     {t("dashboard.authorized_revoke")}
                   </button>
                 ) : (
-                  <span className="text-[10px] text-slate-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-lg">
+                  <span className="text-[10px] text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-lg">
                     {t("dashboard.access_revoked")}
                   </span>
                 )}
@@ -1072,12 +1072,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <LanguageToggle />
             <ThemeToggle />
 
-            <button className="relative p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-900/50 transition-colors">
+            <button className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50 transition-colors">
               <BellRing className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
             </button>
             
-            <div className="h-6 w-px bg-slate-900" />
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-900" />
             
             <div className="text-right hidden sm:block">
               {workspaceLoading && !isDemo ? (
@@ -1086,7 +1086,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   <span className="text-xs text-slate-500 animate-pulse font-medium">กำลังโหลดหอพัก...</span>
                 </div>
               ) : (
-                <p className="text-xs font-semibold text-slate-300">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-300">
                   {t("dashboard.building")} {currentWorkspace.name || "กำลังโหลด..."}
                 </p>
               )}
