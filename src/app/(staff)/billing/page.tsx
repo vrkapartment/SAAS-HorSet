@@ -286,8 +286,8 @@ export default function UnifiedBillingPage() {
         
         // กำหนดความสามารถในการแก้ไขเลขหน่วยครั้งก่อนหน้า (เฉพาะเดือนแรกที่สมัครใช้บริการเท่านั้น เดือนถัดไปจะถูกล็อกถาวร)
         const isFirstMonth = regCycleVal ? (cycle === regCycleVal) : true
-        const isElecPrevEditable = isFirstMonth ? !hasPrevMeterElec : false
-        const isWaterPrevEditable = isFirstMonth ? !hasPrevMeterWater : false
+        const isElecPrevEditable = isFirstMonth
+        const isWaterPrevEditable = isFirstMonth
 
         return {
           roomNumber: r.roomNumber,
