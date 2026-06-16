@@ -1013,7 +1013,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       )}
 
       {/* พื้นที่เนื้อหาหลัก (Main Content Area) */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
         
         {/* Header แถบด้านบน */}
         <header className="flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-900/60 shrink-0">
@@ -1096,7 +1096,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         </header>
 
         {/* ตัวเนื้อหาภายในหน้าเว็บ (Page Content Injection) */}
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6 overflow-x-hidden">
           {children}
         </main>
       </div>
