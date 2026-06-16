@@ -46,6 +46,7 @@ export default function AdminDashboard() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [isDemo, setIsDemo] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState<string | null>(null)
   const [stats, setStats] = useState<any[]>([])
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
@@ -162,6 +163,7 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async (forceRefresh = false) => {
     setLoading(true)
+    setDbError(null)
     try {
       // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
       let userProfile = getCachedData("global", "profile")
@@ -170,6 +172,8 @@ export default function AdminDashboard() {
         if (userRes.success && userRes.data) {
           userProfile = userRes.data
           setCachedData("global", "profile", userRes.data)
+        } else if (userRes.success === false) {
+          throw new Error(userRes.error || "เกิดข้อผิดพลาดในการดึงข้อมูลโปรไฟล์ผู้ใช้")
         }
       }
 
@@ -206,6 +210,9 @@ export default function AdminDashboard() {
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
       if (!rooms || forceRefresh) {
         const roomsRes = await getRooms()
+        if (roomsRes && roomsRes.success === false) {
+          throw new Error(roomsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลห้องพักได้")
+        }
         rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
         if (wsId) setCachedData(wsId, "rooms", rooms)
       }
@@ -214,6 +221,9 @@ export default function AdminDashboard() {
       let tenants = wsId ? getCachedData(wsId, "tenants") : null
       if (!tenants || forceRefresh) {
         const tenantsRes = await getTenants()
+        if (tenantsRes && tenantsRes.success === false) {
+          throw new Error(tenantsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลผู้เช่าได้")
+        }
         tenants = tenantsRes.success && tenantsRes.data ? tenantsRes.data : []
         if (wsId) setCachedData(wsId, "tenants", tenants)
       }
@@ -222,13 +232,16 @@ export default function AdminDashboard() {
       let bills = wsId ? getCachedData(wsId, "bills_all") : null
       if (!bills || forceRefresh) {
         const billsRes = await getBills()
+        if (billsRes && billsRes.success === false) {
+          throw new Error(billsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลบิลได้")
+        }
         bills = billsRes.success && billsRes.data ? billsRes.data : []
         if (wsId) setCachedData(wsId, "bills_all", bills)
       }
 
-      const hasSupabase = rooms.length > 0 || tenants.length > 0 || bills.length > 0
+      const isRealSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
-      if (hasSupabase) {
+      if (isRealSupabase) {
         setIsDemo(false)
         setRawRooms(rooms)
         setRawTenants(tenants)
@@ -241,8 +254,18 @@ export default function AdminDashboard() {
       }
     } catch (e) {
       console.error("Failed to load dashboard data:", e)
-      setIsDemo(true)
-      setupDemoFallback(selectedCycle)
+      const isRealSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+      if (isRealSupabase) {
+        setIsDemo(false)
+        setDbError(e instanceof Error ? e.message : "การเชื่อมต่อ Database มีปัญหา กรุณาลองใหม่อีกครั้ง")
+        setRawRooms([])
+        setRawTenants([])
+        setRawBills([])
+        calculateStats([], [], [], selectedCycle)
+      } else {
+        setIsDemo(true)
+        setupDemoFallback(selectedCycle)
+      }
     } finally {
       setLoading(false)
     }
@@ -492,6 +515,31 @@ export default function AdminDashboard() {
 
       {loading ? (
         <SkeletonLoader />
+      ) : dbError ? (
+        <div className="mt-8 p-8 md:p-12 rounded-3xl bg-red-50/40 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30 text-center space-y-6 max-w-2xl mx-auto backdrop-blur-md animate-fade-in shadow-xl">
+          <div className="inline-flex p-4 rounded-2xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 animate-bounce mx-auto">
+            <AlertTriangle className="w-12 h-12" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              การเชื่อมต่อ Database มีปัญหา
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+              {dbError}
+            </p>
+          </div>
+          <div>
+            <button
+              onClick={() => {
+                setLoading(true);
+                loadDashboardData(true);
+              }}
+              className="px-6 py-3 bg-red-650 hover:bg-red-700 active:scale-95 text-white font-extrabold text-sm rounded-xl shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer"
+            >
+              ลองเชื่อมต่อใหม่อีกครั้ง (Retry)
+            </button>
+          </div>
+        </div>
       ) : (
         <>
           {/* Grid การ์ดสถิติ (Stats Grid) - Fully Adaptive & Clickable with premium interactions */}

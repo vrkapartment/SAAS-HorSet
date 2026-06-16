@@ -134,6 +134,12 @@ drop policy if exists "Staff can read, insert and update bills" on public.bills;
 drop policy if exists "Tenant can view their own bills" on public.bills;
 drop policy if exists "Admin has full access on expenses" on public.expenses;
 
+-- Drop old profiles policies
+drop policy if exists "Allow public read-only of profiles for authenticated users" on public.profiles;
+drop policy if exists "Allow users to update their own profile" on public.profiles;
+drop policy if exists "Read profiles in same workspace or own profile or super_admin" on public.profiles;
+drop policy if exists "Manage profiles in workspace or own profile or super_admin" on public.profiles;
+
 -- Drop new multi-workspace policies if they already exist (to make script re-runnable)
 drop policy if exists "Super Admins can manage all workspaces" on public.workspaces;
 drop policy if exists "Users can view their own workspace" on public.workspaces;
@@ -151,6 +157,37 @@ drop policy if exists "Read bills in workspace or support approved" on public.bi
 drop policy if exists "Manage bills in workspace or support approved" on public.bills;
 drop policy if exists "Read expenses in workspace or support approved" on public.expenses;
 drop policy if exists "Manage expenses in workspace or support approved" on public.expenses;
+
+
+-- ==================== SECURITY DEFINER HELPERS ====================
+-- Helper functions to prevent RLS recursion on public.profiles
+create or replace function public.get_current_user_workspace_id()
+returns uuid as $$
+  select workspace_id from public.profiles where id = auth.uid();
+$$ language sql security definer;
+
+create or replace function public.get_current_user_role()
+returns text as $$
+  select role from public.profiles where id = auth.uid();
+$$ language sql security definer;
+
+
+-- ==================== PROFILES POLICIES ====================
+create policy "Read profiles in same workspace or own profile or super_admin"
+on public.profiles for select
+using (
+  workspace_id = public.get_current_user_workspace_id()
+  or id = auth.uid()
+  or public.get_current_user_role() = 'super_admin'
+);
+
+create policy "Manage profiles in workspace or own profile or super_admin"
+on public.profiles for update
+using (
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() = 'admin')
+  or id = auth.uid()
+  or public.get_current_user_role() = 'super_admin'
+);
 
 
 -- ==================== WORKSPACES POLICIES ====================
