@@ -68,14 +68,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   // ดึงบทบาทจริงจากคุกกี้ หรือใช้ค่า prop เป็นค่าเริ่มต้น
   const [userRole, setUserRole] = useState<"admin" | "staff" | "super_admin">(role)
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([
-    { id: "d290f1ee-6c54-4b01-90e6-d701748f0851", name: "แสนสุข แมนชั่น (Default)" },
-    { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์ (Demo 2)" }
-  ])
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace>({
     id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
-    name: "แสนสุข แมนชั่น (Default)"
+    name: ""
   })
+  const [workspaceLoading, setWorkspaceLoading] = useState(true)
   
   // สถานะการขอรับการสนับสนุน (Support Access Status)
   // 'pending' | 'approved' | 'revoked' | 'none'
@@ -184,9 +182,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         } catch (err) {
           console.error("Supabase load error, fallback to cookie/mock", err)
           fallbackMock(activeWsId)
+        } finally {
+          setWorkspaceLoading(false)
         }
       } else {
         fallbackMock(activeWsId)
+        setWorkspaceLoading(false)
       }
     }
 
@@ -529,10 +530,20 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
             
             <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="w-full flex items-center justify-between text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 py-2.5 px-3 rounded-xl border border-slate-800 transition-colors"
+              onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
+              disabled={workspaceLoading}
+              className={`w-full flex items-center justify-between text-xs font-semibold bg-slate-900 text-slate-200 py-2.5 px-3 rounded-xl border border-slate-800 transition-all ${
+                workspaceLoading ? 'opacity-75 cursor-not-allowed' : 'hover:bg-slate-800'
+              }`}
             >
-              <span className="truncate max-w-[140px]">{currentWorkspace.name}</span>
+              {workspaceLoading && !isDemo ? (
+                <span className="truncate max-w-[140px] flex items-center gap-1.5 text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  กำลังโหลด...
+                </span>
+              ) : (
+                <span className="truncate max-w-[140px]">{currentWorkspace.name || "กำลังโหลด..."}</span>
+              )}
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
@@ -688,10 +699,20 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               <div className="mb-6 p-4 rounded-2xl bg-slate-950 border border-slate-900">
                 <label className="text-[10px] text-slate-400 font-medium block mb-1.5 uppercase">{t("dashboard.select_workspace")}</label>
                 <button
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="w-full flex items-center justify-between text-xs bg-slate-900 text-slate-200 py-2.5 px-3 rounded-xl border border-slate-800"
+                  onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
+                  disabled={workspaceLoading}
+                  className={`w-full flex items-center justify-between text-xs bg-slate-900 text-slate-200 py-2.5 px-3 rounded-xl border border-slate-800 transition-all ${
+                    workspaceLoading ? 'opacity-75 cursor-not-allowed' : ''
+                  }`}
                 >
-                  <span className="truncate">{currentWorkspace.name}</span>
+                  {workspaceLoading && !isDemo ? (
+                    <span className="truncate flex items-center gap-1.5 text-slate-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      กำลังโหลด...
+                    </span>
+                  ) : (
+                    <span className="truncate">{currentWorkspace.name || "กำลังโหลด..."}</span>
+                  )}
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
                 {showDropdown && (
@@ -885,7 +906,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <div className="h-6 w-px bg-slate-900" />
             
             <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold text-slate-300">{t("dashboard.building")} {currentWorkspace.name}</p>
+              {workspaceLoading && !isDemo ? (
+                <div className="flex items-center gap-1.5 justify-end h-5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="text-xs text-slate-500 animate-pulse font-medium">กำลังโหลดหอพัก...</span>
+                </div>
+              ) : (
+                <p className="text-xs font-semibold text-slate-300">
+                  {t("dashboard.building")} {currentWorkspace.name || "กำลังโหลด..."}
+                </p>
+              )}
               <p className="text-[10px] text-slate-500">{t("dashboard.current_cycle")}</p>
             </div>
           </div>
