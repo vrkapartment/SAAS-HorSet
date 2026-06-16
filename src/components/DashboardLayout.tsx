@@ -70,6 +70,14 @@ function setCookie(name: string, value: string, days = 7) {
 export default function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const safeNavigate = (path: string) => {
+    if (typeof window !== "undefined" && (window as any).__hasUnsavedChanges) {
+      const confirmLeave = window.confirm("คุณยังมีข้อมูลที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?")
+      if (!confirmLeave) return
+      ;(window as any).__hasUnsavedChanges = false
+    }
+    router.push(path)
+  }
   const [mobileOpen, setMobileOpen] = useState(false)
   const { t } = useLanguage()
   const { getCachedData, setCachedData } = useWorkspaceData()
@@ -788,7 +796,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   if (item.onClick) {
                     item.onClick()
                   } else {
-                    router.push(item.path)
+                    safeNavigate(item.path)
                   }
                 }}
                 onMouseEnter={() => handlePrefetchPage(item.path)}
@@ -955,7 +963,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                       if (item.onClick) {
                         item.onClick()
                       } else {
-                        router.push(item.path)
+                        safeNavigate(item.path)
                       }
                       setMobileOpen(false)
                     }}

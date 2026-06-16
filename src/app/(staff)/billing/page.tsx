@@ -52,6 +52,8 @@ interface UnifiedRoomBillingItem {
   slipUrl: string | null
   electricUnits: number
   waterUnits: number
+
+  isEdited?: boolean
 }
 
 function getCookie(name: string): string | undefined {
@@ -168,6 +170,9 @@ export default function UnifiedBillingPage() {
   const [newRoomNumber, setNewRoomNumber] = useState("105")
   const [elecUnitsManual, setElecUnitsManual] = useState(80)
   const [waterUnitsManual, setWaterUnitsManual] = useState(10)
+
+  const [savingAll, setSavingAll] = useState(false)
+  const [savingProgress, setSavingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
 
   const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
   const computedElecCost = electricMinChecked && elecUnitsManual <= electricMinUnit
@@ -325,6 +330,29 @@ export default function UnifiedBillingPage() {
   }, [billingCycle])
 
   useEffect(() => {
+    const hasUnsaved = unifiedItems.some(item => item.isEdited)
+    if (typeof window !== "undefined") {
+      ;(window as any).__hasUnsavedChanges = hasUnsaved
+    }
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsaved) {
+        e.preventDefault()
+        e.returnValue = "คุณยังมีข้อมูลที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?"
+        return e.returnValue
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      if (typeof window !== "undefined") {
+        ;(window as any).__hasUnsavedChanges = false
+      }
+    }
+  }, [unifiedItems])
+
+  useEffect(() => {
     async function loadFinance(forceRefresh = false) {
       try {
         let userProfile = getCachedData("global", "profile")
@@ -395,7 +423,7 @@ export default function UnifiedBillingPage() {
   const handleElecChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, elecCurr: value, isMeterSaved: false } : item
+        item.roomNumber === roomNumber ? { ...item, elecCurr: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
@@ -404,7 +432,7 @@ export default function UnifiedBillingPage() {
   const handleWaterChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, waterCurr: value, isMeterSaved: false } : item
+        item.roomNumber === roomNumber ? { ...item, waterCurr: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
@@ -413,7 +441,7 @@ export default function UnifiedBillingPage() {
   const handleElecPrevChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, elecPrev: value, isMeterSaved: false } : item
+        item.roomNumber === roomNumber ? { ...item, elecPrev: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
@@ -422,7 +450,7 @@ export default function UnifiedBillingPage() {
   const handleWaterPrevChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, waterPrev: value, isMeterSaved: false } : item
+        item.roomNumber === roomNumber ? { ...item, waterPrev: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
@@ -503,37 +531,49 @@ export default function UnifiedBillingPage() {
       : wUnits * waterRate
     const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
-    // 1. บันทึกมิเตอร์ใน DB
-    const meterRes = await saveMeterRecord(
-      roomNumber,
-      billingCycle,
-      elecPrevVal,
-      elecVal,
-      waterPrevVal,
-      waterVal
-    )
-    if (!meterRes.success) {
-      alert(meterRes.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์")
-      return
-    }
+    setSavingAll(true)
+    setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
 
-    // 2. สร้าง/อัปเดตบิลใน DB
-    const billRes = await createBill(
-      roomNumber,
-      item.tenantName || "ผู้เช่า",
-      totalAmount,
-      item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
-      billingCycle,
-      eUnits,
-      wUnits
-    )
-    if (!billRes.success) {
-      alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
-      return
-    }
+    try {
+      // 1. บันทึกมิเตอร์ใน DB
+      const meterRes = await saveMeterRecord(
+        roomNumber,
+        billingCycle,
+        elecPrevVal,
+        elecVal,
+        waterPrevVal,
+        waterVal
+      )
+      if (!meterRes.success) {
+        alert(meterRes.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์")
+        setSavingAll(false)
+        return
+      }
 
-    showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
-    await loadData(billingCycle, true)
+      // 2. สร้าง/อัปเดตบิลใน DB
+      const billRes = await createBill(
+        roomNumber,
+        item.tenantName || "ผู้เช่า",
+        totalAmount,
+        item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
+        billingCycle,
+        eUnits,
+        wUnits
+      )
+      if (!billRes.success) {
+        alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
+        setSavingAll(false)
+        return
+      }
+
+      showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
+      await loadData(billingCycle, true)
+    } catch (err) {
+      console.error(err)
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
+    } finally {
+      setSavingAll(false)
+    }
   }
 
   // บันทึกและออกบิลให้ทุกห้องที่ข้อมูลสมบูรณ์
@@ -561,55 +601,71 @@ export default function UnifiedBillingPage() {
       return
     }
 
-    // โหมด Supabase
-    for (const item of unifiedItems) {
-      const elecVal = Number(item.elecCurr)
-      const waterVal = Number(item.waterCurr)
-      const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
-      const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
+    setSavingAll(true)
+    setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: "" })
 
-      const eUnits = elecVal - elecPrevVal
-      const wUnits = waterVal - waterPrevVal
-      const elecCost = electricMinChecked && eUnits <= electricMinUnit
-        ? electricMinUnit * elecRate
-        : eUnits * elecRate
-      const waterCost = waterMinChecked && wUnits <= waterMinUnit
-        ? waterMinUnit * waterRate
-        : wUnits * waterRate
-      const totalAmount = item.baseRent + elecCost + waterCost + commonFee
+    try {
+      let currentIdx = 0
+      // โหมด Supabase
+      for (const item of unifiedItems) {
+        currentIdx++
+        setSavingProgress({ current: currentIdx, total: unifiedItems.length, currentRoom: item.roomNumber })
 
-      // 1. บันทึกเลขมิเตอร์
-      const meterRes = await saveMeterRecord(
-        item.roomNumber,
-        billingCycle,
-        elecPrevVal,
-        elecVal,
-        waterPrevVal,
-        waterVal
-      )
-      if (!meterRes.success) {
-        alert(`เกิดข้อผิดพลาดในการบันทึกมิเตอร์ห้อง ${item.roomNumber}: ${meterRes.error}`)
-        return
+        const elecVal = Number(item.elecCurr)
+        const waterVal = Number(item.waterCurr)
+        const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
+        const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
+
+        const eUnits = elecVal - elecPrevVal
+        const wUnits = waterVal - waterPrevVal
+        const elecCost = electricMinChecked && eUnits <= electricMinUnit
+          ? electricMinUnit * elecRate
+          : eUnits * elecRate
+        const waterCost = waterMinChecked && wUnits <= waterMinUnit
+          ? waterMinUnit * waterRate
+          : wUnits * waterRate
+        const totalAmount = item.baseRent + elecCost + waterCost + commonFee
+
+        // 1. บันทึกเลขมิเตอร์
+        const meterRes = await saveMeterRecord(
+          item.roomNumber,
+          billingCycle,
+          elecPrevVal,
+          elecVal,
+          waterPrevVal,
+          waterVal
+        )
+        if (!meterRes.success) {
+          alert(`เกิดข้อผิดพลาดในการบันทึกมิเตอร์ห้อง ${item.roomNumber}: ${meterRes.error}`)
+          setSavingAll(false)
+          return
+        }
+
+        // 2. บันทึกและออกบิล
+        const billRes = await createBill(
+          item.roomNumber,
+          item.tenantName || "ผู้เช่า",
+          totalAmount,
+          item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
+          billingCycle,
+          eUnits,
+          wUnits
+        )
+        if (!billRes.success) {
+          alert(`เกิดข้อผิดพลาดในการสร้างบิลห้อง ${item.roomNumber}: ${billRes.error}`)
+          setSavingAll(false)
+          return
+        }
       }
 
-      // 2. บันทึกและออกบิล
-      const billRes = await createBill(
-        item.roomNumber,
-        item.tenantName || "ผู้เช่า",
-        totalAmount,
-        item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
-        billingCycle,
-        eUnits,
-        wUnits
-      )
-      if (!billRes.success) {
-        alert(`เกิดข้อผิดพลาดในการสร้างบิลห้อง ${item.roomNumber}: ${billRes.error}`)
-        return
-      }
+      showToast("บันทึกเลขมิเตอร์และคำนวณบิลให้ทุกห้องสำเร็จ!")
+      await loadData(billingCycle, true)
+    } catch (err) {
+      console.error(err)
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
+    } finally {
+      setSavingAll(false)
     }
-
-    showToast("บันทึกเลขมิเตอร์และคำนวณบิลให้ทุกห้องสำเร็จ!")
-    await loadData(billingCycle, true)
   }
 
   // ส่งข้อมูลเข้า LINE OA
@@ -817,14 +873,6 @@ export default function UnifiedBillingPage() {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-
-          {/* บันทึกทั้งหมด */}
-          <button
-            onClick={handleSaveAll}
-            className="w-full md:w-auto h-12 md:h-9 glow-btn bg-teal-600 hover:bg-teal-500 text-white font-semibold px-4 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs shadow-lg shadow-teal-600/15 transition-all cursor-pointer"
-          >
-            <Save className="w-4 h-4 md:w-3.5 md:h-3.5" /> บันทึกและออกบิลทุกห้อง
-          </button>
 
           {/* ดาวน์โหลด PDF ทั้งหมด */}
           <button
@@ -1444,6 +1492,19 @@ export default function UnifiedBillingPage() {
             </tbody>
           </table>
         </div>
+
+        {/* ปุ่มบันทึกบิลทั้งหมด (Save All Bills Button at the bottom of the last room) */}
+        {!loading && unifiedItems.length > 0 && (
+          <div className="mt-8 flex justify-center px-4 md:px-0 pb-4">
+            <button
+              onClick={handleSaveAll}
+              className="w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg shadow-teal-600/20 hover:shadow-teal-500/30 transition-all cursor-pointer active:scale-[0.98] border border-teal-500/30 animate-pulse hover:animate-none"
+            >
+              <Save className="w-5 h-5 md:w-4.5 md:h-4.5 text-teal-100" />
+              <span>บันทึกและออกบิลทุกห้อง ({unifiedItems.length} ห้อง)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}
@@ -1636,6 +1697,52 @@ export default function UnifiedBillingPage() {
                 คำนวณเงินและออกบิลค้างชำระ
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* หน้าต่างกำลังบันทึกข้อมูลและออกบิล (Full-Screen Saving Progress Overlay) */}
+      {savingAll && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md transition-all duration-300">
+          <div className="glass-panel p-8 rounded-3xl border border-slate-800/80 max-w-md w-full mx-4 text-center space-y-6 shadow-2xl relative overflow-hidden bg-slate-900/90">
+            {/* Glow Effects */}
+            <div className="absolute -top-12 -left-12 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl" />
+            <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl" />
+            
+            {/* Large Beautiful Spinner */}
+            <div className="relative flex justify-center">
+              <div className="w-20 h-20 rounded-full border-4 border-teal-500/10 border-t-teal-500 animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Save className="w-8 h-8 text-teal-400 animate-bounce" />
+              </div>
+            </div>
+            
+            {/* Title */}
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-slate-100 tracking-wide animate-pulse">กำลังบันทึกข้อมูลและออกบิล</h3>
+              <p className="text-xs text-slate-400">ระบบกำลังประมวลผลข้อมูลและสร้างบิลไปยังฐานข้อมูล กรุณาอย่าปิดหน้านี้...</p>
+            </div>
+
+            {/* Progress Bar */}
+            {savingProgress.total > 0 && (
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-400 px-1">
+                  <span className="flex items-center gap-1.5 text-teal-400 font-extrabold">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ห้อง {savingProgress.currentRoom}
+                  </span>
+                  <span className="font-mono">{savingProgress.current} / {savingProgress.total} ห้อง</span>
+                </div>
+                
+                {/* Progress track */}
+                <div className="h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-850/60 p-[1px]">
+                  <div 
+                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all duration-300 shadow-md shadow-teal-500/20"
+                    style={{ width: `${(savingProgress.current / savingProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
