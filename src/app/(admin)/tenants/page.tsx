@@ -18,7 +18,8 @@ import {
   Info,
   CheckCircle2,
   AlertTriangle,
-  ChevronDown
+  ChevronDown,
+  Check
 } from "lucide-react"
 import { 
   getTenants, 
@@ -678,24 +679,30 @@ export default function TenantsPage() {
                   </div>
                 </div>
 
-                {/* Submit / Cancel Action Row - Touch target friendly heights */}
-                <div className="flex flex-col sm:flex-row gap-3 pt-3 shrink-0">
+                {/* Submit / Cancel Action Row - Touch target friendly heights & high contrast premium colors */}
+                <div className="flex flex-col sm:flex-row gap-3.5 pt-4 shrink-0">
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
                     disabled={formSubmitting}
-                    className="order- order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer"
+                    className="order-2 sm:order-1 flex-1 h-14 md:h-12 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:from-red-750 active:to-rose-750 text-white text-base md:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-500/20 hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
                   >
+                    <X className="w-5 h-5 md:w-4.5 md:h-4.5 stroke-[2.5]" />
                     ยกเลิกสัญญา
                   </button>
                   <button
                     type="submit"
                     disabled={formSubmitting}
-                    className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm md:text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow shadow-blue-600/10 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
+                    className="order-1 sm:order-2 flex-1 h-14 md:h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:from-blue-700 active:to-indigo-700 text-white text-base md:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
                   >
                     {formSubmitting ? (
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : editingTenant ? "บันทึกอัปเดตสัญญา" : "จัดทำสัญญาเช่าใหม่"}
+                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5 md:w-4.5 md:h-4.5 stroke-[2.5]" />
+                        {editingTenant ? "บันทึกอัปเดตสัญญา" : "จัดทำสัญญาเช่าใหม่"}
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -727,23 +734,25 @@ export default function TenantsPage() {
                 </div>
               </div>
 
-              {/* Action buttons with touch-friendly heights */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              {/* Action buttons with touch-friendly heights & high contrast premium colors */}
+              <div className="flex flex-col sm:flex-row gap-3.5 pt-3">
                 <button
                   type="button"
                   onClick={() => {
                     setDeleteConfirmOpen(false)
                     setDeleteTarget(null)
                   }}
-                  className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer"
+                  className="order-2 sm:order-1 flex-1 h-14 md:h-12 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200/60 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-base md:text-sm font-extrabold transition-all duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                 >
+                  <X className="w-5 h-5 md:w-4.5 md:h-4.5 stroke-[2.5]" />
                   เก็บสัญญาไว้
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmDelete}
-                  className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 text-sm md:text-xs font-bold rounded-xl transition-all duration-150 border border-red-200/50 dark:border-red-900/50 active:scale-95 cursor-pointer"
+                  className="order-1 sm:order-2 flex-1 h-14 md:h-12 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:from-red-750 active:to-rose-750 text-white text-base md:text-sm font-extrabold rounded-xl shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                 >
+                  <Check className="w-5 h-5 md:w-4.5 md:h-4.5 stroke-[2.5]" />
                   ยืนยันลบและปลดห้องว่าง
                 </button>
               </div>
