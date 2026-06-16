@@ -212,8 +212,9 @@ export default function UnifiedBillingPage() {
       let wsId = ""
       let regCycleVal = ""
       if (userProfile) {
-        if (userProfile.created_at) {
-          regCycleVal = getCycleFromTimestamp(userProfile.created_at)
+        const workspaceDate = userProfile.workspace_created_at || userProfile.created_at
+        if (workspaceDate) {
+          regCycleVal = getCycleFromTimestamp(workspaceDate)
           setRegistrationCycle(regCycleVal)
         }
         const isSuperAdmin = userProfile.role === "super_admin"

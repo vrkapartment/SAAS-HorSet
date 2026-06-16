@@ -109,12 +109,32 @@ export async function getCurrentUserProfileAction() {
           phone: user.phone || "",
           tfa_enabled: false,
           workspace_id: null,
-          created_at: user.created_at
+          created_at: user.created_at,
+          workspace_created_at: user.created_at
         }
       }
     }
 
-    return { success: true, data: profile }
+    // ดึงวันสร้าง Workspace เพื่อนำไปอ้างอิงเป็นรอบบิลสมัครใช้งานเริ่มต้น
+    let workspaceCreatedAt = null
+    if (profile.workspace_id) {
+      const { data: wsData } = await supabase
+        .from("workspaces")
+        .select("created_at")
+        .eq("id", profile.workspace_id)
+        .single()
+      if (wsData) {
+        workspaceCreatedAt = wsData.created_at
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        ...profile,
+        workspace_created_at: workspaceCreatedAt || profile.created_at
+      }
+    }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาด" }
   }
