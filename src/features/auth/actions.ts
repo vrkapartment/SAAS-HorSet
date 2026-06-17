@@ -206,12 +206,10 @@ export async function registerWithSecretCodeAction(data: {
   try {
     const supabase = await createClient()
 
-    // 1. ตรวจสอบ Secret Code ในฐานข้อมูล
-    const { data: codeData, error: codeErr } = await supabase
-      .from("registration_codes")
-      .select("*")
-      .eq("code", data.secretCode.trim())
-      .single()
+    // 1. ตรวจสอบ Secret Code ในฐานข้อมูล ผ่าน Secure RPC เพื่อเลี่ยงข้อจำกัด RLS
+    const { data: codeData, error: codeErr } = (await supabase
+      .rpc("verify_registration_code", { input_code: data.secretCode.trim() })
+      .single()) as any
 
     if (codeErr || !codeData) {
       return { success: false, error: "ไม่พบรหัสเชิญชวนนี้ในระบบ กรุณาตรวจสอบความถูกต้อง" }
@@ -225,7 +223,7 @@ export async function registerWithSecretCodeAction(data: {
       return { success: false, error: "รหัสเชิญชวนนี้หมดอายุแล้ว (รหัสเชิญชวนมีอายุการใช้งาน 2 ชั่วโมง)" }
     }
 
-    // 2. สมัครสมาชิกผ่าน Supabase Auth พร้อมระบุ role และ workspace_id ที่ล็อคไว้
+    // 2. สมัครสมาชิกผ่าน Supabase Auth พร้อมระบุ role, workspace_id และ registration_code
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email.trim(),
       password: data.password,
@@ -236,7 +234,8 @@ export async function registerWithSecretCodeAction(data: {
           role: codeData.role,
           full_name: data.fullName.trim(),
           phone: data.phone.trim(),
-          workspace_id: codeData.workspace_id
+          workspace_id: codeData.workspace_id,
+          registration_code: data.secretCode.trim()
         }
       }
     })
