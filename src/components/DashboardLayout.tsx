@@ -32,7 +32,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { updateUserProfileAction } from "@/features/auth/actions"
-import { getCurrentUserProfileClient, setCachedUserProfile } from "@/features/auth/client"
+import { getCurrentUserProfileClient, setCachedUserProfile, clearCachedUserProfile } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRooms, getRoomTypes } from "@/features/room/actions"
 import { getTenants } from "@/features/tenant/actions"
@@ -672,6 +672,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   })
 
   const handleLogout = () => {
+    clearCachedUserProfile()
     document.cookie = "horset_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
     document.cookie = "horset_current_workspace_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
     router.push("/login")

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight } from "lucide-react"
 import { loginAction } from "@/features/auth/actions"
 import { createClient } from "@/lib/supabase/client"
+import { clearCachedUserProfile } from "@/features/auth/client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -49,6 +50,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    clearCachedUserProfile()
 
     if (isDemo) {
       // ค้นหาผู้ใช้จากรายการจำลอง
