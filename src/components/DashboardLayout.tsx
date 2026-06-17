@@ -33,6 +33,9 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { updateUserProfileAction } from "@/features/auth/actions"
+import Sidebar from "./dashboard/Sidebar"
+import SupportModal from "./dashboard/SupportModal"
+import ProfileModal from "./dashboard/ProfileModal"
 import { getCurrentUserProfileClient, setCachedUserProfile, clearCachedUserProfile } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRooms, getRoomTypes } from "@/features/room/actions"
@@ -758,337 +761,29 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
       
-      {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-lg shadow-blue-500/10">
-            <Building className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold tracking-wide flex items-center gap-1">
-              {t("common.app_name")}
-            </h2>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("dashboard.system_subtitle")}</p>
-          </div>
-        </div>
-
-        {/* ส่วนจัดการ Workspace สำหรับ Super Admin */}
-        {userRole === "super_admin" && (
-          <div className="mb-6 p-4 rounded-2xl bg-slate-100 dark:bg-gradient-to-tr dark:from-slate-950 dark:to-slate-900 border border-slate-200 dark:border-slate-800 relative">
-            <label className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
-            
-            <button
-              onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
-              disabled={workspaceLoading}
-              className={`w-full flex items-center justify-between text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 transition-all ${
-                workspaceLoading ? 'opacity-75 cursor-not-allowed' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              {workspaceLoading && !isDemo ? (
-                <span className="truncate max-w-[140px] flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                  กำลังโหลด...
-                </span>
-              ) : (
-                <span className="truncate max-w-[140px]">{currentWorkspace.name || "กำลังโหลด..."}</span>
-              )}
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
-            {showDropdown && (
-              <div className="absolute left-0 right-0 mt-2 mx-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-30 p-1.5 space-y-1">
-                {workspaces.map((ws) => (
-                  <button
-                    key={ws.id}
-                    onClick={() => handleSwitchWorkspace(ws)}
-                    className={`w-full text-left text-xs py-2 px-3 rounded-lg transition-colors ${
-                      currentWorkspace.id === ws.id
-                        ? "bg-blue-600 text-white font-medium"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    {ws.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* แสดงสถานะ Support Permission ของ Workspace ปัจจุบัน */}
-            <div className="mt-3 pt-2.5 border-t border-slate-900 flex flex-col gap-1.5 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">{t("dashboard.support_access")}</span>
-                {supportStatus === "approved" && (
-                  <span className="text-teal-400 font-semibold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> {t("dashboard.approved")}
-                  </span>
-                )}
-                {supportStatus === "pending" && (
-                  <span className="text-amber-400 font-semibold animate-pulse flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3 animate-spin" /> {t("dashboard.pending")}
-                  </span>
-                )}
-                {(supportStatus === "revoked" || supportStatus === "none") && (
-                  <span className="text-red-400 font-semibold flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> {t("dashboard.no_access")}
-                  </span>
-                )}
-              </div>
-
-              {(supportStatus === "none" || supportStatus === "revoked") && (
-                <button
-                  onClick={handleRequestSupport}
-                  className="w-full mt-1.5 py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-blue-600/10"
-                >
-                  {t("dashboard.request_support")}
-                </button>
-              )}
-
-              {supportStatus === "pending" && (
-                <div className="text-[9px] text-slate-500 text-left px-1 mt-1">
-                  {t("dashboard.awaiting_admin_approval")}
-                </div>
-              )}
-
-              {supportStatus === "approved" && (
-                <button
-                  onClick={handleExitSupport}
-                  className="w-full mt-1.5 py-2 px-4 bg-red-600/90 hover:bg-red-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-red-600/10 flex items-center justify-between"
-                >
-                  <span>ออกจาก Workspace นี้</span>
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* รายการเมนู */}
-        <nav className="flex-1 space-y-1">
-          {filteredMenu.map((item) => {
-            const Icon = item.icon
-            const isActive = item.path !== "#profile" && pathname === item.path
-            return (
-              <button
-                key={item.path}
-                onClick={() => {
-                  if (item.onClick) {
-                    item.onClick()
-                  } else {
-                    safeNavigate(item.path)
-                  }
-                }}
-                onMouseEnter={() => handlePrefetchPage(item.path)}
-                onTouchStart={() => handlePrefetchPage(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
-                {item.name}
-              </button>
-            )
-          })}
-        </nav>
-
-        {/* ข้อมูลโปรไฟล์ด้านล่าง */}
-        <div className="pt-6 border-t border-slate-200 dark:border-slate-900 space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-inner">
-                <User className="w-5 h-5 text-slate-500 dark:text-slate-300" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
-                  {!isProfileLoaded && !isDemo ? (
-                    <span className="inline-block bg-slate-200 dark:bg-slate-800 rounded w-16 h-3 animate-pulse" />
-                  ) : (
-                    fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
-                  )}
-                </h4>
-                <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold mt-1 ${
-                  userRole === "super_admin"
-                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/20"
-                    : userRole === "admin"
-                    ? "bg-red-500/20 text-red-400 border border-red-500/20"
-                    : "bg-teal-500/20 text-teal-400 border border-teal-500/20"
-                }`}>
-                  {userRole.toUpperCase()}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
-          >
-            <LogOut className="w-4 h-4" />
-            {t("common.logout") || "ออกจากระบบ"}
-          </button>
-        </div>
-      </aside>
-
-      {/* โมเดล Sidebar สำหรับอุปกรณ์พกพา (Mobile Drawer) */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="relative flex flex-col w-64 glass-panel h-full p-6 animate-slide-right">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-2">
-                <Building className="w-5 h-5 text-blue-500" />
-                <h2 className="text-md font-bold">HorSet หอเสร็จ</h2>
-              </div>
-              <button onClick={() => setMobileOpen(false)} className="p-1.5 text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {userRole === "super_admin" && (
-              <div className="mb-6 p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900">
-                <label className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block mb-1.5 uppercase">{t("dashboard.select_workspace")}</label>
-                <button
-                  onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
-                  disabled={workspaceLoading}
-                  className={`w-full flex items-center justify-between text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 transition-all ${
-                    workspaceLoading ? 'opacity-75 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {workspaceLoading && !isDemo ? (
-                    <span className="truncate flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      กำลังโหลด...
-                    </span>
-                  ) : (
-                    <span className="truncate">{currentWorkspace.name || "กำลังโหลด..."}</span>
-                  )}
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
-                {showDropdown && (
-                  <div className="absolute left-0 right-0 mt-2 mx-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 space-y-1 z-30">
-                    {workspaces.map((ws) => (
-                      <button
-                        key={ws.id}
-                        onClick={() => handleSwitchWorkspace(ws)}
-                        className={`w-full text-left text-xs py-2 px-3 rounded-lg ${
-                          currentWorkspace.id === ws.id ? "bg-blue-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
-                        }`}
-                      >
-                        {ws.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* แสดงสถานะ Support Permission ของ Workspace ปัจจุบัน ในมือถือ */}
-                <div className="mt-3 pt-2.5 border-t border-slate-900 flex flex-col gap-1.5 text-[11px]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">{t("dashboard.support_access") || "สิทธิ์การช่วยเหลือ"}</span>
-                    {supportStatus === "approved" && (
-                      <span className="text-teal-400 font-semibold flex items-center gap-1">
-                        <Check className="w-3 h-3" /> {t("dashboard.approved") || "ได้รับสิทธิ์"}
-                      </span>
-                    )}
-                    {supportStatus === "pending" && (
-                      <span className="text-amber-400 font-semibold animate-pulse flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3 animate-spin" /> {t("dashboard.pending") || "กำลังรอ"}
-                      </span>
-                    )}
-                    {(supportStatus === "revoked" || supportStatus === "none") && (
-                      <span className="text-red-400 font-semibold flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> {t("dashboard.no_access") || "ไม่มีสิทธิ์"}
-                      </span>
-                    )}
-                  </div>
-
-                  {(supportStatus === "none" || supportStatus === "revoked") && (
-                    <button
-                      onClick={handleRequestSupport}
-                      className="w-full mt-1.5 py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-blue-600/10"
-                    >
-                      {t("dashboard.request_support") || "ส่งคำขอเข้าช่วยเหลือระบบ"}
-                    </button>
-                  )}
-
-                  {supportStatus === "pending" && (
-                    <div className="text-[9px] text-slate-500 text-left px-1 mt-1">
-                      {t("dashboard.awaiting_admin_approval") || "รอดำเนินการอนุมัติสิทธิ์"}
-                    </div>
-                  )}
-
-                  {supportStatus === "approved" && (
-                    <button
-                      onClick={handleExitSupport}
-                      className="w-full mt-1.5 py-2 px-4 bg-red-600/90 hover:bg-red-500 text-white font-medium rounded-lg text-[10px] text-left transition-colors shadow-lg shadow-red-600/10 flex items-center justify-between"
-                    >
-                      <span>ออกจาก Workspace นี้</span>
-                      <LogOut className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <nav className="flex-1 space-y-1">
-              {filteredMenu.map((item) => {
-                const Icon = item.icon
-                const isActive = item.path !== "#profile" && pathname === item.path
-                return (
-                  <button
-                    key={item.path}
-                    onClick={() => {
-                      if (item.onClick) {
-                        item.onClick()
-                      } else {
-                        safeNavigate(item.path)
-                      }
-                      setMobileOpen(false)
-                    }}
-                    onMouseEnter={() => handlePrefetchPage(item.path)}
-                    onTouchStart={() => handlePrefetchPage(item.path)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left ${
-                      isActive
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {item.name}
-                  </button>
-                )
-              })}
-            </nav>
-
-            <div className="pt-6 border-t border-slate-200 dark:border-slate-900 space-y-4">
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                    <User className="w-4 h-4 text-slate-500 dark:text-slate-300" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[100px] flex items-center min-h-[16px]" title={fullName}>
-                      {!isProfileLoaded && !isDemo ? (
-                        <span className="inline-block bg-slate-200 dark:bg-slate-800 rounded w-16 h-3 animate-pulse" />
-                      ) : (
-                        fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
-                      )}
-                    </h4>
-                    <span className="text-[9px] text-slate-500 uppercase font-bold">{userRole}</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-left text-red-400"
-              >
-                <LogOut className="w-4 h-4" />
-                {t("common.logout") || "ออกจากระบบ"}
-              </button>
-            </div>
-          </aside>
-        </div>
-      )}
+      <Sidebar
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+        userRole={userRole}
+        workspaceLoading={workspaceLoading}
+        showDropdown={showDropdown}
+        setShowDropdown={setShowDropdown}
+        workspaces={workspaces}
+        currentWorkspace={currentWorkspace}
+        handleSwitchWorkspace={handleSwitchWorkspace}
+        supportStatus={supportStatus}
+        handleRequestSupport={handleRequestSupport}
+        handleExitSupport={handleExitSupport}
+        filteredMenu={filteredMenu}
+        pathname={pathname}
+        safeNavigate={safeNavigate}
+        handlePrefetchPage={handlePrefetchPage}
+        fullName={fullName}
+        isProfileLoaded={isProfileLoaded}
+        isDemo={isDemo}
+        handleLogout={handleLogout}
+        t={t}
+      />
 
       {/* พื้นที่เนื้อหาหลัก (Main Content Area) */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
@@ -1182,284 +877,34 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       {/* ========================================== */}
       {/* POP-UP MODAL สำหรับ ADMIN กดยืนยันให้สิทธิ์เข้าถึง */}
       {/* ========================================== */}
-      {showSupportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop ดำเบลอหรูหรา */}
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" />
-          
-          <div className="relative glass-panel w-full max-w-md p-8 rounded-3xl border border-blue-500/20 shadow-2xl shadow-blue-500/5 animate-scale-up">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 rounded-t-3xl" />
-            
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="p-3 bg-blue-600/10 rounded-2xl border border-blue-500/20 text-blue-400">
-                <Lock className="w-8 h-8" />
-              </div>
-              
-              <h3 className="text-xl font-bold text-slate-100">
-                🔔 คำขอช่วยเหลือระบบ (Support Request)
-              </h3>
-              
-              <p className="text-sm text-slate-400 leading-relaxed">
-                เจ้าหน้าที่บริการลูกค้า <span className="text-blue-400 font-semibold">(Super Admin)</span> ร้องขอเชื่อมต่อสิทธิ์เพื่อตรวจสอบข้อมูลในหอพัก <span className="text-white font-medium">"{currentWorkspace.name}"</span> ของคุณชั่วคราว เพื่อความปลอดภัยสูงสุด โปรดยืนยันการให้สิทธิ์เข้าถึงนี้
-              </p>
+      <SupportModal
+        isOpen={showSupportModal}
+        workspaceName={currentWorkspace.name}
+        onDecide={handleDecideSupport}
+      />
 
-              <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 text-left w-full space-y-2 text-xs text-slate-400">
-                <div className="flex justify-between">
-                  <span>ผู้ร้องขอ:</span>
-                  <span className="text-slate-200 font-medium">HorSet Support Team (Super Admin)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>ขอบเขตข้อมูล:</span>
-                  <span className="text-slate-200 font-medium">อ่านและแก้ไขห้องพัก, สัญญา, มิเตอร์ และบิล</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>ความปลอดภัย:</span>
-                  <span className="text-teal-400 font-semibold">คุณสามารถเพิกถอนสิทธิ์การเข้าถึงได้ตลอดเวลา</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 w-full mt-4">
-                <button
-                  onClick={() => handleDecideSupport(false)}
-                  className="py-3 px-4 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-semibold rounded-xl text-sm transition-colors"
-                >
-                  ปฏิเสธ (Deny)
-                </button>
-                <button
-                  onClick={() => handleDecideSupport(true)}
-                  className="py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-sm shadow-lg shadow-blue-600/20 transition-all"
-                >
-                  อนุมัติสิทธิ์ (Approve)
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================== */}
+       {/* ========================================== */}
       {/* POP-UP MODAL สำหรับแก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน */}
       {/* ========================================== */}
-      {showProfileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop ล้ำสมัย ละมุนหรูหรา */}
-          <div 
-            className="absolute inset-0 bg-slate-900/30 dark:bg-slate-950/75 backdrop-blur-md transition-all duration-300"
-            onClick={() => !profileLoading && setShowProfileModal(false)} 
-          />
-          
-          <div className={`relative w-full max-w-md p-8 rounded-3xl border shadow-2xl animate-scale-up transition-colors duration-300 ${
-            isDark 
-              ? "bg-slate-900/98 border-slate-800/80 shadow-slate-950/80" 
-              : "bg-white/98 border-slate-100 shadow-[0_24px_60px_-15px_rgba(15,23,42,0.15)]"
-          }`}>
-            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-teal-500 rounded-t-3xl animate-gradient-flow" />
-            
-            {/* Close button */}
-            <button
-              disabled={profileLoading}
-              onClick={() => setShowProfileModal(false)}
-              className="absolute top-5 right-5 p-2 rounded-full transition-all duration-200 disabled:opacity-50 hover:scale-105 active:scale-95 cursor-pointer text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      <ProfileModal
+        isOpen={showProfileModal}
+        isDark={isDark}
+        profileLoading={profileLoading}
+        onClose={() => setShowProfileModal(false)}
+        profileName={profileName}
+        setProfileName={setProfileName}
+        profilePhone={profilePhone}
+        setProfilePhone={setProfilePhone}
+        profilePassword={profilePassword}
+        setProfilePassword={setProfilePassword}
+        profileConfirmPassword={profileConfirmPassword}
+        setProfileConfirmPassword={setProfileConfirmPassword}
+        profileError={profileError}
+        profileSuccess={profileSuccess}
+        onSubmit={handleUpdateProfileSubmit}
+      />
 
-            <div className="flex flex-col space-y-6">
-              <div className="flex items-center gap-3.5">
-                <div className={`p-3 rounded-2xl border transition-all duration-300 shadow-sm ${
-                  isDark 
-                    ? "bg-blue-600/10 border-blue-500/25 text-blue-400 shadow-blue-500/5" 
-                    : "bg-gradient-to-tr from-blue-500/10 to-indigo-500/5 border-blue-100 text-blue-600 shadow-blue-500/10"
-                }`}>
-                  <User className="w-6 h-6 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className={`text-xl font-black tracking-tight transition-colors ${
-                    isDark ? "text-white" : "text-slate-850"
-                  }`}>
-                    ตั้งค่าโปรไฟล์ & รหัสผ่าน
-                  </h3>
-                  <p className={`text-xs mt-0.5 font-medium transition-colors ${
-                    isDark ? "text-slate-400" : "text-slate-500"
-                  }`}>
-                    แก้ไขข้อมูลส่วนตัวและรหัสผ่านเพื่อความปลอดภัยของระบบ
-                  </p>
-                </div>
-              </div>
-
-              {profileError && (
-                <div className="p-3.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 rounded-xl flex items-center gap-3 text-xs text-rose-600 dark:text-rose-400 font-semibold animate-pulse shadow-sm">
-                  <AlertCircle className="w-4.5 h-4.5 shrink-0" />
-                  <span>{profileError}</span>
-                </div>
-              )}
-
-              {profileSuccess && (
-                <div className="p-3.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-xl flex items-center gap-3 text-xs text-emerald-600 dark:text-emerald-400 font-bold shadow-sm">
-                  <Check className="w-4.5 h-4.5 shrink-0" />
-                  <span>{profileSuccess}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleUpdateProfileSubmit} className="space-y-4">
-                {/* Full name input */}
-                <div className="group relative flex flex-col space-y-1.5">
-                  <label className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${
-                    isDark ? "text-slate-400 group-focus-within:text-blue-400" : "text-slate-500 group-focus-within:text-blue-600"
-                  }`}>
-                    ชื่อ-นามสกุล
-                  </label>
-                  <div className="relative">
-                    <User className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 transition-colors ${
-                      isDark ? "text-slate-500 group-focus-within:text-blue-400" : "text-slate-400 group-focus-within:text-blue-600"
-                    }`} />
-                    <input
-                      type="text"
-                      required
-                      value={profileName}
-                      onChange={(e) => setProfileName(e.target.value)}
-                      disabled={profileLoading}
-                      placeholder="กรอกชื่อ-นามสกุลจริง"
-                      className={`w-full pl-11 pr-4 py-3 rounded-xl text-xs outline-none transition-all disabled:opacity-50 border focus:ring-4 font-semibold ${
-                        isDark 
-                          ? "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 focus:ring-blue-500/15 placeholder-slate-600" 
-                          : "bg-slate-50/50 hover:bg-slate-50 border-slate-200/80 text-slate-850 focus:bg-white focus:border-blue-600 focus:ring-blue-500/8 placeholder-slate-400/80 shadow-sm"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Phone number input */}
-                <div className="group relative flex flex-col space-y-1.5">
-                  <label className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${
-                    isDark ? "text-slate-400 group-focus-within:text-blue-400" : "text-slate-500 group-focus-within:text-blue-600"
-                  }`}>
-                    เบอร์โทรศัพท์
-                  </label>
-                  <div className="relative">
-                    <AlertCircle className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 transition-colors ${
-                      isDark ? "text-slate-500 group-focus-within:text-blue-400" : "text-slate-400 group-focus-within:text-blue-600"
-                    }`} />
-                    <input
-                      type="tel"
-                      required
-                      value={profilePhone}
-                      onChange={(e) => setProfilePhone(e.target.value)}
-                      disabled={profileLoading}
-                      placeholder="กรอกเบอร์โทรศัพท์มือถือ"
-                      className={`w-full pl-11 pr-4 py-3 rounded-xl text-xs outline-none transition-all disabled:opacity-50 border focus:ring-4 font-semibold ${
-                        isDark 
-                          ? "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 focus:ring-blue-500/15 placeholder-slate-600" 
-                          : "bg-slate-50/50 hover:bg-slate-50 border-slate-200/80 text-slate-850 focus:bg-white focus:border-blue-600 focus:ring-blue-500/8 placeholder-slate-400/80 shadow-sm"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Beautiful fading gradient divider */}
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-800 to-transparent my-6" />
-
-                {/* Interactive Premium Suggestion Card */}
-                <div className={`space-y-1.5 p-4 rounded-r-2xl border-l-4 transition-all duration-300 mb-2 shadow-sm ${
-                  isDark 
-                    ? "bg-blue-950/10 border-blue-500/50 text-blue-400 shadow-blue-950/10" 
-                    : "bg-gradient-to-r from-blue-50/50 to-indigo-50/30 border-blue-500 text-blue-700 shadow-blue-500/5"
-                }`}>
-                  <p className="text-[11px] font-bold flex items-center gap-1.5 uppercase tracking-wide">
-                    <KeyRound className="w-3.5 h-3.5" /> แนะนำการเปลี่ยนรหัสผ่าน
-                  </p>
-                  <p className={`text-[10px] leading-relaxed font-medium ${
-                    isDark ? "text-slate-400" : "text-slate-550"
-                  }`}>
-                    กรอกข้อมูลด้านล่างเฉพาะเมื่อต้องการแก้ไขรหัสผ่านใหม่เท่านั้น หากไม่ต้องการแก้ไข ให้ปล่อยว่างช่องรหัสผ่านไว้ได้เลยครับ
-                  </p>
-                </div>
-
-                {/* New password input */}
-                <div className="group relative flex flex-col space-y-1.5">
-                  <label className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${
-                    isDark ? "text-slate-400 group-focus-within:text-blue-400" : "text-slate-500 group-focus-within:text-blue-600"
-                  }`}>
-                    รหัสผ่านใหม่ (ระบุอย่างน้อย 6 ตัวอักษร)
-                  </label>
-                  <div className="relative">
-                    <Lock className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 transition-colors ${
-                      isDark ? "text-slate-500 group-focus-within:text-blue-400" : "text-slate-400 group-focus-within:text-blue-600"
-                    }`} />
-                    <input
-                      type="password"
-                      value={profilePassword}
-                      onChange={(e) => setProfilePassword(e.target.value)}
-                      disabled={profileLoading}
-                      placeholder="ป้อนรหัสผ่านใหม่ หากต้องการเปลี่ยน"
-                      className={`w-full pl-11 pr-4 py-3 rounded-xl text-xs outline-none transition-all disabled:opacity-50 border focus:ring-4 font-semibold ${
-                        isDark 
-                          ? "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 focus:ring-blue-500/15 placeholder-slate-600" 
-                          : "bg-slate-50/50 hover:bg-slate-50 border-slate-200/80 text-slate-850 focus:bg-white focus:border-blue-600 focus:ring-blue-500/8 placeholder-slate-400/80 shadow-sm"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Confirm new password input */}
-                <div className="group relative flex flex-col space-y-1.5">
-                  <label className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${
-                    isDark ? "text-slate-400 group-focus-within:text-blue-400" : "text-slate-500 group-focus-within:text-blue-600"
-                  }`}>
-                    ยืนยันรหัสผ่านใหม่
-                  </label>
-                  <div className="relative">
-                    <Lock className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 transition-colors ${
-                      isDark ? "text-slate-500 group-focus-within:text-blue-400" : "text-slate-400 group-focus-within:text-blue-600"
-                    }`} />
-                    <input
-                      type="password"
-                      value={profileConfirmPassword}
-                      onChange={(e) => setProfileConfirmPassword(e.target.value)}
-                      disabled={profileLoading}
-                      placeholder="ป้อนรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน"
-                      className={`w-full pl-11 pr-4 py-3 rounded-xl text-xs outline-none transition-all disabled:opacity-50 border focus:ring-4 font-semibold ${
-                        isDark 
-                          ? "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 focus:ring-blue-500/15 placeholder-slate-600" 
-                          : "bg-slate-50/50 hover:bg-slate-50 border-slate-200/80 text-slate-850 focus:bg-white focus:border-blue-600 focus:ring-blue-500/8 placeholder-slate-400/80 shadow-sm"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3.5 w-full pt-5">
-                  <button
-                    type="button"
-                    disabled={profileLoading}
-                    onClick={() => setShowProfileModal(false)}
-                    className={`py-3 px-4 font-extrabold rounded-xl text-xs transition-all duration-250 disabled:opacity-50 border cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-                      isDark 
-                        ? "bg-slate-800/85 border-slate-700/80 hover:bg-slate-750 text-slate-300 hover:text-white" 
-                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-300 shadow-sm"
-                    }`}
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={profileLoading}
-                    className="py-3 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-black rounded-xl text-xs shadow-[0_6px_20px_rgba(37,99,235,0.22)] hover:shadow-[0_8px_25px_rgba(37,99,235,0.42)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                  >
-                    {profileLoading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>กำลังบันทึก...</span>
-                      </>
-                    ) : (
-                      <span>บันทึกข้อมูล</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+    
 
     </div>
   )
