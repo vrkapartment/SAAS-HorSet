@@ -278,6 +278,62 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     loadUserProfile()
   }, [userRole, isDemo])
 
+  // ดึงและอัปเดตสถานะสิทธิ์ช่วยเหลือแบบ Real-time Polling (ตรวจสอบความเปลี่ยนแปลงทุก 3 วินาที)
+  useEffect(() => {
+    if (!currentWorkspace.id) return
+
+    const checkStatus = async () => {
+      try {
+        let nextStatus = "none"
+
+        if (!isDemo) {
+          const supabase = createClient()
+          const { data: grantData, error } = await supabase
+            .from("support_access_grants")
+            .select("status")
+            .eq("workspace_id", currentWorkspace.id)
+            .maybeSingle()
+
+          if (error) {
+            console.error("Error polling support status:", error)
+            return
+          }
+          nextStatus = grantData?.status || "none"
+        } else {
+          // ในโหมด Demo ใช้ค่าจาก Cookie เพื่อซิงก์สถานะข้ามแท็บ
+          nextStatus = getCookie(`horset_support_status_${currentWorkspace.id}`) || "none"
+        }
+
+        // อัปเดต state เมื่อสถานะมีความเปลี่ยนแปลงจริงเท่านั้น
+        setSupportStatus((prevStatus) => {
+          if (prevStatus === nextStatus) return prevStatus
+
+          // [สำหรับ Admin] ถ้าพบสิทธิ์เป็น pending ให้แสดงป๊อปอัปอนุมัติทันทีโดยไม่ต้องเปลี่ยนหน้า
+          if (nextStatus === "pending" && userRole === "admin") {
+            setShowSupportModal(true)
+          }
+
+          // [สำหรับ Admin] ถ้าสิทธิ์เปลี่ยนจาก pending เป็นอย่างอื่นแล้ว ให้ปิดป๊อปอัปทันที
+          if (nextStatus !== "pending" && prevStatus === "pending" && userRole === "admin") {
+            setShowSupportModal(false)
+          }
+
+          return nextStatus
+        })
+      } catch (err) {
+        console.error("Failed to poll support status:", err)
+      }
+    }
+
+    // เรียกดึงข้อมูลครั้งแรกทันที
+    checkStatus()
+
+    // ตั้ง Polling interval ทุก 3 วินาที
+    const interval = setInterval(checkStatus, 3000)
+
+    return () => clearInterval(interval)
+  }, [currentWorkspace.id, userRole, isDemo])
+
   // ฟังก์ชันช่วยสำหรับการทำ prefetch ข้อมูลรายหน้าเมื่อเอาเมาส์ไปชี้ปุ่ม (Hover-Triggered Prefetching)
   const handlePrefetchPage = (path: string) => {
     if (!currentWorkspace.id || isDemo) return
