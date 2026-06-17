@@ -728,7 +728,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     if (!item.roles.includes(userRole)) return false
 
     // หากเป็น Super Admin และไม่มีสิทธิ์ช่วยเหลือของ Workspace ปัจจุบัน ให้ซ่อนแท็บเกี่ยวกับตัวข้อมูลหอพัก/ผู้เช่า/บิล/ภาษี/การเงิน
-    if (userRole === "super_admin" && supportStatus !== "approved") {
+    // (ซ่อนเฉพาะตอนที่อยู่ที่หน้า /super-admin เพื่อป้องกันการกระพริบหายไปของแท็บขณะสลับหน้าระหว่างทำงานใน Workspace)
+    if (userRole === "super_admin" && supportStatus !== "approved" && pathname === "/super-admin") {
       const hiddenPaths = [
         "/dashboard",
         "/rooms",
