@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import DashboardLayout from "@/components/DashboardLayout"
 import { 
   FileText, 
   Download, 
@@ -533,7 +532,7 @@ export default function TaxPage() {
   ]
 
   return (
-    <DashboardLayout role="admin">
+    <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -1290,6 +1289,6 @@ export default function TaxPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   )
 }

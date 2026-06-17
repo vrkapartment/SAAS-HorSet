@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import DashboardLayout from "@/components/DashboardLayout"
 import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2, Droplet, Zap, Building, Sliders } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -219,7 +218,7 @@ export default function FinanceSettingsPage() {
   }
 
   return (
-    <DashboardLayout role="admin">
+    <>
       {/* Toast แจ้งเตือน */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 text-teal-400 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
@@ -574,6 +573,6 @@ export default function FinanceSettingsPage() {
           </div>
         </form>
       )}
-    </DashboardLayout>
+    </>
   )
 }

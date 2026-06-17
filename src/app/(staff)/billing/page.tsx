@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import DashboardLayout from "@/components/DashboardLayout"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import {
   Receipt,
@@ -867,7 +866,7 @@ export default function UnifiedBillingPage() {
   const unpaidCount = unifiedItems.filter(item => item.billStatus === "unpaid" || item.billStatus === "not_created").length
 
   return (
-    <DashboardLayout role="staff">
+    <>
       {/* Toast แจ้งเตือน */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 text-teal-400 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
@@ -1892,6 +1891,6 @@ export default function UnifiedBillingPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   )
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import DashboardLayout from "@/components/DashboardLayout"
 import { 
   Coins, 
   Plus, 
@@ -403,7 +402,7 @@ export default function DailyBillsPage() {
 
   if (userRole === "super_admin" && !supportApproved) {
     return (
-      <DashboardLayout role="super_admin">
+      <>
         <div className="flex flex-col items-center justify-center p-12 text-center bg-slate-900/40 border border-slate-800/60 rounded-3xl max-w-2xl mx-auto space-y-6 mt-12 animate-scale-up backdrop-blur-sm shadow-xl">
           <div className="p-4 bg-red-500/10 rounded-2xl text-red-400 border border-red-500/20">
             <Lock className="w-10 h-10 animate-pulse" />
@@ -418,12 +417,12 @@ export default function DailyBillsPage() {
             💡 กรุณาเปิดแผงควบคุมหลักด้านซ้าย แล้วเลือก <strong>"ส่งคำขอเข้าช่วยเหลือระบบ"</strong> และได้รับการยืนยันสิทธิ์จากเจ้าของระบบก่อนดำเนินการเข้าสลับหอพัก
           </div>
         </div>
-      </DashboardLayout>
+      </>
     )
   }
 
   return (
-    <DashboardLayout role={userRole as any}>
+    <>
       {/* Header section with responsive layout and action toggles */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1066,6 +1065,6 @@ export default function DailyBillsPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   )
 }

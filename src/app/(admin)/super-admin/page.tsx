@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import DashboardLayout from "@/components/DashboardLayout"
 import {
   Building,
   Plus,
@@ -634,7 +633,7 @@ export default function SuperAdminPage() {
   })
 
   return (
-    <DashboardLayout role="super_admin">
+    <>
       <div className="space-y-8 pb-12">
         
         {/* หัวข้อ แนะนำผู้ดูแลระบบ */}
@@ -1428,6 +1427,6 @@ export default function SuperAdminPage() {
         )}
 
       </div>
-    </DashboardLayout>
+    </>
   )
 }

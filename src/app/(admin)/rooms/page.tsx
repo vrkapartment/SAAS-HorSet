@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import DashboardLayout from "@/components/DashboardLayout"
 import { 
   Home, 
   Plus, 
@@ -357,7 +356,7 @@ export default function RoomsPage() {
   )
 
   return (
-    <DashboardLayout role="admin">
+    <>
       {/* Container หลัก: เผื่อ padding ด้านล่าง pb-24 บนโมบายล์เพื่อหลบแถบปุ่ม Sticky และ pb-12 บนเดสก์ท็อป */}
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 p-3 sm:p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8 transition-colors duration-300 pb-24 md:pb-12">
         
@@ -996,6 +995,6 @@ export default function RoomsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }

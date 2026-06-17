@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import DashboardLayout from "@/components/DashboardLayout"
 import { 
   Users, 
   Plus, 
@@ -274,7 +273,7 @@ export default function TenantsPage() {
   )
 
   return (
-    <DashboardLayout role="admin">
+    <>
       {/* Container หลัก: เผื่อ pb-24 บนมือถือสำหรับหลบแถบปุ่มลอย และ pb-12 บนเดสก์ท็อป */}
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 p-3 sm:p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8 transition-colors duration-300 pb-24 md:pb-12">
         
@@ -760,6 +759,6 @@ export default function TenantsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }

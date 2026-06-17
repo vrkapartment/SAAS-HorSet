@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import DashboardLayout from "@/components/DashboardLayout"
 import {
   TrendingUp,
   Users,
@@ -425,7 +424,7 @@ export default function AdminDashboard() {
   )
 
   return (
-    <DashboardLayout role="admin">
+    <>
       {/* ส่วนหัวข้อต้อนรับแบบพรีเมียม (Adaptive layout) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -808,6 +807,6 @@ export default function AdminDashboard() {
           </div>
         </>
       )}
-    </DashboardLayout>
+    </>
   )
 }
