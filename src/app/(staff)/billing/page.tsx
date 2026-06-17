@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import {
@@ -124,6 +125,15 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
 
 export default function UnifiedBillingPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isDark = mounted ? resolvedTheme === "dark" : false
+
   const [billingCycle, setBillingCycle] = useState("2026-06")
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
@@ -855,9 +865,9 @@ export default function UnifiedBillingPage() {
         <div>
           <div className="flex items-center gap-2">
             <Gauge className="w-5 h-5 text-blue-500" />
-            <h2 className="text-xl font-bold text-slate-850 dark:text-slate-100">จดเลขมิเตอร์ & จัดการบิลค่าเช่า</h2>
+            <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดเลขมิเตอร์ & จัดการบิลค่าเช่า</h2>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             หน้าจอแบบบูรณาการ: บันทึกหน่วยมิเตอร์ไฟ/น้ำ พร้อมประมวลผลคำนวณออกใบแจ้งหนี้ให้ผู้เช่าได้ทันทีในคลิกเดียว
           </p>
         </div>
@@ -865,12 +875,14 @@ export default function UnifiedBillingPage() {
         <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm md:text-xs font-semibold transition-all cursor-pointer"
+            className={`w-full md:w-auto h-12 md:h-9 px-3.5 border rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold transition-all cursor-pointer ${
+              isDark ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
+            }`}
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
           >
             {getBillingCycleOptions(registrationCycle).map(opt => (
-              <option key={opt.value} value={opt.value} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">{opt.label}</option>
+              <option key={opt.value} value={opt.value} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{opt.label}</option>
             ))}
           </select>
 
@@ -880,7 +892,7 @@ export default function UnifiedBillingPage() {
             disabled={downloadingAllPdf}
             className={`w-full md:w-auto h-12 md:h-9 text-white font-semibold px-4 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs transition-all cursor-pointer ${
               downloadingAllPdf
-                ? "bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed"
+                ? (isDark ? "bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed" : "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed")
                 : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-600/20 active:scale-95"
             }`}
           >
@@ -898,9 +910,13 @@ export default function UnifiedBillingPage() {
           {/* ปุ่มบิลกำหนดเอง (สำหรับแอดมินหรือกรณีฉุกเฉิน) */}
           <button
             onClick={() => setCreateBillModalOpen(true)}
-            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs font-semibold transition-all cursor-pointer shadow-sm"
+            className={`w-full md:w-auto h-12 md:h-9 px-3.5 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+              isDark
+                ? "bg-slate-900 hover:bg-slate-850 border-slate-800 hover:border-slate-700 text-slate-300"
+                : "bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700"
+            }`}
           >
-            <Plus className="w-4 h-4 md:w-3.5 md:h-3.5 text-blue-500 dark:text-blue-400" /> บิลจำลองพิเศษ
+            <Plus className={`w-4 h-4 md:w-3.5 md:h-3.5 ${isDark ? "text-blue-400" : "text-blue-500"}`} /> บิลจำลองพิเศษ
           </button>
         </div>
       </div>
@@ -908,61 +924,81 @@ export default function UnifiedBillingPage() {
       {/* แดชบอร์ดสรุปสถิติประจำรอบเดือน */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* การจดมิเตอร์ */}
-        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 shadow-sm">
-          <div className="p-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl">
+        <div className={`p-4 rounded-2xl border flex items-center gap-3 shadow-sm ${
+          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
+        }`}>
+          <div className={`p-2.5 rounded-xl ${isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-500/10 text-blue-500"}`}>
             <Gauge className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">บันทึกมิเตอร์แล้ว</p>
-            <p className="text-base font-extrabold text-slate-800 dark:text-slate-100">{billedCount} / {totalOccupied} ห้อง</p>
+            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>บันทึกมิเตอร์แล้ว</p>
+            <p className={`text-base font-extrabold ${isDark ? "text-slate-100" : "text-slate-800"}`}>{billedCount} / {totalOccupied} ห้อง</p>
           </div>
         </div>
 
         {/* ชำระเงินเรียบร้อย */}
-        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 shadow-sm">
-          <div className="p-2.5 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-xl">
+        <div className={`p-4 rounded-2xl border flex items-center gap-3 shadow-sm ${
+          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
+        }`}>
+          <div className={`p-2.5 rounded-xl ${isDark ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-500/10 text-emerald-500"}`}>
             <CheckCircle className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">ชำระเงินเรียบร้อย</p>
-            <p className="text-base font-extrabold text-slate-800 dark:text-slate-100">{paidCount} ห้อง</p>
+            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ชำระเงินเรียบร้อย</p>
+            <p className={`text-base font-extrabold ${isDark ? "text-slate-100" : "text-slate-800"}`}>{paidCount} ห้อง</p>
           </div>
         </div>
 
         {/* รอตรวจสอบสลิป */}
-        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 relative overflow-hidden shadow-sm">
+        <div className={`p-4 rounded-2xl border flex items-center gap-3 relative overflow-hidden shadow-sm ${
+          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
+        }`}>
           {pendingCount > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping" />}
-          <div className="p-2.5 bg-amber-500/10 text-amber-500 dark:text-amber-400 rounded-xl">
+          <div className={`p-2.5 rounded-xl ${isDark ? "bg-amber-500/10 text-amber-400" : "bg-amber-500/10 text-amber-500"}`}>
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">รอตรวจสอบสลิป</p>
-            <p className={`text-base font-extrabold ${pendingCount > 0 ? "text-amber-600 dark:text-amber-400 font-black animate-pulse" : "text-slate-500 dark:text-slate-400"}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>รอตรวจสอบสลิป</p>
+            <p className={`text-base font-extrabold ${
+              pendingCount > 0 
+                ? `font-black animate-pulse ${isDark ? "text-amber-400" : "text-amber-600"}` 
+                : (isDark ? "text-slate-400" : "text-slate-500")
+            }`}>
               {pendingCount} ห้อง
             </p>
           </div>
         </div>
 
         {/* ค้างชำระ */}
-        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 shadow-sm">
-          <div className="p-2.5 bg-rose-500/10 text-rose-500 dark:text-rose-400 rounded-xl">
+        <div className={`p-4 rounded-2xl border flex items-center gap-3 shadow-sm ${
+          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
+        }`}>
+          <div className={`p-2.5 rounded-xl ${isDark ? "bg-rose-500/10 text-rose-400" : "bg-rose-500/10 text-rose-500"}`}>
             <AlertCircle className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">ค้างชำระเงิน</p>
-            <p className="text-base font-extrabold text-rose-600 dark:text-rose-400">{unpaidCount} ห้อง</p>
+            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ค้างชำระเงิน</p>
+            <p className={`text-base font-extrabold ${isDark ? "text-rose-400" : "text-rose-600"}`}>{unpaidCount} ห้อง</p>
           </div>
         </div>
       </div>
 
       {/* แจ้งเตือน */}
-      <div className="flex items-center gap-2.5 p-3.5 bg-blue-50/60 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-400/90 font-medium">
-        <Sparkles className="w-4 h-4 shrink-0 text-blue-500 dark:text-blue-400" />
+      <div className={`flex items-center gap-2.5 p-3.5 border rounded-xl text-xs font-medium ${
+        isDark 
+          ? "bg-blue-950/10 border-blue-500/20 text-blue-400/90" 
+          : "bg-blue-50/60 border-blue-100 text-blue-700"
+      }`}>
+        <Sparkles className={`w-4 h-4 shrink-0 ${isDark ? "text-blue-400" : "text-blue-500"}`} />
         <span>ระบบจำลองการประมวลผลดึงค่ามิเตอร์ครั้งก่อนหน้าและราคาค่าเช่าอิงตาม Room Type โดยอัตโนมัติ กรอกเพียงเลขมิเตอร์ปัจจุบันเพื่อสร้างบิล</span>
       </div>
 
       {/* ตารางควบคุมหลัก */}
-      <div className="p-0 md:p-5 bg-transparent md:bg-white dark:md:bg-slate-900/30 md:border md:border-slate-200 dark:md:border-slate-800/80 md:rounded-2xl md:shadow-sm">
+      <div className={`p-0 md:p-5 bg-transparent md:rounded-2xl md:shadow-sm ${
+        isDark 
+          ? "md:bg-slate-900/30 md:border md:border-slate-800/80" 
+          : "md:bg-white md:border md:border-slate-200"
+      }`}>
         {/* Mobile View: Card List (< 768px) */}
         <div className="block md:hidden space-y-4">
           {loading ? (
@@ -990,72 +1026,84 @@ export default function UnifiedBillingPage() {
               const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
 
               return (
-                <div key={item.roomNumber} className="glass-card rounded-2xl border border-slate-900/60 p-4 bg-slate-950/35 backdrop-blur-md space-y-4">
+                <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
+                  isDark ? "bg-slate-950/35 border-slate-900/60" : "bg-white border-slate-200"
+                }`}>
                   {/* Card Header: Room, Tenant, Status */}
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-black text-slate-100 bg-slate-900/80 px-3 py-1 rounded-xl border border-slate-800">
+                        <span className={`text-lg font-black px-3 py-1 rounded-xl border ${
+                          isDark ? "text-slate-100 bg-slate-900 border-slate-800" : "text-slate-800 bg-slate-100 border-slate-200"
+                        }`}>
                           {item.roomNumber}
                         </span>
                         <span className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-                          item.billStatus === "paid" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                          item.billStatus === "pending" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" :
-                          item.billStatus === "unpaid" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
-                          "bg-slate-900 text-slate-500 border border-slate-800"
+                          item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border border-emerald-200") :
+                          item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border border-amber-200 animate-pulse") :
+                          item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border border-rose-200") :
+                          (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-250")
                         }`}>
                           {item.billStatus === "paid" ? "ชำระเงินแล้ว" :
                            item.billStatus === "pending" ? "รอตรวจสลิป" :
                            item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
                         </span>
                       </div>
-                      <div className="font-bold text-slate-300 mt-2">
-                        {item.tenantName || <span className="text-slate-600 italic">ไม่มีข้อมูลผู้เช่า</span>}
+                      <div className={`font-bold mt-2 ${isDark ? "text-slate-300" : "text-slate-800"}`}>
+                        {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                       </div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                      <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                         ค่าเช่า {item.baseRent.toLocaleString()}.- | ส่วนกลาง {commonFee}.-
                       </div>
                     </div>
                     
                     {/* Total Display */}
                     <div className="text-right">
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ยอดรวมสุทธิ</div>
-                      <div className="text-lg font-black text-teal-400 font-mono">
+                      <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมสุทธิ</div>
+                      <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
                         {calculatedAmount.toLocaleString()}.-
                       </div>
                       {isModified && (
-                        <span className="inline-block text-[9px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1">
+                        <span className={`inline-block text-[9px] bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1 ${
+                          isDark ? "text-amber-400" : "text-amber-600"
+                        }`}>
                           ยอดเงินเปลี่ยน
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="h-px bg-slate-900/60" />
+                  <div className={`h-px ${isDark ? "bg-slate-900/60" : "bg-slate-200"}`} />
 
                   {/* Meter Inputs */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Electricity Meter Card Section */}
-                    <div className="bg-blue-500/5 rounded-xl p-3 border border-blue-500/10 space-y-3">
+                    <div className={`rounded-xl p-3 border space-y-3 ${
+                      isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/50 border-blue-100"
+                    }`}>
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-xs font-bold text-blue-400 flex items-center gap-1">
+                        <span className={`text-xs font-bold flex items-center gap-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
                           <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
                         </span>
                         {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-slate-500 font-bold">ก่อนหน้า:</span>
+                            <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>ก่อนหน้า:</span>
                             <input
                               type="text"
                               inputMode="decimal"
                               placeholder="กรอก"
-                              className="w-16 h-6.5 text-center bg-slate-950 border border-slate-800 rounded text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-blue-500 transition-all"
+                              className={`w-16 h-6.5 text-center border rounded font-mono text-[10px] font-bold focus:outline-none focus:border-blue-500 transition-all ${
+                                isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+                              }`}
                               value={item.elecPrev}
                               onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
                             />
                           </div>
                         ) : (
-                          <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
-                            ก่อนหน้า: <strong className="text-slate-200">{item.elecPrev}</strong>
+                          <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                            isDark ? "bg-slate-950 border-slate-900 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                          }`}>
+                            ก่อนหน้า: <strong className={isDark ? "text-slate-200" : "text-slate-800"}>{item.elecPrev}</strong>
                           </span>
                         )}
                       </div>
@@ -1065,7 +1113,9 @@ export default function UnifiedBillingPage() {
                           type="text"
                           inputMode="decimal"
                           placeholder="จดเลขมิเตอร์ไฟฟ้า..."
-                          className="w-full h-12 px-3 text-base bg-slate-950 border border-slate-800 rounded-xl text-slate-100 font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-600"
+                          className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 ${
+                            isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
+                          }`}
                           value={item.elecCurr}
                           onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
                         />
@@ -1075,14 +1125,14 @@ export default function UnifiedBillingPage() {
                       </div>
 
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500">หน่วยไฟที่ใช้:</span>
-                        <span className={`font-bold ${!hasElecCurr ? "text-slate-500" : elecUnitsUsed < 0 ? "text-red-400" : "text-blue-400"}`}>
+                        <span className="text-slate-500 dark:text-slate-400">หน่วยไฟที่ใช้:</span>
+                        <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
                           {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                         </span>
                       </div>
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500">รวมเงินค่าไฟ:</span>
-                        <span className="font-bold text-slate-300">
+                        <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">
                           {hasElecCurr && elecUnitsUsed >= 0 
                             ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                             : "-"}
@@ -1091,26 +1141,26 @@ export default function UnifiedBillingPage() {
                     </div>
 
                     {/* Water Meter Card Section */}
-                    <div className="bg-teal-500/5 rounded-xl p-3 border border-teal-500/10 space-y-3">
+                    <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3 border border-teal-100 dark:border-teal-500/10 space-y-3">
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-xs font-bold text-teal-400 flex items-center gap-1">
+                        <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
                           <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
                         </span>
                         {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-slate-500 font-bold">ก่อนหน้า:</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">ก่อนหน้า:</span>
                             <input
                               type="text"
                               inputMode="decimal"
                               placeholder="กรอก"
-                              className="w-16 h-6.5 text-center bg-slate-950 border border-slate-800 rounded text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
+                              className="w-16 h-6.5 text-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-slate-800 dark:text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
                               value={item.waterPrev}
                               onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
                             />
                           </div>
                         ) : (
-                          <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-900">
-                            ก่อนหน้า: <strong className="text-slate-200">{item.waterPrev}</strong>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-900">
+                            ก่อนหน้า: <strong className="text-slate-800 dark:text-slate-200">{item.waterPrev}</strong>
                           </span>
                         )}
                       </div>
@@ -1120,7 +1170,7 @@ export default function UnifiedBillingPage() {
                           type="text"
                           inputMode="decimal"
                           placeholder="จดเลขมิเตอร์น้ำประปา..."
-                          className="w-full h-12 px-3 text-base bg-slate-950 border border-slate-800 rounded-xl text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-600"
+                          className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                           value={item.waterCurr}
                           onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
                         />
@@ -1130,14 +1180,14 @@ export default function UnifiedBillingPage() {
                       </div>
 
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500">หน่วยน้ำที่ใช้:</span>
-                        <span className={`font-bold ${!hasWaterCurr ? "text-slate-500" : waterUnitsUsed < 0 ? "text-red-400" : "text-teal-400"}`}>
+                        <span className="text-slate-500 dark:text-slate-400">หน่วยน้ำที่ใช้:</span>
+                        <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
                           {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                         </span>
                       </div>
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500">รวมเงินค่าน้ำ:</span>
-                        <span className="font-bold text-slate-300">
+                        <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">
                           {hasWaterCurr && waterUnitsUsed >= 0 
                             ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
                             : "-"}
@@ -1154,7 +1204,7 @@ export default function UnifiedBillingPage() {
                       disabled={item.isMeterSaved && item.billStatus !== "not_created" && !isModified}
                       className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         item.isMeterSaved && item.billStatus !== "not_created" && !isModified
-                          ? "bg-slate-950/40 border border-slate-900 text-slate-600 cursor-not-allowed"
+                          ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                           : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
                       }`}
                     >
@@ -1179,13 +1229,13 @@ export default function UnifiedBillingPage() {
                           <button
                             onClick={() => handleDownloadBillPdf(item)}
                             disabled={downloadingPdfId !== null}
-                            className="h-12 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-200 hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                            className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                           >
                             {downloadingPdfId === item.roomNumber ? (
                               <div className="w-4 h-4 border border-slate-400 border-t-transparent rounded-full animate-spin" />
                             ) : (
                               <>
-                                <Download className="w-4 h-4 text-blue-400" />
+                                <Download className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                                 <span>ดาวน์โหลด PDF</span>
                               </>
                             )}
@@ -1194,9 +1244,9 @@ export default function UnifiedBillingPage() {
                           {/* Send Line OA */}
                           <button
                             onClick={() => handleSendLine(item.roomNumber)}
-                            className="h-12 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-200 hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                            className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                           >
-                            <Send className="w-4 h-4 text-teal-400" />
+                            <Send className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                             <span>ส่ง LINE OA</span>
                           </button>
                         </div>
@@ -1205,7 +1255,7 @@ export default function UnifiedBillingPage() {
                         {item.billStatus === "unpaid" && (
                           <button
                             onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                            className="w-full h-12 bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                            className="w-full h-12 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
                           >
                             <CheckCircle className="w-4 h-4 text-emerald-500" />
                             <span>รับเงินสด / บันทึกชำระเงินตรง</span>
@@ -1218,7 +1268,7 @@ export default function UnifiedBillingPage() {
               );
             })
           ) : (
-            <div className="py-12 text-center text-slate-500 bg-slate-950/10 border border-slate-900/60 rounded-2xl glass-card backdrop-blur-md">
+            <div className="py-12 text-center text-slate-500 bg-white dark:bg-slate-950/10 border border-slate-200 dark:border-slate-900/60 rounded-2xl shadow-sm">
               ไม่มีรายการห้องพักที่ใช้งานหรือจ้างเช่าอยู่ในขณะนี้
             </div>
           )}
@@ -1277,16 +1327,16 @@ export default function UnifiedBillingPage() {
                   const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
 
                   return (
-                    <tr key={item.roomNumber} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/15 transition-colors">
+                    <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
                       {/* ห้อง */}
-                      <td className="py-4 pl-3 font-black text-slate-800 dark:text-slate-100 text-sm">{item.roomNumber}</td>
+                      <td className={`py-4 pl-3 font-black text-sm ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
                       
                       {/* ผู้เช่า / ค่าเช่าห้อง */}
                       <td className="py-4">
-                        <div className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[140px]" title={item.tenantName || "ไม่มีผู้เช่า"}>
-                          {item.tenantName || <span className="text-slate-400 dark:text-slate-600 italic">ไม่มีข้อมูลผู้เช่า</span>}
+                        <div className={`font-bold truncate max-w-[140px] ${isDark ? "text-slate-300" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
+                          {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                         </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                        <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                           ค่าเช่า {item.baseRent.toLocaleString()}.- + ส่วนกลาง {commonFee}.-
                         </div>
                       </td>
@@ -1298,12 +1348,16 @@ export default function UnifiedBillingPage() {
                             type="text"
                             inputMode="decimal"
                             placeholder="กรอกเลข"
-                            className="w-20 text-center py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100 font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold"
+                            className={`w-20 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold ${
+                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                            }`}
                             value={item.elecPrev}
                             onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
                           />
                         ) : (
-                          <span className="font-mono text-slate-600 dark:text-slate-400 font-semibold bg-slate-100 dark:bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800/40">
+                          <span className={`font-mono font-semibold px-2.5 py-1 rounded-lg border ${
+                            isDark ? "text-slate-400 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-100 border-slate-200"
+                          }`}>
                             {item.elecPrev}
                           </span>
                         )}
@@ -1315,11 +1369,15 @@ export default function UnifiedBillingPage() {
                           <input
                             type="text"
                             placeholder="กรอกเลข"
-                            className="w-24 text-center py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100 font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold"
+                            className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold ${
+                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                            }`}
                             value={item.elecCurr}
                             onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
                           />
-                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 dark:text-slate-600 font-bold pointer-events-none">
+                          <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold pointer-events-none ${
+                            isDark ? "text-slate-600" : "text-slate-400"
+                          }`}>
                             kWh
                           </span>
                         </div>
@@ -1344,12 +1402,16 @@ export default function UnifiedBillingPage() {
                             type="text"
                             inputMode="decimal"
                             placeholder="กรอกเลข"
-                            className="w-20 text-center py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100 font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold"
+                            className={`w-20 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                            }`}
                             value={item.waterPrev}
                             onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
                           />
                         ) : (
-                          <span className="font-mono text-slate-600 dark:text-slate-400 font-semibold bg-slate-100 dark:bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800/40">
+                          <span className={`font-mono font-semibold px-2.5 py-1 rounded-lg border ${
+                            isDark ? "text-slate-400 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-100 border-slate-200"
+                          }`}>
                             {item.waterPrev}
                           </span>
                         )}
@@ -1361,11 +1423,15 @@ export default function UnifiedBillingPage() {
                           <input
                             type="text"
                             placeholder="กรอกเลข"
-                            className="w-24 text-center py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100 font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold"
+                            className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                            }`}
                             value={item.waterCurr}
                             onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
                           />
-                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 dark:text-slate-600 font-bold pointer-events-none">
+                          <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold pointer-events-none ${
+                            isDark ? "text-slate-600" : "text-slate-400"
+                          }`}>
                             m³
                           </span>
                         </div>
@@ -1385,11 +1451,13 @@ export default function UnifiedBillingPage() {
 
                       {/* ยอดบิลรวม */}
                       <td className="py-4 text-right pr-4 font-mono">
-                        <div className="text-sm font-black text-slate-800 dark:text-slate-100">
+                        <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
                           {calculatedAmount.toLocaleString()}.-
                         </div>
                         {isModified && (
-                          <span className="inline-block text-[8px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold">
+                          <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold ${
+                            isDark ? "text-amber-400" : "text-amber-600"
+                          }`}>
                             ยอดเงินเปลี่ยน
                           </span>
                         )}
@@ -1397,11 +1465,11 @@ export default function UnifiedBillingPage() {
 
                       {/* สถานะบิล */}
                       <td className="py-4 text-center">
-                        <span className={`inline-block text-[9px] font-extrabold px-2.5 py-0.5 rounded-full ${
-                          item.billStatus === "paid" ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20" :
-                          item.billStatus === "pending" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 animate-pulse" :
-                          item.billStatus === "unpaid" ? "bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20" :
-                          "bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-250 dark:border-slate-800"
+                        <span className={`inline-block text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                          item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
+                          item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
+                          item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
+                          (isDark ? "bg-slate-900 text-slate-400 border-slate-800" : "bg-slate-100 text-slate-500 border-slate-250")
                         }`}>
                           {item.billStatus === "paid" ? "ชำระเงินแล้ว" :
                            item.billStatus === "pending" ? "รอตรวจสลิป" :
@@ -1418,8 +1486,8 @@ export default function UnifiedBillingPage() {
                             disabled={item.isMeterSaved && item.billStatus !== "not_created" && !isModified}
                             className={`p-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                               item.isMeterSaved && item.billStatus !== "not_created" && !isModified
-                                ? "border-slate-200 dark:border-slate-800/40 bg-slate-50 dark:bg-slate-950/20 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                                : "border-teal-200 dark:border-teal-500/30 bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-600 dark:hover:bg-teal-500 text-teal-700 dark:text-teal-400 hover:text-white dark:hover:text-white hover:scale-105 shadow-sm"
+                                ? (isDark ? "border-slate-800/40 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
+                                : (isDark ? "border-teal-500/30 bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white hover:scale-105 shadow-sm" : "border-teal-250 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white hover:scale-105 shadow-sm")
                             }`}
                             title="บันทึกมิเตอร์และออกบิล"
                           >
@@ -1434,7 +1502,9 @@ export default function UnifiedBillingPage() {
                                 setSelectedBill(item)
                                 setSlipModalOpen(true)
                               }}
-                              className="p-1.5 bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 rounded-xl hover:bg-amber-500 hover:text-white transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer"
+                              className={`p-1.5 rounded-xl border transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer ${
+                                isDark ? "bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500 hover:text-white" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-500 hover:text-white"
+                              }`}
                             >
                               <Eye className="w-3.5 h-3.5" />
                               <span className="text-[10px]">ตรวจสลิป</span>
@@ -1445,7 +1515,9 @@ export default function UnifiedBillingPage() {
                               <button
                                 onClick={() => handleDownloadBillPdf(item)}
                                 disabled={downloadingPdfId !== null}
-                                className="p-1.5 bg-white hover:bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-550 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 hover:border-blue-500/40 rounded-xl transition-all cursor-pointer"
+                                className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
+                                  isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-500/40"
+                                }`}
                                 title="ดาวน์โหลดบิล PDF"
                               >
                                 {downloadingPdfId === item.roomNumber ? (
@@ -1458,7 +1530,9 @@ export default function UnifiedBillingPage() {
                               {/* ส่ง LINE OA */}
                               <button
                                 onClick={() => handleSendLine(item.roomNumber)}
-                                className="p-1.5 bg-white hover:bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-550 dark:text-slate-400 hover:text-teal-500 dark:hover:text-teal-400 hover:border-teal-500/40 rounded-xl transition-all cursor-pointer"
+                                className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
+                                  isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-teal-400 hover:border-teal-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-teal-600 hover:border-teal-500/40"
+                                }`}
                                 title="ส่งเข้า LINE OA"
                               >
                                 <Send className="w-3.5 h-3.5" />
@@ -1468,11 +1542,13 @@ export default function UnifiedBillingPage() {
                               {item.billStatus === "unpaid" && (
                                 <button
                                   onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                                  className="p-1.5 bg-white hover:bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-550 dark:text-slate-400 hover:text-emerald-550 dark:hover:text-emerald-400 hover:border-emerald-500/40 rounded-xl transition-all flex items-center gap-1 hover:scale-105 shadow-sm cursor-pointer"
+                                  className={`p-1.5 border rounded-xl transition-all flex items-center gap-1 hover:scale-105 shadow-sm cursor-pointer ${
+                                    isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-500/40"
+                                  }`}
                                   title="รับเงินสด/บันทึกชำระเงินตรง"
                                 >
                                   <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                                  <span className="text-[10px] hidden xl:inline font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-300">รับเงินแล้ว</span>
+                                  <span className={`text-[10px] hidden xl:inline font-bold ${isDark ? "text-slate-400 hover:text-emerald-300" : "text-slate-500 hover:text-emerald-600"}`}>รับเงินแล้ว</span>
                                 </button>
                               )}
                             </>
@@ -1510,21 +1586,27 @@ export default function UnifiedBillingPage() {
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}
       {slipModalOpen && selectedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up grid grid-cols-1 md:grid-cols-2 gap-6 border border-slate-200 dark:border-slate-800/80">
+          <div className={`${
+            isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
+          } w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up grid grid-cols-1 md:grid-cols-2 gap-6 border`}>
             <button
               onClick={() => {
                 setSlipModalOpen(false)
                 setSelectedBill(null)
               }}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-all cursor-pointer"
+              className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all cursor-pointer ${
+                isDark ? "text-slate-400 hover:text-white hover:bg-slate-900/50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              }`}
             >
               <X className="w-5 h-5" />
             </button>
             
             {/* ฝั่งสลิปธนาคาร */}
             <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400">รูปภาพหลักฐานการโอนเงิน</h4>
-              <div className="w-full aspect-[3/4] bg-slate-50 dark:bg-slate-950 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-900/60 relative flex items-center justify-center">
+              <h4 className={`text-xs font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>รูปภาพหลักฐานการโอนเงิน</h4>
+              <div className={`w-full aspect-[3/4] rounded-2xl overflow-hidden border relative flex items-center justify-center ${
+                isDark ? "bg-slate-950 border-slate-900/60" : "bg-slate-50 border-slate-200"
+              }`}>
                 {selectedBill.slipUrl ? (
                   <img
                     src={selectedBill.slipUrl}
@@ -1532,7 +1614,7 @@ export default function UnifiedBillingPage() {
                     className="object-contain w-full h-full"
                   />
                 ) : (
-                  <p className="text-xs text-slate-400 dark:text-slate-600">ไม่พบหลักฐานไฟล์แนบในระบบ</p>
+                  <p className={`text-xs ${isDark ? "text-slate-600" : "text-slate-400"}`}>ไม่พบหลักฐานไฟล์แนบในระบบ</p>
                 )}
               </div>
             </div>
@@ -1540,32 +1622,36 @@ export default function UnifiedBillingPage() {
             {/* ฝั่งรายละเอียดและการกดอนุมัติ */}
             <div className="flex flex-col justify-between pt-3">
               <div className="space-y-4">
-                <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-blue-500 dark:text-blue-400" /> อนุมัติสลิปโอนและปิดบิล
+                <h3 className={`text-sm font-black flex items-center gap-2 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                  <CreditCard className={`w-4 h-4 ${isDark ? "text-blue-400" : "text-blue-500"}`} /> อนุมัติสลิปโอนและปิดบิล
                 </h3>
  
-                <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl space-y-2.5 border border-slate-200 dark:border-slate-900 text-xs">
+                <div className={`p-4 rounded-xl space-y-2.5 border text-xs ${
+                  isDark ? "bg-slate-900/60 border-slate-900" : "bg-slate-50 border-slate-200"
+                }`}>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">หมายเลขห้องพัก:</span>
-                    <span className="font-extrabold text-slate-800 dark:text-slate-200">{selectedBill.roomNumber}</span>
+                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>หมายเลขห้องพัก:</span>
+                    <span className={`font-extrabold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{selectedBill.roomNumber}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">ผู้จดเช่า:</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-300">{selectedBill.tenantName}</span>
+                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>ผู้จดเช่า:</span>
+                    <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>{selectedBill.tenantName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">ยอดบิลทั้งหมด:</span>
-                    <span className="font-black text-teal-600 dark:text-teal-400 text-sm">
+                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>ยอดบิลทั้งหมด:</span>
+                    <span className={`font-black text-sm ${isDark ? "text-teal-400" : "text-teal-600"}`}>
                       {selectedBill.billAmount.toLocaleString()} บาท
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">รอบเดือนประจำบิล:</span>
-                    <span className="font-mono font-semibold text-slate-600 dark:text-slate-400">{billingCycle}</span>
+                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>รอบเดือนประจำบิล:</span>
+                    <span className={`font-mono font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>{billingCycle}</span>
                   </div>
                 </div>
  
-                <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl text-[11px] text-amber-700 dark:text-amber-400/90 leading-relaxed font-medium">
+                <div className={`p-3 border rounded-xl text-[11px] leading-relaxed font-medium ${
+                  isDark ? "bg-amber-500/10 border-amber-500/20 text-amber-400/90" : "bg-amber-50 border-amber-200 text-amber-700"
+                }`}>
                   โปรดเช็กยอดเงินโอนและเวลารับเงินในแอปบัญชีธนาคารหอพักของคุณให้ตรงกับรูปสลิป
                 </div>
               </div>
@@ -1579,7 +1665,11 @@ export default function UnifiedBillingPage() {
                 </button>
                 <button
                   onClick={() => handleRejectSlip(selectedBill.billId)}
-                  className="w-full h-12 md:h-10 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl text-xs font-bold border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer"
+                  className={`w-full h-12 md:h-10 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                    isDark 
+                      ? "bg-rose-950/20 hover:bg-rose-600 text-rose-400 hover:text-white border-rose-900/40 hover:border-rose-600" 
+                      : "bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border-rose-200 hover:border-rose-600"
+                  }`}
                 >
                   ปฏิเสธสลิป / ข้อมูลการโอนผิดพลาด
                 </button>
@@ -1592,101 +1682,117 @@ export default function UnifiedBillingPage() {
       {/* Modal สร้างบิลพิเศษกำหนดเอง */}
       {createBillModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up border border-slate-200 dark:border-slate-800/80">
+          <div className={`w-full max-w-md max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up border ${
+            isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
+          }`}>
             <button
               onClick={() => setCreateBillModalOpen(false)}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-all cursor-pointer"
+              className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all cursor-pointer ${
+                isDark ? "text-slate-400 hover:text-white hover:bg-slate-900/50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              }`}
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-blue-500 dark:text-blue-400" /> สร้างใบแจ้งหนี้จำลองพิเศษ
+            <h3 className={`text-sm font-bold mb-4 flex items-center gap-2 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+              <Receipt className={`w-5 h-5 ${isDark ? "text-blue-400" : "text-blue-500"}`} /> สร้างใบแจ้งหนี้จำลองพิเศษ
             </h3>
 
             <form onSubmit={handleCreateBillManual} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">ห้องพัก</label>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>ห้องพัก</label>
                   <select
-                    className="w-full h-11 md:h-10 px-3 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold cursor-pointer"
+                    className={`w-full h-11 md:h-10 px-3 border rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold cursor-pointer ${
+                      isDark ? "bg-slate-950 text-slate-100 border-slate-800" : "bg-white text-slate-800 border-slate-300"
+                    }`}
                     value={newRoomNumber}
                     onChange={(e) => setNewRoomNumber(e.target.value)}
                   >
                     {roomsList.map(r => (
-                      <option key={r.roomNumber} value={r.roomNumber} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">ห้อง {r.roomNumber}</option>
+                      <option key={r.roomNumber} value={r.roomNumber} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>ห้อง {r.roomNumber}</option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">รอบบิล</label>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>รอบบิล</label>
                   <input
                     type="text"
                     disabled
-                    className="w-full h-11 md:h-10 px-3 bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/60 rounded-xl text-slate-400 dark:text-slate-500 text-sm md:text-xs font-mono font-bold"
+                    className={`w-full h-11 md:h-10 px-3 border rounded-xl text-sm md:text-xs font-mono font-bold ${
+                      isDark ? "bg-slate-950/40 border-slate-800/60 text-slate-500" : "bg-slate-100 border-slate-200 text-slate-400"
+                    }`}
                     value={billingCycle}
                   />
                 </div>
               </div>
 
               {/* มิเตอร์ปัจจุบัน */}
-              <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800/60 space-y-0.5">
+              <div className={`grid grid-cols-2 gap-3 p-4 rounded-xl border space-y-0.5 ${
+                isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50 border-slate-200"
+              }`}>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">หน่วยไฟที่ใช้</label>
+                  <label className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>หน่วยไฟที่ใช้</label>
                   <div className="relative">
                     <input
                       type="number"
-                      className="w-full h-11 md:h-10 px-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-blue-500"
+                      className={`w-full h-11 md:h-10 px-3 border rounded-xl text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-blue-500 ${
+                        isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
+                      }`}
                       value={elecUnitsManual}
                       onChange={(e) => setElecUnitsManual(Number(e.target.value))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-600 font-black">หน่วย</span>
+                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black ${isDark ? "text-slate-600" : "text-slate-400"}`}>หน่วย</span>
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">หน่วยน้ำที่ใช้</label>
+                  <label className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>หน่วยน้ำที่ใช้</label>
                   <div className="relative">
                     <input
                       type="number"
-                      className="w-full h-11 md:h-10 px-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-teal-500"
+                      className={`w-full h-11 md:h-10 px-3 border rounded-xl text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-teal-500 ${
+                        isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
+                      }`}
                       value={waterUnitsManual}
                       onChange={(e) => setWaterUnitsManual(Number(e.target.value))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-600 font-black">หน่วย</span>
+                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black ${isDark ? "text-slate-600" : "text-slate-400"}`}>หน่วย</span>
                   </div>
                 </div>
               </div>
 
               {/* สรุปยอดราคาจำลอง */}
-              <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/40 text-xs space-y-2 font-medium">
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                  <span>ค่าห้องแอร์/พัดลมปกติ:</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-300">{rentPrice.toLocaleString()} บาท</span>
+              <div className={`p-4 rounded-xl border text-xs space-y-2 font-medium ${
+                isDark ? "bg-blue-950/20 border-blue-900/40" : "bg-blue-50/50 border-blue-100"
+              }`}>
+                <div className="flex justify-between">
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าห้องแอร์/พัดลมปกติ:</span>
+                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>{rentPrice.toLocaleString()} บาท</span>
                 </div>
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                  <span>ค่าส่วนกลาง (Fixed Common Fee):</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-300">{commonFee.toLocaleString()} บาท</span>
+                <div className="flex justify-between">
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าส่วนกลาง (Fixed Common Fee):</span>
+                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>{commonFee.toLocaleString()} บาท</span>
                 </div>
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                  <span>ค่าไฟฟ้า ({elecUnitsManual} หน่วย):</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-300">
+                <div className="flex justify-between">
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าไฟฟ้า ({elecUnitsManual} หน่วย):</span>
+                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>
                     {electricMinChecked && elecUnitsManual <= electricMinUnit 
                       ? `${(electricMinUnit * elecRate).toLocaleString()} บาท (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
                       : `${(elecUnitsManual * elecRate).toLocaleString()} บาท (หน่วยละ ${elecRate}.-)`}
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                  <span>ค่าน้ำประปา ({waterUnitsManual} หน่วย):</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-300">
+                <div className="flex justify-between">
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าน้ำประปา ({waterUnitsManual} หน่วย):</span>
+                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>
                     {waterMinChecked && waterUnitsManual <= waterMinUnit 
                       ? `${(waterMinUnit * waterRate).toLocaleString()} บาท (ขั้นต่ำ ${waterMinUnit} หน่วย)` 
                       : `${(waterUnitsManual * waterRate).toLocaleString()} บาท (หน่วยละ ${waterRate}.-)`}
                   </span>
                 </div>
-                <div className="h-px bg-slate-200 dark:bg-slate-800/80 my-1.5" />
-                <div className="flex justify-between font-extrabold text-slate-800 dark:text-slate-200">
+                <div className={`h-px my-1.5 ${isDark ? "bg-slate-800/80" : "bg-slate-200"}`} />
+                <div className={`flex justify-between font-extrabold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
                   <span>ยอดสุทธิที่ต้องชำระ:</span>
-                  <span className="text-blue-600 dark:text-blue-400 text-sm font-black">{computedTotal.toLocaleString()} บาท</span>
+                  <span className={`text-sm font-black ${isDark ? "text-blue-400" : "text-blue-600"}`}>{computedTotal.toLocaleString()} บาท</span>
                 </div>
               </div>
 
@@ -1703,31 +1809,37 @@ export default function UnifiedBillingPage() {
 
       {/* หน้าต่างกำลังบันทึกข้อมูลและออกบิล (Full-Screen Saving Progress Overlay) */}
       {savingAll && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/40 dark:bg-black/80 backdrop-blur-md transition-all duration-300">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800/80 max-w-md w-full mx-4 text-center space-y-6 shadow-2xl relative overflow-hidden">
+        <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md transition-all duration-300 ${
+          isDark ? "bg-black/80" : "bg-slate-900/40"
+        }`}>
+          <div className={`p-8 rounded-3xl border max-w-md w-full mx-4 text-center space-y-6 shadow-2xl relative overflow-hidden ${
+            isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
+          }`}>
             {/* Glow Effects */}
-            <div className="absolute -top-12 -left-12 w-32 h-32 bg-teal-500/10 dark:bg-teal-500/10 rounded-full blur-2xl" />
-            <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-emerald-500/10 dark:bg-emerald-500/10 rounded-full blur-2xl" />
+            <div className={`absolute -top-12 -left-12 w-32 h-32 rounded-full blur-2xl ${isDark ? "bg-teal-500/10" : "bg-teal-500/5"}`} />
+            <div className={`absolute -bottom-12 -right-12 w-32 h-32 rounded-full blur-2xl ${isDark ? "bg-emerald-500/10" : "bg-emerald-500/5"}`} />
             
             {/* Large Beautiful Spinner */}
             <div className="relative flex justify-center">
-              <div className="w-20 h-20 rounded-full border-4 border-teal-500/10 dark:border-teal-500/5 border-t-teal-500 dark:border-t-teal-400 animate-spin" />
+              <div className={`w-20 h-20 rounded-full border-4 border-t-transparent animate-spin ${
+                isDark ? "border-teal-500/5 border-t-teal-400" : "border-teal-500/10 border-t-teal-500"
+              }`} />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Save className="w-8 h-8 text-teal-600 dark:text-teal-400 animate-bounce" />
+                <Save className={`w-8 h-8 animate-bounce ${isDark ? "text-teal-400" : "text-teal-600"}`} />
               </div>
             </div>
             
             {/* Title */}
             <div className="space-y-2">
-              <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 tracking-wide animate-pulse">กำลังบันทึกข้อมูลและออกบิล</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">ระบบกำลังประมวลผลข้อมูลและสร้างบิลไปยังฐานข้อมูล กรุณาอย่าปิดหน้านี้...</p>
+              <h3 className={`text-lg font-black tracking-wide animate-pulse ${isDark ? "text-slate-100" : "text-slate-800"}`}>กำลังบันทึกข้อมูลและออกบิล</h3>
+              <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>ระบบกำลังประมวลผลข้อมูลและสร้างบิลไปยังฐานข้อมูล กรุณาอย่าปิดหน้านี้...</p>
             </div>
 
             {/* Progress Bar */}
             {savingProgress.total > 0 && (
               <div className="space-y-2.5">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400 px-1">
-                  <span className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400 font-extrabold">
+                <div className={`flex justify-between items-center text-xs font-bold px-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  <span className={`flex items-center gap-1.5 font-extrabold ${isDark ? "text-teal-400" : "text-teal-600"}`}>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     ห้อง {savingProgress.currentRoom}
                   </span>
@@ -1735,7 +1847,9 @@ export default function UnifiedBillingPage() {
                 </div>
                 
                 {/* Progress track */}
-                <div className="h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800/60 p-[1px]">
+                <div className={`h-2.5 rounded-full overflow-hidden border p-[1px] ${
+                  isDark ? "bg-slate-950 border-slate-800/60" : "bg-slate-100 border-slate-200"
+                }`}>
                   <div 
                     className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all duration-300 shadow-md shadow-teal-500/20"
                     style={{ width: `${(savingProgress.current / savingProgress.total) * 100}%` }}
