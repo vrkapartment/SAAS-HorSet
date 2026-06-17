@@ -89,7 +89,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   useEffect(() => {
     setMounted(true)
   }, [])
-  const isDark = mounted ? resolvedTheme === "dark" : false
+  const isDark = mounted ? resolvedTheme === "dark" : true
 
   // ดึงบทบาทจริงจากคุกกี้ หรือใช้ค่า prop เป็นค่าเริ่มต้น
   const [userRole, setUserRole] = useState<"admin" | "staff" | "super_admin">(role)

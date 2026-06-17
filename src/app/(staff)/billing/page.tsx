@@ -133,7 +133,7 @@ export default function UnifiedBillingPage() {
     setMounted(true)
   }, [])
 
-  const isDark = mounted ? resolvedTheme === "dark" : false
+  const isDark = mounted ? resolvedTheme === "dark" : true
 
   const [billingCycle, setBillingCycle] = useState("2026-06")
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
