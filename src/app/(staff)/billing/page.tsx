@@ -127,6 +127,7 @@ export default function UnifiedBillingPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -227,6 +228,7 @@ export default function UnifiedBillingPage() {
       let wsId = ""
       let regCycleVal = ""
       if (userProfile) {
+        setCurrentUserRole(userProfile.role || "staff")
         const workspaceDate = userProfile.workspace_created_at || userProfile.created_at
         if (workspaceDate) {
           regCycleVal = getCycleFromTimestamp(workspaceDate)
@@ -377,6 +379,7 @@ export default function UnifiedBillingPage() {
         let wsId: string | undefined = undefined
         
         if (userProfile) {
+          setCurrentUserRole(userProfile.role || "staff")
           const isSuperAdmin = userProfile.role === "super_admin"
           
           if (!isSuperAdmin && userProfile.workspace_id) {
@@ -467,6 +470,10 @@ export default function UnifiedBillingPage() {
 
   // อนุมัติสลิปโอนเงิน
   const handleApproveSlip = async (id: string) => {
+    if (currentUserRole === "staff") {
+      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์อนุมัติสลิปโอนเงิน")
+      return
+    }
     const res = await updateBillStatus(id, "paid")
     if (res.success) {
       showToast("อนุมัติรายการชำระเงินเรียบร้อยแล้ว!")
@@ -481,6 +488,10 @@ export default function UnifiedBillingPage() {
 
   // ปฏิเสธสลิปโอนเงิน
   const handleRejectSlip = async (id: string) => {
+    if (currentUserRole === "staff") {
+      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์ปฏิเสธสลิปโอนเงิน")
+      return
+    }
     const res = await updateBillStatus(id, "unpaid", null)
     if (res.success) {
       showToast("ปฏิเสธสลิปแล้ว บิลจะกลับเป็นสถานะค้างชำระ")
@@ -495,6 +506,10 @@ export default function UnifiedBillingPage() {
 
   // เปลี่ยนสถานะเป็นชำระเงินแล้วโดยตรง (สำหรับกรณีแอดมินรับเงินสด/โอนตรง)
   const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
+    if (currentUserRole === "staff") {
+      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์กดรับเงินและบันทึกการชำระเงินโดยตรง")
+      return
+    }
     if (!confirm(`คุณต้องการเปลี่ยนสถานะบิลของห้อง ${roomNumber} เป็น "ชำระเงินแล้ว" ใช่หรือไม่? (โปรดยืนยันหากได้รับเงินแล้ว)`)) return
 
     const res = await updateBillStatus(billId, "paid")
@@ -1255,9 +1270,15 @@ export default function UnifiedBillingPage() {
                         {item.billStatus === "unpaid" && (
                           <button
                             onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                            className="w-full h-12 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                            disabled={currentUserRole === "staff"}
+                            className={`w-full h-12 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
+                              currentUserRole === "staff"
+                                ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-400 dark:text-slate-600"
+                                : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer"
+                            }`}
+                            title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด / บันทึกชำระเงินตรง"}
                           >
-                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            <CheckCircle className={`w-4 h-4 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
                             <span>รับเงินสด / บันทึกชำระเงินตรง</span>
                           </button>
                         )}
@@ -1542,13 +1563,24 @@ export default function UnifiedBillingPage() {
                               {item.billStatus === "unpaid" && (
                                 <button
                                   onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                                  className={`p-1.5 border rounded-xl transition-all flex items-center gap-1 hover:scale-105 shadow-sm cursor-pointer ${
-                                    isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-500/40"
+                                  disabled={currentUserRole === "staff"}
+                                  className={`p-1.5 border rounded-xl transition-all flex items-center gap-1 shadow-sm ${
+                                    currentUserRole === "staff"
+                                      ? "opacity-40 cursor-not-allowed"
+                                      : "hover:scale-105 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
+                                  } ${
+                                    isDark ? "bg-slate-900 border-slate-800 text-slate-500" : "bg-white border-slate-200 text-slate-400"
                                   }`}
-                                  title="รับเงินสด/บันทึกชำระเงินตรง"
+                                  title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด/บันทึกชำระเงินตรง"}
                                 >
-                                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                                  <span className={`text-[10px] hidden xl:inline font-bold ${isDark ? "text-slate-400 hover:text-emerald-300" : "text-slate-500 hover:text-emerald-600"}`}>รับเงินแล้ว</span>
+                                  <CheckCircle className={`w-3.5 h-3.5 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
+                                  <span className={`text-[10px] hidden xl:inline font-bold ${
+                                    currentUserRole === "staff"
+                                      ? "text-slate-400 dark:text-slate-600"
+                                      : isDark ? "text-slate-400 hover:text-emerald-300" : "text-slate-500 hover:text-emerald-600"
+                                  }`}>
+                                    รับเงินแล้ว
+                                  </span>
                                 </button>
                               )}
                             </>
