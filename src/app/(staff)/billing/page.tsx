@@ -855,9 +855,9 @@ export default function UnifiedBillingPage() {
         <div>
           <div className="flex items-center gap-2">
             <Gauge className="w-5 h-5 text-blue-500" />
-            <h2 className="text-xl font-bold text-slate-100">จดเลขมิเตอร์ & จัดการบิลค่าเช่า</h2>
+            <h2 className="text-xl font-bold text-slate-850 dark:text-slate-100">จดเลขมิเตอร์ & จัดการบิลค่าเช่า</h2>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             หน้าจอแบบบูรณาการ: บันทึกหน่วยมิเตอร์ไฟ/น้ำ พร้อมประมวลผลคำนวณออกใบแจ้งหนี้ให้ผู้เช่าได้ทันทีในคลิกเดียว
           </p>
         </div>
@@ -865,12 +865,12 @@ export default function UnifiedBillingPage() {
         <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs font-semibold transition-all cursor-pointer"
+            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm md:text-xs font-semibold transition-all cursor-pointer"
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
           >
             {getBillingCycleOptions(registrationCycle).map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">{opt.label}</option>
             ))}
           </select>
 
@@ -880,7 +880,7 @@ export default function UnifiedBillingPage() {
             disabled={downloadingAllPdf}
             className={`w-full md:w-auto h-12 md:h-9 text-white font-semibold px-4 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs transition-all cursor-pointer ${
               downloadingAllPdf
-                ? "bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed"
+                ? "bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed"
                 : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-600/20 active:scale-95"
             }`}
           >
@@ -898,9 +898,9 @@ export default function UnifiedBillingPage() {
           {/* ปุ่มบิลกำหนดเอง (สำหรับแอดมินหรือกรณีฉุกเฉิน) */}
           <button
             onClick={() => setCreateBillModalOpen(true)}
-            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs font-semibold transition-all cursor-pointer"
+            className="w-full md:w-auto h-12 md:h-9 px-3.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs font-semibold transition-all cursor-pointer shadow-sm"
           >
-            <Plus className="w-4 h-4 md:w-3.5 md:h-3.5 text-blue-500" /> บิลจำลองพิเศษ
+            <Plus className="w-4 h-4 md:w-3.5 md:h-3.5 text-blue-500 dark:text-blue-400" /> บิลจำลองพิเศษ
           </button>
         </div>
       </div>
@@ -908,65 +908,65 @@ export default function UnifiedBillingPage() {
       {/* แดชบอร์ดสรุปสถิติประจำรอบเดือน */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* การจดมิเตอร์ */}
-        <div className="glass-card p-4 rounded-2xl border border-slate-900/50 flex items-center gap-3 bg-slate-950/20">
-          <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl">
+        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 shadow-sm">
+          <div className="p-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl">
             <Gauge className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">บันทึกมิเตอร์แล้ว</p>
-            <p className="text-base font-extrabold text-slate-100">{billedCount} / {totalOccupied} ห้อง</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">บันทึกมิเตอร์แล้ว</p>
+            <p className="text-base font-extrabold text-slate-800 dark:text-slate-100">{billedCount} / {totalOccupied} ห้อง</p>
           </div>
         </div>
 
         {/* ชำระเงินเรียบร้อย */}
-        <div className="glass-card p-4 rounded-2xl border border-slate-900/50 flex items-center gap-3 bg-slate-950/20">
-          <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl">
+        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 shadow-sm">
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-xl">
             <CheckCircle className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">ชำระเงินเรียบร้อย</p>
-            <p className="text-base font-extrabold text-slate-100">{paidCount} ห้อง</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">ชำระเงินเรียบร้อย</p>
+            <p className="text-base font-extrabold text-slate-800 dark:text-slate-100">{paidCount} ห้อง</p>
           </div>
         </div>
 
         {/* รอตรวจสอบสลิป */}
-        <div className="glass-card p-4 rounded-2xl border border-slate-900/50 flex items-center gap-3 bg-slate-950/20 relative overflow-hidden">
+        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 relative overflow-hidden shadow-sm">
           {pendingCount > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping" />}
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl">
+          <div className="p-2.5 bg-amber-500/10 text-amber-500 dark:text-amber-400 rounded-xl">
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">รอตรวจสอบสลิป</p>
-            <p className={`text-base font-extrabold ${pendingCount > 0 ? "text-amber-400 font-black animate-pulse" : "text-slate-400"}`}>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">รอตรวจสอบสลิป</p>
+            <p className={`text-base font-extrabold ${pendingCount > 0 ? "text-amber-600 dark:text-amber-400 font-black animate-pulse" : "text-slate-500 dark:text-slate-400"}`}>
               {pendingCount} ห้อง
             </p>
           </div>
         </div>
 
         {/* ค้างชำระ */}
-        <div className="glass-card p-4 rounded-2xl border border-slate-900/50 flex items-center gap-3 bg-slate-950/20">
-          <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-xl">
+        <div className="bg-white dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-3 shadow-sm">
+          <div className="p-2.5 bg-rose-500/10 text-rose-500 dark:text-rose-400 rounded-xl">
             <AlertCircle className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">ค้างชำระเงิน</p>
-            <p className="text-base font-extrabold text-rose-400">{unpaidCount} ห้อง</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">ค้างชำระเงิน</p>
+            <p className="text-base font-extrabold text-rose-600 dark:text-rose-400">{unpaidCount} ห้อง</p>
           </div>
         </div>
       </div>
 
       {/* แจ้งเตือน */}
-      <div className="flex items-center gap-2.5 p-3.5 bg-blue-500/5 border border-blue-500/10 rounded-xl text-xs text-blue-400">
-        <Sparkles className="w-4 h-4 shrink-0 text-blue-400" />
+      <div className="flex items-center gap-2.5 p-3.5 bg-blue-50/60 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-400/90 font-medium">
+        <Sparkles className="w-4 h-4 shrink-0 text-blue-500 dark:text-blue-400" />
         <span>ระบบจำลองการประมวลผลดึงค่ามิเตอร์ครั้งก่อนหน้าและราคาค่าเช่าอิงตาม Room Type โดยอัตโนมัติ กรอกเพียงเลขมิเตอร์ปัจจุบันเพื่อสร้างบิล</span>
       </div>
 
       {/* ตารางควบคุมหลัก */}
-      <div className="p-0 md:p-5 bg-transparent md:bg-slate-950/10 md:border md:border-slate-900/60 md:glass-card md:rounded-2xl md:backdrop-blur-md">
+      <div className="p-0 md:p-5 bg-transparent md:bg-white dark:md:bg-slate-900/30 md:border md:border-slate-200 dark:md:border-slate-800/80 md:rounded-2xl md:shadow-sm">
         {/* Mobile View: Card List (< 768px) */}
         <div className="block md:hidden space-y-4">
           {loading ? (
-            <div className="py-12 text-center text-slate-500 bg-slate-950/10 border border-slate-900/60 rounded-2xl glass-card backdrop-blur-md">
+            <div className="py-12 text-center text-slate-500 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-sm">
               <div className="flex flex-col items-center justify-center gap-3">
                 <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
                 <span>กำลังโหลดข้อมูลรวม...</span>
