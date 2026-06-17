@@ -81,7 +81,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   }
   const [mobileOpen, setMobileOpen] = useState(false)
   const { t } = useLanguage()
-  const { getCachedData, setCachedData } = useWorkspaceData()
+  const { getCachedData, setCachedData, clearAllCache } = useWorkspaceData()
 
   // Theme states
   const { resolvedTheme } = useTheme()
@@ -682,6 +682,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   const handleLogout = () => {
     clearCachedUserProfile()
+    clearAllCache()
     document.cookie = "horset_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
     document.cookie = "horset_current_workspace_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
     router.push("/login")

@@ -6,6 +6,7 @@ import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight } from "lucide-react"
 import { loginAction } from "@/features/auth/actions"
 import { createClient } from "@/lib/supabase/client"
 import { clearCachedUserProfile } from "@/features/auth/client"
+import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -20,8 +21,11 @@ export default function LoginPage() {
   // ตรวจสอบว่าระบบอยู่ในโหมดจำลอง (Demo Mode) หรือไม่
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
-  // ดึงค่า email จาก URL Parameter ในกรณีที่มาจากการสมัครสมาชิกหน้า Register
+  const { clearAllCache } = useWorkspaceData()
+
+  // ดึงค่า email จาก URL Parameter ในกรณีที่มาจากการสมัครสมาชิกหน้า Register และทำความสะอาด Cache ทั้งหมด
   useEffect(() => {
+    clearAllCache()
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search)
       const emailParam = params.get("email")
@@ -29,7 +33,7 @@ export default function LoginPage() {
         setEmail(emailParam)
       }
     }
-  }, [])
+  }, [clearAllCache])
 
   const handleAutofill = (role: "admin" | "staff" | "tenant") => {
     setSelectedRole(role)
