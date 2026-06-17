@@ -29,6 +29,13 @@ import { getMeterRecords, saveMeterRecord } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 
+// Extracted Billing Sub-components
+import BillingSummaryStats from "@/features/billing/components/BillingSummaryStats"
+import SavingProgressOverlay from "@/features/billing/components/SavingProgressOverlay"
+import SlipVerificationModal from "@/features/billing/components/SlipVerificationModal"
+import CreateBillModal from "@/features/billing/components/CreateBillModal"
+
+
 interface UnifiedRoomBillingItem {
   roomNumber: string
   tenantName: string | null
@@ -936,66 +943,14 @@ export default function UnifiedBillingPage() {
       </div>
 
       {/* แดชบอร์ดสรุปสถิติประจำรอบเดือน */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* การจดมิเตอร์ */}
-        <div className={`p-4 rounded-2xl border flex items-center gap-3 shadow-sm ${
-          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
-        }`}>
-          <div className={`p-2.5 rounded-xl ${isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-500/10 text-blue-500"}`}>
-            <Gauge className="w-5 h-5" />
-          </div>
-          <div>
-            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>บันทึกมิเตอร์แล้ว</p>
-            <p className={`text-base font-extrabold ${isDark ? "text-slate-100" : "text-slate-800"}`}>{billedCount} / {totalOccupied} ห้อง</p>
-          </div>
-        </div>
-
-        {/* ชำระเงินเรียบร้อย */}
-        <div className={`p-4 rounded-2xl border flex items-center gap-3 shadow-sm ${
-          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
-        }`}>
-          <div className={`p-2.5 rounded-xl ${isDark ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-500/10 text-emerald-500"}`}>
-            <CheckCircle className="w-5 h-5" />
-          </div>
-          <div>
-            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ชำระเงินเรียบร้อย</p>
-            <p className={`text-base font-extrabold ${isDark ? "text-slate-100" : "text-slate-800"}`}>{paidCount} ห้อง</p>
-          </div>
-        </div>
-
-        {/* รอตรวจสอบสลิป */}
-        <div className={`p-4 rounded-2xl border flex items-center gap-3 relative overflow-hidden shadow-sm ${
-          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
-        }`}>
-          {pendingCount > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping" />}
-          <div className={`p-2.5 rounded-xl ${isDark ? "bg-amber-500/10 text-amber-400" : "bg-amber-500/10 text-amber-500"}`}>
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>รอตรวจสอบสลิป</p>
-            <p className={`text-base font-extrabold ${
-              pendingCount > 0 
-                ? `font-black animate-pulse ${isDark ? "text-amber-400" : "text-amber-600"}` 
-                : (isDark ? "text-slate-400" : "text-slate-500")
-            }`}>
-              {pendingCount} ห้อง
-            </p>
-          </div>
-        </div>
-
-        {/* ค้างชำระ */}
-        <div className={`p-4 rounded-2xl border flex items-center gap-3 shadow-sm ${
-          isDark ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200"
-        }`}>
-          <div className={`p-2.5 rounded-xl ${isDark ? "bg-rose-500/10 text-rose-400" : "bg-rose-500/10 text-rose-500"}`}>
-            <AlertCircle className="w-5 h-5" />
-          </div>
-          <div>
-            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ค้างชำระเงิน</p>
-            <p className={`text-base font-extrabold ${isDark ? "text-rose-400" : "text-rose-600"}`}>{unpaidCount} ห้อง</p>
-          </div>
-        </div>
-      </div>
+      <BillingSummaryStats
+        isDark={isDark}
+        billedCount={billedCount}
+        totalOccupied={totalOccupied}
+        paidCount={paidCount}
+        pendingCount={pendingCount}
+        unpaidCount={unpaidCount}
+      />
 
       {/* แจ้งเตือน */}
       <div className={`flex items-center gap-2.5 p-3.5 border rounded-xl text-xs font-medium ${
@@ -1615,282 +1570,50 @@ export default function UnifiedBillingPage() {
       </div>
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}
-      {slipModalOpen && selectedBill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className={`${
-            isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
-          } w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up grid grid-cols-1 md:grid-cols-2 gap-6 border`}>
-            <button
-              onClick={() => {
-                setSlipModalOpen(false)
-                setSelectedBill(null)
-              }}
-              className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all cursor-pointer ${
-                isDark ? "text-slate-400 hover:text-white hover:bg-slate-900/50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            {/* ฝั่งสลิปธนาคาร */}
-            <div className="space-y-2">
-              <h4 className={`text-xs font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>รูปภาพหลักฐานการโอนเงิน</h4>
-              <div className={`w-full aspect-[3/4] rounded-2xl overflow-hidden border relative flex items-center justify-center ${
-                isDark ? "bg-slate-950 border-slate-900/60" : "bg-slate-50 border-slate-200"
-              }`}>
-                {selectedBill.slipUrl ? (
-                  <img
-                    src={selectedBill.slipUrl}
-                    alt="Slip Verification"
-                    className="object-contain w-full h-full"
-                  />
-                ) : (
-                  <p className={`text-xs ${isDark ? "text-slate-600" : "text-slate-400"}`}>ไม่พบหลักฐานไฟล์แนบในระบบ</p>
-                )}
-              </div>
-            </div>
- 
-            {/* ฝั่งรายละเอียดและการกดอนุมัติ */}
-            <div className="flex flex-col justify-between pt-3">
-              <div className="space-y-4">
-                <h3 className={`text-sm font-black flex items-center gap-2 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                  <CreditCard className={`w-4 h-4 ${isDark ? "text-blue-400" : "text-blue-500"}`} /> อนุมัติสลิปโอนและปิดบิล
-                </h3>
- 
-                <div className={`p-4 rounded-xl space-y-2.5 border text-xs ${
-                  isDark ? "bg-slate-900/60 border-slate-900" : "bg-slate-50 border-slate-200"
-                }`}>
-                  <div className="flex justify-between">
-                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>หมายเลขห้องพัก:</span>
-                    <span className={`font-extrabold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{selectedBill.roomNumber}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>ผู้จดเช่า:</span>
-                    <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>{selectedBill.tenantName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>ยอดบิลทั้งหมด:</span>
-                    <span className={`font-black text-sm ${isDark ? "text-teal-400" : "text-teal-600"}`}>
-                      {selectedBill.billAmount.toLocaleString()} บาท
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>รอบเดือนประจำบิล:</span>
-                    <span className={`font-mono font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>{billingCycle}</span>
-                  </div>
-                </div>
- 
-                <div className={`p-3 border rounded-xl text-[11px] leading-relaxed font-medium ${
-                  isDark ? "bg-amber-500/10 border-amber-500/20 text-amber-400/90" : "bg-amber-50 border-amber-200 text-amber-700"
-                }`}>
-                  โปรดเช็กยอดเงินโอนและเวลารับเงินในแอปบัญชีธนาคารหอพักของคุณให้ตรงกับรูปสลิป
-                </div>
-              </div>
- 
-              <div className="space-y-2 pt-6">
-                <button
-                  onClick={() => handleApproveSlip(selectedBill.billId)}
-                  className="w-full h-12 md:h-10 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg shadow-teal-600/10 transition-all hover:-translate-y-0.5 cursor-pointer"
-                >
-                  <UserCheck className="w-4 h-4" /> อนุมัติยอดและปิดบัญชีบิล
-                </button>
-                <button
-                  onClick={() => handleRejectSlip(selectedBill.billId)}
-                  className={`w-full h-12 md:h-10 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                    isDark 
-                      ? "bg-rose-950/20 hover:bg-rose-600 text-rose-400 hover:text-white border-rose-900/40 hover:border-rose-600" 
-                      : "bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border-rose-200 hover:border-rose-600"
-                  }`}
-                >
-                  ปฏิเสธสลิป / ข้อมูลการโอนผิดพลาด
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SlipVerificationModal
+        isDark={isDark}
+        slipModalOpen={slipModalOpen}
+        selectedBill={selectedBill}
+        billingCycle={billingCycle}
+        onClose={() => {
+          setSlipModalOpen(false)
+          setSelectedBill(null)
+        }}
+        onApprove={handleApproveSlip}
+        onReject={handleRejectSlip}
+      />
 
       {/* Modal สร้างบิลพิเศษกำหนดเอง */}
-      {createBillModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className={`w-full max-w-md max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up border ${
-            isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
-          }`}>
-            <button
-              onClick={() => setCreateBillModalOpen(false)}
-              className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all cursor-pointer ${
-                isDark ? "text-slate-400 hover:text-white hover:bg-slate-900/50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className={`text-sm font-bold mb-4 flex items-center gap-2 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-              <Receipt className={`w-5 h-5 ${isDark ? "text-blue-400" : "text-blue-500"}`} /> สร้างใบแจ้งหนี้จำลองพิเศษ
-            </h3>
-
-            <form onSubmit={handleCreateBillManual} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>ห้องพัก</label>
-                  <select
-                    className={`w-full h-11 md:h-10 px-3 border rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold cursor-pointer ${
-                      isDark ? "bg-slate-950 text-slate-100 border-slate-800" : "bg-white text-slate-800 border-slate-300"
-                    }`}
-                    value={newRoomNumber}
-                    onChange={(e) => setNewRoomNumber(e.target.value)}
-                  >
-                    {roomsList.map(r => (
-                      <option key={r.roomNumber} value={r.roomNumber} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>ห้อง {r.roomNumber}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>รอบบิล</label>
-                  <input
-                    type="text"
-                    disabled
-                    className={`w-full h-11 md:h-10 px-3 border rounded-xl text-sm md:text-xs font-mono font-bold ${
-                      isDark ? "bg-slate-950/40 border-slate-800/60 text-slate-500" : "bg-slate-100 border-slate-200 text-slate-400"
-                    }`}
-                    value={billingCycle}
-                  />
-                </div>
-              </div>
-
-              {/* มิเตอร์ปัจจุบัน */}
-              <div className={`grid grid-cols-2 gap-3 p-4 rounded-xl border space-y-0.5 ${
-                isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50 border-slate-200"
-              }`}>
-                <div className="space-y-1">
-                  <label className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>หน่วยไฟที่ใช้</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      className={`w-full h-11 md:h-10 px-3 border rounded-xl text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-blue-500 ${
-                        isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
-                      }`}
-                      value={elecUnitsManual}
-                      onChange={(e) => setElecUnitsManual(Number(e.target.value))}
-                    />
-                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black ${isDark ? "text-slate-600" : "text-slate-400"}`}>หน่วย</span>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>หน่วยน้ำที่ใช้</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      className={`w-full h-11 md:h-10 px-3 border rounded-xl text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-teal-500 ${
-                        isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
-                      }`}
-                      value={waterUnitsManual}
-                      onChange={(e) => setWaterUnitsManual(Number(e.target.value))}
-                    />
-                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black ${isDark ? "text-slate-600" : "text-slate-400"}`}>หน่วย</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* สรุปยอดราคาจำลอง */}
-              <div className={`p-4 rounded-xl border text-xs space-y-2 font-medium ${
-                isDark ? "bg-blue-950/20 border-blue-900/40" : "bg-blue-50/50 border-blue-100"
-              }`}>
-                <div className="flex justify-between">
-                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าห้องแอร์/พัดลมปกติ:</span>
-                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>{rentPrice.toLocaleString()} บาท</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าส่วนกลาง (Fixed Common Fee):</span>
-                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>{commonFee.toLocaleString()} บาท</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าไฟฟ้า ({elecUnitsManual} หน่วย):</span>
-                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>
-                    {electricMinChecked && elecUnitsManual <= electricMinUnit 
-                      ? `${(electricMinUnit * elecRate).toLocaleString()} บาท (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
-                      : `${(elecUnitsManual * elecRate).toLocaleString()} บาท (หน่วยละ ${elecRate}.-)`}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าน้ำประปา ({waterUnitsManual} หน่วย):</span>
-                  <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-800"}`}>
-                    {waterMinChecked && waterUnitsManual <= waterMinUnit 
-                      ? `${(waterMinUnit * waterRate).toLocaleString()} บาท (ขั้นต่ำ ${waterMinUnit} หน่วย)` 
-                      : `${(waterUnitsManual * waterRate).toLocaleString()} บาท (หน่วยละ ${waterRate}.-)`}
-                  </span>
-                </div>
-                <div className={`h-px my-1.5 ${isDark ? "bg-slate-800/80" : "bg-slate-200"}`} />
-                <div className={`flex justify-between font-extrabold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                  <span>ยอดสุทธิที่ต้องชำระ:</span>
-                  <span className={`text-sm font-black ${isDark ? "text-blue-400" : "text-blue-600"}`}>{computedTotal.toLocaleString()} บาท</span>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full h-12 md:h-10 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm md:text-xs font-bold shadow-lg shadow-blue-600/15 active:scale-[0.98] transition-all flex items-center justify-center cursor-pointer"
-              >
-                คำนวณเงินและออกบิลค้างชำระ
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreateBillModal
+        isDark={isDark}
+        createBillModalOpen={createBillModalOpen}
+        roomsList={roomsList}
+        newRoomNumber={newRoomNumber}
+        setNewRoomNumber={setNewRoomNumber}
+        billingCycle={billingCycle}
+        elecUnitsManual={elecUnitsManual}
+        setElecUnitsManual={setElecUnitsManual}
+        waterUnitsManual={waterUnitsManual}
+        setWaterUnitsManual={setWaterUnitsManual}
+        rentPrice={rentPrice}
+        commonFee={commonFee}
+        elecRate={elecRate}
+        waterRate={waterRate}
+        electricMinChecked={electricMinChecked}
+        electricMinUnit={electricMinUnit}
+        waterMinChecked={waterMinChecked}
+        waterMinUnit={waterMinUnit}
+        computedTotal={computedTotal}
+        onClose={() => setCreateBillModalOpen(false)}
+        onSubmit={handleCreateBillManual}
+      />
 
       {/* หน้าต่างกำลังบันทึกข้อมูลและออกบิล (Full-Screen Saving Progress Overlay) */}
-      {savingAll && (
-        <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md transition-all duration-300 ${
-          isDark ? "bg-black/80" : "bg-slate-900/40"
-        }`}>
-          <div className={`p-8 rounded-3xl border max-w-md w-full mx-4 text-center space-y-6 shadow-2xl relative overflow-hidden ${
-            isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
-          }`}>
-            {/* Glow Effects */}
-            <div className={`absolute -top-12 -left-12 w-32 h-32 rounded-full blur-2xl ${isDark ? "bg-teal-500/10" : "bg-teal-500/5"}`} />
-            <div className={`absolute -bottom-12 -right-12 w-32 h-32 rounded-full blur-2xl ${isDark ? "bg-emerald-500/10" : "bg-emerald-500/5"}`} />
-            
-            {/* Large Beautiful Spinner */}
-            <div className="relative flex justify-center">
-              <div className={`w-20 h-20 rounded-full border-4 border-t-transparent animate-spin ${
-                isDark ? "border-teal-500/5 border-t-teal-400" : "border-teal-500/10 border-t-teal-500"
-              }`} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Save className={`w-8 h-8 animate-bounce ${isDark ? "text-teal-400" : "text-teal-600"}`} />
-              </div>
-            </div>
-            
-            {/* Title */}
-            <div className="space-y-2">
-              <h3 className={`text-lg font-black tracking-wide animate-pulse ${isDark ? "text-slate-100" : "text-slate-800"}`}>กำลังบันทึกข้อมูลและออกบิล</h3>
-              <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>ระบบกำลังประมวลผลข้อมูลและสร้างบิลไปยังฐานข้อมูล กรุณาอย่าปิดหน้านี้...</p>
-            </div>
-
-            {/* Progress Bar */}
-            {savingProgress.total > 0 && (
-              <div className="space-y-2.5">
-                <div className={`flex justify-between items-center text-xs font-bold px-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                  <span className={`flex items-center gap-1.5 font-extrabold ${isDark ? "text-teal-400" : "text-teal-600"}`}>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ห้อง {savingProgress.currentRoom}
-                  </span>
-                  <span className="font-mono">{savingProgress.current} / {savingProgress.total} ห้อง</span>
-                </div>
-                
-                {/* Progress track */}
-                <div className={`h-2.5 rounded-full overflow-hidden border p-[1px] ${
-                  isDark ? "bg-slate-950 border-slate-800/60" : "bg-slate-100 border-slate-200"
-                }`}>
-                  <div 
-                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all duration-300 shadow-md shadow-teal-500/20"
-                    style={{ width: `${(savingProgress.current / savingProgress.total) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <SavingProgressOverlay
+        isDark={isDark}
+        savingAll={savingAll}
+        savingProgress={savingProgress}
+      />
     </>
   )
 }
