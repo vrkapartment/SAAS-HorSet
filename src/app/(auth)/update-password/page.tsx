@@ -24,22 +24,63 @@ export default function UpdatePasswordPage() {
       return
     }
 
-    const checkSession = async () => {
-      try {
-        const supabase = createClient()
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!session) {
-          setError("ไม่พบสิทธิ์การกู้คืนรหัสผ่าน หรือเซสชันกู้คืนรหัสผ่านของคุณหมดอายุแล้ว กรุณากรอกแบบฟอร์มลืมรหัสผ่านเพื่อรับอีเมลใหม่อีกครั้ง")
-        }
+    const supabase = createClient()
+    let isMounted = true
+    let timeoutId: NodeJS.Timeout
+
+    // Listen for auth state changes (e.g. when PKCE code exchange completes successfully)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return
+
+      if (session) {
+        setError(null)
         setSessionChecked(true)
+        if (timeoutId) clearTimeout(timeoutId)
+      }
+    })
+
+    // Also check current session immediately (in case it is already exchanged or we are using Implicit grant flow)
+    const checkInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!isMounted) return
+
+        if (session) {
+          setError(null)
+          setSessionChecked(true)
+        } else {
+          // Check if there is a PKCE 'code' query parameter in the URL
+          const hasCode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("code")
+          
+          if (hasCode) {
+            // Wait for 3.5 seconds to allow client-side PKCE code exchange to finish
+            timeoutId = setTimeout(async () => {
+              if (!isMounted) return
+              const { data: { session: currentSession } } = await supabase.auth.getSession()
+              if (!currentSession) {
+                setError("ไม่พบสิทธิ์การกู้คืนรหัสผ่าน หรือเซสชันกู้คืนรหัสผ่านของคุณหมดอายุแล้ว กรุณากรอกแบบฟอร์มลืมรหัสผ่านเพื่อรับอีเมลใหม่อีกครั้ง")
+                setSessionChecked(true)
+              }
+            }, 3500)
+          } else {
+            // No code in URL, and no active session - invalid recovery access
+            setError("ไม่พบสิทธิ์การกู้คืนรหัสผ่าน หรือเซสชันกู้คืนรหัสผ่านของคุณหมดอายุแล้ว กรุณากรอกแบบฟอร์มลืมรหัสผ่านเพื่อรับอีเมลใหม่อีกครั้ง")
+            setSessionChecked(true)
+          }
+        }
       } catch (err) {
         setError("เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์เข้าถึง")
         setSessionChecked(true)
       }
     }
 
-    checkSession()
+    checkInitialSession()
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+      if (timeoutId) clearTimeout(timeoutId)
+    }
   }, [isDemo])
 
   const getPasswordStrength = () => {
