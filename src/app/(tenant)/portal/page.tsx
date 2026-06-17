@@ -660,58 +660,64 @@ export default function TenantPortal() {
       {/* ========================================== */}
       {/* POP-UP MODAL สำหรับแก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน ของผู้เช่า */}
       {/* ========================================== */}
+      {/* ========================================== */}
+      {/* POP-UP MODAL สำหรับแก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน ของผู้เช่า */}
+      {/* ========================================== */}
       {showProfileModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop ดำเบลอหรูหรา */}
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => !profileLoading && setShowProfileModal(false)} />
+          {/* Backdrop ล้ำสมัย ละมุนหรูหรา */}
+          <div 
+            className="absolute inset-0 bg-slate-950/75 backdrop-blur-md transition-all duration-300" 
+            onClick={() => !profileLoading && setShowProfileModal(false)} 
+          />
           
-          <div className="relative glass-panel w-full max-w-md p-8 rounded-3xl border border-blue-500/20 shadow-2xl shadow-blue-500/5 animate-scale-up">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-teal-500 rounded-t-3xl" />
+          <div className="relative glass-panel w-full max-w-md p-8 rounded-3xl border border-blue-500/20 shadow-2xl shadow-blue-500/5 animate-scale-up transition-colors duration-300">
+            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-teal-500 rounded-t-3xl animate-gradient-flow" />
             
             {/* Close button */}
             <button
               disabled={profileLoading}
               onClick={() => setShowProfileModal(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-slate-900 rounded-full transition-colors disabled:opacity-50"
+              className="absolute top-5 right-5 p-2 rounded-full transition-all duration-200 disabled:opacity-50 hover:scale-105 active:scale-95 cursor-pointer text-slate-400 hover:text-slate-200 hover:bg-slate-900"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="flex flex-col space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-600/10 rounded-2xl border border-blue-500/20 text-blue-400">
-                  <User className="w-6 h-6" />
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 bg-blue-600/10 rounded-2xl border border-blue-500/25 text-blue-400 shadow-inner">
+                  <User className="w-6 h-6 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100">
+                  <h3 className="text-xl font-black tracking-tight text-white">
                     ตั้งค่าโปรไฟล์ & รหัสผ่าน
                   </h3>
-                  <p className="text-xs text-slate-400">แก้ไขข้อมูลผู้เช่าและรหัสผ่านเพื่อความปลอดภัย</p>
+                  <p className="text-xs text-slate-400 mt-0.5 font-medium">แก้ไขข้อมูลผู้เช่าและรหัสผ่านเพื่อความปลอดภัยของบัญชี</p>
                 </div>
               </div>
 
               {profileError && (
-                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2.5 text-xs text-red-400 animate-pulse">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-xs text-red-400 animate-pulse shadow-sm">
+                  <AlertCircle className="w-4.5 h-4.5 shrink-0" />
                   <span>{profileError}</span>
                 </div>
               )}
 
               {profileSuccess && (
-                <div className="p-3.5 bg-teal-500/10 border border-teal-500/20 rounded-xl flex items-center gap-2.5 text-xs text-teal-400">
-                  <Check className="w-4 h-4 shrink-0" />
+                <div className="p-3.5 bg-teal-500/10 border border-teal-500/20 rounded-xl flex items-center gap-3 text-xs text-teal-400 font-bold shadow-sm">
+                  <Check className="w-4.5 h-4.5 shrink-0" />
                   <span>{profileSuccess}</span>
                 </div>
               )}
 
               <form onSubmit={handleUpdateProfileSubmit} className="space-y-4">
                 {/* Full name input */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                    <span>ชื่อ-นามสกุลผู้เช่า</span>
+                <div className="group relative flex flex-col space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-blue-400 transition-colors">
+                    ชื่อ-นามสกุลผู้เช่า
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                     <input
                       type="text"
                       required
@@ -719,18 +725,18 @@ export default function TenantPortal() {
                       onChange={(e) => setProfileName(e.target.value)}
                       disabled={profileLoading}
                       placeholder="กรอกชื่อ-นามสกุลจริง"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-900 focus:border-blue-500 rounded-xl text-xs text-slate-200 outline-none transition-all disabled:opacity-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 rounded-xl text-xs text-slate-100 outline-none transition-all disabled:opacity-50 font-semibold placeholder-slate-650"
                     />
                   </div>
                 </div>
 
                 {/* Phone number input */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                    <span>เบอร์โทรศัพท์</span>
+                <div className="group relative flex flex-col space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-blue-400 transition-colors">
+                    เบอร์โทรศัพท์
                   </label>
                   <div className="relative">
-                    <AlertCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <AlertCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                     <input
                       type="tel"
                       required
@@ -738,75 +744,77 @@ export default function TenantPortal() {
                       onChange={(e) => setProfilePhone(e.target.value)}
                       disabled={profileLoading}
                       placeholder="กรอกเบอร์โทรศัพท์มือถือ"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-900 focus:border-blue-500 rounded-xl text-xs text-slate-200 outline-none transition-all disabled:opacity-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 rounded-xl text-xs text-slate-100 outline-none transition-all disabled:opacity-50 font-semibold placeholder-slate-650"
                     />
                   </div>
                 </div>
 
-                <div className="h-px bg-slate-900 my-4" />
+                {/* Beautiful fading gradient divider */}
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-800 to-transparent my-6" />
 
-                <div className="space-y-1 bg-blue-500/5 p-3 rounded-2xl border border-blue-500/10 mb-2">
-                  <p className="text-[10px] text-blue-400 font-semibold flex items-center gap-1">
-                    <KeyRound className="w-3 h-3" /> แนะนำการเปลี่ยนรหัสผ่าน
+                {/* Interactive Premium Suggestion Card */}
+                <div className="space-y-1.5 p-4 rounded-r-2xl border-l-4 border-blue-500/50 bg-blue-500/5 text-blue-400 transition-all duration-300 mb-2 shadow-sm shadow-blue-950/10">
+                  <p className="text-[11px] font-bold flex items-center gap-1.5 uppercase tracking-wide">
+                    <KeyRound className="w-3.5 h-3.5" /> แนะนำการเปลี่ยนรหัสผ่าน
                   </p>
-                  <p className="text-[9px] text-slate-500 leading-normal">
-                    กรอกข้อมูลด้านล่างเฉพาะเมื่อคุณต้องการแก้ไขรหัสผ่านใหม่เท่านั้น หากไม่ต้องการแก้ไข ให้ปล่อยว่างช่องรหัสผ่านไว้ได้เลยครับ
+                  <p className="text-[10px] leading-relaxed font-medium text-slate-400">
+                    กรอกข้อมูลด้านล่างเฉพาะเมื่อต้องการแก้ไขรหัสผ่านใหม่เท่านั้น หากไม่ต้องการแก้ไข ให้ปล่อยว่างช่องรหัสผ่านไว้ได้เลยครับ
                   </p>
                 </div>
 
                 {/* New password input */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400">
+                <div className="group relative flex flex-col space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-blue-400 transition-colors">
                     รหัสผ่านใหม่ (ระบุอย่างน้อย 6 ตัวอักษร)
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                     <input
                       type="password"
                       value={profilePassword}
                       onChange={(e) => setProfilePassword(e.target.value)}
                       disabled={profileLoading}
                       placeholder="ป้อนรหัสผ่านใหม่ หากต้องการเปลี่ยน"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-900 focus:border-blue-500 rounded-xl text-xs text-slate-200 outline-none transition-all disabled:opacity-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 rounded-xl text-xs text-slate-100 outline-none transition-all disabled:opacity-50 font-semibold placeholder-slate-650"
                     />
                   </div>
                 </div>
 
                 {/* Confirm new password input */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400">
+                <div className="group relative flex flex-col space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-blue-400 transition-colors">
                     ยืนยันรหัสผ่านใหม่
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                     <input
                       type="password"
                       value={profileConfirmPassword}
                       onChange={(e) => setProfileConfirmPassword(e.target.value)}
                       disabled={profileLoading}
                       placeholder="ป้อนรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-900 focus:border-blue-500 rounded-xl text-xs text-slate-200 outline-none transition-all disabled:opacity-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 rounded-xl text-xs text-slate-100 outline-none transition-all disabled:opacity-50 font-semibold placeholder-slate-650"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 w-full pt-4">
+                <div className="grid grid-cols-2 gap-3.5 w-full pt-5">
                   <button
                     type="button"
                     disabled={profileLoading}
                     onClick={() => setShowProfileModal(false)}
-                    className="py-3 px-4 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs transition-colors disabled:opacity-50"
+                    className="py-3 px-4 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-extrabold rounded-xl text-xs transition-all duration-250 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                   >
                     ยกเลิก
                   </button>
                   <button
                     type="submit"
                     disabled={profileLoading}
-                    className="py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="py-3 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black rounded-xl text-xs shadow-[0_6px_20px_rgba(37,99,235,0.22)] hover:shadow-[0_8px_25px_rgba(37,99,235,0.42)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {profileLoading ? (
                       <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <RefreshCw className="w-4 h-4 animate-spin" />
                         <span>กำลังบันทึก...</span>
                       </>
                     ) : (
