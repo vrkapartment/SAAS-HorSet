@@ -102,7 +102,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   
   // สถานะการขอรับการสนับสนุน (Support Access Status)
   // 'pending' | 'approved' | 'revoked' | 'none'
-  const [supportStatus, setSupportStatus] = useState<string>("none")
+  const [supportStatus, setSupportStatus] = useState<string>(() => {
+    if (typeof window === "undefined") return "none"
+    const savedWsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const savedStatus = getCookie(`horset_support_status_${savedWsId}`)
+    return savedStatus || "none"
+  })
   const [showSupportModal, setShowSupportModal] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -197,12 +202,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
           if (grantData) {
             setSupportStatus(grantData.status)
+            setCookie(`horset_support_status_${activeWsId}`, grantData.status)
             // สำหรับสิทธิ์ Admin: ถ้าเป็น Pending ให้เด้ง Pop-up
             if (grantData.status === "pending" && currentRole === "admin") {
               setShowSupportModal(true)
             }
           } else {
             setSupportStatus("none")
+            setCookie(`horset_support_status_${activeWsId}`, "none")
           }
         } catch (err) {
           console.error("Supabase load error, fallback to cookie/mock", err)
@@ -320,6 +327,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
           return nextStatus
         })
+
+        // บันทึกลงคุกกี้เพื่อให้ซิงก์กันข้ามการ Remount หน้าเว็บ
+        setCookie(`horset_support_status_${currentWorkspace.id}`, nextStatus)
       } catch (err) {
         console.error("Failed to poll support status:", err)
       }
