@@ -240,7 +240,16 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs text-slate-400 font-medium">รหัสผ่าน</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs text-slate-400 font-medium">รหัสผ่าน</label>
+                <button
+                  type="button"
+                  onClick={() => router.push("/forgot-password")}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline"
+                >
+                  ลืมรหัสผ่าน?
+                </button>
+              </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <Key className="w-4 h-4 text-slate-500" />
