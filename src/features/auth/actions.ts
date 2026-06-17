@@ -6,7 +6,7 @@ import { cookies } from "next/headers"
 /**
  * ฟังก์ชันสำหรับการทำ Login ผ่าน Supabase
  */
-export async function loginAction(email: string, password: string) {
+export async function loginAction(email: string, password: string, captchaToken?: string) {
   try {
     const supabase = await createClient()
     
@@ -14,6 +14,9 @@ export async function loginAction(email: string, password: string) {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: {
+        captchaToken: captchaToken || undefined,
+      }
     })
 
     if (authError) {
@@ -198,6 +201,7 @@ export async function registerWithSecretCodeAction(data: {
   fullName: string
   phone: string
   secretCode: string
+  captchaToken?: string
 }) {
   try {
     const supabase = await createClient()
@@ -227,6 +231,7 @@ export async function registerWithSecretCodeAction(data: {
       password: data.password,
       options: {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`,
+        captchaToken: data.captchaToken || undefined,
         data: {
           role: codeData.role,
           full_name: data.fullName.trim(),

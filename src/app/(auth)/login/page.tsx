@@ -1,12 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Script from "next/script"
 import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight } from "lucide-react"
 import { loginAction } from "@/features/auth/actions"
 import { createClient } from "@/lib/supabase/client"
 import { clearCachedUserProfile } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+
+// Declare types for Cloudflare Turnstile on the window object
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: string | HTMLElement, options: any) => string
+      remove: (widgetId?: string) => void
+      reset: (widgetId?: string) => void
+    }
+    onloadTurnstileCallback?: () => void
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,11 +30,62 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRole, setSelectedRole] = useState<"admin" | "staff" | "tenant" | "super_admin" | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileContainerRef = useRef<HTMLDivElement>(null)
+  const widgetIdRef = useRef<string | null>(null)
 
   // ตรวจสอบว่าระบบอยู่ในโหมดจำลอง (Demo Mode) หรือไม่
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"
 
   const { clearAllCache } = useWorkspaceData()
+
+  // Initializing Cloudflare Turnstile widget
+  useEffect(() => {
+    const renderWidget = () => {
+      if (typeof window !== "undefined" && window.turnstile && turnstileContainerRef.current && !widgetIdRef.current) {
+        try {
+          const id = window.turnstile.render(turnstileContainerRef.current, {
+            sitekey: turnstileSiteKey,
+            callback: (token: string) => {
+              setTurnstileToken(token)
+              setError(null)
+            },
+            "error-callback": () => {
+              setError("Cloudflare Turnstile ตรวจสอบล้มเหลว กรุณารีเฟรชหน้าจอ")
+              setTurnstileToken(null)
+            },
+            "expired-callback": () => {
+              setError("โทเค็นตรวจสอบความปลอดภัยหมดอายุ กรุณากดตรวจสอบอีกครั้ง")
+              setTurnstileToken(null)
+            },
+            theme: "dark",
+          })
+          widgetIdRef.current = id
+        } catch (err) {
+          console.error("Turnstile render error:", err)
+        }
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      if (window.turnstile) {
+        renderWidget()
+      } else {
+        window.onloadTurnstileCallback = renderWidget
+      }
+    }
+
+    return () => {
+      // Clean up on unmount
+      if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+        try {
+          window.turnstile.remove(widgetIdRef.current)
+          widgetIdRef.current = null
+        } catch (e) {}
+      }
+    }
+  }, [turnstileSiteKey])
 
   // ดึงค่า email จาก URL Parameter ในกรณีที่มาจากการสมัครสมาชิกหน้า Register และทำความสะอาด Cache ทั้งหมด
   useEffect(() => {
@@ -55,6 +119,13 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     clearCachedUserProfile()
+
+    // ตรวจสอบความปลอดภัย Turnstile
+    if (!turnstileToken && !isDemo) {
+      setLoading(false)
+      setError("กรุณาผ่านการตรวจสอบบอท (Cloudflare Turnstile) ก่อนเข้าสู่ระบบ")
+      return
+    }
 
     if (isDemo) {
       // ค้นหาผู้ใช้จากรายการจำลอง
@@ -102,7 +173,7 @@ export default function LoginPage() {
     } else {
       // ใช้งานจริงเชื่อมต่อ Supabase Auth
       try {
-        const res = await loginAction(email, password)
+        const res = await loginAction(email, password, turnstileToken || undefined)
         setLoading(false)
         if (res.success && res.data) {
           const role = res.data.role as "admin" | "staff" | "tenant" | "super_admin"
@@ -127,10 +198,20 @@ export default function LoginPage() {
           }
         } else {
           setError(res.error || "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
+          // รีเซ็ตวิดเจ็ตเพื่อความปลอดภัยกรณีเกิดข้อผิดพลาด
+          if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+            window.turnstile.reset(widgetIdRef.current)
+            setTurnstileToken(null)
+          }
         }
       } catch (err) {
         setLoading(false)
         setError("ไม่สามารถเชื่อมต่อระบบยืนยันตัวตนได้")
+        // รีเซ็ตวิดเจ็ตเพื่อความปลอดภัยกรณีเกิดข้อผิดพลาด
+        if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+          window.turnstile.reset(widgetIdRef.current)
+          setTurnstileToken(null)
+        }
       }
     }
   }
@@ -176,6 +257,12 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-screen flex flex-col justify-center items-center p-4 overflow-hidden bg-slate-950">
+      {/* Script ของ Cloudflare Turnstile */}
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback"
+        strategy="afterInteractive"
+      />
+
       {/* วงกลมแสงเรืองหลังฉาก (Glow Background) */}
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
@@ -264,6 +351,13 @@ export default function LoginPage() {
                 />
               </div>
             </div>
+
+            {/* วิดเจ็ต Cloudflare Turnstile */}
+            {!isDemo && (
+              <div className="space-y-1.5 flex justify-center py-1">
+                <div ref={turnstileContainerRef} className="cf-turnstile" />
+              </div>
+            )}
 
             <button
               type="submit"

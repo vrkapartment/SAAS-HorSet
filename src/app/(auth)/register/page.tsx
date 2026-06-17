@@ -1,9 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Script from "next/script"
 import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight, User, Phone, Sparkles, AlertCircle } from "lucide-react"
 import { registerWithSecretCodeAction } from "@/features/auth/actions"
+
+// Declare types for Cloudflare Turnstile on the window object
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: string | HTMLElement, options: any) => string
+      remove: (widgetId?: string) => void
+      reset: (widgetId?: string) => void
+    }
+    onloadTurnstileCallback?: () => void
+  }
+}
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -32,14 +45,73 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileContainerRef = useRef<HTMLDivElement>(null)
+  const widgetIdRef = useRef<string | null>(null)
+
   // ตรวจสอบว่าระบบอยู่ในโหมดจำลอง (Demo Mode) หรือไม่
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"
+
+  // Initializing Cloudflare Turnstile widget
+  useEffect(() => {
+    const renderWidget = () => {
+      if (typeof window !== "undefined" && window.turnstile && turnstileContainerRef.current && !widgetIdRef.current) {
+        try {
+          const id = window.turnstile.render(turnstileContainerRef.current, {
+            sitekey: turnstileSiteKey,
+            callback: (token: string) => {
+              setTurnstileToken(token)
+              setError(null)
+            },
+            "error-callback": () => {
+              setError("Cloudflare Turnstile ตรวจสอบล้มเหลว กรุณารีเฟรชหน้าจอ")
+              setTurnstileToken(null)
+            },
+            "expired-callback": () => {
+              setError("โทเค็นตรวจสอบความปลอดภัยหมดอายุ กรุณากดตรวจสอบอีกครั้ง")
+              setTurnstileToken(null)
+            },
+            theme: "dark",
+          })
+          widgetIdRef.current = id
+        } catch (err) {
+          console.error("Turnstile render error:", err)
+        }
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      if (window.turnstile) {
+        renderWidget()
+      } else {
+        window.onloadTurnstileCallback = renderWidget
+      }
+    }
+
+    return () => {
+      // Clean up on unmount
+      if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+        try {
+          window.turnstile.remove(widgetIdRef.current)
+          widgetIdRef.current = null
+        } catch (e) {}
+      }
+    }
+  }, [turnstileSiteKey])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     setSuccess(null)
+
+    // ตรวจสอบความปลอดภัย Turnstile
+    if (!turnstileToken && !isDemo) {
+      setLoading(false)
+      setError("กรุณาผ่านการตรวจสอบบอท (Cloudflare Turnstile) ก่อนสมัครสมาชิก")
+      return
+    }
 
     // ตรวจสอบความถูกต้องเบื้องต้น
     if (password.length < 6) {
@@ -160,7 +232,8 @@ export default function RegisterPage() {
           password,
           fullName: fullName.trim(),
           phone: phone.trim(),
-          secretCode: cleanedCode
+          secretCode: cleanedCode,
+          captchaToken: turnstileToken || undefined
         })
 
         setLoading(false)
@@ -171,16 +244,32 @@ export default function RegisterPage() {
           }, 3000)
         } else {
           setError(res.error || "เกิดข้อผิดพลาดในการลงทะเบียน โปรดลองอีกครั้ง")
+          // รีเซ็ตวิดเจ็ตเพื่อความปลอดภัยกรณีเกิดข้อผิดพลาด
+          if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+            window.turnstile.reset(widgetIdRef.current)
+            setTurnstileToken(null)
+          }
         }
       } catch (err) {
         setLoading(false)
         setError("ไม่สามารถติดต่อเซิร์ฟเวอร์ระบบสมัครสมาชิกได้")
+        // รีเซ็ตวิดเจ็ตเพื่อความปลอดภัยกรณีเกิดข้อผิดพลาด
+        if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+          window.turnstile.reset(widgetIdRef.current)
+          setTurnstileToken(null)
+        }
       }
     }
   }
 
   return (
     <main className="relative min-h-screen flex flex-col justify-center items-center p-4 overflow-hidden bg-slate-950">
+      {/* Script ของ Cloudflare Turnstile */}
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback"
+        strategy="afterInteractive"
+      />
+
       {/* วงกลมแสงเรืองหลังฉาก (Glow Background) */}
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
@@ -332,6 +421,13 @@ export default function RegisterPage() {
               </div>
             </div>
           </div>
+
+          {/* วิดเจ็ต Cloudflare Turnstile */}
+          {!isDemo && (
+            <div className="space-y-1.5 flex justify-center py-1">
+              <div ref={turnstileContainerRef} className="cf-turnstile" />
+            </div>
+          )}
 
           <button
             type="submit"
