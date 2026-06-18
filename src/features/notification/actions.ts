@@ -69,35 +69,59 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       }
     }
 
+    // กำจัดช่องว่างและสแลชส่วนเกินของ App URL เพื่อป้องกันปัญหาเครื่องหมายสแลชซ้ำซ้อน (เช่น https://domain.com//portal)
+    let safeAppUrl = appUrl.trim()
+    while (safeAppUrl.endsWith("/")) {
+      safeAppUrl = safeAppUrl.slice(0, -1)
+    }
+    if (!safeAppUrl.startsWith("http://") && !safeAppUrl.startsWith("https://")) {
+      safeAppUrl = `https://${safeAppUrl}`
+    }
+
+    // จัดการค่าข้อความและตัวเลขทั้งหมดแบบปลอดภัย (เพื่อไม่ให้มีฟิลด์ text ว่าง "" หรือค่า NaN ซึ่งทาง LINE API จะตีว่า Request Body Invalid ทันที)
+    const safeRoomNumber = roomNumber && roomNumber.trim() ? roomNumber.trim() : "-"
+    const safeTenantName = tenantName && tenantName.trim() ? tenantName.trim() : "-"
+    const safeBillingCycle = billingCycle && billingCycle.trim() ? billingCycle.trim() : "-"
+    const safeWorkspaceName = workspaceName && workspaceName.trim() ? workspaceName.trim() : "หอพัก"
+
+    const safeBaseRent = typeof baseRent === "number" && !isNaN(baseRent) ? baseRent : 0
+    const safeElectricUnits = typeof electricUnits === "number" && !isNaN(electricUnits) ? electricUnits : 0
+    const safeElectricAmount = typeof electricAmount === "number" && !isNaN(electricAmount) ? electricAmount : 0
+    const safeWaterUnits = typeof waterUnits === "number" && !isNaN(waterUnits) ? waterUnits : 0
+    const safeWaterAmount = typeof waterAmount === "number" && !isNaN(waterAmount) ? waterAmount : 0
+    const safeCommonFee = typeof commonFee === "number" && !isNaN(commonFee) ? commonFee : 0
+    const safeTotalAmount = typeof totalAmount === "number" && !isNaN(totalAmount) ? totalAmount : 0
+
     // สร้างลิงก์เข้าดูบิลตรงแบบไม่ต้องล็อกอิน (โดยระบุ workspace_id และ room_number)
     const portalLink = workspaceId
-      ? `${appUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(roomNumber)}`
-      : `${appUrl}/portal`
+      ? `${safeAppUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(safeRoomNumber)}`
+      : `${safeAppUrl}/portal`
 
     // สร้างข้อความสำรองสำหรับหน้าจอแจ้งเตือน (Notification / Lock Screen)
-    const altText = `🏠 ใบแจ้งค่าเช่า ห้อง ${roomNumber} ยอดชำระ ${totalAmount.toLocaleString()} บาท`
+    const altText = `🏠 ใบแจ้งค่าเช่า ห้อง ${safeRoomNumber} ยอดชำระ ${safeTotalAmount.toLocaleString()} บาท`
 
-    // สร้าง LINE Flex Message คอนเทนต์ระดับพรีเมียม
+    // สร้าง LINE Flex Message คอนเทนต์ระดับพรีเมียม (ใช้ padding ด้วย Standard Token เช่น xl, lg แทน px เพื่อให้แสดงผลลัพธ์ได้อย่างเสถียรที่สุด)
     const flexMessageContent = {
       type: "bubble",
-      size: "mega",
       header: {
         type: "box",
         layout: "vertical",
         backgroundColor: "#10B981",
-        paddingAll: "20px",
+        paddingTop: "xl",
+        paddingBottom: "xl",
+        paddingStart: "xl",
+        paddingEnd: "xl",
         contents: [
           {
             type: "text",
             text: "ใบแจ้งค่าเช่าและบริการประจำเดือน",
             color: "#FFFFFF",
             size: "sm",
-            weight: "bold",
-            opacity: "0.9"
+            weight: "bold"
           },
           {
             type: "text",
-            text: workspaceName,
+            text: safeWorkspaceName,
             color: "#FFFFFF",
             size: "xl",
             weight: "bold",
@@ -109,7 +133,10 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       body: {
         type: "box",
         layout: "vertical",
-        paddingAll: "20px",
+        paddingTop: "xl",
+        paddingBottom: "xl",
+        paddingStart: "xl",
+        paddingEnd: "xl",
         contents: [
           {
             type: "box",
@@ -123,7 +150,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
               },
               {
                 type: "text",
-                text: `ห้อง ${roomNumber}`,
+                text: `ห้อง ${safeRoomNumber}`,
                 color: "#111827",
                 size: "sm",
                 weight: "bold",
@@ -144,7 +171,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
               },
               {
                 type: "text",
-                text: `คุณ ${tenantName}`,
+                text: `คุณ ${safeTenantName}`,
                 color: "#111827",
                 size: "sm",
                 weight: "bold",
@@ -165,7 +192,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
               },
               {
                 type: "text",
-                text: billingCycle,
+                text: safeBillingCycle,
                 color: "#111827",
                 size: "sm",
                 weight: "bold",
@@ -196,7 +223,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
                   },
                   {
                     type: "text",
-                    text: `${baseRent.toLocaleString()} บาท`,
+                    text: `${safeBaseRent.toLocaleString()} บาท`,
                     color: "#111827",
                     size: "sm",
                     weight: "bold",
@@ -210,13 +237,13 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
                 contents: [
                   {
                     type: "text",
-                    text: `⚡️ ค่าไฟฟ้า (${electricUnits} หน่วย)`,
+                    text: `⚡️ ค่าไฟฟ้า (${safeElectricUnits} หน่วย)`,
                     color: "#374151",
                     size: "sm"
                   },
                   {
                     type: "text",
-                    text: `${electricAmount.toLocaleString()} บาท`,
+                    text: `${safeElectricAmount.toLocaleString()} บาท`,
                     color: "#111827",
                     size: "sm",
                     weight: "bold",
@@ -230,13 +257,13 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
                 contents: [
                   {
                     type: "text",
-                    text: `💧 ค่าน้ำประปา (${waterUnits} หน่วย)`,
+                    text: `💧 ค่าน้ำประปา (${safeWaterUnits} หน่วย)`,
                     color: "#374151",
                     size: "sm"
                   },
                   {
                     type: "text",
-                    text: `${waterAmount.toLocaleString()} บาท`,
+                    text: `${safeWaterAmount.toLocaleString()} บาท`,
                     color: "#111827",
                     size: "sm",
                     weight: "bold",
@@ -256,7 +283,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
                   },
                   {
                     type: "text",
-                    text: `${commonFee.toLocaleString()} บาท`,
+                    text: `${safeCommonFee.toLocaleString()} บาท`,
                     color: "#111827",
                     size: "sm",
                     weight: "bold",
@@ -286,7 +313,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
               },
               {
                 type: "text",
-                text: `${totalAmount.toLocaleString()} บาท`,
+                text: `${safeTotalAmount.toLocaleString()} บาท`,
                 color: "#EF4444",
                 size: "xl",
                 weight: "bold",
@@ -299,7 +326,10 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       footer: {
         type: "box",
         layout: "vertical",
-        paddingAll: "15px",
+        paddingTop: "lg",
+        paddingBottom: "lg",
+        paddingStart: "lg",
+        paddingEnd: "lg",
         contents: [
           {
             type: "button",
