@@ -25,7 +25,8 @@ import {
   Droplet,
   Wrench,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  RefreshCw
 } from "lucide-react"
 import { 
   getExpenses, 
@@ -703,9 +704,16 @@ export default function TaxPage() {
                       className="w-full pl-3 pr-24 py-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl text-slate-650 dark:text-slate-400 text-xs font-mono cursor-not-allowed"
                       value={actualExpense405}
                     />
-                    <span className="absolute right-2 top-1.5 inline-flex items-center text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 px-2 py-1 rounded font-bold">
-                      🔗 ดึงอัตโนมัติ
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => loadExpensesData(taxYear, undefined, true)}
+                      disabled={loadingExpenses}
+                      className="absolute right-2 top-1.5 inline-flex items-center gap-1 text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/20 px-2 py-1 rounded font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95 animate-fade-in"
+                      title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${loadingExpenses ? "animate-spin" : ""}`} />
+                      ดึงอัตโนมัติ
+                    </button>
                   </div>
                   <p className="text-[10px] text-slate-500 leading-relaxed">
                     * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
@@ -748,9 +756,16 @@ export default function TaxPage() {
                       className="w-full pl-3 pr-24 py-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl text-slate-650 dark:text-slate-400 text-xs font-mono cursor-not-allowed"
                       value={actualExpense408}
                     />
-                    <span className="absolute right-2 top-1.5 inline-flex items-center text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 px-2 py-1 rounded font-bold">
-                      🔗 ดึงอัตโนมัติ
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => loadExpensesData(taxYear, undefined, true)}
+                      disabled={loadingExpenses}
+                      className="absolute right-2 top-1.5 inline-flex items-center gap-1 text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/20 px-2 py-1 rounded font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95 animate-fade-in"
+                      title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${loadingExpenses ? "animate-spin" : ""}`} />
+                      ดึงอัตโนมัติ
+                    </button>
                   </div>
                   <p className="text-[10px] text-slate-500 leading-relaxed">
                     * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
