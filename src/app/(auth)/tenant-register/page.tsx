@@ -1,19 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Script from "next/script"
-import { Sparkles, MessageSquare, Phone, Home, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
+import { Sparkles, MessageSquare, Phone, Home, Loader2, CheckCircle2, AlertCircle, User } from "lucide-react"
 
-export default function TenantRegisterPage() {
+function TenantRegisterContent() {
   const [liffLoaded, setLiffLoaded] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [lineUserId, setLineUserId] = useState("")
   const [workspaceId, setWorkspaceId] = useState("")
   const [roomNumber, setRoomNumber] = useState("")
   const [phone, setPhone] = useState("")
+  const [tenantName, setTenantName] = useState("")
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [tenantName, setTenantName] = useState("")
   const [error, setError] = useState("")
 
   // ฟังก์ชันล้างเบอร์โทรศัพท์ให้อยู่ในฟอร์แมตตัวเลข 10 หลัก
@@ -22,42 +22,42 @@ export default function TenantRegisterPage() {
     setPhone(clean)
   }
 
-  // ดึงค่า workspace_id จาก URL หรือ liff.state hash
-  const getWorkspaceId = () => {
+  // ฟังก์ชันสากลสำหรับดักจับพารามิเตอร์จาก URL ค้นหาทั้งใน Search และ Hash (สำหรับ LINE LIFF State)
+  const getUrlParam = (name: string): string => {
     if (typeof window === "undefined") return ""
 
     // 1. ดักจับจาก URL Search ปกติ
     const searchParams = new URLSearchParams(window.location.search)
-    let wsId = searchParams.get("workspace_id")
-    if (wsId) return wsId
+    let val = searchParams.get(name)
+    if (val) return val
 
-    // 2. ดักจับกรณีพิเศษของ LINE LIFF ที่มักย้ายพารามิเตอร์ไปไว้ใน Hash (หลัง liff.state)
+    // 2. ดักจับกรณีพิเศษของ LINE LIFF ที่ย้ายพารามิเตอร์ไปซ่อนไว้หลัง liff.state ใน Hash
     const hash = window.location.hash
     if (hash) {
       const liffStateMatch = hash.match(/liff\.state=([^&]+)/)
       if (liffStateMatch) {
         try {
           const decodedState = decodeURIComponent(liffStateMatch[1])
-          if (decodedState.includes("workspace_id=")) {
+          if (decodedState.includes(`${name}=`)) {
             const stateParams = new URLSearchParams(decodedState)
-            const stateWsId = stateParams.get("workspace_id")
-            if (stateWsId) return stateWsId
+            const stateVal = stateParams.get(name)
+            if (stateVal) return stateVal
           } else {
-            // เผื่อเป็น JSON
+            // กรณีเป็น JSON String
             const parsed = JSON.parse(decodedState)
-            if (parsed.workspace_id) return parsed.workspace_id
+            if (parsed[name]) return String(parsed[name])
           }
         } catch (e) {
-          console.error("Error parsing liff.state:", e)
+          console.error(`Error parsing liff.state for ${name}:`, e)
         }
       }
 
-      // ตรวจสอบแบบตรง ๆ เผื่อมี ? ใน hash
+      // ดักจับเพิ่มเติมหากมี ? ปนใน hash ทั่วไป
       if (hash.includes("?")) {
         const hashQuery = hash.substring(hash.indexOf("?"))
         const hashParams = new URLSearchParams(hashQuery)
-        const hashWsId = hashParams.get("workspace_id")
-        if (hashWsId) return hashWsId
+        const hashVal = hashParams.get(name)
+        if (hashVal) return hashVal
       }
     }
 
@@ -81,16 +81,18 @@ export default function TenantRegisterPage() {
       setProfile(userProfile)
       setLineUserId(userProfile.userId)
 
-      // ดึงและตั้งค่า workspace_id
-      const wsId = getWorkspaceId()
+      // ดักจับค่าและเซ็ตพารามิเตอร์ที่ส่งมาจากลิงก์แอดมิน
+      const wsId = getUrlParam("workspace_id")
       setWorkspaceId(wsId)
+
+      const rNum = getUrlParam("room_number")
+      setRoomNumber(rNum)
     } catch (err: any) {
       console.error("LIFF Init Error:", err)
-      setError("ไม่สามารถเริ่มการเชื่อมต่อ LINE ได้ กรุณาเปิดผ่านห้องแชทไลน์")
+      setError("ไม่สามารถเชื่อมต่อบริการ LINE ได้ กรุณาแชร์ลิงก์เปิดทางห้องแชท LINE")
     }
   }
 
-  // เรียกลุยทันทีเมื่อ CDN โหลดเสร็จสิ้น
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).liff) {
       initLiff()
@@ -102,7 +104,11 @@ export default function TenantRegisterPage() {
     setError("")
 
     if (!roomNumber.trim()) {
-      setError("กรุณากรอกหมายเลขห้องพัก")
+      setError("ไม่พบข้อมูลหมายเลขห้องพักจากลิงก์ กรุณาติดต่อแอดมินเพื่อขอลิงก์ใหม่")
+      return
+    }
+    if (!tenantName.trim()) {
+      setError("กรุณากรอกชื่อ-นามสกุลจริงของคุณ")
       return
     }
     if (phone.length !== 10) {
@@ -110,11 +116,11 @@ export default function TenantRegisterPage() {
       return
     }
     if (!lineUserId) {
-      setError("ไม่พบข้อมูล LINE User ID กรุณาเชื่อมต่อไลน์ใหม่อีกครั้ง")
+      setError("ไม่พบข้อมูลสิทธิ์ไลน์ กรุณาลองล็อกอินเข้าใช้งานใหม่อีกครั้ง")
       return
     }
     if (!workspaceId) {
-      setError("ไม่พบข้อมูลรหัสอาพาร์ทเมนท์ (workspace_id) กรุณาแสกน QR Code ประจำหอพักของคุณ")
+      setError("ไม่พบข้อมูลรหัสอาพาร์ทเมนท์ในลิงก์ลงทะเบียนนี้")
       return
     }
 
@@ -128,7 +134,8 @@ export default function TenantRegisterPage() {
         },
         body: JSON.stringify({
           roomNumber,
-          phone,
+          tenantName,
+          tenantPhone: phone,
           lineUserId,
           workspaceId
         })
@@ -137,13 +144,12 @@ export default function TenantRegisterPage() {
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "เกิดข้อผิดพลาดในการลงทะเบียน")
+        throw new Error(data.error || "เกิดข้อผิดพลาดขึ้นระหว่างการลงทะเบียน")
       }
 
-      setTenantName(data.tenantName)
       setSuccess(true)
 
-      // ปิดหน้าต่างไลน์อัตโนมัติหลังลงทะเบียนสำเร็จ 3 วินาที
+      // ทำการปิดหน้าต่าง LINE ทันทีในแอปพลิเคชันหลังสำเร็จ 3 วินาที
       setTimeout(() => {
         const liff = (window as any).liff
         if (liff) {
@@ -152,7 +158,7 @@ export default function TenantRegisterPage() {
       }, 3000)
 
     } catch (err: any) {
-      setError(err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์")
+      setError(err.message || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์หลักได้ กรุณาลองใหม่อีกครั้ง")
     } finally {
       setLoading(false)
     }
@@ -168,7 +174,7 @@ export default function TenantRegisterPage() {
       />
 
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden font-sans">
-        {/* แสงวิบวับรอบตัวหลังบ้าน (Ambient Glow Background) */}
+        {/* แสงวิบวับพรีเมียมรอบตัวหลังบ้าน (Ambient Glow Background) */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
         <div className="absolute bottom-1/4 left-1/3 w-[260px] h-[260px] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
 
@@ -187,10 +193,10 @@ export default function TenantRegisterPage() {
                   <p className="text-slate-400 text-sm font-medium">
                     ยินดีต้อนรับคุณ <strong className="text-emerald-400">{tenantName}</strong> เข้าสู่ระบบ
                   </p>
-                  <p className="text-xs text-slate-500 mt-4">
-                    ระบบได้ผูกไลน์นี้เข้ากับห้องพักของคุณเรียบร้อยแล้ว<br />
-                    คุณจะได้รับใบแจ้งหนี้ ค่าน้ำ ค่าไฟ ผ่านแชทไลน์โดยตรง<br />
-                    <span className="inline-block mt-3 text-emerald-500/70 font-semibold">หน้าต่างกำลังปิดตัวเองลงเพื่อเด้งกลับเข้าแชทไลน์...</span>
+                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                    ระบบผูกข้อมูลห้องพักของคุณเข้ากับบัญชีไลน์นี้เรียบร้อยแล้ว<br />
+                    คุณสามารถรับแจ้งบิลรายเดือนและชำระค่าบริการผ่านไลน์ได้ทันที<br />
+                    <span className="inline-block mt-3 text-emerald-500/70 font-bold">ระบบกำลังพากลับหน้าแชทหลักโดยอัตโนมัติ...</span>
                   </p>
                 </div>
               </div>
@@ -220,11 +226,11 @@ export default function TenantRegisterPage() {
 
                   <div className="space-y-1">
                     <h1 className="text-xl font-black text-slate-100 flex items-center justify-center gap-1.5">
-                      {profile ? `สวัสดีคุณ ${profile.displayName}` : "กำลังโหลดโปรไฟล์ไลน์..."}
+                      {profile ? `สวัสดีคุณ ${profile.displayName}` : "กำลังยืนยันบัญชี LINE..."}
                       <Sparkles className="w-4 h-4 text-emerald-400" />
                     </h1>
-                    <p className="text-slate-400 text-xs font-semibold">
-                      กรุณายืนยันข้อมูลห้องพักเพื่อเปิดรับบริการแจ้งยอดบิลใน LINE
+                    <p className="text-slate-400 text-xs font-semibold leading-relaxed">
+                      กรุณากรอกข้อมูลส่วนบุคคลเพื่อบันทึกสัญญาเช่าและรับบริการบิลใน LINE
                     </p>
                   </div>
                 </div>
@@ -242,28 +248,45 @@ export default function TenantRegisterPage() {
                 {/* ฟิลด์อินพุต */}
                 <div className="space-y-4">
                   
-                  {/* ฟิลด์หมายเลขห้อง */}
+                  {/* ฟิลด์หมายเลขห้อง (แบบล็อคค่า - Read Only) */}
                   <div className="space-y-2">
                     <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                      หมายเลขห้องพัก
+                      หมายเลขห้องพัก (ลงทะเบียนพิเศษ)
                     </label>
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="ตัวอย่างเช่น 101, A2"
-                        className="w-full h-12 pl-11 pr-4 bg-slate-950/60 border border-slate-800 rounded-2xl font-semibold text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-500/20 focus:bg-slate-950 transition-all font-mono"
-                        value={roomNumber}
-                        onChange={(e) => setRoomNumber(e.target.value)}
+                        className="w-full h-12 pl-11 pr-4 bg-slate-950/40 border border-slate-900 text-slate-500 rounded-2xl font-bold font-mono focus:outline-none cursor-not-allowed transition-all"
+                        value={roomNumber || "ไม่ระบุข้อมูลห้องพัก"}
+                        readOnly
+                        disabled
+                      />
+                      <Home className="w-4 h-4 text-slate-600 absolute left-4 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </div>
+
+                  {/* ฟิลด์กรอก ชื่อ-นามสกุล (ผู้เช่ากรอกเอง) */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                      ชื่อ - นามสกุลผู้เช่า
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="ระบุชื่อจริง และนามสกุลจริงของคุณ"
+                        className="w-full h-12 pl-11 pr-4 bg-slate-950/60 border border-slate-800 rounded-2xl font-semibold text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-500/20 focus:bg-slate-950 transition-all"
+                        value={tenantName}
+                        onChange={(e) => setTenantName(e.target.value)}
                         disabled={loading}
                       />
-                      <Home className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                      <User className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
                     </div>
                   </div>
 
                   {/* ฟิลด์เบอร์โทรศัพท์ */}
                   <div className="space-y-2">
                     <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                      เบอร์โทรศัพท์ผู้เช่า
+                      เบอร์โทรศัพท์มือถือ
                     </label>
                     <div className="relative">
                       <input
@@ -307,10 +330,22 @@ export default function TenantRegisterPage() {
           </div>
 
           <p className="text-center text-slate-600 text-[10px] font-semibold">
-            หากคุณประสบปัญหาในการลงทะเบียน กรุณาติดต่อผู้ดูแลหอพักของคุณโดยตรง
+            หากข้อมูลห้องพักไม่ถูกต้อง กรุณาแจ้งผู้ดูแลอาคารเพื่อขอรับลิงก์สำหรับลงทะเบียนใหม่
           </p>
         </div>
       </div>
     </>
+  )
+}
+
+export default function TenantRegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+      </div>
+    }>
+      <TenantRegisterContent />
+    </Suspense>
   )
 }

@@ -1,43 +1,32 @@
 import { NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
-/**
- * ฟังก์ชันช่วยล้างและแปลงเบอร์โทรศัพท์ให้อยู่ในรูปแบบตัวเลขล้วน 10 หลัก (กรณีเบอร์ไทย)
- * เช่น "081-234-5678" -> "0812345678"
- * หรือ "66812345678" -> "0812345678"
- */
-function normalizePhone(p: string): string {
-  if (!p) return ""
-  let clean = p.replace(/\D/g, "")
-  if (clean.startsWith("66") && clean.length === 11) {
-    clean = "0" + clean.slice(2)
-  }
-  return clean
-}
-
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const { roomNumber, phone, lineUserId, workspaceId } = body
+    const { lineUserId, workspaceId, roomNumber, tenantName, tenantPhone } = body
 
-    // 1. ตรวจสอบข้อมูลนำเข้าเบื้องต้น
+    // 1. ตรวจสอบค่าพารามิเตอร์เบื้องต้นที่ส่งมาจากหน้าลงทะเบียนผู้เช่า
     if (!roomNumber || typeof roomNumber !== "string") {
       return NextResponse.json({ success: false, error: "กรุณาระบุหมายเลขห้องพัก" }, { status: 400 })
     }
-    if (!phone || typeof phone !== "string") {
-      return NextResponse.json({ success: false, error: "กรุณาระบุเบอร์โทรศัพท์" }, { status: 400 })
+    if (!tenantName || typeof tenantName !== "string" || !tenantName.trim()) {
+      return NextResponse.json({ success: false, error: "กรุณากรอกชื่อและนามสกุลจริงของคุณ" }, { status: 400 })
+    }
+    if (!tenantPhone || typeof tenantPhone !== "string" || tenantPhone.trim().length !== 10) {
+      return NextResponse.json({ success: false, error: "กรุณาระบุเบอร์โทรศัพท์ที่ถูกต้องจำนวน 10 หลัก" }, { status: 400 })
     }
     if (!lineUserId || typeof lineUserId !== "string") {
-      return NextResponse.json({ success: false, error: "ไม่พบข้อมูล LINE User ID กรุณาเชื่อมต่อไลน์ใหม่อีกครั้ง" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "ไม่พบข้อมูล LINE User ID กรุณาเข้าสู่ระบบไลน์ใหม่อีกครั้ง" }, { status: 400 })
     }
     if (!workspaceId || typeof workspaceId !== "string") {
-      return NextResponse.json({ success: false, error: "ไม่พบข้อมูลรหัสอพาร์ทเมนท์ (workspace_id) กรุณาสแกนคิวอาร์โค้ดประจำหอพักอีกครั้ง" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "ไม่พบรหัสอพาร์ทเมนท์ (workspace_id) ในลิงก์นี้" }, { status: 400 })
     }
 
-    // 2. ตรวจสอบรูปแบบ UUID ของ workspaceId เพื่อป้องกันความปลอดภัยขั้นสูง
+    // ตรวจสอบความถูกต้องของโครงสร้างรหัส UUID ของ workspaceId ป้องกันความปลอดภัยเพิ่มเติม
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(workspaceId)) {
-      return NextResponse.json({ success: false, error: "รหัสอพาร์ทเมนท์ (workspace_id) ไม่ถูกต้อง" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "รหัสอพาร์ทเมนท์ไม่ถูกต้องตามโครงสร้างระบบ" }, { status: 400 })
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -46,11 +35,11 @@ export async function POST(request: Request) {
     if (!url || !serviceKey || serviceKey.includes("placeholder")) {
       return NextResponse.json({
         success: false,
-        error: "ระบบเซิร์ฟเวอร์ยังไม่พร้อมใช้งาน: กรุณาตั้งค่าสิทธิ์ผู้ควบคุมระบบ (Service Role Key) ในไฟล์ .env"
+        error: "เซิร์ฟเวอร์ระบบฐานข้อมูลไม่พร้อมใช้งานชั่วคราว กรุณาติดต่อผู้ดูแลระบบ"
       }, { status: 500 })
     }
 
-    // 3. สร้าง Supabase Client ด้วยสิทธิ์ Service Role เพื่อก้าวข้าม RLS บนเซิร์ฟเวอร์อย่างปลอดภัย
+    // สร้าง Supabase Client ด้วย Service Role Key เพื่อก้าวข้าม Row-Level Security บนเซิร์ฟเวอร์
     const supabaseAdmin = createSupabaseClient(url, serviceKey, {
       auth: {
         autoRefreshToken: false,
@@ -58,83 +47,103 @@ export async function POST(request: Request) {
       }
     })
 
-    // 4. ค้นหาข้อมูลห้องพักใน Workspace นี้ (ทำการตรวจสอบ case-insensitive เพื่อป้องกันผู้ใช้พิมพ์ตัวพิมพ์ใหญ่/เล็กผิดพลาด)
+    // 2. ค้นหาค่า id (UUID ของห้อง) จากตาราง rooms โดยระบุเงื่อนไขห้องและอพาร์ทเมนท์ตามสั่ง
     const { data: room, error: roomError } = await supabaseAdmin
       .from("rooms")
-      .select("id, room_number")
+      .select("id")
+      .eq("room_number", roomNumber.trim())
       .eq("workspace_id", workspaceId)
-      .ilike("room_number", roomNumber.trim())
       .maybeSingle()
 
     if (roomError) {
-      console.error("Room query error:", roomError)
-      return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดในการตรวจสอบข้อมูลห้องพักจากฐานข้อมูล" }, { status: 500 })
+      console.error("Query room ID error:", roomError)
+      return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดในการตรวจสอบห้องพักในระบบ" }, { status: 500 })
     }
 
+    // หากไม่พบห้องพักตามที่ระบุในเงื่อนไข ให้ตอบกลับ HTTP Status 400 ทันทีตามเงื่อนไขที่กำหนด
     if (!room) {
-      return NextResponse.json({ success: false, error: `ไม่พบข้อมูลห้องพักหมายเลข "${roomNumber}" ในหอพักนี้ กรุณาตรวจสอบและลองใหม่อีกครั้ง` }, { status: 404 })
+      return NextResponse.json({ success: false, error: `ไม่พบข้อมูลห้องพักหมายเลข ${roomNumber} ในอาคารนี้` }, { status: 400 })
     }
 
-    // 5. ดึงข้อมูลผู้เช่าทั้งหมดในห้องนี้และ Workspace นี้
-    const { data: tenants, error: tenantsError } = await supabaseAdmin
+    // 3. เตรียมโครงสร้างออบเจกต์ข้อมูลในการบันทึกแถวใหม่
+    const tenantPayload = {
+      room_id: room.id,
+      line_user_id: lineUserId,
+      workspace_id: workspaceId,
+      tenant_name: tenantName.trim(),
+      tenant_phone: tenantPhone.trim(),
+      updated_at: new Date().toISOString()
+    }
+
+    let saveError: any = null
+
+    // 4. บันทึกข้อมูลลงตาราง tenants ด้วยคำสั่ง .upsert() ระบุ onConflict: 'line_user_id' เพื่อแก้ไขทับข้อมูลเก่าเมื่อลงทะเบียนซ้ำ
+    const { error: upsertError } = await supabaseAdmin
       .from("tenants")
-      .select("id, tenant_name, tenant_phone, line_user_id")
-      .eq("workspace_id", workspaceId)
-      .eq("room_id", room.id)
+      .upsert(tenantPayload, { onConflict: "line_user_id" })
 
-    if (tenantsError) {
-      console.error("Tenants query error:", tenantsError)
-      return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้เช่าจากฐานข้อมูล" }, { status: 500 })
+    if (upsertError) {
+      // ตรวจจับกรณีตาราง tenants ในฐานข้อมูล PostgreSQL ของผู้ใช้ยังไม่ได้กำหนดค่า Unique Constraint บน line_user_id
+      // ซึ่งอาจทำให้คำสั่ง upsert ล้มเหลว (Postgres Error 42P10) เราจึงสร้างระบบ Fallback ที่ทนทานสูงสุด
+      if (upsertError.code === "42P10" || upsertError.message?.includes("unique") || upsertError.message?.includes("conflict")) {
+        console.warn("Standard database table public.tenants has no unique index on line_user_id. Running Select-then-Update/Insert fallback flow.")
+        
+        // ค้นหาผู้เช่าเดิมที่มี LINE ID นี้อยู่ก่อนแล้ว
+        const { data: existing, error: selectError } = await supabaseAdmin
+          .from("tenants")
+          .select("id")
+          .eq("line_user_id", lineUserId)
+          .maybeSingle()
+
+        if (selectError) {
+          saveError = selectError
+        } else if (existing) {
+          // อัปเดตข้อมูลทับเรคคอร์ดเดิมทันที
+          const { error: updateError } = await supabaseAdmin
+            .from("tenants")
+            .update(tenantPayload)
+            .eq("id", existing.id)
+          
+          if (updateError) saveError = updateError
+        } else {
+          // แทรกแถวสัญญาใหม่หากไม่พบข้อมูล
+          const { error: insertError } = await supabaseAdmin
+            .from("tenants")
+            .insert([tenantPayload])
+          
+          if (insertError) saveError = insertError
+        }
+      } else {
+        saveError = upsertError
+      }
     }
 
-    if (!tenants || tenants.length === 0) {
-      return NextResponse.json({ success: false, error: `ไม่พบข้อมูลสัญญาเช่าที่เปิดใช้งานอยู่สำหรับห้องหมายเลข ${room.room_number}` }, { status: 404 })
+    if (saveError) {
+      console.error("Database save error:", saveError)
+      return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดขึ้นในบันทึกข้อมูลสัญญาเช่าลงฐานข้อมูล" }, { status: 500 })
     }
 
-    // 6. ล้างข้อมูลเพื่อตรวจสอบเปรียบเทียบเบอร์โทรศัพท์
-    const inputPhoneClean = normalizePhone(phone)
-    if (inputPhoneClean.length !== 10) {
-      return NextResponse.json({ success: false, error: "กรุณาระบุเบอร์โทรศัพท์ให้ครบ 10 หลัก" }, { status: 400 })
+    // 5. บันทึกและอัปเดตสถานะห้องพักให้เป็นมีผู้เช่า (occupied) โดยอัตโนมัติเพื่อแสดงผลบนระบบบริหารของแอดมิน
+    try {
+      await supabaseAdmin
+        .from("rooms")
+        .update({ status: "occupied" })
+        .eq("id", room.id)
+    } catch (roomUpdateErr) {
+      console.warn("Failed to update room status to occupied:", roomUpdateErr)
     }
 
-    // ค้นหาผู้เช่าที่มีเบอร์ตรงกัน
-    const matchedTenant = tenants.find(t => {
-      const tPhoneClean = normalizePhone(t.tenant_phone || "")
-      return tPhoneClean === inputPhoneClean || t.tenant_phone === phone
-    })
-
-    if (!matchedTenant) {
-      return NextResponse.json({
-        success: false,
-        error: "เบอร์โทรศัพท์นี้ไม่ตรงกับเบอร์ที่ลงทะเบียนไว้ในสัญญาเช่าของห้องนี้ กรุณาติดต่อผู้ดูแลหอพักเพื่อแก้ไขข้อมูลในระบบ"
-      }, { status: 400 })
-    }
-
-    // 7. อัปเดตผูก LINE User ID เข้ากับข้อมูลผู้เช่าตัวจริง
-    const { error: updateError } = await supabaseAdmin
-      .from("tenants")
-      .update({
-        line_user_id: lineUserId,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", matchedTenant.id)
-
-    if (updateError) {
-      console.error("Tenant update error:", updateError)
-      return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดในการบันทึกและผูกบัญชี LINE กับระบบ" }, { status: 500 })
-    }
-
-    // 8. ส่งผลลัพธ์ที่สำเร็จกลับไปยังหน้าบ้านพร้อมชื่อผู้เช่าเพื่อให้ความรู้สึกส่วนตัวและน่าเชื่อถือ
+    // 6. หากบันทึกสำเร็จ ให้ส่งกลับสเตตัส 200 พร้อมกับ JSON แจ้งความสำเร็จตามต้องการ
     return NextResponse.json({
       success: true,
-      tenantName: matchedTenant.tenant_name
-    })
+      message: "ลงทะเบียนสัญญาเช่าและผูก LINE สำเร็จเสร็จสิ้น"
+    }, { status: 200 })
 
   } catch (error) {
-    console.error("Registration API Exception:", error)
+    console.error("API register-tenant Exception:", error)
     return NextResponse.json({
       success: false,
-      error: "เกิดข้อผิดพลาดร้ายแรงในระบบเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้งภายหลัง"
+      error: "เกิดข้อผิดพลาดภายในระบบเซิร์ฟเวอร์หลัก กรุณาลองใหม่อีกครั้งภายหลัง"
     }, { status: 500 })
   }
 }
