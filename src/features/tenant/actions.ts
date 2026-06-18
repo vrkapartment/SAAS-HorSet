@@ -261,11 +261,14 @@ export async function getTenantPortalData() {
     let workspaceAddress = ""
     let workspacePhone = ""
     let workspaceTaxId = ""
+    let commonFee = 50
+    let waterRate = 18
+    let electricRate = 7
 
     if (tenant && tenant.workspace_id) {
       const { data: ws } = await supabase
         .from("workspaces")
-        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id")
+        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate")
         .eq("id", tenant.workspace_id)
         .maybeSingle()
       if (ws) {
@@ -275,6 +278,9 @@ export async function getTenantPortalData() {
         workspaceAddress = ws.tax_address || ""
         workspacePhone = ws.tax_phone || ""
         workspaceTaxId = ws.tax_id || ""
+        if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
+        if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
+        if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
       }
     }
 
@@ -293,7 +299,10 @@ export async function getTenantPortalData() {
           workspaceName,
           workspaceAddress,
           workspacePhone,
-          workspaceTaxId
+          workspaceTaxId,
+          commonFee,
+          waterRate,
+          electricRate
         }
       }
     }
@@ -339,7 +348,10 @@ export async function getTenantPortalData() {
         workspaceName,
         workspaceAddress,
         workspacePhone,
-        workspaceTaxId
+        workspaceTaxId,
+        commonFee,
+        waterRate,
+        electricRate
       }
     }
   } catch (error) {
@@ -391,7 +403,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     // 3. ค้นหารายละเอียดของ Workspace และการตั้งค่าพร้อมเพย์
     const { data: ws } = await supabase
       .from("workspaces")
-      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id")
+      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate")
       .eq("id", workspaceId)
       .maybeSingle()
 
@@ -401,6 +413,9 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     let workspaceAddress = ""
     let workspacePhone = ""
     let workspaceTaxId = ""
+    let commonFee = 50
+    let waterRate = 18
+    let electricRate = 7
 
     if (ws) {
       promptPayId = ws.promptpay_id || ""
@@ -409,6 +424,9 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       workspaceAddress = ws.tax_address || ""
       workspacePhone = ws.tax_phone || ""
       workspaceTaxId = ws.tax_id || ""
+      if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
+      if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
+      if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
     }
 
     // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้
@@ -450,7 +468,10 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         workspaceName,
         workspaceAddress,
         workspacePhone,
-        workspaceTaxId
+        workspaceTaxId,
+        commonFee,
+        waterRate,
+        electricRate
       }
     }
   } catch (error) {

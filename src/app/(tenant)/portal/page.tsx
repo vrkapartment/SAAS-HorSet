@@ -29,7 +29,9 @@ import {
   LogOut,
   History,
   QrCode,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ShieldCheck,
+  AlertCircle
 } from "lucide-react"
 import { generatePromptPayPayload } from "@/lib/promptpay"
 import { getTenantPortalData, getTenantPortalDataNoLoginAction } from "@/features/tenant/actions"
@@ -64,6 +66,9 @@ export default function TenantPortal() {
   const [history, setHistory] = useState<BillHistoryItem[]>([])
   const [baseRent, setBaseRent] = useState(4500)
   const [pageLoading, setPageLoading] = useState(true)
+  const [commonFee, setCommonFee] = useState(50)
+  const [waterRate, setWaterRate] = useState(18)
+  const [electricRate, setElectricRate] = useState(7)
 
 
 
@@ -129,6 +134,15 @@ export default function TenantPortal() {
         }
         if (data.workspaceTaxId) {
           setWorkspaceTaxId(data.workspaceTaxId)
+        }
+        if (data.commonFee !== undefined) {
+          setCommonFee(data.commonFee)
+        }
+        if (data.waterRate !== undefined) {
+          setWaterRate(data.waterRate)
+        }
+        if (data.electricRate !== undefined) {
+          setElectricRate(data.electricRate)
         }
 
         const activeBills = data.bills as any[]
@@ -205,12 +219,22 @@ export default function TenantPortal() {
 
 
   // ค่าใช้จ่ายต่างๆ (ใช้ค่าของบิลจริง หรือค่าจำลองหากยังไม่มีบิลในระบบ)
-  const rentPrice = bill ? (bill.amount - (bill.electricUnits * 7) - (bill.waterUnits * 18)) : baseRent
   const elecUnits = bill ? bill.electricUnits : 0
-  const elecAmount = elecUnits * 7
+  const elecAmount = elecUnits * electricRate
   const waterUnits = bill ? bill.waterUnits : 0
-  const waterAmount = waterUnits * 18
-  const totalAmount = bill ? bill.amount : rentPrice
+  const waterAmount = waterUnits * waterRate
+  const commonAreaFee = commonFee
+
+  // คำนวณค่าเช่าห้องพักที่หักส่วนลด (ถ้ามี) เพื่อให้ยอดรวมรวมกันเท่ากับ bill.amount พอดี
+  const rentPrice = bill 
+    ? Math.max(0, Math.min(baseRent, bill.amount - elecAmount - waterAmount - commonAreaFee)) 
+    : baseRent
+
+  const totalAmount = bill ? bill.amount : (rentPrice + elecAmount + waterAmount + commonAreaFee)
+
+  const penaltyAmount = bill 
+    ? Math.max(0, totalAmount - rentPrice - elecAmount - waterAmount - commonAreaFee) 
+    : 0
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
@@ -223,9 +247,10 @@ export default function TenantPortal() {
         billingCycle,
         baseRent: rentPrice,
         electricUnits: elecUnits,
-        electricRate: 7,
+        electricRate,
         waterUnits: waterUnits,
-        waterRate: 18,
+        waterRate,
+        commonFee,
         amount: totalAmount,
         promptPayId,
         promptPayName,
@@ -371,38 +396,60 @@ export default function TenantPortal() {
 
           {/* รายละเอียดค่าใช้จ่าย */}
           <div className="space-y-3 pt-2 text-xs">
+            {/* 1. ค่าเช่าห้องพัก */}
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
-              <span className="text-slate-400">ค่าเช่าห้องพักปกติ</span>
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <Building className="w-3.5 h-3.5 text-blue-400" />
+                <span>1. ค่าเช่าห้องพัก (Room Rent)</span>
+              </div>
               <span className="font-semibold text-slate-200">{rentPrice.toLocaleString()} บาท</span>
             </div>
 
-            {/* ค่าไฟ */}
+            {/* 2. ค่าไฟฟ้า */}
             <div className="flex justify-between items-start pb-2.5 border-b border-slate-900">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 text-slate-400">
-                  <Zap className="w-3.5 h-3.5 text-blue-400" />
-                  <span>ค่ากระแสไฟฟ้า</span>
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>2. ค่าไฟฟ้า (Electricity)</span>
                 </div>
                 <p className="text-[10px] text-slate-500 pl-5">ปริมาณไฟสะสมที่ใช้: {elecUnits} หน่วย</p>
               </div>
               <span className="font-semibold text-slate-200">{elecAmount.toLocaleString()} บาท</span>
             </div>
 
-            {/* ค่าน้ำ */}
+            {/* 3. ค่าน้ำประปา */}
             <div className="flex justify-between items-start pb-2.5 border-b border-slate-900">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 text-slate-400">
                   <Droplet className="w-3.5 h-3.5 text-teal-400" />
-                  <span>ค่าน้ำประปา</span>
+                  <span>3. ค่าน้ำประปา (Water)</span>
                 </div>
                 <p className="text-[10px] text-slate-500 pl-5">ปริมาณน้ำสะสมที่ใช้: {waterUnits} หน่วย</p>
               </div>
               <span className="font-semibold text-slate-200">{waterAmount.toLocaleString()} บาท</span>
             </div>
 
+            {/* 4. ค่าส่วนกลาง */}
+            <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>4. ค่าส่วนกลาง (Common Area Fee)</span>
+              </div>
+              <span className="font-semibold text-slate-200">{commonAreaFee.toLocaleString()} บาท</span>
+            </div>
+
+            {/* 5. ค่าปรับ */}
+            <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                <span>5. ค่าปรับ (Penalty / Fine)</span>
+              </div>
+              <span className="font-semibold text-slate-200">{penaltyAmount.toLocaleString()} บาท</span>
+            </div>
+
             {/* ยอดเงินรวมสุทธิ */}
             <div className="flex justify-between items-center pt-2">
-              <span className="font-bold text-slate-300">ยอดชำระเงินสุทธิ</span>
+              <span className="font-bold text-slate-300">ยอดชำระเงินสุทธิ (Total Amount)</span>
               <span className="text-lg font-bold text-blue-400">{totalAmount.toLocaleString()} บาท</span>
             </div>
 

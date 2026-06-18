@@ -324,18 +324,22 @@ export async function generateBillPdf(data: BillPdfData) {
   const elecAmount = isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate
   const waterAmount = isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate
   
+  // คำนวณค่าเช่าห้องพักที่หักส่วนลด (ถ้ามี) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
+  const adjustedBaseRent = Math.max(0, Math.min(data.baseRent, data.amount - elecAmount - waterAmount - commonFee))
+  const penaltyAmount = Math.max(0, data.amount - adjustedBaseRent - elecAmount - waterAmount - commonFee)
+
   const elecDesc = isElecMin 
-    ? `2. ค่ากระแสไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
-    : "2. ค่ากระแสไฟฟ้า (Electricity Bill)"
+    ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
+    : "2. ค่าไฟฟ้า (Electricity Bill)"
   const waterDesc = isWaterMin 
     ? `3. ค่าน้ำประปา (ขั้นต่ำ ${waterMinUnit} หน่วย)` 
     : "3. ค่าน้ำประปา (Water Bill)"
 
   // รายการ 1: ค่าเช่าห้องพัก
-  drawText("1. ค่าเช่าห้องพักหลัก (Base Room Rent)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText("1. ค่าเช่าห้องพัก (Room Rent)", 50, y, 9, rgb(0.2, 0.2, 0.2))
   drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(data.baseRent.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(data.baseRent.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(adjustedBaseRent.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(adjustedBaseRent.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   y -= 25
   // รายการ 2: ค่าไฟฟ้า
@@ -352,11 +356,18 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText(waterAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   y -= 25
-  // รายการ 4: ค่าบริการส่วนกลาง
-  drawText("4. ค่าบริการส่วนกลาง (Common Area Fee)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+  // รายการ 4: ค่าส่วนกลาง
+  drawText("4. ค่าส่วนกลาง (Common Area Fee)", 50, y, 9, rgb(0.2, 0.2, 0.2))
   drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+
+  y -= 25
+  // รายการ 5: ค่าปรับ
+  drawText("5. ค่าปรับ (Penalty / Fine)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(penaltyAmount.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(penaltyAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   // ขีดเส้นใต้ตาราง
   page.drawLine({
