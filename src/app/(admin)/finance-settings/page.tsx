@@ -7,14 +7,6 @@ import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
-function getCookie(name: string): string | undefined {
-  if (typeof document === "undefined") return undefined
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) return parts.pop()?.split(";").shift()
-  return undefined
-}
-
 function setCookie(name: string, value: string, days = 7) {
   if (typeof document === "undefined") return
   const date = new Date()
@@ -23,12 +15,164 @@ function setCookie(name: string, value: string, days = 7) {
   document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}${isSecure ? "; Secure" : ""}; SameSite=Lax`
 }
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
+
+function parseAddress(fullAddress: string) {
+  const result = {
+    no: "",
+    road: "",
+    subdistrict: "",
+    district: "",
+    province: "",
+    zipcode: ""
+  }
+  
+  if (!fullAddress) return result
+
+  // Extract postal code (5 digits at the end)
+  const zipMatch = fullAddress.match(/\b\d{5}\b/)
+  if (zipMatch) {
+    result.zipcode = zipMatch[0]
+    fullAddress = fullAddress.replace(zipMatch[0], "").trim()
+  }
+
+  // Extract province: look for จังหวัด... or จ.... or กรุงเทพ...
+  const provinceKeywords = ["จังหวัด", "จ.", "กรุงเทพมหานคร", "กรุงเทพฯ", "กรุงเทพ"]
+  let foundProvince = ""
+  for (const kw of provinceKeywords) {
+    if (fullAddress.includes(kw)) {
+      const idx = fullAddress.indexOf(kw)
+      const after = fullAddress.substring(idx).trim()
+      foundProvince = after
+      fullAddress = fullAddress.substring(0, idx).trim()
+      break
+    }
+  }
+  if (foundProvince) {
+    result.province = foundProvince.replace(/^(จังหวัด|จ\.)\s*/, "").trim()
+  }
+
+  // Extract district: look for อำเภอ... or อ.... or เขต...
+  const districtKeywords = ["อำเภอ", "เขต", "อ."]
+  let foundDistrict = ""
+  for (const kw of districtKeywords) {
+    if (fullAddress.includes(kw)) {
+      const idx = fullAddress.indexOf(kw)
+      const after = fullAddress.substring(idx).trim()
+      foundDistrict = after
+      fullAddress = fullAddress.substring(0, idx).trim()
+      break
+    }
+  }
+  if (foundDistrict) {
+    result.district = foundDistrict.replace(/^(อำเภอ|เขต|อ\.)\s*/, "").trim()
+  }
+
+  // Extract subdistrict: look for ตำบล... or ต.... or แขวง...
+  const subdistrictKeywords = ["ตำบล", "แขวง", "ต."]
+  let foundSubdistrict = ""
+  for (const kw of subdistrictKeywords) {
+    if (fullAddress.includes(kw)) {
+      const idx = fullAddress.indexOf(kw)
+      const after = fullAddress.substring(idx).trim()
+      foundSubdistrict = after
+      fullAddress = fullAddress.substring(0, idx).trim()
+      break
+    }
+  }
+  if (foundSubdistrict) {
+    result.subdistrict = foundSubdistrict.replace(/^(ตำบล|แขวง|ต\.)\s*/, "").trim()
+  }
+
+  // Extract road: look for ถนน... or ถ....
+  const roadKeywords = ["ถนน", "ถ."]
+  let foundRoad = ""
+  for (const kw of roadKeywords) {
+    if (fullAddress.includes(kw)) {
+      const idx = fullAddress.indexOf(kw)
+      const after = fullAddress.substring(idx).trim()
+      foundRoad = after
+      fullAddress = fullAddress.substring(0, idx).trim()
+      break
+    }
+  }
+  if (foundRoad) {
+    result.road = foundRoad.replace(/^(ถนน|ถ\.)\s*/, "").trim()
+  }
+
+  // The rest is address No
+  result.no = fullAddress.replace(/,$/, "").trim()
+
+  return result
+}
+
+function formatAddress(no: string, road: string, subdistrict: string, district: string, province: string, zipcode: string): string {
+  const parts: string[] = []
+  if (no) parts.push(no)
+  
+  if (road && road !== "-") {
+    if (road.startsWith("ถนน") || road.startsWith("ถ.")) {
+      parts.push(road)
+    } else {
+      parts.push(`ถนน${road}`)
+    }
+  }
+  
+  if (subdistrict) {
+    const isBkk = province.includes("กรุงเทพ") || province.includes("BKK") || province.includes("Bangkok")
+    const prefix = isBkk ? "แขวง" : "ตำบล"
+    if (subdistrict.startsWith(prefix) || subdistrict.startsWith("ต.") || subdistrict.startsWith("ต ")) {
+      parts.push(subdistrict)
+    } else {
+      parts.push(`${prefix}${subdistrict}`)
+    }
+  }
+
+  if (district) {
+    const isBkk = province.includes("กรุงเทพ") || province.includes("BKK") || province.includes("Bangkok")
+    const prefix = isBkk ? "เขต" : "อำเภอ"
+    if (district.startsWith(prefix) || district.startsWith("อ.") || district.startsWith("อ ")) {
+      parts.push(district)
+    } else {
+      parts.push(`${prefix}${district}`)
+    }
+  }
+
+  if (province) {
+    const isBkk = province.includes("กรุงเทพ") || province.includes("BKK") || province.includes("Bangkok")
+    if (isBkk) {
+      parts.push(province)
+    } else {
+      if (province.startsWith("จังหวัด") || province.startsWith("จ.")) {
+        parts.push(province)
+      } else {
+        parts.push(`จังหวัด${province}`)
+      }
+    }
+  }
+
+  if (zipcode) parts.push(zipcode)
+
+  return parts.join(" ")
+}
+
 export default function FinanceSettingsPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [taxId, setTaxId] = useState("")
-  const [address, setAddress] = useState("")
+  const [addressNo, setAddressNo] = useState("")
+  const [addressRoad, setAddressRoad] = useState("")
+  const [addressSubdistrict, setAddressSubdistrict] = useState("")
+  const [addressDistrict, setAddressDistrict] = useState("")
+  const [addressProvince, setAddressProvince] = useState("")
+  const [addressZipcode, setAddressZipcode] = useState("")
   const [phone, setPhone] = useState("")
 
   const [promptPayType, setPromptPayType] = useState<"phone" | "national_id">("phone")
@@ -101,7 +245,13 @@ export default function FinanceSettingsPage() {
             setFirstName(cached.tax_firstname || "")
             setLastName(cached.tax_lastname || "")
             setTaxId(cached.tax_id || "")
-            setAddress(cached.tax_address || "")
+            const parsed = parseAddress(cached.tax_address || "")
+            setAddressNo(parsed.no)
+            setAddressRoad(parsed.road)
+            setAddressSubdistrict(parsed.subdistrict)
+            setAddressDistrict(parsed.district)
+            setAddressProvince(parsed.province)
+            setAddressZipcode(parsed.zipcode)
             setPhone(cached.tax_phone || "")
             setPromptPayType(cached.promptpay_type || "phone")
             setPromptPayId(cached.promptpay_id || "")
@@ -124,7 +274,13 @@ export default function FinanceSettingsPage() {
             setFirstName(res.data.tax_firstname || "")
             setLastName(res.data.tax_lastname || "")
             setTaxId(res.data.tax_id || "")
-            setAddress(res.data.tax_address || "")
+            const parsed = parseAddress(res.data.tax_address || "")
+            setAddressNo(parsed.no)
+            setAddressRoad(parsed.road)
+            setAddressSubdistrict(parsed.subdistrict)
+            setAddressDistrict(parsed.district)
+            setAddressProvince(parsed.province)
+            setAddressZipcode(parsed.zipcode)
             setPhone(res.data.tax_phone || "")
             setPromptPayType(res.data.promptpay_type || "phone")
             setPromptPayId(res.data.promptpay_id || "")
@@ -179,11 +335,12 @@ export default function FinanceSettingsPage() {
     setErrorMsg(null)
 
     try {
+      const fullAddress = formatAddress(addressNo, addressRoad, addressSubdistrict, addressDistrict, addressProvince, addressZipcode)
       const payload: FinanceSettings = {
         tax_firstname: firstName,
         tax_lastname: lastName,
         tax_id: taxId,
-        tax_address: address,
+        tax_address: fullAddress,
         tax_phone: phone,
         promptpay_type: promptPayType,
         promptpay_id: cleanedPPId,
@@ -258,85 +415,216 @@ export default function FinanceSettingsPage() {
         </div>
       ) : (
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-          {/* คอลัมน์ซ้าย: ข้อมูลผู้เสียภาษี */}
-          <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-              <User className="w-4 h-4 text-blue-400" /> ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา
-            </h3>
+          {/* คอลัมน์ซ้าย: ข้อมูลผู้ยื่นเสียภาษี และ ค่าปรับล่าช้า */}
+          <div className="flex flex-col gap-6">
+            
+            {/* กล่อง 1: ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา */}
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <User className="w-4 h-4 text-blue-400" /> ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา
+              </h3>
 
-            {errorMsg && (
-              <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2 animate-shake">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{errorMsg}</span>
+              {errorMsg && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2 animate-shake">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">ชื่อจริง</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ชื่อจริง (เช่น สมเจตน์)"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">นามสกุล</label>
+                  <input
+                    type="text"
+                    placeholder="นามสกุล (เช่น แสนสุข)"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
               </div>
-            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 font-medium">ชื่อจริง</label>
+                <label className="text-xs text-slate-400 font-medium">เลขประจำตัวผู้เสียภาษีอากร / เลขบัตรประชาชน (13 หลัก)</label>
                 <input
                   type="text"
                   required
-                  placeholder="ชื่อจริง (เช่น สมเจตน์)"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  maxLength={13}
+                  placeholder="1100100222333"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 font-medium">นามสกุล</label>
-                <input
-                  type="text"
-                  placeholder="นามสกุล (เช่น แสนสุข)"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">เบอร์โทรศัพท์ติดต่อ</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="089-999-9999"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* ฟอร์มกรอกที่อยู่แบบแยกประเภท */}
+              <div className="space-y-4 border-t border-slate-200 dark:border-slate-900/40 pt-4">
+                <label className="text-xs text-slate-500 dark:text-slate-400 font-bold block uppercase tracking-wider">ที่อยู่ตามทะเบียนบ้าน (เพื่อกรอกในแบบยื่นภาษีกรมสรรพากร)</label>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">เลขที่ / ซอย / หมู่บ้าน / อาคาร</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="เช่น 21 ซอยหงษ์อ่อน"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      value={addressNo}
+                      onChange={(e) => setAddressNo(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">ถนน (ถ้าไม่มีให้ใส่ -)</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น ประชาราษฎร์บำเพ็ญ"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      value={addressRoad}
+                      onChange={(e) => setAddressRoad(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">ตำบล / แขวง</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="เช่น ห้วยขวาง"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      value={addressSubdistrict}
+                      onChange={(e) => setAddressSubdistrict(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">อำเภอ / เขต</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="เช่น ห้วยขวาง"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      value={addressDistrict}
+                      onChange={(e) => setAddressDistrict(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">จังหวัด</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="เช่น กรุงเทพมหานคร"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      value={addressProvince}
+                      onChange={(e) => setAddressProvince(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">รหัสไปรษณีย์</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={5}
+                      placeholder="เช่น 10310"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
+                      value={addressZipcode}
+                      onChange={(e) => setAddressZipcode(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-400 font-medium">เลขประจำตัวผู้เสียภาษีอากร / เลขบัตรประชาชน (13 หลัก)</label>
-              <input
-                type="text"
-                required
-                maxLength={13}
-                placeholder="1100100222333"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
-                value={taxId}
-                onChange={(e) => setTaxId(e.target.value)}
-              />
-            </div>
+            {/* กล่อง 2: ค่าบริการส่วนกลางคงที่ และ ค่าปรับล่าช้าสะสม */}
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <Sliders className="w-4 h-4 text-blue-400" /> ค่าบริการส่วนกลางและค่าปรับล่าช้า
+              </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 font-medium">เบอร์โทรศัพท์ติดต่อ</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="089-999-9999"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+              {/* ค่าบริการส่วนกลาง */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <Building className="w-4 h-4 text-teal-400" /> ค่าบริการส่วนกลางคงที่
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="50"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={commonFee}
+                      onChange={(e) => setCommonFee(Number(e.target.value))}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    ค่าส่วนกลางคงที่รายเดือน สำหรับนำไปบวกเพิ่มในใบแจ้งหนี้ทุกห้องพักอัตโนมัติ
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-400 font-medium">ที่อยู่ตามทะเบียนบ้าน (เพื่อกรอกในแบบยื่นภาษีกรมสรรพากร)</label>
-              <textarea
-                rows={3}
-                required
-                placeholder="บ้านเลขที่, ถนน, ตำบล, อำเภอ, จังหวัด, รหัสไปรษณีย์"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm leading-relaxed transition-all resize-none"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
+              {/* ค่าปรับจ่ายล่าช้าสะสมรายวัน */}
+              <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/40 pt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <Clock className="w-4 h-4 text-amber-500 animate-pulse" /> ค่าปรับจ่ายบิลล่าช้า (สะสมต่อวัน)
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">อัตราค่าปรับล่าช้าต่อวัน (บาท / วัน)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="50"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={latePenaltyRate}
+                      onChange={(e) => setLatePenaltyRate(Number(e.target.value))}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    สะสมค่าปรับเพิ่มขึ้นอัตโนมัติทุกวันเมื่อพ้นกำหนดส่งเงิน (ตั้งแต่วันที่ 6 ของรอบบิลเป็นต้นไป)
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* คอลัมน์ขวา: พร้อมเพย์และอัตราส่วนกลาง */}
+          {/* คอลัมน์ขวา: พร้อมเพย์และอัตราค่าน้ำค่าไฟ */}
           <div className="flex flex-col gap-6">
+            
+            {/* กล่อง 3: พร้อมเพย์ */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
                 <CreditCard className="w-4 h-4 text-teal-400" /> ตั้งค่าระบบรับเงินพร้อมเพย์ (PromptPay QR)
@@ -410,10 +698,10 @@ export default function FinanceSettingsPage() {
               </div>
             </div>
 
-            {/* กล่องอัตราค่าสาธารณูปโภคและค่าบริการส่วนกลาง */}
+            {/* กล่อง 4: อัตราค่าสาธารณูปโภค (ค่าน้ำประปาและค่าไฟฟ้า) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <Sliders className="w-4 h-4 text-blue-400" /> อัตราสาธารณูปโภคและค่าบริการส่วนกลาง
+                <Sliders className="w-4 h-4 text-blue-400" /> อัตราค่าสาธารณูปโภค (น้ำ / ไฟ)
               </h3>
 
               {/* ค่าน้ำประปา */}
@@ -530,56 +818,6 @@ export default function FinanceSettingsPage() {
                     </p>
                   </div>
                 )}
-              </div>
-
-              {/* ค่าบริการส่วนกลาง */}
-              <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <Building className="w-4 h-4 text-teal-400" /> ค่าบริการส่วนกลางคงที่
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      placeholder="50"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      value={commonFee}
-                      onChange={(e) => setCommonFee(Number(e.target.value))}
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    ค่าส่วนกลางคงที่รายเดือน สำหรับนำไปบวกเพิ่มในใบแจ้งหนี้ทุกห้องพักอัตโนมัติ
-                  </p>
-                </div>
-              </div>
-
-              {/* ค่าปรับจ่ายล่าช้าสะสมรายวัน */}
-              <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <Clock className="w-4 h-4 text-amber-500 animate-pulse" /> ค่าปรับจ่ายบิลล่าช้า (สะสมต่อวัน)
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">อัตราค่าปรับล่าช้าต่อวัน (บาท / วัน)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      placeholder="50"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      value={latePenaltyRate}
-                      onChange={(e) => setLatePenaltyRate(Number(e.target.value))}
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    สะสมค่าปรับเพิ่มขึ้นอัตโนมัติทุกวันเมื่อพ้นกำหนดส่งเงิน (ตั้งแต่วันที่ 6 ของรอบบิลเป็นต้นไป)
-                  </p>
-                </div>
               </div>
             </div>
 
