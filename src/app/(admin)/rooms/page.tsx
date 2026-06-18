@@ -806,14 +806,14 @@ export default function RoomsPage() {
                             {/* 7. Action Button column (Status-dependent) */}
                             <td className="p-4 text-center">
                               <div className="flex items-center justify-center">
-                                {/* VACANT: Make Contract */}
+                                {/* VACANT: Generate LINE Link */}
                                 {!room.tenantName && (
                                   <button
-                                    onClick={() => handleOpenContractModal(room)}
+                                    onClick={() => handleOpenLineLinkModal(room)}
                                     className="px-3.5 py-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1"
                                   >
-                                    <UserPlus className="w-3.5 h-3.5" />
-                                    ทำสัญญา/เพิ่มผู้เช่า
+                                    <Share2 className="w-3.5 h-3.5" />
+                                    เจนลิงก์ LINE
                                   </button>
                                 )}
 
@@ -947,14 +947,14 @@ export default function RoomsPage() {
                           
                           {/* Primary Action Row based on state */}
                           <div className="flex gap-2">
-                            {/* VACANT: Make Contract */}
+                            {/* VACANT: Generate LINE Link */}
                             {!room.tenantName && (
                               <button
-                                onClick={() => handleOpenContractModal(room)}
+                                onClick={() => handleOpenLineLinkModal(room)}
                                 className="flex-1 py-3 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11"
                               >
-                                <UserPlus className="w-4 h-4" />
-                                ทำสัญญา/เพิ่มผู้เช่า
+                                <Share2 className="w-4 h-4" />
+                                เจนลิงก์ LINE
                               </button>
                             )}
 
@@ -1394,22 +1394,47 @@ export default function RoomsPage() {
 
               <div className="space-y-4 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
                 
-                {/* Visual success note */}
-                <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-2">
-                  <div className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    ทำสัญญาสำเร็จ! กรุณาส่งลิงก์นี้ให้ผู้เช่าเชื่อมโยง LINE
+                {/* Visual success/share note */}
+                {selectedRoom.tenantName ? (
+                  <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                    <div className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      ทำสัญญาสำเร็จ! กรุณาส่งลิงก์นี้ให้ผู้เช่าเชื่อมโยง LINE
+                    </div>
+                    <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                      ลิงก์ LINE LIFF นี้ได้รับการล็อค Workspace ID และหมายเลขห้องพัก ({selectedRoom.roomNumber}) ไว้อย่างปลอดภัย ผู้เช่าสามารถเข้าลงทะเบียนด้วย LINE บนสมาร์ทโฟนเพื่อรับส่งบิลค่าน้ำค่าไฟได้ทันที
+                    </p>
                   </div>
-                  <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-                    ลิงก์ LINE LIFF นี้ได้รับการล็อค Workspace ID และหมายเลขห้องพัก ({selectedRoom.roomNumber}) ไว้อย่างปลอดภัย ผู้เช่าสามารถเข้าลงทะเบียนด้วย LINE บนสมาร์ทโฟนเพื่อรับส่งบิลค่าน้ำค่าไฟได้ทันที
-                  </p>
-                </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/10 dark:border-blue-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                    <div className="font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                      <Share2 className="w-4 h-4 shrink-0" />
+                      แชร์ลิงก์ให้ผู้เช่าลงทะเบียน (ห้องว่าง)
+                    </div>
+                    <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                      แชร์ลิงก์ LINE LIFF นี้ให้กับผู้เช่าคนใหม่ ผู้เช่าจะสามารถกรอกชื่อ-นามสกุล และเบอร์โทรศัพท์มือถือผ่านสมาร์ทโฟนของตนเอง เพื่อผูกบัญชีและลงทะเบียนผู้เช่าระบบอพาร์ทเมนท์เข้ากับห้อง {selectedRoom.roomNumber} ได้โดยตรงทันที
+                    </p>
+                  </div>
+                )}
 
                 {/* Tenant Details Preview */}
                 <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/60 px-4 py-1.5 text-xs text-slate-600 dark:text-slate-300">
-                  <div className="flex justify-between py-2"><span className="text-slate-400">ชื่อผู้เช่า:</span> <span className="font-extrabold">{selectedRoom.tenantName}</span></div>
-                  <div className="flex justify-between py-2"><span className="text-slate-400">เบอร์โทรศัพท์:</span> <span className="font-mono font-bold">{selectedRoom.tenantPhone}</span></div>
-                  <div className="flex justify-between py-2"><span className="text-slate-400">หมายเลขห้อง:</span> <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span></div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-slate-400">ชื่อผู้เช่า:</span> 
+                    <span className={selectedRoom.tenantName ? "font-extrabold text-slate-850 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 italic font-semibold"}>
+                      {selectedRoom.tenantName || "(รอผู้เช่าลงทะเบียนกรอกข้อมูล)"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-slate-400">เบอร์โทรศัพท์:</span> 
+                    <span className={selectedRoom.tenantPhone ? "font-mono font-bold text-slate-850 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 italic font-semibold"}>
+                      {selectedRoom.tenantPhone || "(รอผู้เช่าลงทะเบียนกรอกข้อมูล)"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-slate-400">หมายเลขห้อง:</span> 
+                    <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span>
+                  </div>
                 </div>
 
                 {/* Pre-filled Link Section */}
@@ -1438,9 +1463,38 @@ export default function RoomsPage() {
                   <ul className="list-decimal pl-4 space-y-1.5 leading-relaxed">
                     <li>กดปุ่ม <strong className="text-slate-700 dark:text-slate-200">คัดลอกลิงก์</strong> ด้านบน</li>
                     <li>ส่งลิงก์นี้ไปทาง LINE หรือช่องทางแชทให้กับผู้เช่าโดยตรง</li>
-                    <li>ผู้เช่ากดลิงก์บนมือถือ จะเปิดหน้าจอ LINE LIFF เพื่อตรวจสอบความถูกต้องและกดยืนยันตัวตน UID เพื่อเสร็จสิ้น</li>
+                    <li>ผู้เช่ากดลิงก์บนมือถือ จะเปิดหน้าจอ LINE LIFF เพื่อกรอกข้อมูลผู้เช่าและกดยืนยันตัวตน UID เพื่อเสร็จสิ้น</li>
                   </ul>
                 </div>
+
+                {/* Offline manual registration fallback */}
+                {!selectedRoom.tenantName && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
+                    <button
+                      onClick={() => {
+                        setLineLinkModalOpen(false)
+                        setTenantNameInput("")
+                        setTenantPhoneInput("")
+                        
+                        const todayStr = new Date().toISOString().split("T")[0]
+                        setContractStartInput(todayStr)
+                        
+                        const nextYear = new Date()
+                        nextYear.setFullYear(nextYear.getFullYear() + 1)
+                        nextYear.setDate(nextYear.getDate() - 1)
+                        setContractEndInput(nextYear.toISOString().split("T")[0])
+
+                        setTimeout(() => {
+                          setContractModalOpen(true)
+                        }, 300)
+                      }}
+                      className="text-[11px] text-blue-650 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 underline font-extrabold cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      ต้องการทำสัญญา/เพิ่มผู้เช่าแบบออฟไลน์ด้วยตนเอง? (คลิก)
+                    </button>
+                  </div>
+                )}
 
                 {/* Close Button */}
                 <div className="pt-3 flex">

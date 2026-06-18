@@ -66,12 +66,22 @@ export async function POST(request: Request) {
     }
 
     // 3. เตรียมโครงสร้างออบเจกต์ข้อมูลในการบันทึกแถวใหม่
+    const today = new Date()
+    const nextYear = new Date()
+    nextYear.setFullYear(nextYear.getFullYear() + 1)
+    nextYear.setDate(nextYear.getDate() - 1)
+
+    const leaseStart = today.toISOString().split("T")[0]
+    const leaseEnd = nextYear.toISOString().split("T")[0]
+
     const tenantPayload = {
       room_id: room.id,
       line_user_id: lineUserId,
       workspace_id: workspaceId,
       tenant_name: tenantName.trim(),
       tenant_phone: tenantPhone.trim(),
+      lease_start: leaseStart,
+      lease_end: leaseEnd,
       updated_at: new Date().toISOString()
     }
 
