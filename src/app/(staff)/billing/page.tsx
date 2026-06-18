@@ -701,9 +701,60 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  // ส่งข้อมูลเข้า LINE OA
-  const handleSendLine = (room: string) => {
-    showToast(`ส่งไฟล์บิล PDF และพร้อมเพย์ QR ไปยัง LINE ผู้เช่าห้อง ${room} สำเร็จ!`)
+  // ส่งข้อมูลเข้า LINE OA ของจริง
+  const handleSendLine = async (roomNumber: string) => {
+    // 1. ค้นหาข้อมูลห้องพักจาก List เพื่อหยิบ lineUserId ของผู้เช่าจริงออกมา
+    const roomInfo = roomsList.find((r: any) => r.roomNumber === roomNumber)
+    const lineUserId = roomInfo?.lineUserId
+
+    if (!lineUserId) {
+      showToast(`ไม่สามารถส่ง LINE ได้ เนื่องจากผู้เช่าห้อง ${roomNumber} ยังไม่ได้ลงทะเบียนผูก LINE ID`)
+      return
+    }
+
+    // 2. ค้นหาบิลประจำงวดของห้องนั้นๆ
+    const item = unifiedItems.find((x: any) => x.roomNumber === roomNumber)
+    if (!item) {
+      showToast(`ไม่พบข้อมูลค่าใช้จ่ายของห้อง ${roomNumber}`)
+      return
+    }
+
+    if (item.billStatus === "not_created") {
+      showToast(`กรุณากดคำนวณบิลห้อง ${roomNumber} ให้เสร็จสิ้นก่อนส่งข้อความ`)
+      return
+    }
+
+    try {
+      const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+      const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+
+      const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+      const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+
+      const { sendLineBillNotificationAction } = await import("@/features/notification/actions")
+      const result = await sendLineBillNotificationAction({
+        lineUserId,
+        roomNumber: item.roomNumber,
+        tenantName: item.tenantName || "ผู้เช่า",
+        billingCycle: formatBillingCycleThai(billingCycle),
+        baseRent: item.baseRent,
+        electricUnits: elecUnitsUsed,
+        electricAmount: elecCost,
+        waterUnits: waterUnitsUsed,
+        waterAmount: waterCost,
+        totalAmount: item.billAmount,
+        workspaceName: workspaceName || "หอพักของเรา"
+      })
+
+      if (result.success) {
+        showToast(`ส่งยอดบิล และลิงก์ชำระเงินไปยัง LINE ผู้เช่าห้อง ${roomNumber} สำเร็จแล้ว!`)
+      } else {
+        showToast(`ส่ง LINE ล้มเหลว: ${result.error}`)
+      }
+    } catch (err: any) {
+      console.error(err)
+      showToast("เกิดข้อผิดพลาดในการเรียกส่งข้อมูลผ่าน LINE")
+    }
   }
 
   // ดาวน์โหลดบิล PDF

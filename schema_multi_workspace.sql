@@ -52,6 +52,14 @@ update public.meter_records set workspace_id = 'd290f1ee-6c54-4b01-90e6-d701748f
 update public.bills set workspace_id = 'd290f1ee-6c54-4b01-90e6-d701748f0851' where workspace_id is null;
 update public.expenses set workspace_id = 'd290f1ee-6c54-4b01-90e6-d701748f0851' where workspace_id is null;
 
+-- Drop old global unique constraints that prevent multi-workspace duplicate names
+alter table public.rooms drop constraint if exists rooms_room_number_key;
+alter table public.room_types drop constraint if exists room_types_name_key;
+
+-- Add new composite unique constraints scoped per workspace
+alter table public.rooms add constraint rooms_workspace_id_room_number_key unique (workspace_id, room_number);
+alter table public.room_types add constraint room_types_workspace_id_name_key unique (workspace_id, name);
+
 -- 4. Create Support Access Grants Table
 create table if not exists public.support_access_grants (
   id uuid primary key default gen_random_uuid(),
