@@ -39,7 +39,7 @@ import {
   X
 } from "lucide-react"
 import { generatePromptPayPayload } from "@/lib/promptpay"
-import { getTenantPortalData } from "@/features/tenant/actions"
+import { getTenantPortalData, getTenantPortalDataNoLoginAction } from "@/features/tenant/actions"
 import { updateBillStatus } from "@/features/billing/actions"
 import { getCurrentUserProfileAction, updateUserProfileAction } from "@/features/auth/actions"
 
@@ -98,7 +98,21 @@ export default function TenantPortal() {
   }
 
   const loadPortalData = async () => {
-    const res = await getTenantPortalData()
+    let wsId = ""
+    let rNum = ""
+    
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search)
+      wsId = searchParams.get("workspace_id") || ""
+      rNum = searchParams.get("room_number") || ""
+    }
+
+    let res
+    if (wsId && rNum) {
+      res = await getTenantPortalDataNoLoginAction(wsId, rNum)
+    } else {
+      res = await getTenantPortalData()
+    }
 
     if (res.success && res.data) {
       setIsDemo(false)
@@ -148,7 +162,7 @@ export default function TenantPortal() {
         setBillingCycle("ยังไม่มีรอบบิล")
         setHistory([])
       }
-    } else if (res.fallback) {
+    } else if ((res as any).fallback) {
       setIsDemo(true)
       setRoomNumber("105")
       setTenantName("คุณณัฐพล ใจดี")

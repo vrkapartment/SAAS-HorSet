@@ -25,8 +25,10 @@ interface LineBillNotificationPayload {
   electricAmount: number
   waterUnits: number
   waterAmount: number
+  commonFee?: number
   totalAmount: number
   workspaceName: string
+  workspaceId?: string
 }
 
 /**
@@ -44,8 +46,10 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       electricAmount,
       waterUnits,
       waterAmount,
+      commonFee = 0,
       totalAmount,
       workspaceName,
+      workspaceId,
     } = payload
 
     const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
@@ -65,22 +69,252 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       }
     }
 
-    // สร้างข้อความรายละเอียดค่าใช้จ่ายที่อ่านง่าย สะอาดตา และเป็นระเบียบ
-    const messageText = `🏠 แจ้งยอดค่าเช่าและบริการประจำ${billingCycle}
-━━━━━━━━━━━━━━━━━━━━
-🏢 หอพัก: ${workspaceName}
-🚪 ห้องพัก: ห้อง ${roomNumber}
-👤 ผู้เช่า: คุณ ${tenantName}
+    // สร้างลิงก์เข้าดูบิลตรงแบบไม่ต้องล็อกอิน (โดยระบุ workspace_id และ room_number)
+    const portalLink = workspaceId
+      ? `${appUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(roomNumber)}`
+      : `${appUrl}/portal`
 
-รายการค่าใช้จ่ายประจำเดือน:
-• ค่าเช่าห้องพัก: ${baseRent.toLocaleString()} บาท
-• ค่าไฟฟ้า (${electricUnits} หน่วย): ${electricAmount.toLocaleString()} บาท
-• ค่าน้ำประปา (${waterUnits} หน่วย): ${waterAmount.toLocaleString()} บาท
+    // สร้างข้อความสำรองสำหรับหน้าจอแจ้งเตือน (Notification / Lock Screen)
+    const altText = `🏠 ใบแจ้งค่าเช่า ห้อง ${roomNumber} ยอดชำระ ${totalAmount.toLocaleString()} บาท`
 
-💰 ยอดรวมทั้งสิ้นที่ต้องชำระ: ${totalAmount.toLocaleString()} บาท
-━━━━━━━━━━━━━━━━━━━━
-* คุณสามารถสแกน PromptPay QR Code, แนบสลิปโอนเงิน และดูบิลฉบับเต็มได้ทันทีที่ Tenant Portal:
-🔗 ${appUrl}/portal`
+    // สร้าง LINE Flex Message คอนเทนต์ระดับพรีเมียม
+    const flexMessageContent = {
+      type: "bubble",
+      size: "mega",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#10B981",
+        paddingAll: "20px",
+        contents: [
+          {
+            type: "text",
+            text: "ใบแจ้งค่าเช่าและบริการประจำเดือน",
+            color: "#FFFFFF",
+            size: "sm",
+            weight: "bold",
+            opacity: "0.9"
+          },
+          {
+            type: "text",
+            text: workspaceName,
+            color: "#FFFFFF",
+            size: "xl",
+            weight: "bold",
+            margin: "sm",
+            wrap: true
+          }
+        ]
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "20px",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              {
+                type: "text",
+                text: "หมายเลขห้อง",
+                color: "#6B7280",
+                size: "sm"
+              },
+              {
+                type: "text",
+                text: `ห้อง ${roomNumber}`,
+                color: "#111827",
+                size: "sm",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          },
+          {
+            type: "box",
+            layout: "horizontal",
+            margin: "md",
+            contents: [
+              {
+                type: "text",
+                text: "ผู้เช่า",
+                color: "#6B7280",
+                size: "sm"
+              },
+              {
+                type: "text",
+                text: `คุณ ${tenantName}`,
+                color: "#111827",
+                size: "sm",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          },
+          {
+            type: "box",
+            layout: "horizontal",
+            margin: "md",
+            contents: [
+              {
+                type: "text",
+                text: "รอบบิล",
+                color: "#6B7280",
+                size: "sm"
+              },
+              {
+                type: "text",
+                text: billingCycle,
+                color: "#111827",
+                size: "sm",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          },
+          {
+            type: "separator",
+            margin: "xl",
+            color: "#E5E7EB"
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            margin: "xl",
+            spacing: "md",
+            contents: [
+              {
+                type: "box",
+                layout: "horizontal",
+                contents: [
+                  {
+                    type: "text",
+                    text: "🏠 ค่าเช่าห้องพัก",
+                    color: "#374151",
+                    size: "sm"
+                  },
+                  {
+                    type: "text",
+                    text: `${baseRent.toLocaleString()} บาท`,
+                    color: "#111827",
+                    size: "sm",
+                    weight: "bold",
+                    align: "end"
+                  }
+                ]
+              },
+              {
+                type: "box",
+                layout: "horizontal",
+                contents: [
+                  {
+                    type: "text",
+                    text: `⚡️ ค่าไฟฟ้า (${electricUnits} หน่วย)`,
+                    color: "#374151",
+                    size: "sm"
+                  },
+                  {
+                    type: "text",
+                    text: `${electricAmount.toLocaleString()} บาท`,
+                    color: "#111827",
+                    size: "sm",
+                    weight: "bold",
+                    align: "end"
+                  }
+                ]
+              },
+              {
+                type: "box",
+                layout: "horizontal",
+                contents: [
+                  {
+                    type: "text",
+                    text: `💧 ค่าน้ำประปา (${waterUnits} หน่วย)`,
+                    color: "#374151",
+                    size: "sm"
+                  },
+                  {
+                    type: "text",
+                    text: `${waterAmount.toLocaleString()} บาท`,
+                    color: "#111827",
+                    size: "sm",
+                    weight: "bold",
+                    align: "end"
+                  }
+                ]
+              },
+              {
+                type: "box",
+                layout: "horizontal",
+                contents: [
+                  {
+                    type: "text",
+                    text: "🏢 ค่าส่วนกลาง",
+                    color: "#374151",
+                    size: "sm"
+                  },
+                  {
+                    type: "text",
+                    text: `${commonFee.toLocaleString()} บาท`,
+                    color: "#111827",
+                    size: "sm",
+                    weight: "bold",
+                    align: "end"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            type: "separator",
+            margin: "xl",
+            color: "#E5E7EB"
+          },
+          {
+            type: "box",
+            layout: "horizontal",
+            margin: "xl",
+            contents: [
+              {
+                type: "text",
+                text: "ยอดชำระทั้งสิ้น",
+                color: "#111827",
+                size: "md",
+                weight: "bold",
+                gravity: "center"
+              },
+              {
+                type: "text",
+                text: `${totalAmount.toLocaleString()} บาท`,
+                color: "#EF4444",
+                size: "xl",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "15px",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: "#10B981",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "📲 ดูบิลและสแกนจ่ายเงิน",
+              uri: portalLink
+            }
+          }
+        ]
+      }
+    }
 
     const response = await fetch("https://api.line.me/v2/bot/message/push", {
       method: "POST",
@@ -92,8 +326,9 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
         to: lineUserId.trim(),
         messages: [
           {
-            type: "text",
-            text: messageText
+            type: "flex",
+            altText,
+            contents: flexMessageContent
           }
         ]
       })

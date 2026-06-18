@@ -348,3 +348,102 @@ export async function getTenantPortalData() {
   }
 }
 
+/**
+ * ดึงข้อมูลบิลและค่าใช้จ่ายแบบไม่ต้อง Login โดยอาศัยรหัสความปลอดภัยร่วมกัน (workspaceId + roomNumber)
+ */
+export async function getTenantPortalDataNoLoginAction(workspaceId: string, roomNumber: string) {
+  try {
+    const supabase = await createClient()
+
+    // 1. ค้นหาข้อมูลห้องพัก
+    const { data: room, error: roomError } = await supabase
+      .from("rooms")
+      .select("id, base_rent, room_types(default_rent)")
+      .eq("workspace_id", workspaceId)
+      .eq("room_number", roomNumber)
+      .maybeSingle()
+
+    if (roomError || !room) {
+      return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
+    }
+
+    // 2. ค้นหาข้อมูลผู้เช่าของห้องนี้
+    const { data: tenant, error: tenantError } = await supabase
+      .from("tenants")
+      .select("*")
+      .eq("room_id", room.id)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    // 3. ค้นหารายละเอียดของ Workspace และการตั้งค่าพร้อมเพย์
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id")
+      .eq("id", workspaceId)
+      .maybeSingle()
+
+    let promptPayId = ""
+    let promptPayName = ""
+    let workspaceName = ""
+    let workspaceAddress = ""
+    let workspacePhone = ""
+    let workspaceTaxId = ""
+
+    if (ws) {
+      promptPayId = ws.promptpay_id || ""
+      promptPayName = ws.promptpay_name || ""
+      workspaceName = ws.name || ""
+      workspaceAddress = ws.tax_address || ""
+      workspacePhone = ws.tax_phone || ""
+      workspaceTaxId = ws.tax_id || ""
+    }
+
+    // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้
+    const { data: bills, error: billsError } = await supabase
+      .from("bills")
+      .select("*")
+      .eq("room_number", roomNumber)
+      .eq("workspace_id", workspaceId)
+      .order("billing_cycle", { ascending: false })
+
+    if (billsError) throw billsError
+
+    let formattedBills: any[] = []
+    if (bills) {
+      formattedBills = bills.map((b: any) => ({
+        id: b.id,
+        roomNumber: b.room_number,
+        tenantName: b.tenant_name,
+        amount: Number(b.amount),
+        status: b.status,
+        billingCycle: b.billing_cycle,
+        slipUrl: b.slip_url,
+        electricUnits: Number(b.electric_units),
+        waterUnits: Number(b.water_units)
+      }))
+    }
+
+    const baseRent = room.room_types ? Number((room.room_types as any).default_rent) : Number(room.base_rent)
+
+    return {
+      success: true,
+      data: {
+        roomNumber,
+        tenantName: tenant ? tenant.tenant_name : "ผู้เช่า",
+        baseRent,
+        bills: formattedBills,
+        promptPayId,
+        promptPayName,
+        workspaceName,
+        workspaceAddress,
+        workspacePhone,
+        workspaceTaxId
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการโหลดข้อมูลบิล"
+    return { success: false, error: errorMessage }
+  }
+}
+
+

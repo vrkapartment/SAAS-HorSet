@@ -180,6 +180,7 @@ export default function UnifiedBillingPage() {
   const [workspaceAddress, setWorkspaceAddress] = useState<string>("")
   const [workspacePhone, setWorkspacePhone] = useState<string>("")
   const [workspaceTaxId, setWorkspaceTaxId] = useState<string>("")
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>("")
   
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
@@ -249,6 +250,7 @@ export default function UnifiedBillingPage() {
           const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
           wsId = cookieWsId || userProfile.workspace_id || ""
         }
+        setCurrentWorkspaceId(wsId)
       }
 
       // ถ้าเป็นการ Force Refresh (เช่น มีการบันทึกมิเตอร์สำเร็จ หรือกดปุ่มอัปเดต) ให้ล้างแคชเก่าออก
@@ -401,6 +403,7 @@ export default function UnifiedBillingPage() {
         }
 
         if (wsId) {
+          setCurrentWorkspaceId(wsId)
           let financeData = getCachedData(wsId, "finance_settings")
           if (!financeData || forceRefresh) {
             const financeRes = await getFinanceSettings(wsId)
@@ -742,8 +745,10 @@ export default function UnifiedBillingPage() {
         electricAmount: elecCost,
         waterUnits: waterUnitsUsed,
         waterAmount: waterCost,
+        commonFee: commonFee,
         totalAmount: item.billAmount,
-        workspaceName: workspaceName || "หอพักของเรา"
+        workspaceName: workspaceName || "หอพักของเรา",
+        workspaceId: currentWorkspaceId,
       })
 
       if (result.success) {
