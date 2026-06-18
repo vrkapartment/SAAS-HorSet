@@ -228,14 +228,19 @@ export default function TenantPortal() {
     if (!cycleStr || !cycleStr.includes("-")) return 0
     const [yearStr, monthStr] = cycleStr.split("-")
     const year = parseInt(yearStr, 10)
-    const month = parseInt(monthStr, 10) - 1 // Date month is 0-indexed
     
-    const dueDate = new Date(year, month, 5, 23, 59, 59, 999)
+    // สำหรับบิลรอบเดือน มิถุนายน (06) กำหนดจ่ายคือวันที่ 5 ของเดือนถัดไป (กรกฎาคม / index 6)
+    // ใน JavaScript Date นั้น เดือนเป็น 0-indexed (0 = ม.ค., 5 = มิ.ย., 6 = ก.ค.)
+    // ดังนั้น การระบุค่าเดือนถัดไปของรอบบิล สามารถใช้ค่า monthStr (ซึ่งเป็น 1-indexed เช่น 6 สำหรับมิถุนายน)
+    // ไปส่งเป็นค่าเดือนตรงๆ ใน New Date ได้เลย จะทำให้ได้รอบกำหนดจ่ายเป็นวันที่ 5 ของเดือนถัดไปอย่างถูกต้องและรองรับสิ้นปี (ธันวาคม -> มกราคมปีถัดไป)
+    const dueMonth = parseInt(monthStr, 10) 
+    
+    const dueDate = new Date(year, dueMonth, 5, 23, 59, 59, 999)
     const now = new Date()
     
     if (now <= dueDate) return 0
     
-    const dueMidnight = new Date(year, month, 5)
+    const dueMidnight = new Date(year, dueMonth, 5)
     const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     
     const diffTime = nowMidnight.getTime() - dueMidnight.getTime()
@@ -476,7 +481,7 @@ export default function TenantPortal() {
                   <span>5. ค่าปรับ (Penalty / Fine)</span>
                 </div>
                 {lateDays > 0 && (
-                  <p className="text-[10px] text-rose-400 pl-5">จ่ายล่าช้าเกินวันที่ 5 เป็นเวลา: {lateDays} วัน (ปรับวันละ {latePenaltyRate} บาท)</p>
+                  <p className="text-[10px] text-rose-400 pl-5">จ่ายล่าช้าเกินวันที่ 5 ของเดือนถัดไป เป็นเวลา: {lateDays} วัน (ปรับวันละ {latePenaltyRate} บาท)</p>
                 )}
                 {lateDays === 0 && penaltyAmount > 0 && (
                   <p className="text-[10px] text-rose-400 pl-5">ค่าปรับล่าช้าสะสมที่บันทึกไว้</p>
