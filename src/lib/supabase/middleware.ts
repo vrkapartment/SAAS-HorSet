@@ -42,9 +42,16 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (tenantPaths.includes(path) && mockRole !== "tenant") {
-    const url = request.nextUrl.clone()
-    url.pathname = "/login"
-    return NextResponse.redirect(url)
+    // อนุญาตให้ผู้เช่าเข้าหน้า /portal ได้โดยไม่ต้อง Login หากเข้าผ่านลิงก์ตรงจากไลน์ (มี workspace_id และ room_number)
+    const workspaceId = request.nextUrl.searchParams.get("workspace_id")
+    const roomNumber = request.nextUrl.searchParams.get("room_number")
+    const isLoginFreePortal = workspaceId && roomNumber
+
+    if (!isLoginFreePortal) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/login"
+      return NextResponse.redirect(url)
+    }
   }
 
   // หากผู้ใช้อยู่ที่หน้า login แต่ล็อกอินแล้ว ให้นำทางไปแดชบอร์ดตามสิทธิ์ที่มี
