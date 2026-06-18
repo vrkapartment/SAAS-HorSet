@@ -528,15 +528,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "super_admin"]
     },
     {
-      name: t("nav.rooms") || "จัดการห้องพัก",
+      name: t("nav.rooms") || "จัดการห้องพักและผู้เช่า",
       path: "/rooms",
       icon: Home,
-      roles: ["admin", "staff", "super_admin"]
-    },
-    {
-      name: t("nav.tenants") || "จัดการผู้เช่า",
-      path: "/tenants",
-      icon: Users,
       roles: ["admin", "staff", "super_admin"]
     },
     {
@@ -663,8 +657,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               <h1 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <span className="truncate max-w-[130px] sm:max-w-none">
                   {pathname === "/dashboard" && (t("nav.dashboard") || "หน้าแรกภาพรวมสถิติ")}
-                  {pathname === "/rooms" && (t("nav.rooms") || "ระบบจัดการห้องพัก")}
-                  {pathname === "/tenants" && (t("nav.tenants") || "ระบบจัดการข้อมูลสัญญาผู้เช่า")}
+                  {pathname === "/rooms" && (t("nav.rooms") || "จัดการห้องพักและผู้เช่า")}
                   {pathname === "/billing" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
                   {pathname === "/meter" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
                   {pathname === "/daily-bills" && "จัดการบิลรายจ่ายรายวัน (40(5) / 40(8))"}

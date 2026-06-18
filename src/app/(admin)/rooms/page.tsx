@@ -16,7 +16,15 @@ import {
   Phone,
   CheckCircle2,
   DollarSign,
-  Info
+  Info,
+  Copy,
+  ExternalLink,
+  Calendar,
+  UserPlus,
+  LogOut,
+  Share2,
+  ClipboardCheck,
+  Building
 } from "lucide-react"
 import { 
   getRooms, 
@@ -28,6 +36,11 @@ import {
   updateRoomType,
   deleteRoomType
 } from "@/features/room/actions"
+import { 
+  createTenant, 
+  deleteTenant, 
+  updateTenant 
+} from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 function getCookie(name: string): string | undefined {
@@ -43,8 +56,12 @@ interface RoomItem {
   roomNumber: string
   status: "occupied" | "available"
   baseRent: number
+  tenantId?: string | null
   tenantName: string | null
   tenantPhone: string | null
+  lineUserId?: string | null
+  leaseStart?: string | null
+  leaseEnd?: string | null
   roomTypeId: string | null
   roomTypeName: string
 }
@@ -63,18 +80,24 @@ export default function RoomsPage() {
   const [error, setError] = useState<string | null>(null)
   
   const [search, setSearch] = useState("")
-  const [filter, setFilter] = useState<"all" | "occupied" | "available">("all")
+  const [filter, setFilter] = useState<"all" | "available" | "waiting" | "occupied">("all")
   
   // Modals Control
-  const [modalOpen, setModalOpen] = useState(false)
-  const [typesModalOpen, setTypesModalOpen] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false) // Room Modal
+  const [typesModalOpen, setTypesModalOpen] = useState(false) // Room Types Modal
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false) // Confirm Delete
   
-  // Custom Delete Confirm Modal State
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  // Unified Tenant Modals
+  const [contractModalOpen, setContractModalOpen] = useState(false)
+  const [tenantDetailModalOpen, setTenantDetailModalOpen] = useState(false)
+  const [lineLinkModalOpen, setLineLinkModalOpen] = useState(false)
+  
+  const [selectedRoom, setSelectedRoom] = useState<RoomItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
-    type: "room" | "type"
+    type: "room" | "type" | "tenant"
     name: string
+    extraId?: string // used for tenant roomNumber
   } | null>(null)
   
   // Room Form State
@@ -89,6 +112,27 @@ export default function RoomsPage() {
   const [newTypeRent, setNewTypeRent] = useState(4000)
   const [editingType, setEditingType] = useState<RoomTypeItem | null>(null)
   const [typeSubmitting, setTypeSubmitting] = useState(false)
+
+  // Contract Form State
+  const [tenantNameInput, setTenantNameInput] = useState("")
+  const [tenantPhoneInput, setTenantPhoneInput] = useState("")
+  const [contractStartInput, setContractStartInput] = useState("")
+  const [contractEndInput, setContractEndInput] = useState("")
+  const [contractSubmitting, setContractSubmitting] = useState(false)
+
+  // Custom Toast State
+  const [toast, setToast] = useState<{
+    show: boolean
+    message: string
+    type: "success" | "error" | "info"
+  }>({ show: false, message: "", type: "success" })
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ show: true, message, type })
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }))
+    }, 4000)
+  }
 
   // โหลดข้อมูลทั้งหมดจาก Supabase ร่วมกับการใช้งาน Cache ความเร็วสูง
   const loadData = async (forceRefresh = false) => {
@@ -194,17 +238,19 @@ export default function RoomsPage() {
     if (deleteTarget.type === "room") {
       const res = await deleteRoom(deleteTarget.id)
       if (res.success) {
+        showToast("✓ ลบห้องพักออกจากระบบสำเร็จแล้ว", "success")
         await loadData(true) // รีเฟรชข้อมูลและเคลียร์แคช
       } else {
-        alert(res.error || "ลบห้องพักไม่สำเร็จ")
+        showToast(res.error || "ลบห้องพักไม่สำเร็จ", "error")
         setLoading(false)
       }
-    } else {
+    } else if (deleteTarget.type === "type") {
       setTypeSubmitting(true)
       const res = await deleteRoomType(deleteTarget.id)
       if (res.success) {
         const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
         clearWorkspaceCache(wsId)
+        showToast("✓ ลบประเภทห้องพักสำเร็จแล้ว", "success")
         const typesRes = await getRoomTypes()
         if (typesRes.success && typesRes.data) {
           const typesData = typesRes.data as RoomTypeItem[]
@@ -212,10 +258,20 @@ export default function RoomsPage() {
           setCachedData(wsId, "room_types", typesData)
         }
       } else {
-        alert(res.error || "ไม่สามารถลบประเภทห้องนี้ได้ เนื่องจากมีห้องพักอื่นอ้างอิงใช้งานประเภทนี้อยู่")
+        showToast(res.error || "ไม่สามารถลบประเภทห้องนี้ได้ เนื่องจากมีห้องพักอื่นอ้างอิงใช้งานประเภทนี้อยู่", "error")
       }
       setTypeSubmitting(false)
       setLoading(false)
+    } else if (deleteTarget.type === "tenant") {
+      const res = await deleteTenant(deleteTarget.id, deleteTarget.extraId || "")
+      if (res.success) {
+        showToast(`✓ ดำเนินการย้ายออกผู้เช่า และคืนสถานะว่างให้ห้อง ${deleteTarget.extraId} สำเร็จแล้ว`, "success")
+        setTenantDetailModalOpen(false)
+        await loadData(true)
+      } else {
+        showToast(res.error || "ยกเลิกสัญญาผู้เช่าไม่สำเร็จ", "error")
+        setLoading(false)
+      }
     }
     setDeleteTarget(null)
   }
@@ -236,19 +292,21 @@ export default function RoomsPage() {
         editingRoom.status
       )
       if (res.success) {
+        showToast("✓ อัปเดตข้อมูลห้องพักสำเร็จ", "success")
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
-        alert(res.error || "แก้ไขข้อมูลห้องพักไม่สำเร็จ")
+        showToast(res.error || "แก้ไขข้อมูลห้องพักไม่สำเร็จ", "error")
       }
     } else {
       // เพิ่มห้องพักใหม่
       const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent))
       if (res.success) {
+        showToast("✓ เพิ่มห้องพักใหม่เข้าสู่ระบบสำเร็จ", "success")
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
-        alert(res.error || "สร้างห้องพักไม่สำเร็จ")
+        showToast(res.error || "สร้างห้องพักไม่สำเร็จ", "error")
       }
     }
     setFormSubmitting(false)
@@ -265,6 +323,7 @@ export default function RoomsPage() {
     if (editingType) {
       const res = await updateRoomType(editingType.id, newTypeName, Number(newTypeRent))
       if (res.success) {
+        showToast("✓ อัปเดตข้อมูลประเภทห้องสำเร็จ", "success")
         setNewTypeName("")
         setNewTypeRent(4000)
         setEditingType(null)
@@ -277,11 +336,12 @@ export default function RoomsPage() {
           setCachedData(wsId, "room_types", typesData)
         }
       } else {
-        alert(res.error || "แก้ไขประเภทห้องไม่สำเร็จ")
+        showToast(res.error || "แก้ไขประเภทห้องไม่สำเร็จ", "error")
       }
     } else {
       const res = await createRoomType(newTypeName, Number(newTypeRent))
       if (res.success) {
+        showToast("✓ สร้างประเภทห้องพักใหม่สำเร็จ", "success")
         setNewTypeName("")
         setNewTypeRent(4000)
         clearWorkspaceCache(wsId)
@@ -292,26 +352,173 @@ export default function RoomsPage() {
           setCachedData(wsId, "room_types", typesData)
         }
       } else {
-        alert(res.error || "เพิ่มประเภทห้องไม่สำเร็จ")
+        showToast(res.error || "เพิ่มประเภทห้องไม่สำเร็จ", "error")
       }
     }
     setTypeSubmitting(false)
   }
 
-  // คัดกรองห้องตามการค้นหาและฟิลเตอร์
+  // ---------------------------------------------------------
+  // Unified Tenant Management logic
+  // ---------------------------------------------------------
+  
+  // เปิดสำหรับทำสัญญาใหม่
+  const handleOpenContractModal = (room: RoomItem) => {
+    setSelectedRoom(room)
+    setTenantNameInput("")
+    setTenantPhoneInput("")
+    
+    // ตั้งค่าเริ่มต้นของวันที่วันนี้และสิ้นสุดปีถัดไป
+    const today = new Date()
+    const nextYear = new Date()
+    nextYear.setFullYear(nextYear.getFullYear() + 1)
+    nextYear.setDate(nextYear.getDate() - 1)
+    
+    setContractStartInput(today.toISOString().split("T")[0])
+    setContractEndInput(nextYear.toISOString().split("T")[0])
+    setContractModalOpen(true)
+  }
+
+  // ส่งแบบฟอร์มทำสัญญา
+  const handleSubmitContract = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRoom || !tenantNameInput || !tenantPhoneInput) return
+    setContractSubmitting(true)
+
+    try {
+      const res = await createTenant(
+        selectedRoom.roomNumber,
+        tenantNameInput,
+        tenantPhoneInput,
+        null, // lineUserId is null, waiting for Line LIFF registration!
+        contractStartInput,
+        contractEndInput
+      )
+      
+      if (res.success) {
+        showToast(`✓ ทำสัญญาห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว! ถัดไปคือแชร์ลิงก์ให้ผู้เช่าเชื่อมต่อกับ LINE`, "success")
+        setContractModalOpen(false)
+        await loadData(true) // เคลียร์แคชและโหลดข้อมูลจริง
+        
+        // ค้นหาข้อมูลห้องที่พึ่งอัปเดตเพื่อเปิด Modal เจนลิงก์ LINE ต่อให้แอดมินทันที
+        const updatedRoom = rooms.find(r => r.roomNumber === selectedRoom.roomNumber)
+        if (updatedRoom) {
+          // หน่วงเวลาเปิดเพื่อความต่อเนื่องของ UI
+          setTimeout(() => {
+            setSelectedRoom({
+              ...updatedRoom,
+              tenantName: tenantNameInput,
+              tenantPhone: tenantPhoneInput,
+              tenantId: res.data.id
+            })
+            setLineLinkModalOpen(true)
+          }, 400)
+        } else {
+          // หากหาใน state ทันทีไม่เจอก็จำลองอ็อบเจกต์ขึ้นมา
+          setTimeout(() => {
+            setSelectedRoom({
+              ...selectedRoom,
+              tenantName: tenantNameInput,
+              tenantPhone: tenantPhoneInput,
+              tenantId: res.data.id,
+              status: "occupied"
+            })
+            setLineLinkModalOpen(true)
+          }, 400)
+        }
+      } else {
+        showToast(res.error || "ทำสัญญาผู้เช่าไม่สำเร็จ", "error")
+      }
+    } catch (err) {
+      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "error")
+    } finally {
+      setContractSubmitting(false)
+    }
+  }
+
+  // จัดการแชร์/เจนลิงก์ LINE
+  const handleOpenLineLinkModal = (room: RoomItem) => {
+    setSelectedRoom(room)
+    setLineLinkModalOpen(true)
+  }
+
+  const getLiffRegistrationLink = (roomNum: string) => {
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    return `https://liff.line.me/2010442620-H4josaDy?workspace_id=${wsId}&room_number=${roomNum}`
+  }
+
+  const handleCopyLinkToClipboard = (roomNum: string) => {
+    const link = getLiffRegistrationLink(roomNum)
+    navigator.clipboard.writeText(link)
+    showToast(`✓ คัดลอกลิงก์ LINE LIFF ของห้อง ${roomNum} สำเร็จ! สามารถส่งแชทให้ผู้เช่าลงทะเบียนได้เลย`, "success")
+  }
+
+  // เปิดดูรายละเอียดและแจ้งย้ายออก
+  const handleOpenDetailModal = (room: RoomItem) => {
+    setSelectedRoom(room)
+    setTenantDetailModalOpen(true)
+  }
+
+  // จัดการย้ายออกผู้เช่า
+  const handleCheckoutTenantTrigger = () => {
+    if (!selectedRoom || !selectedRoom.tenantId) return
+    setDeleteTarget({
+      id: selectedRoom.tenantId,
+      type: "tenant",
+      name: `ผู้เช่าคุณ ${selectedRoom.tenantName}`,
+      extraId: selectedRoom.roomNumber
+    })
+    setDeleteConfirmOpen(true)
+  }
+
+  // คำนวณสถานะห้อง (ว่าง / รอลงทะเบียน / มีผู้เช่าแล้ว)
+  const getRoomStatusDetails = (room: RoomItem) => {
+    const hasTenant = !!room.tenantName
+    const isRegistered = !!room.lineUserId
+
+    if (!hasTenant) {
+      return {
+        label: "ว่าง",
+        badgeStyle: "bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-400 border border-slate-200/50 dark:border-slate-800/60",
+        dotStyle: "bg-slate-400 dark:bg-slate-500",
+        code: "available"
+      }
+    } else if (!isRegistered) {
+      return {
+        label: "รอลงทะเบียน LINE",
+        badgeStyle: "bg-blue-50 text-blue-600 dark:bg-blue-950/35 dark:text-blue-400 border border-blue-200/40 dark:border-blue-800/40",
+        dotStyle: "bg-blue-500",
+        code: "waiting"
+      }
+    } else {
+      return {
+        label: "มีผู้เช่าแล้ว (เชื่อม LINE)",
+        badgeStyle: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/35 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-800/40",
+        dotStyle: "bg-emerald-500",
+        code: "occupied"
+      }
+    }
+  }
+
+  // คัดกรองห้องตามการค้นหาและฟิลเตอร์สถานะใหม่ (ว่าง / รอลงทะเบียน / มีผู้เช่าแล้ว)
   const filteredRooms = rooms.filter(room => {
     const matchesSearch = 
       room.roomNumber.includes(search) || 
       room.roomTypeName.toLowerCase().includes(search.toLowerCase()) ||
-      (room.tenantName && room.tenantName.toLowerCase().includes(search.toLowerCase()))
-    const matchesFilter = filter === "all" || room.status === filter
+      (room.tenantName && room.tenantName.toLowerCase().includes(search.toLowerCase())) ||
+      (room.tenantPhone && room.tenantPhone.includes(search))
+
+    const details = getRoomStatusDetails(room)
+    const matchesFilter = filter === "all" || details.code === filter
+    
     return matchesSearch && matchesFilter
   })
 
   // คำนวณสถิติหลักของห้องพัก
   const totalRoomsCount = rooms.length
-  const occupiedRoomsCount = rooms.filter(r => r.status === "occupied").length
-  const availableRoomsCount = rooms.filter(r => r.status === "available").length
+  const vacantRoomsCount = rooms.filter(r => !r.tenantName).length
+  const waitingRoomsCount = rooms.filter(r => r.tenantName && !r.lineUserId).length
+  const occupiedRoomsCount = rooms.filter(r => r.tenantName && r.lineUserId).length
 
   // Skeletons Loader component for loading states
   const SkeletonLoader = () => (
@@ -357,260 +564,316 @@ export default function RoomsPage() {
 
   return (
     <>
-      {/* Container หลัก: เผื่อ padding ด้านล่าง pb-24 บนโมบายล์เพื่อหลบแถบปุ่ม Sticky และ pb-12 บนเดสก์ท็อป */}
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 p-3 sm:p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8 transition-colors duration-300 pb-24 md:pb-12">
-        
-        {/* HEADER AREA - ADAPTIVE */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white dark:bg-slate-800/80 p-5 md:p-8 rounded-2xl border border-slate-200/60 dark:border-slate-700/50 shadow-sm relative overflow-hidden">
-          {/* subtle glow */}
-          <div className="absolute top-0 right-0 w-[260px] h-[130px] bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-[60px] pointer-events-none" />
-          
-          <div className="space-y-2 relative z-10 w-full md:w-auto">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400 font-bold rounded-full text-[10px] md:text-[11px] uppercase tracking-wider">
-              <Home className="w-3.5 h-3.5" /> ระบบการจัดการห้องพัก
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className={`px-5 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-md font-bold text-xs ${
+            toast.type === "success" 
+              ? "bg-emerald-500/90 text-white shadow-emerald-500/10 border border-emerald-400/20"
+              : toast.type === "error"
+              ? "bg-red-500/90 text-white shadow-red-500/10 border border-red-400/20"
+              : "bg-blue-600/90 text-white shadow-blue-600/10 border border-blue-500/20"
+          }`}>
+            {toast.type === "success" && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+            {toast.type === "error" && <AlertCircle className="w-4 h-4 shrink-0" />}
+            {toast.type === "info" && <Info className="w-4 h-4 shrink-0" />}
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto pb-24 md:pb-6 relative">
+        {/* Ambient Decorative Background Glows */}
+        <div className="absolute top-10 right-1/4 w-[300px] h-[300px] bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute bottom-10 left-10 w-[250px] h-[250px] bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
+
+        {/* 1. HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold mb-1">
+              <Home className="w-3.5 h-3.5" /> ระบบบริหารจัดการอพาร์ทเมนท์
             </div>
-            <h1 className="text-xl md:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-              จัดการห้องพัก (Manage Rooms)
-            </h1>
-            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
-              บริหารจัดการห้องพัก เลือกสลับประเภทแอร์หรือพัดลม คอนฟิกอัตราค่าเช่ามาตรฐานของแต่ละประเภทห้อง ตลอดจนติดตามรายละเอียดข้อมูลผู้เช่าและหมายเลขโทรศัพท์ได้ทันที
+            <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              จัดการห้องพักและผู้เช่า
+            </h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-2xl leading-relaxed">
+              ตารางรวมรายชื่อห้องพักทั้งหมด (Room-centric) เพิ่มผู้เช่า ทำสัญญาเช่าใหม่ เจนลิงก์สำหรับส่งให้ผู้เช่าลงทะเบียนผ่าน LINE และดำเนินการย้ายออกในหน้ารวมหน้านี้หน้าเดียว
             </p>
           </div>
 
-          {/* Desktop inline action items (hidden on mobile to prevent clutter; mobile will use sticky bottom bar) */}
-          <div className="hidden md:flex items-center gap-2.5 relative z-10 shrink-0">
-            <button
-              onClick={() => loadData(true)}
-              disabled={loading}
-              className="p-2.5 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center cursor-pointer hover:-translate-y-0.5 active:scale-95 duration-200 h-10 w-10"
-              title="รีเฟรชข้อมูลระบบ"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-500" : ""}`} />
-            </button>
-            
+          <div className="flex items-center gap-3 self-end md:self-auto">
+            {/* Manage Types Config */}
             <button
               onClick={() => setTypesModalOpen(true)}
-              className="bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold h-10 px-4 rounded-xl flex items-center justify-center gap-2 text-xs transition-all hover:-translate-y-0.5 active:scale-95 duration-200 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
             >
-              <Settings className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> จัดการประเภทห้องพัก
+              <Settings className="w-4 h-4 text-indigo-500 animate-spin-hover" />
+              ตั้งค่าประเภทห้องพัก
             </button>
-            
+
+            {/* Add Room Button (desktop only) */}
             <button
               onClick={handleAddClick}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-10 px-4 rounded-xl flex items-center justify-center gap-2 text-xs shadow-md shadow-blue-600/10 transition-all hover:-translate-y-0.5 active:scale-95 duration-200 cursor-pointer"
+              className="hidden md:flex px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs items-center gap-2 transition-all shadow shadow-blue-500/10 active:scale-95 cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> เพิ่มห้องพักใหม่
-            </button>
-          </div>
-          
-          {/* Quick Refresh action for Mobile in Header */}
-          <div className="md:hidden absolute top-4 right-4 z-10">
-            <button
-              onClick={() => loadData(true)}
-              disabled={loading}
-              className="p-3 bg-slate-100 active:bg-slate-200 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 text-slate-600 dark:text-slate-400 rounded-xl flex items-center justify-center transition-all duration-250 cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-500" : ""}`} />
+              <Plus className="w-4 h-4" />
+              เพิ่มห้องพักใหม่
             </button>
           </div>
         </div>
 
-        {/* STATS PANEL GRID - ADAPTIVE */}
-        <div className="grid grid-cols-3 md:grid-cols-3 gap-3 md:gap-6">
+        {/* 2. STATS CARDS GRID */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-4 shrink-0">
           {/* Card 1: Total Rooms */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl md:rounded-2xl border border-slate-200/60 dark:border-slate-700/50 p-3 md:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
-            <div className="space-y-0.5 md:space-y-1">
-              <span className="text-[9px] md:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">ห้องพักรวม</span>
-              <span className="text-xl md:text-3xl font-extrabold text-slate-800 dark:text-slate-100">{totalRoomsCount}</span>
-              <span className="text-[9px] md:text-[11px] text-slate-400 dark:text-slate-500 block hidden md:block">ยูนิตห้องพักทั้งหมดในระบบ</span>
+          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-slate-300 dark:hover:border-slate-800/80 transition-all group">
+            <div className="p-3 bg-slate-100 dark:bg-slate-950/60 text-slate-600 dark:text-slate-400 rounded-xl group-hover:scale-110 transition-transform">
+              <Building className="w-5 h-5" />
             </div>
-            <div className="p-2 md:p-4 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg md:rounded-2xl border border-blue-100 dark:border-blue-800/40 self-start md:self-auto mt-1 md:mt-0">
-              <Home className="w-4 h-4 md:w-6 md:h-6" />
-            </div>
-          </div>
-
-          {/* Card 2: Occupied Rooms */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl md:rounded-2xl border border-slate-200/60 dark:border-slate-700/50 p-3 md:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
-            <div className="space-y-0.5 md:space-y-1">
-              <span className="text-[9px] md:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">มีผู้เช่า</span>
-              <span className="text-xl md:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">{occupiedRoomsCount}</span>
-              <span className="text-[9px] md:text-[11px] text-slate-400 dark:text-slate-500 block hidden md:block">ยูนิตที่มีการสัญญาสมบูรณ์</span>
-            </div>
-            <div className="p-2 md:p-4 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg md:rounded-2xl border border-emerald-100 dark:border-emerald-800/40 self-start md:self-auto mt-1 md:mt-0">
-              <CheckCircle2 className="w-4 h-4 md:w-6 md:h-6" />
+            <div className="min-w-0">
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ห้องพักทั้งหมด</span>
+              <span className="text-lg md:text-xl font-extrabold text-slate-850 dark:text-slate-100 mt-0.5 block">{loading ? "..." : totalRoomsCount} ห้อง</span>
             </div>
           </div>
 
-          {/* Card 3: Available Rooms */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl md:rounded-2xl border border-slate-200/60 dark:border-slate-700/50 p-3 md:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
-            <div className="space-y-0.5 md:space-y-1">
-              <span className="text-[9px] md:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">ห้องว่าง</span>
-              <span className="text-xl md:text-3xl font-extrabold text-amber-500 dark:text-amber-450">{availableRoomsCount}</span>
-              <span className="text-[9px] md:text-[11px] text-slate-400 dark:text-slate-500 block hidden md:block">พร้อมต้อนรับผู้เช่ารายใหม่</span>
+          {/* Card 2: Vacant Rooms */}
+          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-slate-300 dark:hover:border-slate-800/80 transition-all group">
+            <div className="p-3 bg-slate-100 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 rounded-xl group-hover:scale-110 transition-transform">
+              <Home className="w-5 h-5" />
             </div>
-            <div className="p-2 md:p-4 bg-amber-50 dark:bg-amber-900/30 text-amber-500 dark:text-amber-450 rounded-lg md:rounded-2xl border border-amber-100 dark:border-amber-800/40 self-start md:self-auto mt-1 md:mt-0">
-              <Tag className="w-4 h-4 md:w-6 md:h-6" />
+            <div className="min-w-0">
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ห้องว่าง</span>
+              <span className="text-lg md:text-xl font-extrabold text-slate-850 dark:text-slate-100 mt-0.5 block">{loading ? "..." : vacantRoomsCount} ห้อง</span>
+            </div>
+          </div>
+
+          {/* Card 3: Waiting for LINE Registration */}
+          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-blue-200 dark:hover:border-blue-900/40 transition-all group">
+            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:scale-110 transition-transform">
+              <Users className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">รอลงทะเบียน LINE</span>
+              <span className="text-lg md:text-xl font-extrabold text-blue-600 dark:text-blue-400 mt-0.5 block">{loading ? "..." : waitingRoomsCount} ห้อง</span>
+            </div>
+          </div>
+
+          {/* Card 4: Occupied & Registered */}
+          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-emerald-200 dark:hover:border-emerald-900/40 transition-all group">
+            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl group-hover:scale-110 transition-transform">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">มีผู้เช่าสมบูรณ์</span>
+              <span className="text-lg md:text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{loading ? "..." : occupiedRoomsCount} ห้อง</span>
             </div>
           </div>
         </div>
 
-        {/* CONTROLS AREA (SEARCH & FILTER) - ADAPTIVE */}
-        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-700/50 shadow-sm transition-colors duration-300">
-          
-          {/* Search Box - Adaptive touch target on mobile */}
-          <div className="relative flex-1">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
-              <Search className="w-5 h-5 md:w-4 md:h-4 text-slate-400" />
+        {/* 3. SEARCH & STATUS FILTERS */}
+        <div className="glass-panel p-4 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Search bar with ambient border glow */}
+          <div className="relative flex-1 max-w-md">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-450 dark:text-slate-500">
+              <Search className="w-4 h-4" />
             </span>
             <input
               type="text"
-              placeholder="ค้นหา หมายเลขห้อง, ประเภท หรือชื่อผู้เช่า..."
-              className="w-full h-12 md:h-10 pl-11 md:pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-850 dark:text-slate-100 text-base md:text-xs transition-all placeholder-slate-400"
+              placeholder="ค้นหา หมายเลขห้อง, ชื่อผู้เช่า หรือเบอร์โทรศัพท์..."
+              className="w-full h-11 pl-10 pr-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-xs font-medium transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search && (
+              <button 
+                onClick={() => setSearch("")}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Segmented Control Switch Filter - High-touch targets on mobile */}
-          <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200/40 dark:border-slate-800/60 h-12 md:h-10">
-            <button
-              onClick={() => setFilter("all")}
-              className={`flex-1 md:flex-none text-center px-3.5 text-xs md:text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center active:scale-95 duration-150 ${
-                filter === "all"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-slate-700/50"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
-            >
-              ทั้งหมด ({rooms.length})
-            </button>
-            <button
-              onClick={() => setFilter("occupied")}
-              className={`flex-1 md:flex-none text-center px-3.5 text-xs md:text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center active:scale-95 duration-150 ${
-                filter === "occupied"
-                  ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/60 dark:border-slate-700/50"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
-            >
-              มีผู้เช่า ({rooms.filter(r => r.status === "occupied").length})
-            </button>
-            <button
-              onClick={() => setFilter("available")}
-              className={`flex-1 md:flex-none text-center px-3.5 text-xs md:text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center active:scale-95 duration-150 ${
-                filter === "available"
-                  ? "bg-white dark:bg-slate-800 text-amber-500 dark:text-amber-450 shadow-sm border border-slate-200/60 dark:border-slate-700/50"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
-            >
-              ห้องว่าง ({rooms.filter(r => r.status === "available").length})
-            </button>
+          {/* Filter Badges Row */}
+          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">ตัวกรอง:</span>
+            {[
+              { id: "all", label: "ทั้งหมด" },
+              { id: "available", label: "เฉพาะห้องว่าง" },
+              { id: "waiting", label: "รอลงทะเบียน LINE" },
+              { id: "occupied", label: "มีผู้เช่าแล้ว" }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setFilter(tab.id as any)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filter === tab.id
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow shadow-slate-950/10"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-200"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Error Alert Box */}
-        {error && (
-          <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-red-800 dark:text-red-400 rounded-2xl text-xs md:text-sm flex items-center gap-3 shadow-sm animate-in fade-in">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-            <span className="font-semibold">{error}</span>
-          </div>
-        )}
+        {/* 4. MAIN DATA LIST: DESKTOP & MOBILE VIEWS */}
+        <div>
+          {error && (
+            <div className="p-4 bg-red-500/10 border border-red-500/25 rounded-2xl flex items-start gap-3.5 text-red-500 text-xs font-semibold mb-6">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div>
+                <p>ข้อผิดพลาดระบบ: {error}</p>
+                <button onClick={() => loadData(true)} className="mt-1 text-[11px] underline flex items-center gap-1 cursor-pointer">
+                  <RefreshCw className="w-3 h-3" /> ลองใหม่อีกครั้ง
+                </button>
+              </div>
+            </div>
+          )}
 
-        {/* ROOM DATA CONTAINER - ADAPTIVE LAYOUTS */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/60 dark:border-slate-700/50 p-4 md:p-6 shadow-sm transition-colors duration-300">
-          
           {loading && rooms.length === 0 ? (
             <SkeletonLoader />
           ) : (
             <>
               {/* DESKTOP VIEW: HIGH-DENSITY DATA TABLE (hidden on mobile, visible on desktop) */}
-              <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+              <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/60 dark:border-slate-900/60 shadow-sm">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800/80">
-                      <th className="p-4">หมายเลขห้อง</th>
-                      <th className="p-4">ประเภทห้องพัก</th>
-                      <th className="p-4">สถานะสัญญา</th>
-                      <th className="p-4 text-right">อัตราค่าเช่า (เดือน)</th>
-                      <th className="p-4">ชื่อผู้เช่าห้อง</th>
-                      <th className="p-4">เบอร์โทรติดต่อ</th>
-                      <th className="p-4 text-center">การจัดการ</th>
+                    <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200/60 dark:border-slate-900/60">
+                      <th className="p-4 w-28">หมายเลขห้อง</th>
+                      <th className="p-4 w-40">สถานะห้อง</th>
+                      <th className="p-4 w-32 text-right">ค่าเช่ารายเดือน</th>
+                      <th className="p-4">ประเภทห้อง</th>
+                      <th className="p-4">ผู้เช่าสัญญา</th>
+                      <th className="p-4">เบอร์โทรศัพท์</th>
+                      <th className="p-4 text-center w-52">การดำเนินการ</th>
+                      <th className="p-4 text-center w-24">ตั้งค่าห้อง</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900/50">
                     {filteredRooms.length > 0 ? (
-                      filteredRooms.map((room) => (
-                        <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/25 transition-colors">
-                          <td className="p-4 font-extrabold text-slate-850 dark:text-slate-100 text-sm tracking-wide">{room.roomNumber}</td>
-                          <td className="p-4">
-                            <span className="inline-flex items-center gap-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-0.5 rounded-lg border border-indigo-200/40 dark:border-indigo-800/40">
-                              <Tag className="w-3 h-3" /> {room.roomTypeName}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              room.status === "occupied" 
-                                ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-800/40" 
-                                : "bg-amber-50 text-amber-500 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/40 dark:border-amber-800/40"
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${
-                                room.status === "occupied" ? "bg-emerald-500" : "bg-amber-500"
-                              }`} />
-                              {room.status === "occupied" ? "มีผู้เช่าแล้ว" : "ห้องว่าง"}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right font-extrabold text-slate-800 dark:text-slate-100">
-                            {room.baseRent.toLocaleString()} บาท
-                          </td>
-                          <td className="p-4 text-slate-700 dark:text-slate-350 font-semibold">
-                            {room.tenantName ? (
-                              <div className="flex items-center gap-1.5">
-                                <Users className="w-3.5 h-3.5 text-slate-400" />
-                                {room.tenantName}
+                      filteredRooms.map((room) => {
+                        const statusDetails = getRoomStatusDetails(room)
+                        return (
+                          <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/15 transition-colors">
+                            {/* 1. Room Number */}
+                            <td className="p-4 font-extrabold text-slate-850 dark:text-slate-100 text-sm tracking-wide">{room.roomNumber}</td>
+                            
+                            {/* 2. Room Status */}
+                            <td className="p-4">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
+                                {statusDetails.label}
+                              </span>
+                            </td>
+
+                            {/* 3. Rent */}
+                            <td className="p-4 text-right font-extrabold text-slate-850 dark:text-slate-100">
+                              {room.baseRent.toLocaleString()} บาท
+                            </td>
+
+                            {/* 4. Type Name */}
+                            <td className="p-4">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30">
+                                <Tag className="w-3 h-3" /> {room.roomTypeName}
+                              </span>
+                            </td>
+
+                            {/* 5. Tenant Name */}
+                            <td className="p-4 text-slate-700 dark:text-slate-300 font-bold">
+                              {room.tenantName ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="truncate max-w-[140px]" title={room.tenantName}>{room.tenantName}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                              )}
+                            </td>
+
+                            {/* 6. Phone Number */}
+                            <td className="p-4 text-slate-500 dark:text-slate-400 font-mono">
+                              {room.tenantPhone ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>{room.tenantPhone}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                              )}
+                            </td>
+
+                            {/* 7. Action Button column (Status-dependent) */}
+                            <td className="p-4 text-center">
+                              <div className="flex items-center justify-center">
+                                {/* VACANT: Make Contract */}
+                                {!room.tenantName && (
+                                  <button
+                                    onClick={() => handleOpenContractModal(room)}
+                                    className="px-3.5 py-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1"
+                                  >
+                                    <UserPlus className="w-3.5 h-3.5" />
+                                    ทำสัญญา/เพิ่มผู้เช่า
+                                  </button>
+                                )}
+
+                                {/* WAITING FOR LINE: Generate/Copy Link */}
+                                {room.tenantName && !room.lineUserId && (
+                                  <button
+                                    onClick={() => handleOpenLineLinkModal(room)}
+                                    className="px-3.5 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/40 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <Share2 className="w-3.5 h-3.5" />
+                                    เจนลิงก์ LINE
+                                  </button>
+                                )}
+
+                                {/* REGISTERED: View details / checkout */}
+                                {room.tenantName && room.lineUserId && (
+                                  <button
+                                    onClick={() => handleOpenDetailModal(room)}
+                                    className="px-3.5 py-1.5 text-[11px] font-bold text-teal-600 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/40 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    ดูรายละเอียด/ย้ายออก
+                                  </button>
+                                )}
                               </div>
-                            ) : (
-                              <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-slate-500 dark:text-slate-450 font-mono">
-                            {room.tenantPhone ? (
-                              <div className="flex items-center gap-1.5">
-                                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                                {room.tenantPhone}
+                            </td>
+
+                            {/* 8. Room Management Buttons */}
+                            <td className="p-4 text-center border-l border-slate-100 dark:border-slate-900/50">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button 
+                                  onClick={() => handleEditClick(room)}
+                                  className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
+                                  title="แก้ไขข้อมูลห้องพัก"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
+                                  className="p-1.5 text-red-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
+                                  title="ลบห้องพัก"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
-                            ) : (
-                              <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button 
-                                onClick={() => handleEditClick(room)}
-                                className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 rounded-lg border border-slate-200 dark:border-slate-800 transition-colors cursor-pointer"
-                                title="แก้ไขข้อมูลห้องพัก"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
-                                className="p-1.5 text-red-500 hover:text-red-450 bg-slate-50 hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-red-950/20 rounded-lg border border-slate-200 dark:border-slate-800 transition-colors cursor-pointer"
-                                title="ลบห้องพัก"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                            </td>
+                          </tr>
+                        )
+                      })
                     ) : (
                       <tr>
-                        <td colSpan={7} className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs">
+                        <td colSpan={8} className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs">
                           {/* Empty State Block */}
                           <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
                             <div className="p-3 bg-slate-100 dark:bg-slate-900 text-slate-400 rounded-full border border-slate-200/50">
                               <Home className="w-6 h-6" />
                             </div>
                             <div>
-                              <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">ไม่พบข้อมูลระบบห้องพัก</p>
-                              <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">ทดลองกรอกค้นหาหมายเลขอื่น หรือเพิ่มห้องพักใหม่เข้าระบบ</p>
+                              <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">ไม่พบข้อมูลห้องพักหรือเงื่อนไขผู้เช่า</p>
+                              <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">ทดลองกรอกค้นหาข้อมูลอื่น สลับฟิลเตอร์สถานะ หรือกดปุ่มเพิ่มห้องพักใหม่ด้านบน</p>
                             </div>
                           </div>
                         </td>
@@ -620,82 +883,124 @@ export default function RoomsPage() {
                 </table>
               </div>
 
-              {/* MOBILE VIEW: CARD-BASED LIST (visible on mobile, hidden on desktop) */}
+              {/* MOBILE VIEW: PREMIUM CARD-BASED LIST (visible on mobile, hidden on desktop) */}
               <div className="block md:hidden space-y-4">
                 {filteredRooms.length > 0 ? (
-                  filteredRooms.map((room) => (
-                    <div 
-                      key={room.id}
-                      className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 shadow-sm space-y-4 hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-300"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">หมายเลขห้องพัก</span>
-                          <span className="text-lg font-extrabold text-slate-850 dark:text-slate-100 tracking-wide">{room.roomNumber}</span>
+                  filteredRooms.map((room) => {
+                    const statusDetails = getRoomStatusDetails(room)
+                    return (
+                      <div 
+                        key={room.id}
+                        className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-850 shadow-sm space-y-4 hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all duration-300"
+                      >
+                        {/* Mobile Header Card */}
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
+                            <span className="text-lg font-extrabold text-slate-850 dark:text-slate-100 tracking-wide">ห้อง {room.roomNumber}</span>
+                          </div>
+                          <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
+                            {statusDetails.label}
+                          </span>
                         </div>
-                        <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                          room.status === "occupied" 
-                            ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-800/40" 
-                            : "bg-amber-50 text-amber-500 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/40 dark:border-amber-800/40"
-                        }`}>
-                          {room.status === "occupied" ? "มีผู้เช่าแล้ว" : "ห้องว่าง"}
-                        </span>
-                      </div>
 
-                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col gap-3 text-sm text-slate-600 dark:text-slate-350">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium text-xs">ประเภทห้อง:</span>
-                          <span className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-0.5 rounded-lg border border-indigo-200/40 dark:border-indigo-800/40">
-                            <Tag className="w-3.5 h-3.5" /> {room.roomTypeName}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium text-xs">ค่าเช่ารายเดือน:</span>
-                          <span className="font-extrabold text-slate-850 dark:text-slate-100">{room.baseRent.toLocaleString()} บาท</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium text-xs">ผู้เช่าปัจจุบัน:</span>
-                          <span className="font-bold text-slate-700 dark:text-slate-200">
-                            {room.tenantName ? (
-                              <span className="flex items-center gap-1">
-                                <Users className="w-4 h-4 text-slate-400 shrink-0" /> {room.tenantName}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                            )}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium text-xs">เบอร์โทรศัพท์:</span>
-                          <span className="font-mono text-slate-700 dark:text-slate-250">
-                            {room.tenantPhone ? (
-                              <a href={`tel:${room.tenantPhone}`} className="flex items-center gap-1 text-blue-600 dark:text-blue-400 underline decoration-dotted">
-                                <Phone className="w-4 h-4 text-slate-400 shrink-0" /> {room.tenantPhone}
-                              </a>
-                            ) : (
-                              <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
+                        {/* Mobile Info Body */}
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5 text-xs text-slate-600 dark:text-slate-300">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">ประเภท & ค่าเช่า:</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100">
+                              {room.roomTypeName} • {room.baseRent.toLocaleString()} บ.
+                            </span>
+                          </div>
+                          
+                          {/* Tenant Info */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">ผู้เช่าปัจจุบัน:</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100">
+                              {room.tenantName ? (
+                                <span className="flex items-center gap-1 font-extrabold text-slate-800 dark:text-slate-200">
+                                  <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {room.tenantName}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                              )}
+                            </span>
+                          </div>
 
-                      {/* Action buttons with high-touch targets on mobile */}
-                      <div className="pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end gap-3">
-                        <button
-                          onClick={() => handleEditClick(room)}
-                          className="flex-1 py-3 px-4 text-sm font-bold text-blue-600 dark:text-blue-400 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all flex items-center justify-center gap-2 h-12 active:scale-95 active:bg-slate-100 dark:active:bg-slate-800 duration-200 cursor-pointer"
-                        >
-                          <Edit className="w-4 h-4" /> แก้ไขห้อง
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
-                          className="flex-1 py-3 px-4 text-sm font-bold text-red-600 dark:text-red-400 bg-slate-50 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/20 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all flex items-center justify-center gap-2 h-12 active:scale-95 active:bg-red-100 dark:active:bg-red-950/30 duration-200 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" /> ลบห้องพัก
-                        </button>
+                          {/* Tenant Phone */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                            <span className="font-mono font-semibold text-slate-700 dark:text-slate-350">
+                              {room.tenantPhone ? (
+                                <a href={`tel:${room.tenantPhone}`} className="flex items-center gap-1 text-blue-600 dark:text-blue-400 underline decoration-dotted">
+                                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {room.tenantPhone}
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Mobile Footer Buttons (Dynamic lease triggers and setting buttons) */}
+                        <div className="pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+                          
+                          {/* Primary Action Row based on state */}
+                          <div className="flex gap-2">
+                            {/* VACANT: Make Contract */}
+                            {!room.tenantName && (
+                              <button
+                                onClick={() => handleOpenContractModal(room)}
+                                className="flex-1 py-3 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11"
+                              >
+                                <UserPlus className="w-4 h-4" />
+                                ทำสัญญา/เพิ่มผู้เช่า
+                              </button>
+                            )}
+
+                            {/* WAITING: Generate LIFF LINK */}
+                            {room.tenantName && !room.lineUserId && (
+                              <button
+                                onClick={() => handleOpenLineLinkModal(room)}
+                                className="flex-1 py-3 px-4 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/40 hover:bg-blue-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11"
+                              >
+                                <Share2 className="w-4 h-4" />
+                                เจนลิงก์ LINE
+                              </button>
+                            )}
+
+                            {/* OCCUPIED: View Details / Checkout */}
+                            {room.tenantName && room.lineUserId && (
+                              <button
+                                onClick={() => handleOpenDetailModal(room)}
+                                className="flex-1 py-3 px-4 text-xs font-bold text-teal-600 dark:text-teal-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 hover:bg-emerald-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                ดูรายละเอียด/ย้ายออก
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Secondary Row: Room Configuration */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEditClick(room)}
+                              className="flex-1 py-2 px-3 text-[11px] font-bold text-slate-500 dark:text-slate-400 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-250/50 dark:border-slate-800 transition-all flex items-center justify-center gap-1 h-9 active:scale-95 duration-200 cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5" /> แก้ไขข้อมูลห้อง
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
+                              className="flex-1 py-2 px-3 text-[11px] font-bold text-red-500 dark:text-red-400 bg-slate-50 hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-red-950/20 rounded-lg border border-slate-250/50 dark:border-slate-800 transition-all flex items-center justify-center gap-1 h-9 active:scale-95 duration-200 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> ลบห้องพัก
+                            </button>
+                          </div>
+
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 ) : (
                   <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-900/40 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 text-xs">
                     ไม่พบข้อมูลห้องพักหรือตึกตามที่ระบุค้นหา
@@ -724,14 +1029,16 @@ export default function RoomsPage() {
           </button>
         </div>
 
-        {/* MODAL 1: ADD/EDIT ROOM MODAL (Dialog on Desktop, Sheet on Mobile) */}
+        {/* ========================================================= */}
+        {/* MODAL 1: ADD/EDIT ROOM MODAL */}
+        {/* ========================================================= */}
         {modalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
             <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-6 relative overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
-              {/* Subtle ambient glow in modal */}
+              {/* Ambient decoration */}
               <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-blue-500/10 rounded-full blur-[50px] pointer-events-none" />
               
-              <div className="flex justify-between items-center relative z-10 shrink-0">
+              <div className="flex justify-between items-center shrink-0 relative z-10">
                 <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Home className="w-5 h-5 text-blue-500" /> 
                   {editingRoom ? "แก้ไขข้อมูลห้องพัก" : "เพิ่มห้องพักใหม่ (Add Room)"}
@@ -777,7 +1084,7 @@ export default function RoomsPage() {
                 <div className="space-y-2">
                   <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ค่าเช่าสุทธิรายเดือน (บาท / เดือน)</label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-450">
                       <DollarSign className="w-4 h-4 md:w-3.5 md:h-3.5" />
                     </span>
                     <input
@@ -795,20 +1102,20 @@ export default function RoomsPage() {
                   </span>
                 </div>
 
-                {/* Submit / Cancel Button Row - Touch friendly heights */}
+                {/* Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 pt-3 shrink-0">
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
                     disabled={formSubmitting}
-                    className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer"
+                    className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer"
                   >
-                    ยกเลิกและปิดหน้าต่าง
+                    ยกเลิกและปิด
                   </button>
                   <button
                     type="submit"
                     disabled={formSubmitting || roomTypes.length === 0}
-                    className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm md:text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow shadow-blue-600/10 hover:-translate-y-0.5 transition-all duration-150 active:scale-95 cursor-pointer"
+                    className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm md:text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow shadow-blue-600/10 transition-all duration-150 active:scale-95 cursor-pointer"
                   >
                     {formSubmitting ? (
                       <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -820,12 +1127,13 @@ export default function RoomsPage() {
           </div>
         )}
 
-        {/* MODAL 2: MANAGE ROOM TYPES MODAL (Dialog on Desktop, Sheet on Mobile) */}
+        {/* ========================================================= */}
+        {/* MODAL 2: MANAGE ROOM TYPES MODAL */}
+        {/* ========================================================= */}
         {typesModalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
             <div className="w-full md:max-w-lg bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 relative max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
-              {/* Subtle ambient glow in modal */}
-              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none animate-pulse" />
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none" />
               
               <div className="flex justify-between items-center mb-4 shrink-0 relative z-10">
                 <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -839,16 +1147,13 @@ export default function RoomsPage() {
                 </button>
               </div>
 
-              {/* Form container scrollable inside sheet */}
               <div className="flex-1 overflow-y-auto space-y-5 pr-1">
-                {/* Form: Add/Edit Type - Adaptive Columns */}
                 <form onSubmit={handleSubmitTypeForm} className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/80 space-y-4 shrink-0 relative z-10">
                   <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/50 dark:border-slate-800/55 pb-2">
                     <Settings className="w-3.5 h-3.5 text-indigo-500" />
-                    {editingType ? "แก้ไขประเภทห้องพัก (Edit Type)" : "เพิ่มประเภทห้องพักใหม่ (Create Type)"}
+                    {editingType ? "แก้ไขประเภทห้องพัก" : "เพิ่มประเภทห้องพักใหม่"}
                   </h4>
                   
-                  {/* Grid Layout: Adaptive column counts */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ชื่อประเภทห้องพัก</label>
@@ -906,11 +1211,10 @@ export default function RoomsPage() {
                   </div>
                 </form>
 
-                {/* List: Existing Types - Touch friendly action layouts */}
                 <div className="space-y-3 shrink-0 relative z-10">
                   <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">ประเภทห้องพักปัจจุบัน</h4>
                   {roomTypes.length > 0 ? (
-                    <div className="divide-y divide-slate-150 dark:divide-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/60 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+                    <div className="divide-y divide-slate-150 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/60 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
                       {roomTypes.map(type => (
                         <div key={type.id} className="flex justify-between items-center p-3.5 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                           <div className="space-y-0.5 min-w-0 pr-2">
@@ -951,7 +1255,324 @@ export default function RoomsPage() {
           </div>
         )}
 
-        {/* MODAL 3: CUSTOM CONFIRM DELETE MODAL (Premium SaaS UX - Dialog/Sheet Adaptive) */}
+        {/* ========================================================= */}
+        {/* MODAL 3: UNIFIED LEASE CONTRACT MODAL (ทำสัญญา/เพิ่มผู้เช่า) */}
+        {/* ========================================================= */}
+        {contractModalOpen && selectedRoom && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+            <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-6 relative overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-blue-500/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex justify-between items-center shrink-0 relative z-10">
+                <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-blue-500" /> 
+                  ทำสัญญาเช่าห้อง {selectedRoom.roomNumber}
+                </h3>
+                <button 
+                  onClick={() => setContractModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitContract} className="space-y-4.5 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                
+                {/* Room Info Preview */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">ประเภท: {selectedRoom.roomTypeName}</span>
+                  </div>
+                  <div className="font-extrabold text-slate-850 dark:text-slate-200">
+                    อัตราค่าเช่า: {selectedRoom.baseRent.toLocaleString()} บาท/เดือน
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ชื่อ-นามสกุล ผู้เช่า</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ระบุชื่อ-นามสกุลจริงของผู้เช่า..."
+                    className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
+                    value={tenantNameInput}
+                    onChange={(e) => setTenantNameInput(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">เบอร์โทรศัพท์มือถือ</label>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    placeholder="เช่น 0891234567..."
+                    className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-bold font-mono"
+                    value={tenantPhoneInput}
+                    onChange={(e) => setTenantPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">วันเริ่มสัญญา</label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-colors cursor-pointer"
+                      value={contractStartInput}
+                      onChange={(e) => setContractStartInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">วันสิ้นสุดสัญญา</label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-colors cursor-pointer"
+                      value={contractEndInput}
+                      onChange={(e) => setContractEndInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Info Note */}
+                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-semibold flex items-start gap-1.5 leading-normal bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    เมื่อบันทึกข้อมูลแล้ว สัญญาจะเริ่มทำงานทันที โดยระบบจะสร้าง URL Dynamic Pre-filled เพื่อแชร์ให้ผู้เช่าเชื่อมโยง UID และสิทธิ์รับบิลตรงผ่าน LINE
+                  </span>
+                </span>
+
+                {/* Submit / Cancel Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setContractModalOpen(false)}
+                    disabled={contractSubmitting}
+                    className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={contractSubmitting}
+                    className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm md:text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow shadow-blue-600/10 transition-all duration-150 active:scale-95 cursor-pointer"
+                  >
+                    {contractSubmitting ? (
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : "สร้างสัญญาและเชื่อมต่อ LINE"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL 4: LINE REGISTRATION LINK MODAL (เจนลิงก์ LINE) */}
+        {/* ========================================================= */}
+        {lineLinkModalOpen && selectedRoom && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+            <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-6 relative overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-green-500/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex justify-between items-center shrink-0 relative z-10">
+                <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-emerald-500" /> 
+                  เจนลิงก์ LINE (ห้อง {selectedRoom.roomNumber})
+                </h3>
+                <button 
+                  onClick={() => setLineLinkModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                
+                {/* Visual success note */}
+                <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                  <div className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    ทำสัญญาสำเร็จ! กรุณาส่งลิงก์นี้ให้ผู้เช่าเชื่อมโยง LINE
+                  </div>
+                  <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                    ลิงก์ LINE LIFF นี้ได้รับการล็อค Workspace ID และหมายเลขห้องพัก ({selectedRoom.roomNumber}) ไว้อย่างปลอดภัย ผู้เช่าสามารถเข้าลงทะเบียนด้วย LINE บนสมาร์ทโฟนเพื่อรับส่งบิลค่าน้ำค่าไฟได้ทันที
+                  </p>
+                </div>
+
+                {/* Tenant Details Preview */}
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/60 px-4 py-1.5 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="flex justify-between py-2"><span className="text-slate-400">ชื่อผู้เช่า:</span> <span className="font-extrabold">{selectedRoom.tenantName}</span></div>
+                  <div className="flex justify-between py-2"><span className="text-slate-400">เบอร์โทรศัพท์:</span> <span className="font-mono font-bold">{selectedRoom.tenantPhone}</span></div>
+                  <div className="flex justify-between py-2"><span className="text-slate-400">หมายเลขห้อง:</span> <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span></div>
+                </div>
+
+                {/* Pre-filled Link Section */}
+                <div className="space-y-2">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">ลิงก์ลงทะเบียน LINE LIFF สำหรับแชร์</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      className="flex-1 h-11 px-3.5 bg-slate-100 dark:bg-slate-950 border border-slate-250 dark:border-slate-900 rounded-xl text-slate-500 text-[11px] select-all focus:outline-none font-mono"
+                      value={getLiffRegistrationLink(selectedRoom.roomNumber)}
+                    />
+                    <button
+                      onClick={() => handleCopyLinkToClipboard(selectedRoom.roomNumber)}
+                      className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      คัดลอกลิงก์
+                    </button>
+                  </div>
+                </div>
+
+                {/* Instruction steps */}
+                <div className="pt-2 text-[11px] text-slate-500 space-y-2">
+                  <div className="font-bold text-slate-700 dark:text-slate-300">💡 วิธีการแชร์และใช้งาน:</div>
+                  <ul className="list-decimal pl-4 space-y-1.5 leading-relaxed">
+                    <li>กดปุ่ม <strong className="text-slate-700 dark:text-slate-200">คัดลอกลิงก์</strong> ด้านบน</li>
+                    <li>ส่งลิงก์นี้ไปทาง LINE หรือช่องทางแชทให้กับผู้เช่าโดยตรง</li>
+                    <li>ผู้เช่ากดลิงก์บนมือถือ จะเปิดหน้าจอ LINE LIFF เพื่อตรวจสอบความถูกต้องและกดยืนยันตัวตน UID เพื่อเสร็จสิ้น</li>
+                  </ul>
+                </div>
+
+                {/* Close Button */}
+                <div className="pt-3 flex">
+                  <button
+                    onClick={() => setLineLinkModalOpen(false)}
+                    className="flex-1 h-12 md:h-10 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs rounded-xl active:scale-95 transition-all cursor-pointer"
+                  >
+                    ปิดหน้าต่างเสร็จสิ้น
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL 5: TENANT DETAIL MODAL (ดูรายละเอียด/จัดการย้ายออก) */}
+        {/* ========================================================= */}
+        {tenantDetailModalOpen && selectedRoom && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+            <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-6 relative overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-teal-500/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex justify-between items-center shrink-0 relative z-10">
+                <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-teal-550" /> 
+                  ข้อมูลผู้เช่าห้อง {selectedRoom.roomNumber}
+                </h3>
+                <button 
+                  onClick={() => setTenantDetailModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4.5 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                
+                {/* Connection Line Verified Badge */}
+                <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/15 text-xs flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs">
+                      ผู้เช่าได้ทำการยืนยันตัวตนสำเร็จแล้ว
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
+                      ผู้เช่าเข้าเชื่อมต่อ UID กับแอป LINE OA แล้ว ระบบจะส่งภาพบิลและแจ้งโอนโดยอัตโนมัติ
+                    </p>
+                  </div>
+                </div>
+
+                {/* Contract details list */}
+                <div className="divide-y divide-slate-150 dark:divide-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-900/40 px-4 py-2 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-slate-400 dark:text-slate-500">ชื่อผู้เช่า:</span> 
+                    <span className="font-extrabold text-slate-850 dark:text-slate-200">{selectedRoom.tenantName}</span>
+                  </div>
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-slate-400 dark:text-slate-500">เบอร์โทรศัพท์:</span> 
+                    <span className="font-mono font-bold text-slate-850 dark:text-slate-200">{selectedRoom.tenantPhone}</span>
+                  </div>
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-slate-400 dark:text-slate-500">หมายเลขห้องพัก:</span> 
+                    <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span>
+                  </div>
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-slate-400 dark:text-slate-500">ประเภทห้อง & ค่าเช่า:</span> 
+                    <span className="font-semibold">{selectedRoom.roomTypeName} • {selectedRoom.baseRent.toLocaleString()} บาท/เดือน</span>
+                  </div>
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-slate-400 dark:text-slate-500">ระยะสัญญาเริ่มต้น:</span> 
+                    <span className="font-mono text-slate-700 dark:text-slate-300">{selectedRoom.leaseStart ? new Date(selectedRoom.leaseStart).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}</span>
+                  </div>
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-slate-400 dark:text-slate-500">วันสิ้นสุดสัญญา:</span> 
+                    <span className="font-mono text-slate-700 dark:text-slate-300">{selectedRoom.leaseEnd ? new Date(selectedRoom.leaseEnd).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}</span>
+                  </div>
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-slate-400 dark:text-slate-500">รหัส LINE UID:</span> 
+                    <span className="font-mono text-[10px] text-indigo-500 dark:text-indigo-400 select-all truncate max-w-[200px]" title={selectedRoom.lineUserId || ""}>{selectedRoom.lineUserId}</span>
+                  </div>
+                </div>
+
+                {/* Actions Button */}
+                <div className="flex flex-col gap-3 pt-2">
+                  {/* Share Dynamic LINE Link again option in details */}
+                  <button
+                    onClick={() => {
+                      setTenantDetailModalOpen(false)
+                      setTimeout(() => {
+                        setLineLinkModalOpen(true)
+                      }, 300)
+                    }}
+                    className="w-full h-11 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-slate-650 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-150"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-blue-500" />
+                    คัดลอก/ดูลิงก์ LINE LIFF ของห้องอีกครั้ง
+                  </button>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTenantDetailModalOpen(false)}
+                      className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer"
+                    >
+                      ปิดหน้าต่าง
+                    </button>
+                    
+                    {/* RED CHECKOUT BUTTON */}
+                    <button
+                      type="button"
+                      onClick={handleCheckoutTenantTrigger}
+                      className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 text-sm md:text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all duration-150 border border-red-200 dark:border-red-900/50 active:scale-95 cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      แจ้งคืนห้อง/ย้ายออก
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL 6: CUSTOM CONFIRM DELETE MODAL */}
+        {/* ========================================================= */}
         {deleteConfirmOpen && deleteTarget && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
             <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-750 shadow-2xl p-6 space-y-6 relative overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
@@ -963,10 +1584,11 @@ export default function RoomsPage() {
                 
                 <div className="space-y-1.5 flex-1 min-w-0">
                   <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100">
-                    ยืนยันการลบข้อมูลระบบ
+                    ยืนยันการทำเรื่องถอนระบบข้อมูล
                   </h3>
                   <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                    คุณแน่ใจหรือไม่ที่จะลบรายการ <strong className="text-slate-850 dark:text-slate-100 font-extrabold">{deleteTarget.name}</strong> ออกจากฐานข้อมูลระบบ? การดำเนินการนี้จะลบข้อมูลถาวรและไม่สามารถย้อนคืนได้
+                    คุณแน่ใจหรือไม่ที่จะลบหรือถอนข้อมูล <strong className="text-slate-850 dark:text-slate-100 font-extrabold">{deleteTarget.name}</strong>? 
+                    {deleteTarget.type === "tenant" ? " การแจ้งคืนห้องพัก/ย้ายออกจะยกเลิกสัญญาเช่าปัจจุบัน และปลดความเชื่อมโยง LINE ทันที โดยข้อมูลในตารางบิลและมิเตอร์ทั้งหมดจะยังคงอยู่เพื่อความถูกต้องทางบัญชี" : " การดำเนินการนี้จะลบข้อมูลจากระบบถาวรและไม่สามารถกู้กลับคืนมาได้อีก"}
                   </p>
                 </div>
               </div>
@@ -988,12 +1610,13 @@ export default function RoomsPage() {
                   onClick={handleConfirmDelete}
                   className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 text-sm md:text-xs font-bold rounded-xl transition-all duration-150 border border-red-200/50 dark:border-red-900/50 active:scale-95 cursor-pointer"
                 >
-                  ยืนยันลบข้อมูลถาวร
+                  {deleteTarget.type === "tenant" ? "ยืนยันการคืนห้องพัก" : "ยืนยันลบข้อมูลถาวร"}
                 </button>
               </div>
             </div>
           </div>
         )}
+
       </div>
     </>
   )

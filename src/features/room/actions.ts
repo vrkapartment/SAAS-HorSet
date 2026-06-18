@@ -88,8 +88,12 @@ export async function getRooms() {
           default_rent
         ),
         tenants (
+          id,
           tenant_name,
-          tenant_phone
+          tenant_phone,
+          line_user_id,
+          lease_start,
+          lease_end
         )
       `)
       .order("room_number", { ascending: true })
@@ -103,8 +107,12 @@ export async function getRooms() {
         roomNumber: room.room_number,
         status: room.status,
         baseRent: room.room_types ? Number(room.room_types.default_rent) : Number(room.base_rent),
+        tenantId: tenant ? tenant.id : null,
         tenantName: tenant ? tenant.tenant_name : null,
         tenantPhone: tenant ? tenant.tenant_phone : null,
+        lineUserId: tenant ? tenant.line_user_id : null,
+        leaseStart: tenant ? tenant.lease_start : null,
+        leaseEnd: tenant ? tenant.lease_end : null,
         roomTypeId: room.room_type_id,
         roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ"
       }
