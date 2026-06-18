@@ -70,6 +70,7 @@ export default function TenantPortal() {
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [history, setHistory] = useState<BillHistoryItem[]>([])
   const [baseRent, setBaseRent] = useState(4500)
+  const [pageLoading, setPageLoading] = useState(true)
 
   // สถานะแก้ไขข้อมูลโปรไฟล์และเปลี่ยนรหัสผ่าน
   const [showProfileModal, setShowProfileModal] = useState(false)
@@ -97,7 +98,10 @@ export default function TenantPortal() {
     return cycleStr
   }
 
-  const loadPortalData = async () => {
+  const loadPortalData = async (isInitial = false) => {
+    if (isInitial) {
+      setPageLoading(true)
+    }
     let wsId = ""
     let rNum = ""
     
@@ -107,99 +111,107 @@ export default function TenantPortal() {
       rNum = searchParams.get("room_number") || ""
     }
 
-    let res
-    if (wsId && rNum) {
-      res = await getTenantPortalDataNoLoginAction(wsId, rNum)
-    } else {
-      res = await getTenantPortalData()
-    }
-
-    if (res.success && res.data) {
-      setIsDemo(false)
-      const data = res.data
-      setRoomNumber(data.roomNumber || "ไม่มีห้อง")
-      setTenantName(data.tenantName)
-      setBaseRent(data.baseRent)
-      if (data.promptPayId) {
-        setPromptPayId(data.promptPayId)
-      }
-      if (data.promptPayName) {
-        setPromptPayName(data.promptPayName)
-      }
-      if (data.workspaceName) {
-        setWorkspaceName(data.workspaceName)
-      }
-      if (data.workspaceAddress) {
-        setWorkspaceAddress(data.workspaceAddress)
-      }
-      if (data.workspacePhone) {
-        setWorkspacePhone(data.workspacePhone)
-      }
-      if (data.workspaceTaxId) {
-        setWorkspaceTaxId(data.workspaceTaxId)
-      }
-
-      const activeBills = data.bills as any[]
-      if (activeBills && activeBills.length > 0) {
-        // Latest bill is current bill
-        const latest = activeBills[0]
-        setBill(latest)
-        setBillStatus(latest.status)
-        setUploadedSlip(latest.slipUrl)
-        setBillingCycle(formatCycle(latest.billingCycle))
-
-        // Rest are history
-        const hist: BillHistoryItem[] = activeBills.slice(1).map(b => ({
-          cycle: formatCycle(b.billingCycle),
-          amount: b.amount,
-          status: b.status === "paid" ? "paid" : "unpaid"
-        }))
-        setHistory(hist)
+    try {
+      let res
+      if (wsId && rNum) {
+        res = await getTenantPortalDataNoLoginAction(wsId, rNum)
       } else {
-        setBill(null)
-        setBillStatus("paid") // default to clean state if no bills
-        setUploadedSlip(null)
-        setBillingCycle("ยังไม่มีรอบบิล")
-        setHistory([])
+        res = await getTenantPortalData()
       }
-    } else if ((res as any).fallback) {
-      setIsDemo(true)
-      setRoomNumber("105")
-      setTenantName("คุณณัฐพล ใจดี")
-      setBillingCycle("มิถุนายน 2026")
-      setBaseRent(4500)
 
-      const loadMyBill = () => {
-        const savedBills = getCookie("horset_bills")
-        if (savedBills) {
-          try {
-            const bills = JSON.parse(decodeURIComponent(savedBills))
-            const myBill = bills.find((b: any) => b.roomNumber === "105" && b.billingCycle === "2026-06")
-            if (myBill) {
-              setBill(myBill)
-              setBillStatus(myBill.status)
-              setUploadedSlip(myBill.slipUrl)
+      if (res.success && res.data) {
+        setIsDemo(false)
+        const data = res.data
+        setRoomNumber(data.roomNumber || "ไม่มีห้อง")
+        setTenantName(data.tenantName)
+        setBaseRent(data.baseRent)
+        if (data.promptPayId) {
+          setPromptPayId(data.promptPayId)
+        }
+        if (data.promptPayName) {
+          setPromptPayName(data.promptPayName)
+        }
+        if (data.workspaceName) {
+          setWorkspaceName(data.workspaceName)
+        }
+        if (data.workspaceAddress) {
+          setWorkspaceAddress(data.workspaceAddress)
+        }
+        if (data.workspacePhone) {
+          setWorkspacePhone(data.workspacePhone)
+        }
+        if (data.workspaceTaxId) {
+          setWorkspaceTaxId(data.workspaceTaxId)
+        }
+
+        const activeBills = data.bills as any[]
+        if (activeBills && activeBills.length > 0) {
+          // Latest bill is current bill
+          const latest = activeBills[0]
+          setBill(latest)
+          setBillStatus(latest.status)
+          setUploadedSlip(latest.slipUrl)
+          setBillingCycle(formatCycle(latest.billingCycle))
+
+          // Rest are history
+          const hist: BillHistoryItem[] = activeBills.slice(1).map(b => ({
+            cycle: formatCycle(b.billingCycle),
+            amount: b.amount,
+            status: b.status === "paid" ? "paid" : "unpaid"
+          }))
+          setHistory(hist)
+        } else {
+          setBill(null)
+          setBillStatus("paid") // default to clean state if no bills
+          setUploadedSlip(null)
+          setBillingCycle("ยังไม่มีรอบบิล")
+          setHistory([])
+        }
+      } else if ((res as any).fallback) {
+        setIsDemo(true)
+        setRoomNumber("105")
+        setTenantName("คุณณัฐพล ใจดี")
+        setBillingCycle("มิถุนายน 2026")
+        setBaseRent(4500)
+
+        const loadMyBill = () => {
+          const savedBills = getCookie("horset_bills")
+          if (savedBills) {
+            try {
+              const bills = JSON.parse(decodeURIComponent(savedBills))
+              const myBill = bills.find((b: any) => b.roomNumber === "105" && b.billingCycle === "2026-06")
+              if (myBill) {
+                setBill(myBill)
+                setBillStatus(myBill.status)
+                setUploadedSlip(myBill.slipUrl)
+              }
+            } catch (e) {
+              console.error(e)
             }
-          } catch (e) {
-            console.error(e)
           }
         }
-      }
-      loadMyBill()
+        loadMyBill()
 
-      const demoHistory: BillHistoryItem[] = [
-        { cycle: "พฤษภาคม 2026", amount: 5120, status: "paid" },
-        { cycle: "เมษายน 2026", amount: 4950, status: "paid" },
-        { cycle: "มีนาคม 2026", amount: 5310, status: "paid" }
-      ]
-      setHistory(demoHistory)
+        const demoHistory: BillHistoryItem[] = [
+          { cycle: "พฤษภาคม 2026", amount: 5120, status: "paid" },
+          { cycle: "เมษายน 2026", amount: 4950, status: "paid" },
+          { cycle: "มีนาคม 2026", amount: 5310, status: "paid" }
+        ]
+        setHistory(demoHistory)
+      }
+    } catch (e) {
+      console.error("Error loading portal data:", e)
+    } finally {
+      if (isInitial) {
+        setPageLoading(false)
+      }
     }
   }
 
   useEffect(() => {
-    loadPortalData()
+    loadPortalData(true)
     // Poll updates every 5s if logged in to auto-reflect approval
-    const timer = setInterval(loadPortalData, 5000)
+    const timer = setInterval(() => loadPortalData(false), 5000)
     return () => clearInterval(timer)
   }, [])
 
@@ -380,6 +392,28 @@ export default function TenantPortal() {
     }
   }
 
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="relative flex flex-col items-center max-w-sm w-full text-center space-y-6">
+          <div className="absolute w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl -top-12 animate-pulse pointer-events-none" />
+          <div className="absolute w-48 h-48 bg-blue-500/10 rounded-full blur-3xl -bottom-12 animate-pulse pointer-events-none" />
+          <div className="relative flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full border-4 border-slate-900 border-t-emerald-500 animate-spin" />
+            <Building className="absolute w-6 h-6 text-emerald-500 animate-bounce" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-lg font-bold tracking-wide text-slate-100 animate-pulse">กำลังโหลดข้อมูลบิลของคุณ...</h2>
+            <p className="text-xs text-slate-400">กรุณารอสักครู่ ระบบกำลังดึงรายละเอียดค่าเช่าและบริการ</p>
+          </div>
+          <div className="text-[10px] text-slate-500 tracking-wider uppercase border border-slate-900/60 rounded-full px-3 py-1 bg-slate-950/40">
+            Secure Connection • SAAS HorSet
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-12">
