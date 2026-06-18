@@ -106,12 +106,31 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
 
   try {
     const supabase = await createClient()
+    let activeClient = supabase
+
+    // ความปลอดภัยสูงมาก (High Security): 
+    // - หากผู้เช่ากดส่งสลิปเพื่อขอตรวจสอบ (สถานะเป็น "pending") อนุญาตให้ใช้ Admin Client บายพาส RLS ได้ 
+    // - หากเป็นค่ายอดชำระจริง ("paid" หรือ "unpaid") ที่ต้องการสิทธิ์แอดมิน ให้ใช้สิทธิ์คุกกี้ผู้ใช้ตาม RLS ทั่วไป เพื่อป้องกันการแฮกเปลี่ยนสถานะบิลของตนเอง
+    if (status === "pending") {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (url && serviceKey && !serviceKey.includes("placeholder")) {
+        const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+        activeClient = createSupabaseClient(url, serviceKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          }
+        }) as any
+      }
+    }
+
     const updateData: any = { status }
     if (slipUrl !== undefined) {
       updateData.slip_url = slipUrl
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await activeClient
       .from("bills")
       .update(updateData)
       .eq("id", id)

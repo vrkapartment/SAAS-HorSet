@@ -353,7 +353,20 @@ export async function getTenantPortalData() {
  */
 export async function getTenantPortalDataNoLoginAction(workspaceId: string, roomNumber: string) {
   try {
-    const supabase = await createClient()
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!url || !serviceKey || serviceKey.includes("placeholder")) {
+      return { success: false, error: "ระบบฐานข้อมูลหลังบ้านไม่พร้อมใช้งาน" }
+    }
+
+    const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+    const supabase = createSupabaseClient(url, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      }
+    })
 
     // 1. ค้นหาข้อมูลห้องพัก
     const { data: room, error: roomError } = await supabase
