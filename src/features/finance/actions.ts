@@ -19,6 +19,7 @@ export interface FinanceSettings {
   water_min_unit: number
   electric_min_checked: boolean
   electric_min_unit: number
+  late_penalty_rate: number
 }
 
 /**
@@ -53,6 +54,21 @@ export async function getFinanceSettings(workspaceId: string) {
       console.warn("Utility columns (water_rate, etc.) not available yet in table workspaces. Using defaults.")
     }
 
+    // 3. ดึงข้อมูลค่าปรับรายวัน (แยกการดึงข้อมูลเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ถูกสร้าง)
+    let latePenaltyRate = 0
+    try {
+      const { data: lpData, error: lpError } = await supabase
+        .from("workspaces")
+        .select("late_penalty_rate")
+        .eq("id", workspaceId)
+        .single()
+      if (!lpError && lpData) {
+        latePenaltyRate = Number(lpData.late_penalty_rate || 0)
+      }
+    } catch (e) {
+      console.warn("Column late_penalty_rate not available in workspaces. Defaulting to 0.")
+    }
+
     const merged = {
       ...coreData,
       ...(utilityData || {
@@ -62,7 +78,8 @@ export async function getFinanceSettings(workspaceId: string) {
         water_min_unit: 3,
         electric_min_checked: true,
         electric_min_unit: 10
-      })
+      }),
+      late_penalty_rate: latePenaltyRate
     }
 
     return { 
@@ -83,7 +100,8 @@ export async function getFinanceSettings(workspaceId: string) {
         water_min_checked: Boolean(merged.water_min_checked !== null && merged.water_min_checked !== undefined ? merged.water_min_checked : true),
         water_min_unit: Number(merged.water_min_unit !== null && merged.water_min_unit !== undefined ? merged.water_min_unit : 3),
         electric_min_checked: Boolean(merged.electric_min_checked !== null && merged.electric_min_checked !== undefined ? merged.electric_min_checked : true),
-        electric_min_unit: Number(merged.electric_min_unit !== null && merged.electric_min_unit !== undefined ? merged.electric_min_unit : 10)
+        electric_min_unit: Number(merged.electric_min_unit !== null && merged.electric_min_unit !== undefined ? merged.electric_min_unit : 10),
+        late_penalty_rate: Number(merged.late_penalty_rate !== null && merged.late_penalty_rate !== undefined ? merged.late_penalty_rate : 0)
       } as FinanceSettings 
     }
   } catch (error) {
@@ -123,7 +141,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
       return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
     }
 
-    // 2. พยายามอัปเดตข้อมูลทั้งหมดรวมทั้งค่าน้ำค่าไฟในตาราง workspaces
+    // 2. พยายามอัปเดตข้อมูลทั้งหมดรวมทั้งค่าน้ำค่าไฟและค่าปรับสะสมรายวันในตาราง workspaces
     const { error: updateError } = await supabase
       .from("workspaces")
       .update({
@@ -141,7 +159,8 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         water_min_checked: Boolean(settings.water_min_checked),
         water_min_unit: Number(settings.water_min_unit),
         electric_min_checked: Boolean(settings.electric_min_checked),
-        electric_min_unit: Number(settings.electric_min_unit)
+        electric_min_unit: Number(settings.electric_min_unit),
+        late_penalty_rate: Number(settings.late_penalty_rate || 0)
       })
       .eq("id", workspaceId)
 
@@ -151,8 +170,8 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         updateError.code === "42703"
 
       if (isMissingColumn) {
-        // หากคอลัมน์ค่าน้ำค่าไฟไม่มี ให้บันทึกเฉพาะส่วนโครงสร้างหลักที่รับประกันว่ามีแน่นอน
-        const { error: coreUpdateError } = await supabase
+        // หากคอลัมน์ late_penalty_rate ยังไม่ได้สร้าง หรือคอลัมน์อื่นไม่มี ให้ลดรูปมาอัปเดตเฉพาะน้ำไฟ
+        const { error: lpMissingError } = await supabase
           .from("workspaces")
           .update({
             tax_firstname: settings.tax_firstname.trim(),
@@ -163,18 +182,42 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
             promptpay_type: settings.promptpay_type,
             promptpay_id: settings.promptpay_id.trim(),
             promptpay_name: settings.promptpay_name.trim(),
-            common_fee: Number(settings.common_fee)
+            common_fee: Number(settings.common_fee),
+            water_rate: Number(settings.water_rate),
+            electric_rate: Number(settings.electric_rate),
+            water_min_checked: Boolean(settings.water_min_checked),
+            water_min_unit: Number(settings.water_min_unit),
+            electric_min_checked: Boolean(settings.electric_min_checked),
+            electric_min_unit: Number(settings.electric_min_unit)
           })
           .eq("id", workspaceId)
 
-        if (coreUpdateError) {
-          throw coreUpdateError
+        if (lpMissingError) {
+          // หากคอลัมน์ค่าน้ำค่าไฟก็ไม่มีอีก ให้บันทึกเฉพาะส่วนโครงสร้างหลักที่รับประกันว่ามีแน่นอน
+          const { error: coreUpdateError } = await supabase
+            .from("workspaces")
+            .update({
+              tax_firstname: settings.tax_firstname.trim(),
+              tax_lastname: settings.tax_lastname.trim(),
+              tax_id: settings.tax_id.trim(),
+              tax_address: settings.tax_address.trim(),
+              tax_phone: settings.tax_phone.trim(),
+              promptpay_type: settings.promptpay_type,
+              promptpay_id: settings.promptpay_id.trim(),
+              promptpay_name: settings.promptpay_name.trim(),
+              common_fee: Number(settings.common_fee)
+            })
+            .eq("id", workspaceId)
+
+          if (coreUpdateError) {
+            throw coreUpdateError
+          }
         }
 
         return { 
           success: true, 
           fallback: true,
-          message: "บันทึกเฉพาะข้อมูลภาษีและพร้อมเพย์สำเร็จแล้ว! (เนื่องจากคอลัมน์ค่าน้ำค่าไฟยังไม่ได้เปิดใช้งานในระบบฐานข้อมูลของคุณ)" 
+          message: "บันทึกข้อมูลเรียบร้อยแล้ว! (มีบางคอลัมน์เพิ่มเติม เช่น ค่าปรับสะสมจ่ายล่าช้า ยังไม่ได้ติดตั้งลงในฐานข้อมูลระบบคลาวด์ของคุณ)" 
         }
       }
       throw updateError

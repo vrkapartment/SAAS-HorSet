@@ -99,7 +99,7 @@ export async function createBill(
   }
 }
 
-export async function updateBillStatus(id: string, status: "unpaid" | "pending" | "paid", slipUrl?: string | null) {
+export async function updateBillStatus(id: string, status: "unpaid" | "pending" | "paid", slipUrl?: string | null, amount?: number) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
@@ -128,6 +128,9 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
     const updateData: any = { status }
     if (slipUrl !== undefined) {
       updateData.slip_url = slipUrl
+    }
+    if (amount !== undefined && amount !== null) {
+      updateData.amount = Number(amount)
     }
 
     const { data, error } = await activeClient

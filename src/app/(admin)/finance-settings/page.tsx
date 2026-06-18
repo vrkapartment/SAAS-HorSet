@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2, Droplet, Zap, Building, Sliders } from "lucide-react"
+import { Landmark, Save, ShieldCheck, Check, CreditCard, User, AlertTriangle, Loader2, Droplet, Zap, Building, Sliders, Clock } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
@@ -35,6 +35,7 @@ export default function FinanceSettingsPage() {
   const [promptPayId, setPromptPayId] = useState("")
   const [promptPayName, setPromptPayName] = useState("")
   const [commonFee, setCommonFee] = useState<number>(50)
+  const [latePenaltyRate, setLatePenaltyRate] = useState<number>(0)
 
   // สำหรับราคาหน่วย ค่าน้ำ ค่าไฟ และขั้นต่ำ
   const [waterRate, setWaterRate] = useState<number>(18)
@@ -106,6 +107,7 @@ export default function FinanceSettingsPage() {
             setPromptPayId(cached.promptpay_id || "")
             setPromptPayName(cached.promptpay_name || "")
             setCommonFee(cached.common_fee !== undefined ? cached.common_fee : 50)
+            setLatePenaltyRate(cached.late_penalty_rate !== undefined ? cached.late_penalty_rate : 0)
             setWaterRate(cached.water_rate !== undefined ? cached.water_rate : 18)
             setElectricRate(cached.electric_rate !== undefined ? cached.electric_rate : 7)
             setWaterMinChecked(cached.water_min_checked !== undefined ? cached.water_min_checked : true)
@@ -128,6 +130,7 @@ export default function FinanceSettingsPage() {
             setPromptPayId(res.data.promptpay_id || "")
             setPromptPayName(res.data.promptpay_name || "")
             setCommonFee(res.data.common_fee !== undefined ? res.data.common_fee : 50)
+            setLatePenaltyRate(res.data.late_penalty_rate !== undefined ? res.data.late_penalty_rate : 0)
             setWaterRate(res.data.water_rate !== undefined ? res.data.water_rate : 18)
             setElectricRate(res.data.electric_rate !== undefined ? res.data.electric_rate : 7)
             setWaterMinChecked(res.data.water_min_checked !== undefined ? res.data.water_min_checked : true)
@@ -186,6 +189,7 @@ export default function FinanceSettingsPage() {
         promptpay_id: cleanedPPId,
         promptpay_name: promptPayName,
         common_fee: commonFee,
+        late_penalty_rate: latePenaltyRate,
         water_rate: waterRate,
         electric_rate: electricRate,
         water_min_checked: waterMinChecked,
@@ -549,6 +553,31 @@ export default function FinanceSettingsPage() {
                   </div>
                   <p className="text-[10px] text-slate-500 mt-1">
                     ค่าส่วนกลางคงที่รายเดือน สำหรับนำไปบวกเพิ่มในใบแจ้งหนี้ทุกห้องพักอัตโนมัติ
+                  </p>
+                </div>
+              </div>
+
+              {/* ค่าปรับจ่ายล่าช้าสะสมรายวัน */}
+              <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/40 pt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <Clock className="w-4 h-4 text-amber-500 animate-pulse" /> ค่าปรับจ่ายบิลล่าช้า (สะสมต่อวัน)
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">อัตราค่าปรับล่าช้าต่อวัน (บาท / วัน)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      placeholder="50"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={latePenaltyRate}
+                      onChange={(e) => setLatePenaltyRate(Number(e.target.value))}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    สะสมค่าปรับเพิ่มขึ้นอัตโนมัติทุกวันเมื่อพ้นกำหนดส่งเงิน (ตั้งแต่วันที่ 6 ของรอบบิลเป็นต้นไป)
                   </p>
                 </div>
               </div>

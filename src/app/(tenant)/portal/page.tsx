@@ -69,6 +69,7 @@ export default function TenantPortal() {
   const [commonFee, setCommonFee] = useState(50)
   const [waterRate, setWaterRate] = useState(18)
   const [electricRate, setElectricRate] = useState(7)
+  const [latePenaltyRate, setLatePenaltyRate] = useState(0)
 
 
 
@@ -144,6 +145,9 @@ export default function TenantPortal() {
         if (data.electricRate !== undefined) {
           setElectricRate(data.electricRate)
         }
+        if (data.latePenaltyRate !== undefined) {
+          setLatePenaltyRate(data.latePenaltyRate)
+        }
 
         const activeBills = data.bills as any[]
         if (activeBills && activeBills.length > 0) {
@@ -174,6 +178,7 @@ export default function TenantPortal() {
         setTenantName("คุณณัฐพล ใจดี")
         setBillingCycle("มิถุนายน 2026")
         setBaseRent(4500)
+        setLatePenaltyRate(100) // Fallback penalty rate for demo
 
         const loadMyBill = () => {
           const savedBills = getCookie("horset_bills")
@@ -218,6 +223,28 @@ export default function TenantPortal() {
 
 
 
+  // Helper to calculate late days
+  const calculateLateDays = (cycleStr: string): number => {
+    if (!cycleStr || !cycleStr.includes("-")) return 0
+    const [yearStr, monthStr] = cycleStr.split("-")
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10) - 1 // Date month is 0-indexed
+    
+    const dueDate = new Date(year, month, 5, 23, 59, 59, 999)
+    const now = new Date()
+    
+    if (now <= dueDate) return 0
+    
+    const dueMidnight = new Date(year, month, 5)
+    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    const diffTime = nowMidnight.getTime() - dueMidnight.getTime()
+    if (diffTime <= 0) return 0
+    
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays > 0 ? diffDays : 0
+  }
+
   // ค่าใช้จ่ายต่างๆ (ใช้ค่าของบิลจริง หรือค่าจำลองหากยังไม่มีบิลในระบบ)
   const elecUnits = bill ? bill.electricUnits : 0
   const elecAmount = elecUnits * electricRate
@@ -225,16 +252,19 @@ export default function TenantPortal() {
   const waterAmount = waterUnits * waterRate
   const commonAreaFee = commonFee
 
-  // คำนวณค่าเช่าห้องพักที่หักส่วนลด (ถ้ามี) เพื่อให้ยอดรวมรวมกันเท่ากับ bill.amount พอดี
-  const rentPrice = bill 
-    ? Math.max(0, Math.min(baseRent, bill.amount - elecAmount - waterAmount - commonAreaFee)) 
-    : baseRent
+  // ค่าเช่าห้องพักหลัก
+  const rentPrice = baseRent
 
-  const totalAmount = bill ? bill.amount : (rentPrice + elecAmount + waterAmount + commonAreaFee)
+  // คำนวณจำนวนวันและค่าปรับล่าช้าแบบพลวัต
+  const lateDays = (bill && billStatus === "unpaid") ? calculateLateDays(bill.billingCycle) : 0
+  
+  const penaltyAmount = (bill && billStatus === "unpaid")
+    ? (lateDays * latePenaltyRate)
+    : (bill ? Math.max(0, bill.amount - (baseRent + elecAmount + waterAmount + commonAreaFee)) : 0)
 
-  const penaltyAmount = bill 
-    ? Math.max(0, totalAmount - rentPrice - elecAmount - waterAmount - commonAreaFee) 
-    : 0
+  const totalAmount = (bill && billStatus === "unpaid")
+    ? (baseRent + elecAmount + waterAmount + commonAreaFee + penaltyAmount)
+    : (bill ? bill.amount : (baseRent + elecAmount + waterAmount + commonAreaFee))
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
@@ -290,7 +320,7 @@ export default function TenantPortal() {
             const bills = JSON.parse(decodeURIComponent(savedBills))
             const updatedBills = bills.map((b: any) => {
               if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
-                return { ...b, status: "pending", slipUrl: mockSlipUrl }
+                return { ...b, status: "pending", slipUrl: mockSlipUrl, amount: totalAmount }
               }
               return b
             })
@@ -308,7 +338,7 @@ export default function TenantPortal() {
         return
       }
       
-      const res = await updateBillStatus(bill.id, "pending", mockSlipUrl)
+      const res = await updateBillStatus(bill.id, "pending", mockSlipUrl, totalAmount)
       setUploading(false)
       if (res.success) {
         setUploadedSlip(mockSlipUrl)
@@ -439,10 +469,18 @@ export default function TenantPortal() {
             </div>
 
             {/* 5. ค่าปรับ */}
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
-                <span>5. ค่าปรับ (Penalty / Fine)</span>
+            <div className="flex justify-between items-start pb-2.5 border-b border-slate-900">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                  <span>5. ค่าปรับ (Penalty / Fine)</span>
+                </div>
+                {lateDays > 0 && (
+                  <p className="text-[10px] text-rose-400 pl-5">จ่ายล่าช้าเกินวันที่ 5 เป็นเวลา: {lateDays} วัน (ปรับวันละ {latePenaltyRate} บาท)</p>
+                )}
+                {lateDays === 0 && penaltyAmount > 0 && (
+                  <p className="text-[10px] text-rose-400 pl-5">ค่าปรับล่าช้าสะสมที่บันทึกไว้</p>
+                )}
               </div>
               <span className="font-semibold text-slate-200">{penaltyAmount.toLocaleString()} บาท</span>
             </div>
@@ -571,7 +609,7 @@ export default function TenantPortal() {
                         const bills = JSON.parse(decodeURIComponent(savedBills))
                         const updatedBills = bills.map((b: any) => {
                           if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
-                            return { ...b, status: "unpaid", slipUrl: null }
+                            return { ...b, status: "unpaid", slipUrl: null, amount: baseRent + elecAmount + waterAmount + commonAreaFee }
                           }
                           return b
                         })
@@ -582,7 +620,7 @@ export default function TenantPortal() {
                     }
                   } else {
                     if (!bill) return
-                    const res = await updateBillStatus(bill.id, "unpaid", null)
+                    const res = await updateBillStatus(bill.id, "unpaid", null, baseRent + elecAmount + waterAmount + commonAreaFee)
                     if (res.success) {
                       setBillStatus("unpaid")
                       setUploadedSlip(null)

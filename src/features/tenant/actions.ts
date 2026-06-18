@@ -265,6 +265,7 @@ export async function getTenantPortalData() {
     let waterRate = 18
     let electricRate = 7
 
+    let latePenaltyRate = 0
     if (tenant && tenant.workspace_id) {
       const { data: ws } = await supabase
         .from("workspaces")
@@ -281,6 +282,20 @@ export async function getTenantPortalData() {
         if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
         if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
         if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
+      }
+
+      // ดึงข้อมูล late_penalty_rate แบบปลอดภัย เผื่อคอลัมน์ยังไม่มีในตาราง
+      try {
+        const { data: lpData } = await supabase
+          .from("workspaces")
+          .select("late_penalty_rate")
+          .eq("id", tenant.workspace_id)
+          .maybeSingle()
+        if (lpData && lpData.late_penalty_rate !== null && lpData.late_penalty_rate !== undefined) {
+          latePenaltyRate = Number(lpData.late_penalty_rate)
+        }
+      } catch (err) {
+        console.warn("Could not query late_penalty_rate, defaulting to 0:", err)
       }
     }
 
@@ -302,7 +317,8 @@ export async function getTenantPortalData() {
           workspaceTaxId,
           commonFee,
           waterRate,
-          electricRate
+          electricRate,
+          latePenaltyRate
         }
       }
     }
@@ -351,7 +367,8 @@ export async function getTenantPortalData() {
         workspaceTaxId,
         commonFee,
         waterRate,
-        electricRate
+        electricRate,
+        latePenaltyRate
       }
     }
   } catch (error) {
@@ -416,6 +433,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     let commonFee = 50
     let waterRate = 18
     let electricRate = 7
+    let latePenaltyRate = 0
 
     if (ws) {
       promptPayId = ws.promptpay_id || ""
@@ -427,6 +445,20 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
       if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
       if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
+    }
+
+    // ดึงข้อมูล late_penalty_rate แบบปลอดภัย เผื่อคอลัมน์ยังไม่มีในตาราง
+    try {
+      const { data: lpData } = await supabase
+        .from("workspaces")
+        .select("late_penalty_rate")
+        .eq("id", workspaceId)
+        .maybeSingle()
+      if (lpData && lpData.late_penalty_rate !== null && lpData.late_penalty_rate !== undefined) {
+        latePenaltyRate = Number(lpData.late_penalty_rate)
+      }
+    } catch (err) {
+      console.warn("Could not query late_penalty_rate, defaulting to 0:", err)
     }
 
     // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้
@@ -471,7 +503,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         workspaceTaxId,
         commonFee,
         waterRate,
-        electricRate
+        electricRate,
+        latePenaltyRate
       }
     }
   } catch (error) {
