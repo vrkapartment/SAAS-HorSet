@@ -76,8 +76,9 @@ export default function TaxPage() {
   const [manualRent405, setManualRent405] = useState(1188000)
   const [manualUtilities408, setManualUtilities408] = useState(591000)
 
-  // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5)
-  const [deductionMethod405, setDeductionMethod405] = useState<"เหมา 60%" | "เหมา 30%" | "ตามจริง">("เหมา 60%")
+  // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5) และ 40(8)
+  const [deductionMethod405, setDeductionMethod405] = useState<"เหมา 30%" | "ตามจริง">("เหมา 30%")
+  const [deductionMethod408, setDeductionMethod408] = useState<"เหมา 60%" | "ตามจริง">("เหมา 60%")
   const [actualExpense405, setActualExpense405] = useState(0)
   const [actualExpense408, setActualExpense408] = useState(320000)
 
@@ -382,8 +383,12 @@ export default function TaxPage() {
     setManualUtilities408(val)
   }
 
-  const handleDeductionMethodChange = (val: "เหมา 60%" | "เหมา 30%" | "ตามจริง") => {
+  const handleDeductionMethodChange = (val: "เหมา 30%" | "ตามจริง") => {
     setDeductionMethod405(val)
+  }
+
+  const handleDeductionMethod408Change = (val: "เหมา 60%" | "ตามจริง") => {
+    setDeductionMethod408(val)
   }
 
   const handleActualExpense405Change = (val: number) => {
@@ -454,7 +459,6 @@ export default function TaxPage() {
   // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5)
   // เต็มปี
   const getDeduction405Full = () => {
-    if (deductionMethod405 === "เหมา 60%") return rent405Full * 0.60
     if (deductionMethod405 === "เหมา 30%") return rent405Full * 0.30
     return actualExpense405
   }
@@ -462,15 +466,23 @@ export default function TaxPage() {
 
   // ครึ่งปี
   const getDeduction405Half = () => {
-    if (deductionMethod405 === "เหมา 60%") return rent405Half * 0.60
     if (deductionMethod405 === "เหมา 30%") return rent405Half * 0.30
     return actualExpense405 / 2
   }
   const deductionRent405Half = getDeduction405Half()
 
-  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(8) (ตามจริงเท่านั้น)
-  const deductionUtilities408Full = actualExpense408
-  const deductionUtilities408Half = actualExpense408 / 2
+  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(8) (เหมา 60% หรือตามจริง)
+  const getDeduction408Full = () => {
+    if (deductionMethod408 === "เหมา 60%") return utilities408Full * 0.60
+    return actualExpense408
+  }
+  const deductionUtilities408Full = getDeduction408Full()
+
+  const getDeduction408Half = () => {
+    if (deductionMethod408 === "เหมา 60%") return utilities408Half * 0.60
+    return actualExpense408 / 2
+  }
+  const deductionUtilities408Half = getDeduction408Half()
 
   // รายได้สุทธิประเมิน
   const fullTotalRevenue = rent405Full + utilities408Full
@@ -664,7 +676,7 @@ export default function TaxPage() {
                 <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-full font-semibold">มาตรา 40(5)</span>
               </div>
               <div className="flex gap-2">
-                {(["เหมา 60%", "เหมา 30%", "ตามจริง"] as const).map(method => (
+                {(["เหมา 30%", "ตามจริง"] as const).map(method => (
                   <button
                     key={method}
                     type="button"
@@ -675,7 +687,7 @@ export default function TaxPage() {
                         : "bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700"
                     }`}
                   >
-                    {method}
+                    {method === "เหมา 30%" ? "หักเหมา 30%" : "หักตามจริง"}
                   </button>
                 ))}
               </div>
@@ -702,27 +714,54 @@ export default function TaxPage() {
               )}
             </div>
 
-            {/* 40(8) Deduction (Actual only) */}
+            {/* 40(8) Deduction Select */}
             <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/60 pt-3">
               <div className="flex justify-between items-center">
-                <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">ค่าใช้จ่ายจริงที่เกิดขึ้นของค่าน้ำไฟ/บริการ 40(8) ทั้งปี (บาท)</label>
-                <span className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full font-semibold">มาตรา 40(8) หักจริงเท่านั้น</span>
+                <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">รูปแบบการหักรายจ่ายของ ค่าน้ำไฟ/บริการ 40(8)</label>
+                <span className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full font-semibold">มาตรา 40(8)</span>
               </div>
-              <div className="relative">
-                <input
-                  type="number"
-                  readOnly
-                  placeholder="ระบบคำนวณจากบันทึกค่าใช้จ่าย 40(8) ด้านล่าง..."
-                  className="w-full pl-3 pr-24 py-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl text-slate-650 dark:text-slate-400 text-xs font-mono cursor-not-allowed"
-                  value={actualExpense408}
-                />
-                <span className="absolute right-2 top-1.5 inline-flex items-center text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 px-2 py-1 rounded font-bold">
-                  🔗 ดึงอัตโนมัติ
-                </span>
+              <div className="flex gap-2">
+                {(["เหมา 60%", "ตามจริง"] as const).map(method => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => handleDeductionMethod408Change(method)}
+                    className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all ${
+                      deductionMethod408 === method
+                        ? "bg-teal-50 dark:bg-teal-600/10 border-teal-500 text-teal-600 dark:text-teal-400"
+                        : "bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    {method === "เหมา 60%" ? "หักเหมา 60%" : "หักตามจริง"}
+                  </button>
+                ))}
               </div>
-              <p className="text-[10px] text-slate-500 leading-relaxed">
-                * ตามกฎหมาย รายรับน้ำไฟ/บริการของธุรกิจอพาร์ทเมนท์ไม่สามารถหักแบบเหมาได้ ต้องหักจากรายจ่ายจริงที่บันทึกด้านล่างเท่านั้น
-              </p>
+              
+              {deductionMethod408 === "ตามจริง" && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">ค่าใช้จ่ายจริงที่เกิดขึ้นของค่าน้ำไฟ/บริการ 40(8) ทั้งปี (บาท)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      readOnly
+                      placeholder="ระบบคำนวณจากบันทึกค่าใช้จ่าย 40(8) ด้านล่าง..."
+                      className="w-full pl-3 pr-24 py-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl text-slate-650 dark:text-slate-400 text-xs font-mono cursor-not-allowed"
+                      value={actualExpense408}
+                    />
+                    <span className="absolute right-2 top-1.5 inline-flex items-center text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 px-2 py-1 rounded font-bold">
+                      🔗 ดึงอัตโนมัติ
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
+                  </p>
+                </div>
+              )}
+              {deductionMethod408 === "เหมา 60%" && (
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  * ระบบทำการคำนวณหักรายจ่ายแบบเหมาในอัตรา 60% ของรายได้พึงประเมินมาตรา 40(8) ทั้งหมด
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -759,9 +798,9 @@ export default function TaxPage() {
             <p className="text-xl font-bold mt-1 text-slate-800 dark:text-slate-100">{utilities408Full.toLocaleString()} บาท</p>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1">
-            <p>ค่าน้ำประปา ค่ากระแสไฟฟ้า และบริการสิ่งอำนวยความสะดวก ต้องหักตามจริง:</p>
+            <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่ท่านเลือกด้านบน:</p>
             <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
-              หักรายจ่ายตามจริง : <span className="text-teal-600 dark:text-teal-400 font-bold">{deductionUtilities408Full.toLocaleString()} บาท</span>
+              หักแบบ{deductionMethod408} : <span className="text-teal-600 dark:text-teal-400 font-bold">{deductionUtilities408Full.toLocaleString()} บาท</span>
             </div>
           </div>
         </div>
@@ -1251,7 +1290,7 @@ export default function TaxPage() {
                       <li><strong className="text-slate-700 dark:text-slate-300">อินเทอร์เน็ต, น้ำมันเครื่องปั่นไฟ</strong> และค่าบำบัดน้ำเสียส่วนกลาง</li>
                     </ul>
                     <p className="text-[9px] text-amber-750 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/5 p-1.5 rounded border border-amber-200 dark:border-amber-500/10 mt-1">
-                      ⚠️ รายได้บริการ 40(8) สรรพากรไม่มีตัวเลือกหักแบบเหมา ต้องยื่นหักตามจริงเท่านั้น และต้องเก็บใบเสร็จ/ใบกำกับภาษีไว้อย่างน้อย 5 ปี
+                      💡 สรรพากรเปิดช่องให้เลือกหักเหมา 60% ได้ หากจ่ายจริงรวมทั้งปีไม่ถึง 60% แนะนำให้ยื่นหักแบบเหมาเพื่อประหยัดภาษีสูงสุด
                     </p>
                   </div>
                 )}
