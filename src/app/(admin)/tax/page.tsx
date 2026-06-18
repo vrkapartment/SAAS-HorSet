@@ -73,14 +73,14 @@ export default function TaxPage() {
 
   // แหล่งที่มาของข้อมูลการคำนวณภาษี
   const [dataSource, setDataSource] = useState<"system" | "manual">("system")
-  const [manualRent405, setManualRent405] = useState(1188000)
-  const [manualUtilities408, setManualUtilities408] = useState(591000)
+  const [manualRent405, setManualRent405] = useState(0)
+  const [manualUtilities408, setManualUtilities408] = useState(0)
 
   // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5) และ 40(8)
   const [deductionMethod405, setDeductionMethod405] = useState<"เหมา 30%" | "ตามจริง">("เหมา 30%")
   const [deductionMethod408, setDeductionMethod408] = useState<"เหมา 60%" | "ตามจริง">("เหมา 60%")
   const [actualExpense405, setActualExpense405] = useState(0)
-  const [actualExpense408, setActualExpense408] = useState(320000)
+  const [actualExpense408, setActualExpense408] = useState(0)
 
   // ข้อมูลค่าใช้จ่ายจาก DB
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
@@ -440,21 +440,21 @@ export default function TaxPage() {
   // 1. รายได้รวมมาตรา 40(5) (ค่าเช่าทรัพย์สิน)
   const rent405Full = dataSource === "system" && hasPaidBills
     ? calculatedRent405Full
-    : (dataSource === "system" ? 1188000 : manualRent405)
+    : (dataSource === "system" ? 0 : manualRent405)
 
   // 2. รายได้รวมมาตรา 40(8) (ค่าบริการและสาธารณูปโภค)
   const utilities408Full = dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Full
-    : (dataSource === "system" ? 591000 : manualUtilities408)
+    : (dataSource === "system" ? 0 : manualUtilities408)
 
   // ครึ่งปี
   const rent405Half = dataSource === "system" && hasPaidBills
     ? calculatedRent405Half
-    : (dataSource === "system" ? 594000 : manualRent405 / 2)
+    : (dataSource === "system" ? 0 : manualRent405 / 2)
 
   const utilities408Half = dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Half
-    : (dataSource === "system" ? 295500 : manualUtilities408 / 2)
+    : (dataSource === "system" ? 0 : manualUtilities408 / 2)
 
   // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5)
   // เต็มปี
@@ -626,14 +626,14 @@ export default function TaxPage() {
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full text-[10px]">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> ใช้ข้อมูลจำลองชั่วคราว (ยังไม่มีบิลชำระในปีนี้)
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> ไม่พบประวัติบิลชำระเงิน (ยังไม่มีบิลชำระในปีนี้)
                     </span>
                   )}
                 </div>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
                   {hasPaidBills 
                     ? `ระบบทำการรวมรายได้จากบิลค่าเช่าในระบบที่เปลี่ยนสถานะเป็น "ชำระแล้ว" ในปี ${taxYear} โดยคำนวณแยกตามมิเตอร์และค่าเช่าสุทธิ`
-                    : `เนื่องจากไม่พบประวัติบิลที่ชำระเงินในปี ${taxYear} ระบบจึงใช้อัตราค่าเช่าจำลอง 99,000 บ./เดือน และค่าน้ำไฟเฉลี่ยรวม 49,250 บ./เดือน เพื่อแสดงแนวทางการทำงาน ท่านสามารถป้อนตัวเลขเองได้โดยเปลี่ยนเป็นโหมด "กำหนดตัวเลขเอง"`
+                    : `ไม่พบประวัติบิลที่ชำระเงินในปี ${taxYear} ระบบจึงแสดงยอดรายได้พึงประเมินเป็น 0 บาท ท่านสามารถบันทึกบิลชำระเงินในระบบเพื่ออัปเดตยอดจริง หรือเปลี่ยนเป็นโหมด "กำหนดตัวเลขเอง" ด้านบน`
                   }
                 </p>
               </div>
