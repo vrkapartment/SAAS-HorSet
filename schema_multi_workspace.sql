@@ -56,6 +56,10 @@ update public.expenses set workspace_id = 'd290f1ee-6c54-4b01-90e6-d701748f0851'
 alter table public.rooms drop constraint if exists rooms_room_number_key;
 alter table public.room_types drop constraint if exists room_types_name_key;
 
+-- Drop composite unique constraints if they already exist from a previous run
+alter table public.rooms drop constraint if exists rooms_workspace_id_room_number_key;
+alter table public.room_types drop constraint if exists room_types_workspace_id_name_key;
+
 -- Add new composite unique constraints scoped per workspace
 alter table public.rooms add constraint rooms_workspace_id_room_number_key unique (workspace_id, room_number);
 alter table public.room_types add constraint room_types_workspace_id_name_key unique (workspace_id, name);
@@ -470,6 +474,9 @@ alter table public.workspaces add column if not exists water_min_checked boolean
 alter table public.workspaces add column if not exists water_min_unit numeric default 3;
 alter table public.workspaces add column if not exists electric_min_checked boolean default true;
 alter table public.workspaces add column if not exists electric_min_unit numeric default 10;
+alter table public.workspaces add column if not exists late_penalty_rate numeric default 0;
+alter table public.workspaces add column if not exists deposit_amount numeric default 0;
+alter table public.workspaces add column if not exists advance_rent numeric default 0;
 
 -- Drop policy if it exists
 drop policy if exists "Workspace admins can update their own workspace" on public.workspaces;

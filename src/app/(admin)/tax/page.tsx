@@ -26,7 +26,8 @@ import {
   Wrench,
   ChevronDown,
   ChevronUp,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck
 } from "lucide-react"
 import { 
   getExpenses, 
@@ -36,8 +37,10 @@ import {
   ExpenseItem 
 } from "@/features/expenses/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
+import { getRooms } from "@/features/room/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getBills } from "@/features/billing/actions"
+import { getTenants } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 interface BillItem {
@@ -64,6 +67,23 @@ export default function TaxPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [taxYear, setTaxYear] = useState("2026")
 
+  // สำหรับเงินประกันและค่าเช่าล่วงหน้า
+  const [workspaceId, setWorkspaceId] = useState("")
+  const [tenants, setTenants] = useState<any[]>([])
+  const [cancelledContracts, setCancelledContracts] = useState<any[]>([])
+  const [defaultDepositAmount, setDefaultDepositAmount] = useState(0)
+  const [defaultAdvanceRent, setDefaultAdvanceRent] = useState(0)
+
+  // State ฟอร์มวันยกเลิกสัญญาและเงินประกัน
+  const [cancellationModalOpen, setCancellationModalOpen] = useState(false)
+  const [cancelTenantId, setCancelTenantId] = useState("")
+  const [cancelRoomNumber, setCancelRoomNumber] = useState("")
+  const [cancelTenantName, setCancelTenantName] = useState("")
+  const [cancelDate, setCancelDate] = useState(new Date().toISOString().split("T")[0])
+  const [cancelDeposit, setCancelDeposit] = useState<number>(0)
+  const [cancelRefund, setCancelRefund] = useState<number>(0)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+
   // โหลดข้อมูลผู้เสียภาษีจากตั้งค่าการเงิน
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -76,6 +96,14 @@ export default function TaxPage() {
   const [dataSource, setDataSource] = useState<"system" | "manual">("system")
   const [manualRent405, setManualRent405] = useState(0)
   const [manualUtilities408, setManualUtilities408] = useState(0)
+  const [manualOther408, setManualOther408] = useState(0)
+
+  // อัตราและข้อมูลตั้งค่าการเงินจริงจากระบบ
+  const [electricRate, setElectricRate] = useState(7)
+  const [waterRate, setWaterRate] = useState(18)
+  const [commonFee, setCommonFee] = useState(50)
+  const [latePenaltyRate, setLatePenaltyRate] = useState(0)
+  const [rooms, setRooms] = useState<{ roomNumber: string; baseRent: number }[]>([])
 
   // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5) และ 40(8)
   const [deductionMethod405, setDeductionMethod405] = useState<"เหมา 30%" | "ตามจริง">("เหมา 30%")
@@ -124,7 +152,19 @@ export default function TaxPage() {
         }
 
         if (currentWsId) {
-          // 1. โหลดข้อมูลผู้เสียภาษี
+          setWorkspaceId(currentWsId)
+
+          // โหลดข้อมูลประวัติยกเลิกสัญญาจาก localStorage
+          const savedCancellations = localStorage.getItem(`cancelled_contracts_${currentWsId}`)
+          if (savedCancellations) {
+            try {
+              setCancelledContracts(JSON.parse(savedCancellations))
+            } catch (e) {
+              console.error("Failed to parse saved cancellations", e)
+            }
+          }
+
+          // 1. โหลดข้อมูลผู้เสียภาษีและการเงิน
           const financeCacheKey = "finance_settings"
           const cachedFinance = getCachedData<any>(currentWsId, financeCacheKey)
           if (cachedFinance) {
@@ -133,6 +173,12 @@ export default function TaxPage() {
             setTaxId(cachedFinance.tax_id || "")
             setAddress(cachedFinance.tax_address || "")
             setPhone(cachedFinance.tax_phone || "")
+            setElectricRate(Number(cachedFinance.electric_rate !== null && cachedFinance.electric_rate !== undefined ? cachedFinance.electric_rate : 7))
+            setWaterRate(Number(cachedFinance.water_rate !== null && cachedFinance.water_rate !== undefined ? cachedFinance.water_rate : 18))
+            setCommonFee(Number(cachedFinance.common_fee !== null && cachedFinance.common_fee !== undefined ? cachedFinance.common_fee : 50))
+            setLatePenaltyRate(Number(cachedFinance.late_penalty_rate !== null && cachedFinance.late_penalty_rate !== undefined ? cachedFinance.late_penalty_rate : 0))
+            setDefaultDepositAmount(Number(cachedFinance.deposit_amount !== null && cachedFinance.deposit_amount !== undefined ? cachedFinance.deposit_amount : 0))
+            setDefaultAdvanceRent(Number(cachedFinance.advance_rent !== null && cachedFinance.advance_rent !== undefined ? cachedFinance.advance_rent : 0))
           } else {
             const res = await getFinanceSettings(currentWsId)
             if (res.success && res.data) {
@@ -141,7 +187,43 @@ export default function TaxPage() {
               setTaxId(res.data.tax_id || "")
               setAddress(res.data.tax_address || "")
               setPhone(res.data.tax_phone || "")
+              setElectricRate(res.data.electric_rate)
+              setWaterRate(res.data.water_rate)
+              setCommonFee(res.data.common_fee)
+              setLatePenaltyRate(res.data.late_penalty_rate)
+              setDefaultDepositAmount(res.data.deposit_amount !== undefined ? Number(res.data.deposit_amount) : 0)
+              setDefaultAdvanceRent(res.data.advance_rent !== undefined ? Number(res.data.advance_rent) : 0)
               setCachedData(currentWsId, financeCacheKey, res.data)
+            }
+          }
+
+          // 1.2 โหลดข้อมูลผู้เช่า
+          const tenantsCacheKey = "tenants_all"
+          const cachedTenants = getCachedData<any[]>(currentWsId, tenantsCacheKey)
+          if (cachedTenants) {
+            setTenants(cachedTenants)
+          } else {
+            const tenantsRes = await getTenants()
+            if (tenantsRes.success && tenantsRes.data) {
+              setTenants(tenantsRes.data)
+              setCachedData(currentWsId, tenantsCacheKey, tenantsRes.data)
+            }
+          }
+
+          // 1.5 โหลดข้อมูลห้องเพื่อรู้ค่าเช่าห้องพักหลัก (baseRent)
+          const roomsCacheKey = "rooms_all"
+          const cachedRooms = getCachedData<any[]>(currentWsId, roomsCacheKey)
+          if (cachedRooms) {
+            setRooms(cachedRooms)
+          } else {
+            const roomsRes = await getRooms()
+            if (roomsRes.success && roomsRes.data) {
+              const mappedRooms = roomsRes.data.map((r: any) => ({
+                roomNumber: r.roomNumber,
+                baseRent: Number(r.baseRent)
+              }))
+              setRooms(mappedRooms)
+              setCachedData(currentWsId, roomsCacheKey, mappedRooms)
             }
           }
 
@@ -371,6 +453,55 @@ export default function TaxPage() {
     }
   }
 
+  const handleAddCancellation = (
+    tenantId: string,
+    roomNum: string,
+    name: string,
+    dateStr: string,
+    depAmt: number,
+    refundAmt: number
+  ) => {
+    if (!dateStr) {
+      setCancelError("กรุณากรอกวันที่ยกเลิกสัญญา")
+      return
+    }
+    if (refundAmt < 0) {
+      setCancelError("จำนวนเงินโอนคืนต้องไม่ต่ำกว่า 0 บาท")
+      return
+    }
+    if (refundAmt > depAmt) {
+      setCancelError("จำนวนเงินโอนคืนต้องไม่เกินยอดเงินประกัน")
+      return
+    }
+    const forfeited = Math.max(0, depAmt - refundAmt)
+    const newCancellation = {
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+      tenantId,
+      roomNumber: roomNum,
+      tenantName: name,
+      cancellationDate: dateStr,
+      depositAmount: depAmt,
+      actualRefund: refundAmt,
+      forfeitedAmount: forfeited
+    }
+    const updated = [newCancellation, ...cancelledContracts]
+    setCancelledContracts(updated)
+    if (workspaceId) {
+      localStorage.setItem(`cancelled_contracts_${workspaceId}`, JSON.stringify(updated))
+    }
+    setCancellationModalOpen(false)
+    setCancelError(null)
+  }
+
+  const handleDeleteCancellation = (id: string) => {
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการยกเลิกสัญญานี้?")) return
+    const updated = cancelledContracts.filter(c => c.id !== id)
+    setCancelledContracts(updated)
+    if (workspaceId) {
+      localStorage.setItem(`cancelled_contracts_${workspaceId}`, JSON.stringify(updated))
+    }
+  }
+
   // บันทึกการตั้งค่าเมื่อมีการเปลี่ยนแปลง
   const handleDataSourceChange = (val: "system" | "manual") => {
     setDataSource(val)
@@ -382,6 +513,10 @@ export default function TaxPage() {
 
   const handleManualUtilChange = (val: number) => {
     setManualUtilities408(val)
+  }
+
+  const handleManualOtherChange = (val: number) => {
+    setManualOther408(val)
   }
 
   const handleDeductionMethodChange = (val: "เหมา 30%" | "ตามจริง") => {
@@ -400,9 +535,10 @@ export default function TaxPage() {
     setActualExpense408(val)
   }
 
-  // อัตราการคำนวณบิล
-  const electricRate = 7
-  const waterRate = 18
+  // คำนวณรายได้จากบิลจริงแยกประเภทตามเกณฑ์สรรพากรใหม่
+  // 1. ค่าเช่า 40(5) คือเฉพาะ ค่าเช่าห้องพักหลัก (baseRent)
+  // 2. ค่าน้ำไฟ/บริการ 40(8) คือ ยูนิตน้ำไฟ + ค่าบริการส่วนกลางคงที่
+  // 3. รายได้อื่นๆ 40(8) (ไม่เข้าเกณฑ์หักเหมา) คือ ค่าปรับจ่ายล่าช้า หรือค่าบริการพิเศษอื่นๆ
 
   // คัดกรองบิลตามปีภาษีที่เลือกและสถานะที่ชำระเงินแล้ว
   const paidBillsInYear = bills.filter(bill => {
@@ -414,18 +550,37 @@ export default function TaxPage() {
   // คำนวณรายได้จากบิลจริง
   let calculatedRent405Full = 0
   let calculatedUtilities408Full = 0
+  let calculatedOther408Full = 0
+  
   let calculatedRent405Half = 0
   let calculatedUtilities408Half = 0
+  let calculatedOther408Half = 0
 
   paidBillsInYear.forEach(bill => {
     const electricUnits = Number(bill.electricUnits || 0)
     const waterUnits = Number(bill.waterUnits || 0)
-    const utilitiesAmount = (electricUnits * electricRate) + (waterUnits * waterRate)
+    
+    const elecAmount = electricUnits * electricRate
+    const waterAmount = waterUnits * waterRate
+    
+    // ค่าน้ำไฟ/บริการ 40(8) = ค่ายูนิตน้ำ + ค่ายูนิตไฟ + ค่าส่วนกลาง
+    const utilitiesAmount = elecAmount + waterAmount + commonFee
+    
     const billAmount = Number(bill.amount || 0)
-    const rentAmount = billAmount - utilitiesAmount
+    
+    // ค้นหาค่าเช่าห้องพักหลัก (baseRent) จากข้อมูลห้อง หรือใช้ส่วนต่างบิลหักน้ำไฟส่วนกลางเป็นทางเลือกสุดท้าย
+    const matchedRoom = rooms.find(r => r.roomNumber === bill.roomNumber)
+    const baseRentVal = matchedRoom ? matchedRoom.baseRent : Math.max(0, billAmount - utilitiesAmount)
+    
+    // ค่าเช่า 40(5) = เฉพาะค่าเช่าห้องพักหลัก
+    const rentAmount = Math.max(0, Math.min(baseRentVal, billAmount))
+    
+    // รายได้อื่นๆ 40(8) (ไม่หักเหมา) = ยอดชำระสุทธิ - ค่าเช่าห้อง - ค่าน้ำไฟ/บริการส่วนกลาง (เช่น เงินปรับล่าช้า / มัดจำ)
+    const otherAmount = Math.max(0, billAmount - rentAmount - utilitiesAmount)
 
     calculatedRent405Full += rentAmount
     calculatedUtilities408Full += utilitiesAmount
+    calculatedOther408Full += otherAmount
 
     // ครึ่งปีแรก (เดือน 01 - 06)
     const cycleParts = bill.billingCycle.split("-")
@@ -433,29 +588,85 @@ export default function TaxPage() {
     if (monthNum >= 1 && monthNum <= 6) {
       calculatedRent405Half += rentAmount
       calculatedUtilities408Half += utilitiesAmount
+      calculatedOther408Half += otherAmount
     }
   })
 
   const hasPaidBills = paidBillsInYear.length > 0
 
-  // 1. รายได้รวมมาตรา 40(5) (ค่าเช่าทรัพย์สิน)
-  const rent405Full = dataSource === "system" && hasPaidBills
-    ? calculatedRent405Full
-    : (dataSource === "system" ? 0 : manualRent405)
+  // =========================================================================
+  // LOGIC คำนวณค่าเช่าล่วงหน้า และ เงินประกันยกเลิกสัญญา
+  // =========================================================================
 
-  // 2. รายได้รวมมาตรา 40(8) (ค่าบริการและสาธารณูปโภค)
+  // 1. ค่าเช่าล่วงหน้า (มาตรา 40(5)): วิ่งไปบวกใน 40(5) ของปีนั้นๆ ทันทีตามปี พ.ศ. ที่เริ่มสัญญา
+  const advanceRentBills = tenants.filter(t => {
+    if (!t.contractStart) return false
+    const parts = t.contractStart.split("-")
+    return parts[0] === taxYear
+  })
+  
+  // คำนวณรายหัว: จำนวนเดือน * ค่าเช่าของห้องนั้นๆ
+  const totalAdvanceRentAmount = advanceRentBills.reduce((sum, t) => {
+    const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
+    const roomRent = matchedRoom ? matchedRoom.baseRent : 0
+    return sum + (roomRent * defaultAdvanceRent)
+  }, 0)
+
+  // ครึ่งปีแรก (สัญญาเริ่มเดือน 01 - 06)
+  const advanceRentBillsHalf = advanceRentBills.filter(t => {
+    const parts = t.contractStart.split("-")
+    const month = parts[1] ? parseInt(parts[1], 10) : 0
+    return month >= 1 && month <= 6
+  })
+  const totalAdvanceRentAmountHalf = advanceRentBillsHalf.reduce((sum, t) => {
+    const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
+    const roomRent = matchedRoom ? matchedRoom.baseRent : 0
+    return sum + (roomRent * defaultAdvanceRent)
+  }, 0)
+
+  // 2. เงินประกันริบ (มาตรา 40(8)): เมื่อยกเลิกสัญญา คำนวณ [มัดจำ - เงินคืนจริง] = ยอดริบ และนำไปบวกเป็นรายได้ในปีที่ยกเลิกสัญญา
+  const cancelledInYear = cancelledContracts.filter(c => {
+    if (!c.cancellationDate) return false
+    const parts = c.cancellationDate.split("-")
+    return parts[0] === taxYear
+  })
+  const totalForfeitedAmount = cancelledInYear.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
+
+  // ครึ่งปีแรก (ยกเลิกสัญญาช่วงเดือน 01 - 06)
+  const cancelledInYearHalf = cancelledInYear.filter(c => {
+    const parts = c.cancellationDate.split("-")
+    const month = parts[1] ? parseInt(parts[1], 10) : 0
+    return month >= 1 && month <= 6
+  })
+  const totalForfeitedAmountHalf = cancelledInYearHalf.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
+
+  // 1. รายได้รวมมาตรา 40(5) (เฉพาะค่าเช่าห้องพักหลัก) + ยอดค่าเช่าล่วงหน้า
+  const rent405Full = (dataSource === "system" && hasPaidBills
+    ? calculatedRent405Full
+    : (dataSource === "system" ? 0 : manualRent405)) + totalAdvanceRentAmount
+
+  // 2. รายได้รวมมาตรา 40(8) (ค่าน้ำไฟ/บริการส่วนกลาง)
   const utilities408Full = dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Full
     : (dataSource === "system" ? 0 : manualUtilities408)
 
+  // 3. รายได้รวมอื่นๆ มาตรา 40(8) (เงินปรับจ่ายล่าช้า / ยอดริบมัดจำ - ไม่เข้าเกณฑ์หักเหมา)
+  const other408Full = (dataSource === "system" && hasPaidBills
+    ? calculatedOther408Full
+    : (dataSource === "system" ? 0 : manualOther408)) + totalForfeitedAmount
+
   // ครึ่งปี
-  const rent405Half = dataSource === "system" && hasPaidBills
+  const rent405Half = (dataSource === "system" && hasPaidBills
     ? calculatedRent405Half
-    : (dataSource === "system" ? 0 : manualRent405 / 2)
+    : (dataSource === "system" ? 0 : manualRent405 / 2)) + totalAdvanceRentAmountHalf
 
   const utilities408Half = dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Half
     : (dataSource === "system" ? 0 : manualUtilities408 / 2)
+
+  const other408Half = (dataSource === "system" && hasPaidBills
+    ? calculatedOther408Half
+    : (dataSource === "system" ? 0 : manualOther408 / 2)) + totalForfeitedAmountHalf
 
   // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5)
   // เต็มปี
@@ -472,9 +683,9 @@ export default function TaxPage() {
   }
   const deductionRent405Half = getDeduction405Half()
 
-  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(8) (เหมา 60% หรือตามจริง)
+  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(8) (เหมา 60% เฉพาะส่วนบริการน้ำไฟ หรือหักตามจริง)
   const getDeduction408Full = () => {
-    if (deductionMethod408 === "เหมา 60%") return utilities408Full * 0.60
+    if (deductionMethod408 === "เหมา 60%") return utilities408Full * 0.60 // รายได้อื่นๆ หักเหมาได้ 0% ตามเงื่อนไขสรรพากร
     return actualExpense408
   }
   const deductionUtilities408Full = getDeduction408Full()
@@ -486,10 +697,10 @@ export default function TaxPage() {
   const deductionUtilities408Half = getDeduction408Half()
 
   // รายได้สุทธิประเมิน
-  const fullTotalRevenue = rent405Full + utilities408Full
+  const fullTotalRevenue = rent405Full + utilities408Full + other408Full
   const netIncomeFull = fullTotalRevenue - (deductionRent405Full + deductionUtilities408Full)
 
-  const halfTotalRevenue = rent405Half + utilities408Half
+  const halfTotalRevenue = rent405Half + utilities408Half + other408Half
   const netIncomeHalf = halfTotalRevenue - (deductionRent405Half + deductionUtilities408Half)
 
   const handleExport = () => {
@@ -508,7 +719,7 @@ export default function TaxPage() {
         phone,
         rent405: type === "90" ? rent405Full : rent405Half * 2,
         deductionRent405: type === "90" ? deductionRent405Full : deductionRent405Half,
-        utilities408: type === "90" ? utilities408Full : utilities408Half * 2,
+        utilities408: type === "90" ? (utilities408Full + other408Full) : (utilities408Half + other408Half) * 2,
         deductionUtilities408: type === "90" ? deductionUtilities408Full : deductionUtilities408Half,
         netIncome: type === "90" ? netIncomeFull : netIncomeHalf,
         taxYear,
@@ -639,23 +850,32 @@ export default function TaxPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-600 dark:text-slate-400 font-medium">ป้อนรายได้เช่า 40(5) ทั้งปี (บาท)</label>
+                  <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">ป้อนรายได้เช่า 40(5) ทั้งปี (บาท)</label>
                   <input
                     type="number"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
                     value={manualRent405}
                     onChange={(e) => handleManualRentChange(Number(e.target.value))}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-600 dark:text-slate-400 font-medium">ป้อนรายได้สาธารณูปโภค 40(8) ทั้งปี (บาท)</label>
+                  <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">ป้อนรายได้สาธารณูปโภค 40(8) ทั้งปี (บาท)</label>
                   <input
                     type="number"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
                     value={manualUtilities408}
                     onChange={(e) => handleManualUtilChange(Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">ป้อนรายได้อื่นๆ 40(8) ทั้งปี (บาท)</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
+                    value={manualOther408}
+                    onChange={(e) => handleManualOtherChange(Number(e.target.value))}
                   />
                 </div>
               </div>
@@ -783,19 +1003,22 @@ export default function TaxPage() {
       </div>
 
       {/* การแบ่งประเภทรายได้และเปรียบเทียบการหักลดหย่อน */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* รายได้ประเภทที่ 40(5) */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4">
-          <div className="flex justify-between items-start">
-            <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400">มาตรา 40(5)</span>
-            <Landmark className="w-5 h-5 text-blue-500" />
+        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400">มาตรา 40(5)</span>
+              <Landmark className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้ค่าเช่าห้องพัก</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เฉพาะส่วนที่เป็นค่าเช่าห้องพักหลัก</p>
+              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{rent405Full.toLocaleString()} บาท</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้ค่าเช่าทรัพย์สิน (ห้องพัก)</h3>
-            <p className="text-xl font-bold mt-1 text-slate-800 dark:text-slate-100">{rent405Full.toLocaleString()} บาท</p>
-          </div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1">
-            <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่ท่านเลือกด้านบน:</p>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
+            <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่เลือก:</p>
             <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
               หักแบบ{deductionMethod405} : <span className="text-blue-600 dark:text-blue-400 font-bold">{deductionRent405Full.toLocaleString()} บาท</span>
             </div>
@@ -803,35 +1026,66 @@ export default function TaxPage() {
         </div>
 
         {/* รายได้ประเภทที่ 40(8) */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4">
-          <div className="flex justify-between items-start">
-            <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400">มาตรา 40(8)</span>
-            <Landmark className="w-5 h-5 text-teal-500" />
+        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400">มาตรา 40(8)</span>
+              <Zap className="w-5 h-5 text-teal-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">ค่าน้ำไฟและบริการ</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ค่ายูนิตน้ำ/ไฟ + ค่าบริการส่วนกลาง</p>
+              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{utilities408Full.toLocaleString()} บาท</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้ค่าสาธารณูปโภคและบริการ</h3>
-            <p className="text-xl font-bold mt-1 text-slate-800 dark:text-slate-100">{utilities408Full.toLocaleString()} บาท</p>
-          </div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1">
-            <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่ท่านเลือกด้านบน:</p>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
+            <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่เลือก:</p>
             <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
               หักแบบ{deductionMethod408} : <span className="text-teal-600 dark:text-teal-400 font-bold">{deductionUtilities408Full.toLocaleString()} บาท</span>
             </div>
           </div>
         </div>
 
+        {/* รายได้ประเภทที่ 40(8) อื่นๆ (ไม่หักเหมา) */}
+        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400">ม. 40(8) อื่นๆ (ไม่หักเหมา)</span>
+              <Coins className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้อื่น (ค่าปรับ/ริบมัดจำ)</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เงินปรับจ่ายล่าช้า หรือเงินริบมัดจำ</p>
+              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{other408Full.toLocaleString()} บาท</p>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
+            <p>ไม่เข้าเกณฑ์หักเหมา 60% (หักแบบเหมาเป็น 0):</p>
+            <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
+              {deductionMethod408 === "เหมา 60%" ? (
+                <span>หักแบบเหมา 60% : <span className="text-amber-600 dark:text-amber-400 font-bold">0 บาท</span></span>
+              ) : (
+                <span>หักตามจ่ายจริง : <span className="text-teal-600 dark:text-teal-400 font-bold">ใช้สิทธิ์ตามจ่ายจริง</span></span>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* รายจ่ายจริงสะสม */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4">
-          <div className="flex justify-between items-start">
-            <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400">รายจ่ายสะสม</span>
-            <Calculator className="w-5 h-5 text-amber-500" />
+        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">รายจ่ายสะสม</span>
+              <Calculator className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายจ่ายรวมหักลดหย่อน</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">รวมค่าใช้จ่ายหักเหมาหรือหักจริง</p>
+              <p className="text-xl font-bold mt-2 text-emerald-600 dark:text-emerald-400">{(deductionRent405Full + deductionUtilities408Full).toLocaleString()} บาท</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายจ่ายรวมที่ใช้ยื่นหักลดหย่อน</h3>
-            <p className="text-xl font-bold mt-1 text-slate-800 dark:text-slate-100">{(deductionRent405Full + deductionUtilities408Full).toLocaleString()} บาท</p>
-          </div>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            เป็นการรวมค่าใช้จ่ายหักเหมาหรือตามจริงของค่าเช่าห้อง {deductionRent405Full.toLocaleString()} บ. และค่าน้ำไฟหลวงสะสมที่ท่านได้ระบุด้านบน {deductionUtilities408Full.toLocaleString()} บ.
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mt-auto pt-2">
+            เป็นการรวมยอดค่าลดหย่อนภาษีของค่าเช่าห้อง ({deductionRent405Full.toLocaleString()} บ.) และค่าน้ำไฟหลวง/บริการ ({deductionUtilities408Full.toLocaleString()} บ.)
           </p>
         </div>
       </div>
@@ -1088,6 +1342,161 @@ export default function TaxPage() {
         </div>
       </div>
 
+      {/* ส่วนจัดการสัญญา ค่าเช่าล่วงหน้า และเงินประกัน */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* บล็อกค่าเช่าล่วงหน้าสะสม (มาตรา 40(5)) */}
+        <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Landmark className="w-4 h-4 text-blue-500" /> ค่าเช่าล่วงหน้าสะสม มาตรา 40(5)
+            </h3>
+            <p className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5">
+              สัญญาเช่าที่เริ่มต้นในปีภาษี {taxYear} จะนำยอดค่าเช่าล่วงหน้าวิ่งไปคำนวณเป็นรายได้ 40(5) ของปีนั้นๆ ทันที
+            </p>
+          </div>
+
+          {advanceRentBills.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-900 text-slate-550 font-semibold text-[11px]">
+                    <th className="pb-2.5 pl-2">ห้องพัก / ผู้เช่า</th>
+                    <th className="pb-2.5 text-center">วันที่เริ่มสัญญา</th>
+                    <th className="pb-2.5 text-right">ยอดเช่าล่วงหน้า</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-900/40">
+                  {advanceRentBills.map((t) => {
+                    const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
+                    const roomRent = matchedRoom ? matchedRoom.baseRent : 0
+                    const advanceRentVal = roomRent * defaultAdvanceRent
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/5">
+                        <td className="py-2.5 pl-2 font-medium text-slate-800 dark:text-slate-200">
+                          ห้อง {t.roomNumber} - {t.fullName}
+                          <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
+                            ค่าเช่าห้อง: {roomRent.toLocaleString()} บ. (ล่วงหน้า {defaultAdvanceRent} เดือน)
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-center text-slate-500 dark:text-slate-400 font-mono text-[10px]">
+                          {t.contractStart ? new Date(t.contractStart).toLocaleDateString("th-TH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          }) : "-"}
+                        </td>
+                        <td className="py-2.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {advanceRentVal.toLocaleString()} บ.
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-900 text-[11px] text-slate-550 dark:text-slate-400 mt-2 font-semibold">
+                <span>จำนวนสัญญาที่เริ่มในปีนี้: {advanceRentBills.length} รายการ</span>
+                <span className="text-blue-600 dark:text-blue-400 font-bold font-mono">
+                  รวม {totalAdvanceRentAmount.toLocaleString()} บาท
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-900/60 text-slate-550 text-xs">
+              <p>ไม่มีสัญญาใหม่ที่เริ่มเช่าในปีภาษี {taxYear}</p>
+            </div>
+          )}
+        </div>
+
+        {/* บล็อกเงินประกันและสัญญายกเลิก (มาตรา 40(8)) */}
+        <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-red-500" /> เงินประกันและสัญญายกเลิก มาตรา 40(8)
+              </h3>
+              <p className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5">
+                ประวัติการยกเลิกสัญญาและคำนวณเงินประกันริบ [มัดจำ - เงินคืนจริง] เพื่อบวกเป็นรายได้ 40(8)
+              </p>
+            </div>
+            
+            <button
+              onClick={() => {
+                setCancelTenantId("")
+                setCancelRoomNumber("")
+                setCancelTenantName("")
+                setCancelDeposit(0)
+                setCancelRefund(0)
+                setCancellationModalOpen(true)
+                setCancelError(null)
+              }}
+              className="glow-btn bg-red-600 hover:bg-red-500 text-white font-medium py-1.5 px-3.5 rounded-xl flex items-center gap-1.5 text-[11px] shadow-lg shadow-red-600/10 transition-colors cursor-pointer shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" /> บันทึกสัญญายกเลิก
+            </button>
+          </div>
+
+          {cancelledInYear.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-900 text-slate-550 font-semibold text-[11px]">
+                    <th className="pb-2.5 pl-2">ห้องพัก / ผู้เช่า</th>
+                    <th className="pb-2.5 text-center">วันที่ยกเลิก</th>
+                    <th className="pb-2.5 text-right">เงินประกัน</th>
+                    <th className="pb-2.5 text-right">โอนคืนจริง</th>
+                    <th className="pb-2.5 text-right">ยอดที่ริบ</th>
+                    <th className="pb-2.5 text-center">ลบ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-900/40">
+                  {cancelledInYear.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/5">
+                      <td className="py-2.5 pl-2 font-medium text-slate-800 dark:text-slate-200">
+                        ห้อง {c.roomNumber} - {c.tenantName}
+                      </td>
+                      <td className="py-2.5 text-center text-slate-500 dark:text-slate-400 font-mono text-[10px]">
+                        {c.cancellationDate ? new Date(c.cancellationDate).toLocaleDateString("th-TH", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        }) : "-"}
+                      </td>
+                      <td className="py-2.5 text-right font-mono text-slate-700 dark:text-slate-300">
+                        {Number(c.depositAmount || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 text-right font-mono text-slate-700 dark:text-slate-300">
+                        {Number(c.actualRefund || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 text-right font-mono font-bold text-red-600 dark:text-red-400">
+                        {Number(c.forfeitedAmount || 0).toLocaleString()} บ.
+                      </td>
+                      <td className="py-2.5 text-center">
+                        <button
+                          onClick={() => handleDeleteCancellation(c.id)}
+                          className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 animate-pulse" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-900 text-[11px] text-slate-550 dark:text-slate-400 mt-2 font-semibold">
+                <span>จำนวนสัญญายกเลิกปีนี้: {cancelledInYear.length} รายการ</span>
+                <span className="text-red-600 dark:text-red-400 font-bold font-mono">
+                  รวมริบ {totalForfeitedAmount.toLocaleString()} บาท
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-900/60 text-slate-550 text-xs">
+              <p>ไม่มีประวัติการยกเลิกสัญญาในปีภาษี {taxYear}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* แถวการคำนวณแบ่งยื่นครึ่งปีและเต็มปี */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ครึ่งปี ภ.ง.ด. 94 */}
@@ -1338,6 +1747,189 @@ export default function TaxPage() {
                     บันทึกรายการ
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal บันทึกยกเลิกสัญญาและเงินประกัน */}
+      {cancellationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
+                  <ShieldCheck className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-base">
+                    บันทึกการยกเลิกสัญญาและเงินประกัน
+                  </h3>
+                  <p className="text-[10px] text-slate-550 dark:text-slate-400">คำนวณภาษีเงินประกันริบ มาตรา 40(8)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCancellationModalOpen(false)}
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {cancelError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{cancelError}</span>
+                </div>
+              )}
+
+              {/* เลือกผู้เช่า */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  ห้องพัก / ชื่อผู้เช่า <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={cancelTenantId}
+                  onChange={(e) => {
+                    const selectedId = e.target.value
+                    setCancelTenantId(selectedId)
+                    const selectedTenant = tenants.find(t => t.id === selectedId)
+                    if (selectedTenant) {
+                      setCancelRoomNumber(selectedTenant.roomNumber || "")
+                      setCancelTenantName(selectedTenant.fullName || "")
+                      // ค้นหาค่าเช่าห้องพักหลัก เพื่อคำนวณเงินประกัน = จำนวนเดือน * ค่าเช่าของห้องนั้นๆ
+                      const matchedRoom = rooms.find(r => r.roomNumber === selectedTenant.roomNumber)
+                      const roomRent = matchedRoom ? matchedRoom.baseRent : 0
+                      setCancelDeposit(roomRent * defaultDepositAmount)
+                      setCancelRefund(0)
+                    } else {
+                      setCancelRoomNumber("")
+                      setCancelTenantName("")
+                      setCancelDeposit(0)
+                      setCancelRefund(0)
+                    }
+                  }}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 transition-all cursor-pointer"
+                >
+                  <option value="">-- เลือกห้องพัก/ผู้เช่า --</option>
+                  {tenants.map(t => (
+                    <option key={t.id} value={t.id}>
+                      ห้อง {t.roomNumber} - {t.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ข้อมูลแฝงที่เลือก */}
+              {cancelTenantId && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-850 text-[11px] space-y-2 text-slate-650 dark:text-slate-400">
+                  <div className="flex justify-between">
+                    <span>ผู้เช่า:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{cancelTenantName} (ห้อง {cancelRoomNumber})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>วันที่เริ่มสัญญา:</span>
+                    <span className="font-mono">
+                      {tenants.find(t => t.id === cancelTenantId)?.contractStart || "ไม่ได้ตั้งค่า"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* วันที่ยกเลิกสัญญา */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  วันที่ยกเลิกสัญญา <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={cancelDate}
+                  onChange={(e) => setCancelDate(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 font-mono transition-all"
+                />
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
+                  * ปีภาษีที่ยกเลิกคือปี พ.ศ. ของวันที่ระบุด้านบน ยอดเงินประกันที่ริบไว้จะถูกนำไปคิดภาษีมาตรา 40(8) ของปีนั้นๆ ทันที
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* เงินประกัน (เงินมัดจำ) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    ยอดเงินประกัน (บาท)
+                  </label>
+                  <input
+                    type="number"
+                    value={cancelDeposit}
+                    onChange={(e) => setCancelDeposit(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 font-bold font-mono transition-all"
+                  />
+                </div>
+
+                {/* เงินคืนผู้เช่าจริง */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    เงินโอนคืนผู้เช่าจริง (บาท)
+                  </label>
+                  <input
+                    type="number"
+                    value={cancelRefund}
+                    onChange={(e) => setCancelRefund(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 font-bold font-mono transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* ยอดเงินประกันที่ริบไว้ */}
+              <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/10 flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-red-700 dark:text-red-400">ยอดเงินมัดจำส่วนที่ริบไว้ (รายได้)</h4>
+                  <p className="text-[10px] text-red-600 dark:text-red-400/80 mt-0.5">สูตร: [ เงินประกัน - เงินคืนจริง ]</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-extrabold font-mono text-red-600 dark:text-red-400">
+                    {Math.max(0, cancelDeposit - cancelRefund).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] font-bold text-red-650 dark:text-red-400/90 ml-1">บาท</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancellationModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!cancelTenantId) {
+                    setCancelError("กรุณาเลือกผู้เช่า/ห้องพัก")
+                    return
+                  }
+                  handleAddCancellation(
+                    cancelTenantId,
+                    cancelRoomNumber,
+                    cancelTenantName,
+                    cancelDate,
+                    cancelDeposit,
+                    cancelRefund
+                  )
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-red-500/10 hover:shadow-red-500/20 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                บันทึกยกเลิกสัญญา
               </button>
             </div>
           </div>

@@ -180,6 +180,8 @@ export default function FinanceSettingsPage() {
   const [promptPayName, setPromptPayName] = useState("")
   const [commonFee, setCommonFee] = useState<number>(50)
   const [latePenaltyRate, setLatePenaltyRate] = useState<number>(0)
+  const [depositAmount, setDepositAmount] = useState<number>(0)
+  const [advanceRent, setAdvanceRent] = useState<number>(0)
 
   // สำหรับราคาหน่วย ค่าน้ำ ค่าไฟ และขั้นต่ำ
   const [waterRate, setWaterRate] = useState<number>(18)
@@ -258,6 +260,8 @@ export default function FinanceSettingsPage() {
             setPromptPayName(cached.promptpay_name || "")
             setCommonFee(cached.common_fee !== undefined ? cached.common_fee : 50)
             setLatePenaltyRate(cached.late_penalty_rate !== undefined ? cached.late_penalty_rate : 0)
+            setDepositAmount(cached.deposit_amount !== undefined ? cached.deposit_amount : 0)
+            setAdvanceRent(cached.advance_rent !== undefined ? cached.advance_rent : 0)
             setWaterRate(cached.water_rate !== undefined ? cached.water_rate : 18)
             setElectricRate(cached.electric_rate !== undefined ? cached.electric_rate : 7)
             setWaterMinChecked(cached.water_min_checked !== undefined ? cached.water_min_checked : true)
@@ -287,6 +291,8 @@ export default function FinanceSettingsPage() {
             setPromptPayName(res.data.promptpay_name || "")
             setCommonFee(res.data.common_fee !== undefined ? res.data.common_fee : 50)
             setLatePenaltyRate(res.data.late_penalty_rate !== undefined ? res.data.late_penalty_rate : 0)
+            setDepositAmount(res.data.deposit_amount !== undefined ? res.data.deposit_amount : 0)
+            setAdvanceRent(res.data.advance_rent !== undefined ? res.data.advance_rent : 0)
             setWaterRate(res.data.water_rate !== undefined ? res.data.water_rate : 18)
             setElectricRate(res.data.electric_rate !== undefined ? res.data.electric_rate : 7)
             setWaterMinChecked(res.data.water_min_checked !== undefined ? res.data.water_min_checked : true)
@@ -352,7 +358,9 @@ export default function FinanceSettingsPage() {
         water_min_checked: waterMinChecked,
         water_min_unit: waterMinUnit,
         electric_min_checked: electricMinChecked,
-        electric_min_unit: electricMinUnit
+        electric_min_unit: electricMinUnit,
+        deposit_amount: depositAmount,
+        advance_rent: advanceRent
       }
 
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
@@ -617,6 +625,55 @@ export default function FinanceSettingsPage() {
                     สะสมค่าปรับเพิ่มขึ้นอัตโนมัติทุกวันเมื่อพ้นกำหนดส่งเงิน (ตั้งแต่วันที่ 6 ของรอบบิลเป็นต้นไป)
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* กล่อง 2.5: เงินประกันและค่าเช่าล่วงหน้า */}
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <ShieldCheck className="w-4 h-4 text-teal-400" /> เงินประกันและค่าเช่าล่วงหน้า
+              </h3>
+
+              {/* เงินประกัน (เงินมัดจำ) */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 font-medium">เงินประกัน (เงินมัดจำ) (จำนวนเดือน)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step={0.5}
+                    placeholder="0"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(Number(e.target.value))}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">เดือน</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                  ระบุจำนวนเดือนของเงินประกัน (เช่น 2 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อพักยอดเงินประกันไว้ในสถานะหนี้สิน และคำนวณหักกลบลบด้วยยอดคืนเงินจริงเมื่อยกเลิกสัญญาเพื่อส่งเป็นรายได้ 40(8)
+                </p>
+              </div>
+
+              {/* ค่าเช่าล่วงหน้า */}
+              <div className="space-y-1.5 border-t border-slate-200 dark:border-slate-900/40 pt-4">
+                <label className="text-xs text-slate-400 font-medium">ค่าเช่าล่วงหน้า (จำนวนเดือน)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step={0.5}
+                    placeholder="0"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    value={advanceRent}
+                    onChange={(e) => setAdvanceRent(Number(e.target.value))}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">เดือน</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                  ระบุจำนวนเดือนของค่าเช่าล่วงหน้า (เช่น 1 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อบันทึกเป็นรายได้กลุ่มมาตรา 40(5) (ค่าเช่าทรัพย์สิน) ประจำปีภาษีที่สัญญาเริ่มเช่าทันที
+                </p>
               </div>
             </div>
           </div>
