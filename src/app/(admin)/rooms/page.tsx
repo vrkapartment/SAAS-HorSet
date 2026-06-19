@@ -603,7 +603,7 @@ export default function RoomsPage() {
       }
     } else if (!isRegistered) {
       return {
-        label: "รอลงทะเบียน LINE",
+        label: "มีผู้เช่าแล้ว (ยังไม่ลงทะเบียนไลน์)",
         badgeStyle: "bg-blue-50 text-blue-600 dark:bg-blue-950/35 dark:text-blue-400 border border-blue-200/40 dark:border-blue-800/40",
         dotStyle: "bg-blue-500",
         code: "waiting"
@@ -770,7 +770,7 @@ export default function RoomsPage() {
               <Users className="w-5 h-5 animate-pulse" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">รอลงทะเบียน LINE</span>
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ยังไม่ลงทะเบียนไลน์</span>
               <span className="text-lg md:text-xl font-extrabold text-blue-600 dark:text-blue-400 mt-0.5 block">{loading ? "..." : waitingRoomsCount} ห้อง</span>
             </div>
           </div>
@@ -817,8 +817,8 @@ export default function RoomsPage() {
             {[
               { id: "all", label: "ทั้งหมด" },
               { id: "available", label: "เฉพาะห้องว่าง" },
-              { id: "waiting", label: "รอลงทะเบียน LINE" },
-              { id: "occupied", label: "มีผู้เช่าแล้ว" }
+              { id: "waiting", label: "มีผู้เช่าแล้ว (ยังไม่ลงทะเบียนไลน์)" },
+              { id: "occupied", label: "มีผู้เช่าแล้ว (เชื่อม LINE)" }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -923,7 +923,7 @@ export default function RoomsPage() {
 
                             {/* 7. Action Button column (Status-dependent) */}
                             <td className="p-4 text-center">
-                              <div className="flex items-center justify-center">
+                              <div className="flex items-center justify-center gap-2">
                                 {/* VACANT: Generate LINE Link */}
                                 {!room.tenantName && (
                                   <button
@@ -935,15 +935,24 @@ export default function RoomsPage() {
                                   </button>
                                 )}
 
-                                {/* WAITING FOR LINE: Generate/Copy Link */}
+                                {/* WAITING FOR LINE: Generate/Copy Link & View Details/Checkout */}
                                 {room.tenantName && !room.lineUserId && (
-                                  <button
-                                    onClick={() => handleOpenLineLinkModal(room)}
-                                    className="px-3.5 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/40 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
-                                  >
-                                    <Share2 className="w-3.5 h-3.5" />
-                                    เจนลิงก์ LINE
-                                  </button>
+                                  <>
+                                    <button
+                                      onClick={() => handleOpenLineLinkModal(room)}
+                                      className="px-3.5 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/40 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      <Share2 className="w-3.5 h-3.5" />
+                                      เจนลิงก์ LINE
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenDetailModal(room)}
+                                      className="px-3.5 py-1.5 text-[11px] font-bold text-teal-600 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/40 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      ดูรายละเอียด/ย้ายออก
+                                    </button>
+                                  </>
                                 )}
 
                                 {/* REGISTERED: View details / checkout */}
@@ -1076,15 +1085,24 @@ export default function RoomsPage() {
                               </button>
                             )}
 
-                            {/* WAITING: Generate LIFF LINK */}
+                            {/* WAITING: Generate LIFF LINK & View Details/Checkout */}
                             {room.tenantName && !room.lineUserId && (
-                              <button
-                                onClick={() => handleOpenLineLinkModal(room)}
-                                className="flex-1 py-3 px-4 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/40 hover:bg-blue-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11"
-                              >
-                                <Share2 className="w-4 h-4" />
-                                เจนลิงก์ LINE
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleOpenLineLinkModal(room)}
+                                  className="flex-1 py-3 px-4 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/40 hover:bg-blue-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11"
+                                >
+                                  <Share2 className="w-4 h-4" />
+                                  เจนลิงก์ LINE
+                                </button>
+                                <button
+                                  onClick={() => handleOpenDetailModal(room)}
+                                  className="flex-1 py-3 px-4 text-xs font-bold text-teal-600 dark:text-teal-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 hover:bg-emerald-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  ดูรายละเอียด/ย้ายออก
+                                </button>
+                              </>
                             )}
 
                             {/* OCCUPIED: View Details / Checkout */}
