@@ -597,15 +597,15 @@ export default function RoomsPage() {
     if (!hasTenant) {
       return {
         label: "ว่าง",
-        badgeStyle: "bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-400 border border-slate-200/50 dark:border-slate-800/60",
-        dotStyle: "bg-slate-400 dark:bg-slate-500",
+        badgeStyle: "bg-red-50 text-red-600 dark:bg-red-950/35 dark:text-red-400 border border-red-200/40 dark:border-red-800/40",
+        dotStyle: "bg-red-500",
         code: "available"
       }
     } else if (!isRegistered) {
       return {
         label: "มีผู้เช่าแล้ว (ยังไม่ลงทะเบียนไลน์)",
-        badgeStyle: "bg-blue-50 text-blue-600 dark:bg-blue-950/35 dark:text-blue-400 border border-blue-200/40 dark:border-blue-800/40",
-        dotStyle: "bg-blue-500",
+        badgeStyle: "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/40 dark:border-amber-900/40",
+        dotStyle: "bg-amber-500",
         code: "waiting"
       }
     } else {
@@ -754,24 +754,24 @@ export default function RoomsPage() {
           </div>
 
           {/* Card 2: Vacant Rooms */}
-          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-slate-300 dark:hover:border-slate-800/80 transition-all group">
-            <div className="p-3 bg-slate-100 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 rounded-xl group-hover:scale-110 transition-transform">
+          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-red-200 dark:hover:border-red-900/40 transition-all group">
+            <div className="p-3 bg-red-500/10 text-red-500 rounded-xl group-hover:scale-110 transition-transform">
               <Home className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ห้องว่าง</span>
-              <span className="text-lg md:text-xl font-extrabold text-slate-850 dark:text-slate-100 mt-0.5 block">{loading ? "..." : vacantRoomsCount} ห้อง</span>
+              <span className="text-lg md:text-xl font-extrabold text-red-600 dark:text-red-400 mt-0.5 block">{loading ? "..." : vacantRoomsCount} ห้อง</span>
             </div>
           </div>
 
           {/* Card 3: Waiting for LINE Registration */}
-          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-blue-200 dark:hover:border-blue-900/40 transition-all group">
-            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:scale-110 transition-transform">
+          <div className="glass-panel p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex items-center gap-4 hover:border-amber-200 dark:hover:border-amber-900/40 transition-all group">
+            <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl group-hover:scale-110 transition-transform">
               <Users className="w-5 h-5 animate-pulse" />
             </div>
             <div className="min-w-0">
               <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ยังไม่ลงทะเบียนไลน์</span>
-              <span className="text-lg md:text-xl font-extrabold text-blue-600 dark:text-blue-400 mt-0.5 block">{loading ? "..." : waitingRoomsCount} ห้อง</span>
+              <span className="text-lg md:text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 block">{loading ? "..." : waitingRoomsCount} ห้อง</span>
             </div>
           </div>
 
