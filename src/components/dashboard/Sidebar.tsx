@@ -171,32 +171,41 @@ export default function Sidebar({
 
         {/* รายการเมนู */}
         <nav className="flex-1 space-y-1">
-          {filteredMenu.map((item) => {
-            const Icon = item.icon
-            const isActive = item.path !== "#profile" && pathname === item.path
-            return (
-              <button
-                key={item.path}
-                onClick={() => {
-                  if (item.onClick) {
-                    item.onClick()
-                  } else {
-                    safeNavigate(item.path)
-                  }
-                }}
-                onMouseEnter={() => handlePrefetchPage(item.path)}
-                onTouchStart={() => handlePrefetchPage(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left cursor-pointer ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
-                {item.name}
-              </button>
-            )
-          })}
+          {!isProfileLoaded && !isDemo ? (
+            <div className="space-y-2 px-1">
+              <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+              <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+              <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+              <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+            </div>
+          ) : (
+            filteredMenu.map((item) => {
+              const Icon = item.icon
+              const isActive = item.path !== "#profile" && pathname === item.path
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => {
+                    if (item.onClick) {
+                      item.onClick()
+                    } else {
+                      safeNavigate(item.path)
+                    }
+                  }}
+                  onMouseEnter={() => handlePrefetchPage(item.path)}
+                  onTouchStart={() => handlePrefetchPage(item.path)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left cursor-pointer ${
+                    isActive
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
+                  {item.name}
+                </button>
+              )
+            })
+          )}
         </nav>
 
         {/* ข้อมูลโปรไฟล์ด้านล่าง */}
@@ -338,33 +347,42 @@ export default function Sidebar({
             )}
 
             <nav className="flex-1 space-y-1">
-              {filteredMenu.map((item) => {
-                const Icon = item.icon
-                const isActive = item.path !== "#profile" && pathname === item.path
-                return (
-                  <button
-                    key={item.path}
-                    onClick={() => {
-                      if (item.onClick) {
-                        item.onClick()
-                      } else {
-                        safeNavigate(item.path)
-                      }
-                      setMobileOpen(false)
-                    }}
-                    onMouseEnter={() => handlePrefetchPage(item.path)}
-                    onTouchStart={() => handlePrefetchPage(item.path)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left cursor-pointer ${
-                      isActive
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {item.name}
-                  </button>
-                )
-              })}
+              {!isProfileLoaded && !isDemo ? (
+                <div className="space-y-2 px-1">
+                  <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+                  <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+                  <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+                  <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
+                </div>
+              ) : (
+                filteredMenu.map((item) => {
+                  const Icon = item.icon
+                  const isActive = item.path !== "#profile" && pathname === item.path
+                  return (
+                    <button
+                      key={item.path}
+                      onClick={() => {
+                        if (item.onClick) {
+                          item.onClick()
+                        } else {
+                          safeNavigate(item.path)
+                        }
+                        setMobileOpen(false)
+                      }}
+                      onMouseEnter={() => handlePrefetchPage(item.path)}
+                      onTouchStart={() => handlePrefetchPage(item.path)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left cursor-pointer ${
+                        isActive
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 hover:text-slate-900 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {item.name}
+                    </button>
+                  )
+                })
+              )}
             </nav>
 
             <div className="pt-6 border-t border-slate-200 dark:border-slate-900 space-y-4">

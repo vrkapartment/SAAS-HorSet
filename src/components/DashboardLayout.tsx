@@ -135,44 +135,87 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     handleExitSupport
   } = useSupportAccess(currentWorkspace, userRole, isDemo)
 
-  // โหลดสิทธิ์, Workspace, และสิทธิ์การเข้าดูแลระบบชั่วคราว
+  // โหลดสิทธิ์, ข้อมูลผู้ใช้, รายการ Workspace และสิทธิ์การช่วยเหลือระบบทั้งหมดในรอบเดียวเพื่อความเสถียรและเร็วสูงสุด
   useEffect(() => {
-    // 1. ดึงสิทธิ์ผู้ใช้จากคุกกี้
-    const mockRole = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("horset_user_role="))
-      ?.split("=")[1];
-    if (mockRole === "admin" || mockRole === "staff" || mockRole === "super_admin") {
-      setUserRole(mockRole as any);
-    }
+    const initUserData = async () => {
+      // 1. ตรวจสอบบทบาทเบื้องต้นจาก cookie ก่อนเพื่อให้ปรับ state ได้อย่างรวดเร็ว
+      const mockRole = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("horset_user_role="))
+        ?.split("=")[1];
+      
+      let initialRole = role
+      if (mockRole === "admin" || mockRole === "staff" || mockRole === "super_admin") {
+        initialRole = mockRole as any
+        setUserRole(initialRole)
+      }
 
-    // 2. โหลดรายการ Workspace และอันที่เลือกอยู่
-    const loadWorkspaceAndSupport = async () => {
       let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
-      let currentRole = mockRole || role
+      let currentRole = initialRole
       let profileWsId: string | null = null
 
       if (!isDemo) {
         try {
-          const profileRes = await getCurrentUserProfileClient()
-          if (profileRes.success && profileRes.data) {
-            profileWsId = profileRes.data.workspace_id || null
-            if (profileRes.data.role) {
-              currentRole = profileRes.data.role
-              setUserRole(profileRes.data.role as any)
+          const res = await getCurrentUserProfileClient()
+          if (res.success && res.data) {
+            const profileData = res.data
+            setFullName(profileData.full_name || profileData.email || "ผู้ดูแลระบบ")
+            setProfileName(profileData.full_name || "")
+            setProfilePhone(profileData.phone || "")
+            
+            if (profileData.role) {
+              currentRole = profileData.role
+              setUserRole(profileData.role as any)
+            }
+
+            profileWsId = profileData.workspace_id || null
+
+            // โหลดสิทธิ์การเข้าถึงแบบละเอียด (Permissions)
+            const isUserAdminOrSuper = profileData.role === "admin" || profileData.role === "super_admin"
+            const defaultPerms = isUserAdminOrSuper ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS
+
+            if (profileData.permissions) {
+              let perms = profileData.permissions
+              if (typeof perms === "string") {
+                try {
+                  perms = JSON.parse(perms)
+                } catch {
+                  perms = defaultPerms
+                }
+              }
+              setUserPermissions({
+                ...defaultPerms,
+                ...perms
+              })
+            } else {
+              setUserPermissions(defaultPerms)
             }
           }
-        } catch (e) {
-          console.error("Error loading user profile in DashboardLayout:", e)
+        } catch (err) {
+          console.error("Error loading user profile in DashboardLayout:", err)
+        } finally {
+          setIsProfileLoaded(true)
         }
+      } else {
+        // โหมด Demo
+        const savedName = getCookie(`horset_demo_profile_name_${currentRole}`)
+        const savedPhone = getCookie(`horset_demo_profile_phone_${currentRole}`)
+        
+        const defaultName = currentRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : currentRole === "admin" ? "คุณสมเจตน์" : "สมชาย"
+        const defaultPhone = "089-999-9999"
+
+        setFullName(savedName || defaultName)
+        setProfileName(savedName || defaultName)
+        setProfilePhone(savedPhone || defaultPhone)
+        setUserPermissions(currentRole === "super_admin" || currentRole === "admin" ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS)
+        setIsProfileLoaded(true)
       }
 
-      // ถ้าไม่ใช่ Super Admin และมี profileWsId ให้ใช้ของ Profile เสมอ
+      // 2. จัดการเรื่องคุกกี้ Workspace
       if (currentRole !== "super_admin" && profileWsId) {
         activeWsId = profileWsId
         setCookie("horset_current_workspace_id", activeWsId)
       } else {
-        // สำหรับ Super Admin หรือโหมด Demo ให้ใช้จากคุกกี้
         const savedWsId = getCookie("horset_current_workspace_id")
         if (savedWsId) {
           activeWsId = savedWsId
@@ -181,11 +224,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         }
       }
 
+      // 3. โหลด Workspaces และ Support Access Status
       if (!isDemo) {
         try {
           const supabase = createClient()
           
-          // ดึง Workspaces จริงจากตาราง
           const { data: wsData, error: wsError } = await supabase
             .from("workspaces")
             .select("id, name")
@@ -202,7 +245,6 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             }
           }
 
-          // ดึงสถานะ Support Access จาก Supabase
           const { data: grantData } = await supabase
             .from("support_access_grants")
             .select("status")
@@ -212,7 +254,6 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           if (grantData) {
             setSupportStatus(grantData.status)
             setCookie(`horset_support_status_${activeWsId}`, grantData.status)
-            // สำหรับสิทธิ์ Admin: ถ้าเป็น Pending ให้เด้ง Pop-up
             if (grantData.status === "pending" && currentRole === "admin") {
               setShowSupportModal(true)
             }
@@ -221,18 +262,18 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             setCookie(`horset_support_status_${activeWsId}`, "none")
           }
         } catch (err) {
-          console.error("Supabase load error, fallback to cookie/mock", err)
-          fallbackMock(activeWsId)
+          console.error("Supabase load error inside DashboardLayout init:", err)
+          fallbackMock(activeWsId, currentRole)
         } finally {
           setWorkspaceLoading(false)
         }
       } else {
-        fallbackMock(activeWsId)
+        fallbackMock(activeWsId, currentRole)
         setWorkspaceLoading(false)
       }
     }
 
-    const fallbackMock = (activeWsId: string) => {
+    const fallbackMock = (activeWsId: string, currentRole: string) => {
       const localWorkspaces = getCookie("horset_workspaces")
       const mockWs: Workspace[] = localWorkspaces
         ? JSON.parse(decodeURIComponent(localWorkspaces))
@@ -250,71 +291,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         setCookie("horset_current_workspace_id", mockWs[0].id)
       }
       
-      // ดึงสถานะ Support จาก cookie
       const savedStatus = getCookie(`horset_support_status_${activeWsId}`) || "none"
       setSupportStatus(savedStatus)
       
-      if (savedStatus === "pending" && (mockRole || role) === "admin") {
+      if (savedStatus === "pending" && currentRole === "admin") {
         setShowSupportModal(true)
       }
     }
 
-    loadWorkspaceAndSupport()
-  }, [userRole, isDemo])
-
-  // โหลดข้อมูลโปรไฟล์ของผู้ใช้เมื่อเปิดหน้าขึ้นมา
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      if (!isDemo) {
-        try {
-          const res = await getCurrentUserProfileClient()
-          if (res.success && res.data) {
-            setFullName(res.data.full_name || res.data.email || "ผู้ดูแลระบบ")
-            setProfileName(res.data.full_name || "")
-            setProfilePhone(res.data.phone || "")
-            
-            // โหลดสิทธิ์การเข้าถึงแบบละเอียด (Permissions)
-            const isUserAdminOrSuper = res.data.role === "admin" || res.data.role === "super_admin"
-            const defaultPerms = isUserAdminOrSuper ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS
-
-            if (res.data.permissions) {
-              let perms = res.data.permissions
-              if (typeof perms === "string") {
-                try {
-                  perms = JSON.parse(perms)
-                } catch {
-                  perms = defaultPerms
-                }
-              }
-              setUserPermissions({
-                ...defaultPerms,
-                ...perms
-              })
-            } else {
-              setUserPermissions(defaultPerms)
-            }
-          }
-        } catch (err) {
-          console.error("Error loading user profile:", err)
-        } finally {
-          setIsProfileLoaded(true)
-        }
-      } else {
-        const savedName = getCookie(`horset_demo_profile_name_${userRole}`)
-        const savedPhone = getCookie(`horset_demo_profile_phone_${userRole}`)
-        
-        const defaultName = userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย"
-        const defaultPhone = "089-999-9999"
-
-        setFullName(savedName || defaultName)
-        setProfileName(savedName || defaultName)
-        setProfilePhone(savedPhone || defaultPhone)
-        setUserPermissions(userRole === "super_admin" || userRole === "admin" ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS)
-        setIsProfileLoaded(true)
-      }
-    }
-    loadUserProfile()
-  }, [userRole, isDemo])
+    initUserData()
+  }, [])
 
 
 
