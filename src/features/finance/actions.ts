@@ -263,7 +263,9 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
             electric_min_unit: Number(settings.electric_min_unit),
             late_penalty_rate: Number(settings.late_penalty_rate || 0),
             deposit_amount: Number(settings.deposit_amount || 0),
-            advance_rent: Number(settings.advance_rent || 0)
+            advance_rent: Number(settings.advance_rent || 0),
+            lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
+            lease_expiry_action: settings.lease_expiry_action || "renew"
           })
           .eq("id", workspaceId)
 
