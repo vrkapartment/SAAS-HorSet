@@ -95,6 +95,9 @@ export default function MeterReadingTable({
               
               const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
               const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
+              const isSaveDisabled = item.tenantName
+                ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
+                : item.isMeterSaved
 
               return (
                 <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
@@ -110,12 +113,14 @@ export default function MeterReadingTable({
                           {item.roomNumber}
                         </span>
                         <span className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
+                          !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
                           item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border border-emerald-200") :
                           item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border border-amber-200 animate-pulse") :
                           item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border border-rose-200") :
                           (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-250")
                         }`}>
-                          {item.billStatus === "paid" ? "ชำระเงินแล้ว" :
+                          {!item.tenantName ? "ห้องว่าง" :
+                           item.billStatus === "paid" ? "ชำระเงินแล้ว" :
                            item.billStatus === "pending" ? "รอตรวจสลิป" :
                            item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
                         </span>
@@ -124,7 +129,7 @@ export default function MeterReadingTable({
                         {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                       </div>
                       <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                        ค่าเช่า {item.baseRent.toLocaleString()}.- | ส่วนกลาง {commonFee}.-
+                        {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.- | ส่วนกลาง ${commonFee}.-` : "ห้องว่าง"}
                       </div>
                     </div>
                     
@@ -132,9 +137,9 @@ export default function MeterReadingTable({
                     <div className="text-right">
                       <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมสุทธิ</div>
                       <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
-                        {calculatedAmount.toLocaleString()}.-
+                        {item.tenantName ? `${calculatedAmount.toLocaleString()}.-` : "-"}
                       </div>
-                      {isModified && (
+                      {item.tenantName && isModified && (
                         <span className={`inline-block text-[9px] bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1 ${
                           isDark ? "text-amber-400" : "text-amber-600"
                         }`}>
@@ -272,14 +277,14 @@ export default function MeterReadingTable({
                     {/* Save Button (Primary Action) */}
                     <button
                       onClick={() => handleSaveRow(item.roomNumber)}
-                      disabled={item.isMeterSaved && item.billStatus !== "not_created" && !isModified}
+                      disabled={isSaveDisabled}
                       className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        item.isMeterSaved && item.billStatus !== "not_created" && !isModified
+                        isSaveDisabled
                           ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                           : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
                       }`}
                     >
-                      <Save className="w-4 h-4" /> บันทึกและออกบิลห้อง {item.roomNumber}
+                      <Save className="w-4 h-4" /> {item.tenantName ? `บันทึกและออกบิลห้อง ${item.roomNumber}` : `บันทึกมิเตอร์ห้อง ${item.roomNumber}`}
                     </button>
 
                     {/* Sub/Secondary Actions Grid */}
@@ -402,6 +407,9 @@ export default function MeterReadingTable({
                   const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
 
                   const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
+                  const isSaveDisabled = item.tenantName
+                    ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
+                    : item.isMeterSaved
 
                   return (
                     <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
@@ -414,7 +422,7 @@ export default function MeterReadingTable({
                           {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                         </div>
                         <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          ค่าเช่า {item.baseRent.toLocaleString()}.- + ส่วนกลาง {commonFee}.-
+                          {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.- + ส่วนกลาง ${commonFee}.-` : "ห้องว่าง"}
                         </div>
                       </td>
                       
@@ -528,27 +536,37 @@ export default function MeterReadingTable({
 
                       {/* ยอดบิลรวม */}
                       <td className="py-4 text-right pr-4 font-mono">
-                        <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                          {calculatedAmount.toLocaleString()}.-
-                        </div>
-                        {isModified && (
-                          <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold ${
-                            isDark ? "text-amber-400" : "text-amber-600"
-                          }`}>
-                            ยอดเงินเปลี่ยน
-                          </span>
+                        {item.tenantName ? (
+                          <>
+                            <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                              {calculatedAmount.toLocaleString()}.-
+                            </div>
+                            {isModified && (
+                              <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold ${
+                                isDark ? "text-amber-400" : "text-amber-600"
+                              }`}>
+                                ยอดเงินเปลี่ยน
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <div className={`text-sm font-bold ${isDark ? "text-slate-600" : "text-slate-400"}`}>
+                            -
+                          </div>
                         )}
                       </td>
 
                       {/* สถานะบิล */}
                       <td className="py-4 text-center">
                         <span className={`inline-block text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                          !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
                           item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
                           item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
                           item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
                           (isDark ? "bg-slate-900 text-slate-400 border-slate-800" : "bg-slate-100 text-slate-500 border-slate-250")
                         }`}>
-                          {item.billStatus === "paid" ? "ชำระเงินแล้ว" :
+                          {!item.tenantName ? "ห้องว่าง" :
+                           item.billStatus === "paid" ? "ชำระเงินแล้ว" :
                            item.billStatus === "pending" ? "รอตรวจสลิป" :
                            item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
                         </span>
@@ -560,16 +578,16 @@ export default function MeterReadingTable({
                           {/* ปุ่มเซฟและออกบิล */}
                           <button
                             onClick={() => handleSaveRow(item.roomNumber)}
-                            disabled={item.isMeterSaved && item.billStatus !== "not_created" && !isModified}
+                            disabled={isSaveDisabled}
                             className={`p-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                              item.isMeterSaved && item.billStatus !== "not_created" && !isModified
+                              isSaveDisabled
                                 ? (isDark ? "border-slate-800/40 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                 : (isDark ? "border-teal-500/30 bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white hover:scale-105 shadow-sm" : "border-teal-250 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white hover:scale-105 shadow-sm")
                             }`}
-                            title="บันทึกมิเตอร์และออกบิล"
+                            title={item.tenantName ? "บันทึกมิเตอร์และออกบิล" : "บันทึกมิเตอร์"}
                           >
                             <Save className="w-3.5 h-3.5" />
-                            <span className="text-[10px]">บันทึกบิล</span>
+                            <span className="text-[10px]">{item.tenantName ? "บันทึกบิล" : "บันทึกมิเตอร์"}</span>
                           </button>
 
                           {/* ปุ่มตรวจสลิป กรณีชำระเงินเข้ามา */}
@@ -665,7 +683,7 @@ export default function MeterReadingTable({
               className="w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg shadow-teal-600/20 hover:shadow-teal-500/30 transition-all cursor-pointer active:scale-[0.98] border border-teal-500/30 animate-pulse hover:animate-none"
             >
               <Save className="w-5 h-5 md:w-4.5 md:h-4.5 text-teal-100" />
-              <span>บันทึกและออกบิลทุกห้อง ({unifiedItems.length} ห้อง)</span>
+              <span>บันทึกข้อมูลมิเตอร์ & ออกบิลทุกห้อง ({unifiedItems.length} ห้อง)</span>
             </button>
           </div>
         )}

@@ -292,8 +292,8 @@ export default function UnifiedBillingPage() {
         if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
       }
       
-      // โหมด Supabase ดั้งเดิมและถาวร
-      const activeRooms = rooms.filter((r: any) => r.status === "occupied" || dbBills.some((b: any) => b.roomNumber === r.roomNumber))
+      // โหมด Supabase ดั้งเดิมและถาวร (รวมทุกห้องแม้ไม่มีผู้เช่า)
+      const activeRooms = rooms
       const compiled = activeRooms.map((r: any) => {
         const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
         const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
@@ -586,7 +586,14 @@ export default function UnifiedBillingPage() {
         return
       }
 
-      // 2. สร้าง/อัปเดตบิลใน DB
+      // 2. สร้าง/อัปเดตบิลใน DB (เฉพาะกรณีมีผู้เช่าเท่านั้น)
+      if (!item.tenantName) {
+        showToast(`บันทึกข้อมูลมิเตอร์ห้อง ${roomNumber} สำเร็จ! (ไม่มีผู้เช่า จึงไม่ได้ออกบิล)`)
+        await loadData(billingCycle, true)
+        setSavingAll(false)
+        return
+      }
+
       const billRes = await createBill(
         roomNumber,
         item.tenantName || "ผู้เช่า",
@@ -677,7 +684,11 @@ export default function UnifiedBillingPage() {
           return
         }
 
-        // 2. บันทึกและออกบิล
+        // 2. บันทึกและออกบิล (เฉพาะกรณีมีผู้เช่าเท่านั้น)
+        if (!item.tenantName) {
+          continue
+        }
+
         const billRes = await createBill(
           item.roomNumber,
           item.tenantName || "ผู้เช่า",
@@ -694,7 +705,7 @@ export default function UnifiedBillingPage() {
         }
       }
 
-      showToast("บันทึกเลขมิเตอร์และคำนวณบิลให้ทุกห้องสำเร็จ!")
+      showToast("บันทึกข้อมูลมิเตอร์และคำนวณบิลสำเร็จเรียบร้อย!")
       await loadData(billingCycle, true)
     } catch (err) {
       console.error(err)
@@ -923,12 +934,12 @@ export default function UnifiedBillingPage() {
     setCreateBillModalOpen(false)
   }
 
-  // คำนวณสรุปสถิติด้านบนของแดชบอร์ด
+  // คำนวณสรุปสถิติด้านบนของแดชบอร์ด (ปรับเปลี่ยนให้เหมาะสมกับห้องว่าง/ไม่มีผู้เช่า)
   const totalOccupied = unifiedItems.length
-  const billedCount = unifiedItems.filter(item => item.billStatus !== "not_created").length
+  const billedCount = unifiedItems.filter(item => item.isMeterSaved).length
   const paidCount = unifiedItems.filter(item => item.billStatus === "paid").length
   const pendingCount = unifiedItems.filter(item => item.billStatus === "pending").length
-  const unpaidCount = unifiedItems.filter(item => item.billStatus === "unpaid" || item.billStatus === "not_created").length
+  const unpaidCount = unifiedItems.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length
 
   return (
     <>
