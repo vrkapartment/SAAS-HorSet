@@ -109,9 +109,9 @@ WHERE role IN ('admin', 'super_admin');`;
 
         setCurrentUser(profile)
         await loadStaffData()
-      } catch (err) {
+      } catch (err: any) {
         console.error("Initialization error:", err)
-        setError("ไม่สามารถโหลดสิทธิ์การเข้าใช้งานของคุณได้")
+        setError(`ไม่สามารถโหลดสิทธิ์การเข้าใช้งานของคุณได้: ${err?.message || String(err)}`)
         setLoading(false)
       }
     }
