@@ -499,9 +499,16 @@ export default function RoomsPage() {
     
     setCheckoutDate(new Date().toISOString().split("T")[0])
     
-    // คำนวณเงินประกันสะสมตามจำนวนเดือนดีฟอลต์ * ราคาค่าเช่าห้องพัก
-    const depositMonths = financeSettings?.deposit_amount || 0
-    const calculatedDeposit = selectedRoom.baseRent * depositMonths
+    // คำนวณเงินประกันสะสมตามโหมด: คิดตามจำนวนเดือน หรือ ยอดเงินคงที่
+    let calculatedDeposit = 0
+    if (financeSettings) {
+      if (financeSettings.deposit_type === "fixed") {
+        calculatedDeposit = financeSettings.deposit_amount || 0
+      } else {
+        const depositMonths = financeSettings.deposit_amount || 0
+        calculatedDeposit = selectedRoom.baseRent * depositMonths
+      }
+    }
     setCheckoutDeposit(calculatedDeposit)
     setCheckoutRefund(0)
     setCheckoutError(null)
@@ -1657,8 +1664,13 @@ export default function RoomsPage() {
                   <div className="flex justify-between py-2">
                     <span className="text-slate-400">เงินประกัน (มัดจำ):</span> 
                     <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
-                      {financeSettings ? `${financeSettings.deposit_amount || 0} เดือน` : "กำลังโหลด..."}{" "}
-                      {financeSettings && `(${((selectedRoom.baseRent || 0) * (financeSettings.deposit_amount || 0)).toLocaleString()} บาท)`}
+                      {financeSettings ? (
+                        financeSettings.deposit_type === "fixed" ? (
+                          `${(financeSettings.deposit_amount || 0).toLocaleString()} บาท (คงที่)`
+                        ) : (
+                          `${financeSettings.deposit_amount || 0} เดือน (${((selectedRoom.baseRent || 0) * (financeSettings.deposit_amount || 0)).toLocaleString()} บาท)`
+                        )
+                      ) : "กำลังโหลด..."}
                     </span>
                   </div>
                   <div className="flex justify-between py-2">

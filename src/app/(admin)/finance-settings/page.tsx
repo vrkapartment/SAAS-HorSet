@@ -181,6 +181,7 @@ export default function FinanceSettingsPage() {
   const [commonFee, setCommonFee] = useState<number>(50)
   const [latePenaltyRate, setLatePenaltyRate] = useState<number>(0)
   const [depositAmount, setDepositAmount] = useState<number>(0)
+  const [depositType, setDepositType] = useState<"months" | "fixed">("months")
   const [advanceRent, setAdvanceRent] = useState<number>(0)
 
   // สำหรับราคาหน่วย ค่าน้ำ ค่าไฟ และขั้นต่ำ
@@ -261,6 +262,7 @@ export default function FinanceSettingsPage() {
             setCommonFee(cached.common_fee !== undefined ? cached.common_fee : 50)
             setLatePenaltyRate(cached.late_penalty_rate !== undefined ? cached.late_penalty_rate : 0)
             setDepositAmount(cached.deposit_amount !== undefined ? cached.deposit_amount : 0)
+            setDepositType(cached.deposit_type || "months")
             setAdvanceRent(cached.advance_rent !== undefined ? cached.advance_rent : 0)
             setWaterRate(cached.water_rate !== undefined ? cached.water_rate : 18)
             setElectricRate(cached.electric_rate !== undefined ? cached.electric_rate : 7)
@@ -292,6 +294,7 @@ export default function FinanceSettingsPage() {
             setCommonFee(res.data.common_fee !== undefined ? res.data.common_fee : 50)
             setLatePenaltyRate(res.data.late_penalty_rate !== undefined ? res.data.late_penalty_rate : 0)
             setDepositAmount(res.data.deposit_amount !== undefined ? res.data.deposit_amount : 0)
+            setDepositType(res.data.deposit_type || "months")
             setAdvanceRent(res.data.advance_rent !== undefined ? res.data.advance_rent : 0)
             setWaterRate(res.data.water_rate !== undefined ? res.data.water_rate : 18)
             setElectricRate(res.data.electric_rate !== undefined ? res.data.electric_rate : 7)
@@ -360,6 +363,7 @@ export default function FinanceSettingsPage() {
         electric_min_checked: electricMinChecked,
         electric_min_unit: electricMinUnit,
         deposit_amount: depositAmount,
+        deposit_type: depositType,
         advance_rent: advanceRent
       }
 
@@ -635,23 +639,69 @@ export default function FinanceSettingsPage() {
               </h3>
 
               {/* เงินประกัน (เงินมัดจำ) */}
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 font-medium">เงินประกัน (เงินมัดจำ) (จำนวนเดือน)</label>
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="text-xs text-slate-400 font-medium">
+                    เงินประกัน (เงินมัดจำ) {depositType === "months" ? "(จำนวนเดือน)" : "(จำนวนเงินบาท)"}
+                  </label>
+                  
+                  {/* Toggle Mode */}
+                  <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850/80">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDepositType("months")
+                        if (depositAmount > 12) {
+                          setDepositAmount(1)
+                        }
+                      }}
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        depositType === "months"
+                          ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
+                          : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                      }`}
+                    >
+                      คิดตามจำนวนเดือน
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDepositType("fixed")
+                        if (depositAmount <= 12) {
+                          setDepositAmount(5000)
+                        }
+                      }}
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        depositType === "fixed"
+                          ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
+                          : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                      }`}
+                    >
+                      ระบุตัวเลขเงินคงที่
+                    </button>
+                  </div>
+                </div>
+
                 <div className="relative">
                   <input
                     type="number"
                     required
                     min={0}
-                    step={0.5}
+                    step={depositType === "months" ? 0.5 : 100}
                     placeholder="0"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(Number(e.target.value))}
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">เดือน</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">
+                    {depositType === "months" ? "เดือน" : "บาท"}
+                  </span>
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1 leading-normal">
-                  ระบุจำนวนเดือนของเงินประกัน (เช่น 2 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อพักยอดเงินประกันไว้ในสถานะหนี้สิน และคำนวณหักกลบลบด้วยยอดคืนเงินจริงเมื่อยกเลิกสัญญาเพื่อส่งเป็นรายได้ 40(8)
+                  {depositType === "months" 
+                    ? "ระบุจำนวนเดือนของเงินประกัน (เช่น 2 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อพักยอดเงินประกันไว้ในสถานะหนี้สิน และคำนวณหักกลบลบด้วยยอดคืนเงินจริงเมื่อยกเลิกสัญญาเพื่อส่งเป็นรายได้ 40(8)"
+                    : "ระบุจำนวนเงินประกันเป็นจำนวนเงินคงที่ (เช่น 5,000 บาท) ทุกๆ ห้องพักจะใช้ยอดเงินประกันเท่ากันนี้โดยตรง ไม่ขึ้นอยู่กับราคาค่าเช่าห้องพัก เพื่อพักยอดเงินประกันไว้และคำนวณคืนเงินจริงเมื่อยกเลิกสัญญา"
+                  }
                 </p>
               </div>
 

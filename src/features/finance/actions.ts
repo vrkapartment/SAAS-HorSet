@@ -22,6 +22,7 @@ export interface FinanceSettings {
   late_penalty_rate: number
   deposit_amount?: number
   advance_rent?: number
+  deposit_type?: "months" | "fixed"
 }
 
 /**
@@ -74,18 +75,33 @@ export async function getFinanceSettings(workspaceId: string) {
     // 4. ดึงข้อมูลเงินประกันและค่าเช่าล่วงหน้า (แยกการดึงเพื่อความปลอดภัย)
     let depositAmount = 0
     let advanceRent = 0
+    let depositType: "months" | "fixed" = "months"
     try {
       const { data: depData, error: depError } = await supabase
         .from("workspaces")
-        .select("deposit_amount, advance_rent")
+        .select("deposit_amount, advance_rent, deposit_type")
         .eq("id", workspaceId)
         .single()
       if (!depError && depData) {
         depositAmount = Number(depData.deposit_amount || 0)
         advanceRent = Number(depData.advance_rent || 0)
+        depositType = (depData.deposit_type as "months" | "fixed") || "months"
+      } else {
+        // หากมี error (เช่น คอลัมน์ deposit_type ยังไม่มี) ให้ลองดึงเฉพาะส่วนเงินประกันและค่าเช่าล่วงหน้า
+        const { data: depDataNoType, error: depErrorNoType } = await supabase
+          .from("workspaces")
+          .select("deposit_amount, advance_rent")
+          .eq("id", workspaceId)
+          .single()
+        if (!depErrorNoType && depDataNoType) {
+          depositAmount = Number(depDataNoType.deposit_amount || 0)
+          advanceRent = Number(depDataNoType.advance_rent || 0)
+          // Heuristics: ถ้าค่าเงินประกัน > 12 คาดการณ์ว่าเป็นแบบใส่ตัวเลขคงที่ (fixed)
+          depositType = depositAmount > 12 ? "fixed" : "months"
+        }
       }
     } catch (e) {
-      console.warn("Columns deposit_amount or advance_rent not available in workspaces. Defaulting to 0.")
+      console.warn("Columns deposit_amount, advance_rent, or deposit_type not available in workspaces. Defaulting.")
     }
 
     const merged = {
@@ -100,7 +116,8 @@ export async function getFinanceSettings(workspaceId: string) {
       }),
       late_penalty_rate: latePenaltyRate,
       deposit_amount: depositAmount,
-      advance_rent: advanceRent
+      advance_rent: advanceRent,
+      deposit_type: depositType
     }
 
     return { 
@@ -124,7 +141,8 @@ export async function getFinanceSettings(workspaceId: string) {
         electric_min_unit: Number(merged.electric_min_unit !== null && merged.electric_min_unit !== undefined ? merged.electric_min_unit : 10),
         late_penalty_rate: Number(merged.late_penalty_rate !== null && merged.late_penalty_rate !== undefined ? merged.late_penalty_rate : 0),
         deposit_amount: Number(merged.deposit_amount !== null && merged.deposit_amount !== undefined ? merged.deposit_amount : 0),
-        advance_rent: Number(merged.advance_rent !== null && merged.advance_rent !== undefined ? merged.advance_rent : 0)
+        advance_rent: Number(merged.advance_rent !== null && merged.advance_rent !== undefined ? merged.advance_rent : 0),
+        deposit_type: merged.deposit_type as "months" | "fixed"
       } as FinanceSettings 
     }
   } catch (error) {
@@ -185,7 +203,8 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         electric_min_unit: Number(settings.electric_min_unit),
         late_penalty_rate: Number(settings.late_penalty_rate || 0),
         deposit_amount: Number(settings.deposit_amount || 0),
-        advance_rent: Number(settings.advance_rent || 0)
+        advance_rent: Number(settings.advance_rent || 0),
+        deposit_type: settings.deposit_type || "months"
       })
       .eq("id", workspaceId)
 
@@ -195,7 +214,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         updateError.code === "42703"
 
       if (isMissingColumn) {
-        // หากคอลัมน์ deposit_amount หรืออื่นๆ ยังไม่ได้สร้าง ให้ลดรูปมาอัปเดตแบบไม่มีเงินมัดจำ/เช่าล่วงหน้า
+        // หากคอลัมน์ deposit_type หรือ deposit_amount ยังไม่มี ให้บันทึกแบบจำกัดเท่าที่มี
         const { error: lpMissingError } = await supabase
           .from("workspaces")
           .update({
@@ -214,12 +233,14 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
             water_min_unit: Number(settings.water_min_unit),
             electric_min_checked: Boolean(settings.electric_min_checked),
             electric_min_unit: Number(settings.electric_min_unit),
-            late_penalty_rate: Number(settings.late_penalty_rate || 0)
+            late_penalty_rate: Number(settings.late_penalty_rate || 0),
+            deposit_amount: Number(settings.deposit_amount || 0),
+            advance_rent: Number(settings.advance_rent || 0)
           })
           .eq("id", workspaceId)
 
         if (lpMissingError) {
-          // หากคอลัมน์ค่าน้ำค่าไฟก็ไม่มีอีก ให้บันทึกเฉพาะส่วนโครงสร้างหลักที่รับประกันว่ามีแน่นอน
+          // หากไม่มีคอลัมน์อื่นๆ อีก ให้ลดรูปบันทึกส่วนข้อมูลหลักที่รับประกันว่ามีแน่นอน
           const { error: coreUpdateError } = await supabase
             .from("workspaces")
             .update({
