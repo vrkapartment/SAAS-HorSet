@@ -532,13 +532,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   // เมนูนำทาง
   const menuItems = [
     {
-      name: t("nav.dashboard") || "แดชบอร์ดภาพรวม",
+      name: t("nav.dashboard") || "หน้าแรก ภาพรวมสถิติ",
       path: "/dashboard",
       icon: LayoutDashboard,
       roles: ["admin", "super_admin"]
     },
     {
-      name: t("nav.rooms") || "จัดการห้องพักและผู้เช่า",
+      name: t("nav.rooms") || "จัดการห้องพัก และผู้เช่า",
       path: "/rooms",
       icon: Home,
       roles: ["admin", "staff", "super_admin"]
@@ -550,7 +550,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "จัดการบิลรายจ่ายรายวัน",
+      name: "จัดการบิล รายจ่ายรายวัน",
       path: "/daily-bills",
       icon: Coins,
       roles: ["admin", "super_admin"]

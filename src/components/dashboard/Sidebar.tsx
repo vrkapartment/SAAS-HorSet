@@ -200,7 +200,7 @@ export default function Sidebar({
                   }`}
                 >
                   <Icon className={`w-4 h-4 transition-transform duration-300 shrink-0 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
-                  <span className="truncate whitespace-nowrap flex-1">{item.name}</span>
+                  <span className="flex-1 [word-break:keep-all]">{item.name}</span>
                 </button>
               )
             })
@@ -383,7 +383,7 @@ export default function Sidebar({
                       }`}
                     >
                       <Icon className={`w-4 h-4 transition-transform duration-300 shrink-0 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
-                      <span className="truncate whitespace-nowrap flex-1">{item.name}</span>
+                      <span className="flex-1 [word-break:keep-all]">{item.name}</span>
                     </button>
                   )
                 })
