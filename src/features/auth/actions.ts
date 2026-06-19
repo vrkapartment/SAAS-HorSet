@@ -133,10 +133,10 @@ export async function getCurrentUserProfileAction() {
 
     return {
       success: true,
-      data: {
+      data: JSON.parse(JSON.stringify({
         ...profile,
         workspace_created_at: workspaceCreatedAt || profile.created_at
-      }
+      }))
     }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาด" }

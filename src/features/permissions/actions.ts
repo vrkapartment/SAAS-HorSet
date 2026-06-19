@@ -149,7 +149,7 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
       }
     })
 
-    return { success: true, data: sanitizedStaffs }
+    return { success: true, data: JSON.parse(JSON.stringify(sanitizedStaffs)) }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการโหลดข้อมูล Staff" }
   }
