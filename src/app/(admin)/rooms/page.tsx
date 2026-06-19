@@ -864,7 +864,7 @@ export default function RoomsPage() {
                       <th className="p-4">ประเภทห้อง</th>
                       <th className="p-4">ผู้เช่าสัญญา</th>
                       <th className="p-4">เบอร์โทรศัพท์</th>
-                      <th className="p-4 text-center w-52">การดำเนินการ</th>
+                      <th className="p-4 text-center w-[270px]">การดำเนินการ</th>
                       <th className="p-4 text-center w-24">ตั้งค่าห้อง</th>
                     </tr>
                   </thead>
@@ -923,12 +923,12 @@ export default function RoomsPage() {
 
                             {/* 7. Action Button column (Status-dependent) */}
                             <td className="p-4 text-center">
-                              <div className="flex flex-col items-center justify-center gap-1.5 w-[145px] mx-auto">
+                              <div className="flex items-center justify-center gap-2 max-w-[260px] mx-auto">
                                 {/* VACANT: Generate LINE Link */}
                                 {!room.tenantName && (
                                   <button
                                     onClick={() => handleOpenLineLinkModal(room)}
-                                    className="w-full h-8 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                    className="w-[145px] h-8 text-[11px] font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-lg hover:-translate-y-0.5 transition-all shadow-sm hover:shadow-[#06C755]/15 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                   >
                                     <Share2 className="w-3.5 h-3.5 shrink-0" />
                                     เจนลิงก์ LINE
@@ -940,14 +940,14 @@ export default function RoomsPage() {
                                   <>
                                     <button
                                       onClick={() => handleOpenLineLinkModal(room)}
-                                      className="w-full h-8 text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/40 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                      className="w-[115px] h-8 text-[11px] font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                     >
                                       <Share2 className="w-3.5 h-3.5 shrink-0" />
                                       เจนลิงก์ LINE
                                     </button>
                                     <button
                                       onClick={() => handleOpenDetailModal(room)}
-                                      className="w-full h-8 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/40 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                      className="w-[125px] h-8 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                     >
                                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                       ดูรายละเอียด/ย้ายออก
@@ -959,7 +959,7 @@ export default function RoomsPage() {
                                 {room.tenantName && room.lineUserId && (
                                   <button
                                     onClick={() => handleOpenDetailModal(room)}
-                                    className="w-full h-8 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/40 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                    className="w-[145px] h-8 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm hover:shadow-teal-600/10 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                   >
                                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                     ดูรายละเอียด/ย้ายออก
@@ -1078,7 +1078,7 @@ export default function RoomsPage() {
                             {!room.tenantName && (
                               <button
                                 onClick={() => handleOpenLineLinkModal(room)}
-                                className="flex-1 py-3 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                className="flex-1 py-3 px-4 text-xs font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
                               >
                                 <Share2 className="w-4 h-4 shrink-0" />
                                 เจนลิงก์ LINE
@@ -1090,14 +1090,14 @@ export default function RoomsPage() {
                               <>
                                 <button
                                   onClick={() => handleOpenLineLinkModal(room)}
-                                  className="flex-1 py-3 px-4 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/40 hover:bg-blue-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                  className="flex-1 py-3 px-4 text-xs font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
                                 >
                                   <Share2 className="w-4 h-4 shrink-0" />
                                   เจนลิงก์ LINE
                                 </button>
                                 <button
                                   onClick={() => handleOpenDetailModal(room)}
-                                  className="flex-1 py-3 px-4 text-xs font-bold text-teal-600 dark:text-teal-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 hover:bg-emerald-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                  className="flex-1 py-3 px-4 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
                                 >
                                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                                   ดูรายละเอียด/ย้ายออก
@@ -1109,7 +1109,7 @@ export default function RoomsPage() {
                             {room.tenantName && room.lineUserId && (
                               <button
                                 onClick={() => handleOpenDetailModal(room)}
-                                className="flex-1 py-3 px-4 text-xs font-bold text-teal-600 dark:text-teal-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 hover:bg-emerald-100 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                className="flex-1 py-3 px-4 text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
                               >
                                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                                 ดูรายละเอียด/ย้ายออก
