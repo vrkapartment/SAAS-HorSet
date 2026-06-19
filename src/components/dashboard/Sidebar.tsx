@@ -67,15 +67,15 @@ export default function Sidebar({
     <>
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
       <aside className="hidden md:flex flex-col w-64 h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0">
-        <div className="flex items-center gap-3 mb-8 px-1">
-          <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-md shadow-blue-500/20 animate-pulse-subtle">
+        <div className="flex items-center gap-3 mb-8 px-1 min-w-0">
+          <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-md shadow-blue-500/20 animate-pulse-subtle shrink-0">
             <Building className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h2 className="text-lg font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
               {t("common.app_name") || "HorSet หอเสร็จ"}
             </h2>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-wide">{t("dashboard.system_subtitle")}</p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-wide truncate whitespace-nowrap">{t("dashboard.system_subtitle")}</p>
           </div>
         </div>
 
@@ -107,7 +107,7 @@ export default function Sidebar({
                   <button
                     key={ws.id}
                     onClick={() => handleSwitchWorkspace(ws)}
-                    className={`w-full text-left text-xs py-2 px-3 rounded-lg transition-colors cursor-pointer ${
+                    className={`w-full text-left text-xs py-2 px-3 rounded-lg transition-colors cursor-pointer truncate whitespace-nowrap ${
                       currentWorkspace.id === ws.id
                         ? "bg-blue-600 text-white font-bold"
                         : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-200"
@@ -158,10 +158,10 @@ export default function Sidebar({
               {supportStatus === "approved" && (
                 <button
                   onClick={handleExitSupport}
-                  className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-[10px] transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                  className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-[10px] transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
                 >
-                  <span>ออกจาก Workspace นี้</span>
-                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="truncate whitespace-nowrap mr-2">ออกจาก Workspace นี้</span>
+                  <LogOut className="w-3.5 h-3.5 shrink-0" />
                 </button>
               )}
             </div>
@@ -193,14 +193,14 @@ export default function Sidebar({
                   }}
                   onMouseEnter={() => handlePrefetchPage(item.path)}
                   onTouchStart={() => handlePrefetchPage(item.path)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-left cursor-pointer ${
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-left cursor-pointer min-w-0 ${
                     isActive
                       ? "bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-600 dark:to-indigo-500 text-white shadow-lg shadow-blue-500/20 translate-x-1.5 scale-[1.01]"
                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-900/40 hover:text-blue-600 dark:hover:text-blue-400 hover:translate-x-1.5"
                   }`}
                 >
-                  <Icon className={`w-4 h-4 transition-transform duration-300 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
-                  <span>{item.name}</span>
+                  <Icon className={`w-4 h-4 transition-transform duration-300 shrink-0 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
+                  <span className="truncate whitespace-nowrap flex-1">{item.name}</span>
                 </button>
               )
             })
@@ -209,20 +209,20 @@ export default function Sidebar({
 
         {/* ข้อมูลโปรไฟล์ด้านล่าง */}
         <div className="pt-5 border-t border-slate-200/60 dark:border-slate-800/60 space-y-4">
-          <div className="bg-slate-100/40 dark:bg-slate-900/20 border border-slate-200/40 dark:border-slate-800/30 rounded-2xl p-3 shadow-inner">
-            <div className="flex items-center gap-3">
+          <div className="bg-slate-100/40 dark:bg-slate-900/20 border border-slate-200/40 dark:border-slate-800/30 rounded-2xl p-3 shadow-inner min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full bg-slate-200/50 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-sm shrink-0">
                 <User className="w-5 h-5 text-slate-600 dark:text-slate-300" />
               </div>
               <div className="min-w-0 flex-1">
-                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate flex items-center min-h-[16px]" title={fullName}>
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 min-h-[16px] truncate whitespace-nowrap" title={fullName}>
                   {!isProfileLoaded && !isDemo ? (
                     <span className="inline-block bg-slate-200 dark:bg-slate-800 rounded w-16 h-3 animate-pulse" />
                   ) : (
                     fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
                   )}
                 </h4>
-                <span className={`inline-block text-[9px] px-2.5 py-0.5 rounded-full font-bold mt-1.5 ${
+                <span className={`inline-block text-[9px] px-2.5 py-0.5 rounded-full font-bold mt-1.5 truncate whitespace-nowrap max-w-full ${
                   userRole === "super_admin"
                     ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
                     : userRole === "admin"
@@ -237,10 +237,10 @@ export default function Sidebar({
 
           <button
             onClick={handleLogout}
-            className="w-full bg-red-500/5 dark:bg-red-500/10 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 border border-red-500/10 hover:border-red-600 rounded-xl py-2.5 px-4 font-bold flex items-center justify-center gap-2.5 shadow-sm hover:shadow-md hover:shadow-red-500/15 hover:-translate-y-0.5 transition-all duration-300 text-red-500 dark:text-red-400 cursor-pointer"
+            className="w-full bg-red-500/5 dark:bg-red-500/10 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 border border-red-500/10 hover:border-red-600 rounded-xl py-2.5 px-4 font-bold flex items-center justify-center gap-2.5 shadow-sm hover:shadow-md hover:shadow-red-500/15 hover:-translate-y-0.5 transition-all duration-300 text-red-500 dark:text-red-400 cursor-pointer min-w-0"
           >
-            <LogOut className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-            <span>{t("common.logout") || "ออกจากระบบ"}</span>
+            <LogOut className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 shrink-0" />
+            <span className="truncate whitespace-nowrap">{t("common.logout") || "ออกจากระบบ"}</span>
           </button>
         </div>
       </aside>
@@ -250,16 +250,18 @@ export default function Sidebar({
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <aside className="relative flex flex-col w-64 glass-panel h-full p-6 animate-slide-right">
-            <div className="flex items-center justify-between mb-8 px-1">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg shadow-md shadow-blue-500/15">
+            <div className="flex items-center justify-between mb-8 px-1 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg shadow-md shadow-blue-500/15 shrink-0">
                   <Building className="w-4.5 h-4.5 text-white" />
                 </div>
-                <h2 className="text-md font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                  {t("common.app_name") || "HorSet หอเสร็จ"}
-                </h2>
+                <div className="min-w-0">
+                  <h2 className="text-md font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
+                    {t("common.app_name") || "HorSet หอเสร็จ"}
+                  </h2>
+                </div>
               </div>
-              <button onClick={() => setMobileOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer">
+              <button onClick={() => setMobileOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -290,7 +292,7 @@ export default function Sidebar({
                       <button
                         key={ws.id}
                         onClick={() => handleSwitchWorkspace(ws)}
-                        className={`w-full text-left text-xs py-2 px-3 rounded-lg transition-colors cursor-pointer ${
+                        className={`w-full text-left text-xs py-2 px-3 rounded-lg transition-colors cursor-pointer truncate whitespace-nowrap ${
                           currentWorkspace.id === ws.id ? "bg-blue-600 text-white font-bold" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
                         }`}
                       >
@@ -339,10 +341,10 @@ export default function Sidebar({
                   {supportStatus === "approved" && (
                     <button
                       onClick={handleExitSupport}
-                      className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-[10px] transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                      className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-[10px] transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
                     >
-                      <span>ออกจาก Workspace นี้</span>
-                      <LogOut className="w-3.5 h-3.5" />
+                      <span className="truncate whitespace-nowrap mr-2">ออกจาก Workspace นี้</span>
+                      <LogOut className="w-3.5 h-3.5 shrink-0" />
                     </button>
                   )}
                 </div>
@@ -374,14 +376,14 @@ export default function Sidebar({
                       }}
                       onMouseEnter={() => handlePrefetchPage(item.path)}
                       onTouchStart={() => handlePrefetchPage(item.path)}
-                      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-left cursor-pointer ${
+                      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-left cursor-pointer min-w-0 ${
                         isActive
                           ? "bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-600 dark:to-indigo-500 text-white shadow-lg shadow-blue-500/20 translate-x-1.5 scale-[1.01]"
                           : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-900/40 hover:text-blue-600 dark:hover:text-blue-400 hover:translate-x-1.5"
                       }`}
                     >
-                      <Icon className={`w-4 h-4 transition-transform duration-300 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
-                      <span>{item.name}</span>
+                      <Icon className={`w-4 h-4 transition-transform duration-300 shrink-0 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
+                      <span className="truncate whitespace-nowrap flex-1">{item.name}</span>
                     </button>
                   )
                 })
@@ -389,20 +391,20 @@ export default function Sidebar({
             </nav>
 
             <div className="pt-5 border-t border-slate-200/60 dark:border-slate-800/60 space-y-4">
-              <div className="bg-slate-100/40 dark:bg-slate-900/20 border border-slate-200/40 dark:border-slate-800/30 rounded-2xl p-3 shadow-inner">
-                <div className="flex items-center gap-3">
+              <div className="bg-slate-100/40 dark:bg-slate-900/20 border border-slate-200/40 dark:border-slate-800/30 rounded-2xl p-3 shadow-inner min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-slate-200/50 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-sm shrink-0">
                     <User className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate flex items-center min-h-[16px]" title={fullName}>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 min-h-[16px] truncate whitespace-nowrap" title={fullName}>
                       {!isProfileLoaded && !isDemo ? (
                         <span className="inline-block bg-slate-200 dark:bg-slate-800 rounded w-16 h-3 animate-pulse" />
                       ) : (
                         fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
                       )}
                     </h4>
-                    <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold mt-1 ${
+                    <span className={`inline-block text-[9px] px-2.5 py-0.5 rounded-full font-bold mt-1 truncate whitespace-nowrap max-w-full ${
                       userRole === "super_admin"
                         ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
                         : userRole === "admin"
@@ -416,10 +418,10 @@ export default function Sidebar({
               </div>
               <button
                 onClick={handleLogout}
-                className="w-full bg-red-500/5 dark:bg-red-500/10 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 border border-red-500/10 hover:border-red-600 rounded-xl py-2.5 px-4 font-bold flex items-center justify-center gap-2.5 shadow-sm hover:shadow-md hover:shadow-red-500/15 hover:-translate-y-0.5 transition-all duration-300 text-red-500 dark:text-red-400 cursor-pointer"
+                className="w-full bg-red-500/5 dark:bg-red-500/10 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 border border-red-500/10 hover:border-red-600 rounded-xl py-2.5 px-4 font-bold flex items-center justify-center gap-2.5 shadow-sm hover:shadow-md hover:shadow-red-500/15 hover:-translate-y-0.5 transition-all duration-300 text-red-500 dark:text-red-400 cursor-pointer min-w-0"
               >
-                <LogOut className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                <span>{t("common.logout") || "ออกจากระบบ"}</span>
+                <LogOut className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 shrink-0" />
+                <span className="truncate whitespace-nowrap">{t("common.logout") || "ออกจากระบบ"}</span>
               </button>
             </div>
           </aside>
