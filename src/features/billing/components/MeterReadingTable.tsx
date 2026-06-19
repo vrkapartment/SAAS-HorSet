@@ -1,5 +1,5 @@
-import React from "react"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles } from "lucide-react"
+import React, { useState } from "react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, LayoutGrid } from "lucide-react"
 
 interface MeterReadingTableProps {
   isDark: boolean
@@ -52,6 +52,9 @@ export default function MeterReadingTable({
   handleMarkAsPaid,
   handleSaveAll
 }: MeterReadingTableProps) {
+  const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">("all")
+  const colSpanVal = activeTab === "all" ? 11 : 8
+
   return (
     <>
       {/* แจ้งเตือน */}
@@ -65,11 +68,68 @@ export default function MeterReadingTable({
       </div>
 
       {/* ตารางควบคุมหลัก */}
-      <div className={`p-0 md:p-5 bg-transparent md:rounded-2xl md:shadow-sm ${
+      <div className={`p-4 md:p-5 bg-transparent md:rounded-2xl md:shadow-sm ${
         isDark 
           ? "md:bg-slate-900/30 md:border md:border-slate-800/80" 
           : "md:bg-white md:border md:border-slate-200"
       }`}>
+        {/* แถบแยกมิเตอร์ (Tabs) เพื่อความสะดวกในการจดบันทึก */}
+        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+          <div className={`flex p-1 rounded-xl transition-all shadow-inner ${
+            isDark ? "bg-slate-950/60 border border-slate-900/50" : "bg-slate-100 border border-slate-200"
+          }`}>
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "all"
+                  ? (isDark ? "bg-slate-900 text-teal-400 border border-slate-800/45 shadow-sm" : "bg-white text-slate-800 border border-slate-200 shadow-sm")
+                  : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>ทั้งหมด & จัดการบิล</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("electric")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "electric"
+                  ? (isDark ? "bg-blue-950/30 text-blue-450 border border-blue-500/20 shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm")
+                  : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-blue-500" />
+              <span>จดเฉพาะมิเตอร์ไฟ</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("water")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "water"
+                  ? (isDark ? "bg-teal-950/30 text-teal-450 border border-teal-500/20 shadow-sm" : "bg-teal-50 text-teal-700 border border-teal-200 shadow-sm")
+                  : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+              }`}
+            >
+              <Droplet className="w-3.5 h-3.5 text-teal-500" />
+              <span>จดเฉพาะมิเตอร์น้ำ</span>
+            </button>
+          </div>
+          
+          <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-semibold border ${
+            isDark ? "bg-slate-900/30 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+              activeTab === "all" ? "bg-teal-500" : activeTab === "electric" ? "bg-blue-500" : "bg-teal-500"
+            }`}></span>
+            <span>โหมดจดบันทึก: </span>
+            <strong className={
+              activeTab === "all" ? "text-slate-700 dark:text-slate-300" : 
+              activeTab === "electric" ? "text-blue-600 dark:text-blue-400" : "text-teal-600 dark:text-teal-400"
+            }>
+              {activeTab === "all" ? "มิเตอร์ทั้งหมด" : 
+               activeTab === "electric" ? "มิเตอร์ไฟฟ้าเท่านั้น" : "มิเตอร์น้ำอย่างเดียว"}
+            </strong>
+          </div>
+        </div>
+
         {/* Mobile View: Card List (< 768px) */}
         <div className="block md:hidden space-y-4">
           {loading ? (
@@ -152,124 +212,128 @@ export default function MeterReadingTable({
                   <div className={`h-px ${isDark ? "bg-slate-900/60" : "bg-slate-200"}`} />
 
                   {/* Meter Inputs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className={`grid grid-cols-1 gap-4 ${activeTab === "all" ? "sm:grid-cols-2" : ""}`}>
                     {/* Electricity Meter Card Section */}
-                    <div className={`rounded-xl p-3 border space-y-3 ${
-                      isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/50 border-blue-100"
-                    }`}>
-                      <div className="flex justify-between items-center gap-2">
-                        <span className={`text-xs font-bold flex items-center gap-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                          <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
-                        </span>
-                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>ก่อนหน้า:</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="กรอก"
-                              className={`w-16 h-6.5 text-center border rounded font-mono text-[10px] font-bold focus:outline-none focus:border-blue-500 transition-all ${
-                                isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
-                              }`}
-                              value={item.elecPrev}
-                              onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
-                            />
-                          </div>
-                        ) : (
-                          <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
-                            isDark ? "bg-slate-950 border-slate-900 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
-                          }`}>
-                            ก่อนหน้า: <strong className={isDark ? "text-slate-200" : "text-slate-800"}>{item.elecPrev}</strong>
+                    {(activeTab === "all" || activeTab === "electric") && (
+                      <div className={`rounded-xl p-3 border space-y-3 ${
+                        isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/50 border-blue-100"
+                      }`}>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className={`text-xs font-bold flex items-center gap-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                            <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
                           </span>
-                        )}
-                      </div>
-                      
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="จดเลขมิเตอร์ไฟฟ้า..."
-                          className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 ${
-                            isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
-                          }`}
-                          value={item.elecCurr}
-                          onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
-                        />
-                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
-                          kWh
-                        </span>
-                      </div>
+                          {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>ก่อนหน้า:</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="กรอก"
+                                className={`w-16 h-6.5 text-center border rounded font-mono text-[10px] font-bold focus:outline-none focus:border-blue-500 transition-all ${
+                                  isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+                                }`}
+                                value={item.elecPrev}
+                                onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
+                              />
+                            </div>
+                          ) : (
+                            <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                              isDark ? "bg-slate-950 border-slate-900 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                            }`}>
+                              ก่อนหน้า: <strong className={isDark ? "text-slate-200" : "text-slate-800"}>{item.elecPrev}</strong>
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="จดเลขมิเตอร์ไฟฟ้า..."
+                            className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 ${
+                              isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
+                            }`}
+                            value={item.elecCurr}
+                            onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
+                          />
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
+                            kWh
+                          </span>
+                        </div>
 
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500 dark:text-slate-400">หน่วยไฟที่ใช้:</span>
-                        <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
-                          {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
-                        </span>
+                        <div className="flex justify-between text-xs font-mono">
+                          <span className="text-slate-500 dark:text-slate-400">หน่วยไฟที่ใช้:</span>
+                          <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
+                            {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs font-mono">
+                          <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            {hasElecCurr && elecUnitsUsed >= 0 
+                              ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                              : "-"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">
-                          {hasElecCurr && elecUnitsUsed >= 0 
-                            ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
-                            : "-"}
-                        </span>
-                      </div>
-                    </div>
+                    )}
 
                     {/* Water Meter Card Section */}
-                    <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3 border border-teal-100 dark:border-teal-500/10 space-y-3">
-                      <div className="flex justify-between items-center gap-2">
-                        <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
-                          <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
-                        </span>
-                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">ก่อนหน้า:</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="กรอก"
-                              className="w-16 h-6.5 text-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-slate-800 dark:text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
-                              value={item.waterPrev}
-                              onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-900">
-                            ก่อนหน้า: <strong className="text-slate-800 dark:text-slate-200">{item.waterPrev}</strong>
+                    {(activeTab === "all" || activeTab === "water") && (
+                      <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3 border border-teal-100 dark:border-teal-500/10 space-y-3">
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
+                            <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
                           </span>
-                        )}
-                      </div>
-                      
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="จดเลขมิเตอร์น้ำประปา..."
-                          className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                          value={item.waterCurr}
-                          onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
-                        />
-                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
-                          m³
-                        </span>
-                      </div>
+                          {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">ก่อนหน้า:</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="กรอก"
+                                className="w-16 h-6.5 text-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-slate-800 dark:text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
+                                value={item.waterPrev}
+                                onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-900">
+                              ก่อนหน้า: <strong className="text-slate-800 dark:text-slate-200">{item.waterPrev}</strong>
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="จดเลขมิเตอร์น้ำประปา..."
+                            className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                            value={item.waterCurr}
+                            onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
+                          />
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
+                            m³
+                          </span>
+                        </div>
 
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500 dark:text-slate-400">หน่วยน้ำที่ใช้:</span>
-                        <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
-                          {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
-                        </span>
+                        <div className="flex justify-between text-xs font-mono">
+                          <span className="text-slate-500 dark:text-slate-400">หน่วยน้ำที่ใช้:</span>
+                          <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
+                            {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs font-mono">
+                          <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            {hasWaterCurr && waterUnitsUsed >= 0 
+                              ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                              : "-"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-xs font-mono">
-                        <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">
-                          {hasWaterCurr && waterUnitsUsed >= 0 
-                            ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
-                            : "-"}
-                        </span>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Action Buttons Section */}
@@ -365,14 +429,22 @@ export default function MeterReadingTable({
                 <th className="pb-3 w-40">ผู้เช่า / ค่าเช่า</th>
                 
                 {/* กลุ่มไฟฟ้า */}
-                <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 rounded-t-xl w-32 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">ไฟก่อนหน้า</th>
-                <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 w-36 text-blue-600 dark:text-blue-400 font-bold">ไฟรอบนี้</th>
-                <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">หน่วย/ยอด</th>
+                {(activeTab === "all" || activeTab === "electric") && (
+                  <>
+                    <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 rounded-t-xl w-32 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">ไฟก่อนหน้า</th>
+                    <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 w-36 text-blue-600 dark:text-blue-400 font-bold">ไฟรอบนี้</th>
+                    <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">หน่วย/ยอด</th>
+                  </>
+                )}
                 
                 {/* กลุ่มน้ำ */}
-                <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 rounded-t-xl w-32 text-teal-600 dark:text-teal-400 font-bold font-bold">น้ำก่อนหน้า</th>
-                <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-36 text-teal-600 dark:text-teal-400 font-bold font-bold font-bold">น้ำรอบนี้</th>
-                <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">หน่วย/ยอด</th>
+                {(activeTab === "all" || activeTab === "water") && (
+                  <>
+                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 rounded-t-xl w-32 text-teal-600 dark:text-teal-400 font-bold">น้ำก่อนหน้า</th>
+                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-36 text-teal-600 dark:text-teal-400 font-bold font-bold">น้ำรอบนี้</th>
+                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">หน่วย/ยอด</th>
+                  </>
+                )}
                 
                 <th className="pb-3 text-right pr-4 w-32">ยอดรวมบิล</th>
                 <th className="pb-3 text-center w-28">สถานะ</th>
@@ -382,7 +454,7 @@ export default function MeterReadingTable({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-500">
+                  <td colSpan={colSpanVal} className="py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
                       <span>กำลังโหลดข้อมูลรวม...</span>
@@ -426,113 +498,123 @@ export default function MeterReadingTable({
                         </div>
                       </td>
                       
-                      {/* ไฟฟ้า - ก่อนหน้า */}
-                      <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-2">
-                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="กรอกเลข"
-                            className={`w-20 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold ${
-                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                            }`}
-                            value={item.elecPrev}
-                            onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
-                          />
-                        ) : (
-                          <span className={`font-mono font-semibold px-2.5 py-1 rounded-lg border ${
-                            isDark ? "text-slate-400 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-100 border-slate-200"
-                          }`}>
-                            {item.elecPrev}
-                          </span>
-                        )}
-                      </td>
+                      {/* ไฟฟ้า */}
+                      {(activeTab === "all" || activeTab === "electric") && (
+                        <>
+                          {/* ไฟฟ้า - ก่อนหน้า */}
+                          <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-2">
+                            {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="กรอกเลข"
+                                className={`w-20 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold ${
+                                  isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                }`}
+                                value={item.elecPrev}
+                                onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
+                              />
+                            ) : (
+                              <span className={`font-mono font-semibold px-2.5 py-1 rounded-lg border ${
+                                isDark ? "text-slate-400 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-100 border-slate-200"
+                              }`}>
+                                {item.elecPrev}
+                              </span>
+                            )}
+                          </td>
 
-                      {/* ไฟฟ้า - อินพุตปัจจุบัน */}
-                      <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 px-2">
-                        <div className="relative inline-block">
-                          <input
-                            type="text"
-                            placeholder="กรอกเลข"
-                            className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold ${
-                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                            }`}
-                            value={item.elecCurr}
-                            onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
-                          />
-                          <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold pointer-events-none ${
-                            isDark ? "text-slate-600" : "text-slate-400"
-                          }`}>
-                            kWh
-                          </span>
-                        </div>
-                      </td>
+                          {/* ไฟฟ้า - อินพุตปัจจุบัน */}
+                          <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 px-2">
+                            <div className="relative inline-block">
+                              <input
+                                type="text"
+                                placeholder="กรอกเลข"
+                                className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold ${
+                                  isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                }`}
+                                value={item.elecCurr}
+                                onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
+                              />
+                              <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold pointer-events-none ${
+                                isDark ? "text-slate-600" : "text-slate-400"
+                              }`}>
+                                kWh
+                              </span>
+                            </div>
+                          </td>
 
-                      {/* ไฟฟ้า - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
-                      <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
-                        <div className={`font-black text-xs ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
-                          {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
-                        </div>
-                        <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                          {hasElecCurr && elecUnitsUsed >= 0 
-                            ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
-                            : "-"}
-                        </div>
-                      </td>
+                          {/* ไฟฟ้า - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
+                          <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
+                            <div className={`font-black text-xs ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
+                              {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                            </div>
+                            <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
+                              {hasElecCurr && elecUnitsUsed >= 0 
+                                ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                : "-"}
+                            </div>
+                          </td>
+                        </>
+                      )}
 
-                      {/* น้ำประปา - ก่อนหน้า */}
-                      <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 px-2">
-                        {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="กรอกเลข"
-                            className={`w-20 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
-                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                            }`}
-                            value={item.waterPrev}
-                            onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
-                          />
-                        ) : (
-                          <span className={`font-mono font-semibold px-2.5 py-1 rounded-lg border ${
-                            isDark ? "text-slate-400 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-100 border-slate-200"
-                          }`}>
-                            {item.waterPrev}
-                          </span>
-                        )}
-                      </td>
+                      {/* น้ำประปา */}
+                      {(activeTab === "all" || activeTab === "water") && (
+                        <>
+                          {/* น้ำประปา - ก่อนหน้า */}
+                          <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 px-2">
+                            {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="กรอกเลข"
+                                className={`w-20 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                                  isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                }`}
+                                value={item.waterPrev}
+                                onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
+                              />
+                            ) : (
+                              <span className={`font-mono font-semibold px-2.5 py-1 rounded-lg border ${
+                                isDark ? "text-slate-400 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-100 border-slate-200"
+                              }`}>
+                                {item.waterPrev}
+                              </span>
+                            )}
+                          </td>
 
-                      {/* น้ำประปา - อินพุตปัจจุบัน */}
-                      <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 px-2">
-                        <div className="relative inline-block">
-                          <input
-                            type="text"
-                            placeholder="กรอกเลข"
-                            className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
-                              isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                            }`}
-                            value={item.waterCurr}
-                            onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
-                          />
-                          <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold pointer-events-none ${
-                            isDark ? "text-slate-600" : "text-slate-400"
-                          }`}>
-                            m³
-                          </span>
-                        </div>
-                      </td>
+                          {/* น้ำประปา - อินพุตปัจจุบัน */}
+                          <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 px-2">
+                            <div className="relative inline-block">
+                              <input
+                                type="text"
+                                placeholder="กรอกเลข"
+                                className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                                  isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                }`}
+                                value={item.waterCurr}
+                                onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
+                              />
+                              <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold pointer-events-none ${
+                                isDark ? "text-slate-600" : "text-slate-400"
+                              }`}>
+                                m³
+                              </span>
+                            </div>
+                          </td>
 
-                      {/* น้ำประปา - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
-                      <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
-                        <div className={`font-black text-xs ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
-                          {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
-                        </div>
-                        <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                          {hasWaterCurr && waterUnitsUsed >= 0 
-                            ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
-                            : "-"}
-                        </div>
-                      </td>
+                          {/* น้ำประปา - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
+                          <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
+                            <div className={`font-black text-xs ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
+                              {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                            </div>
+                            <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
+                              {hasWaterCurr && waterUnitsUsed >= 0 
+                                ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                : "-"}
+                            </div>
+                          </td>
+                        </>
+                      )}
 
                       {/* ยอดบิลรวม */}
                       <td className="py-4 text-right pr-4 font-mono">
@@ -666,7 +748,7 @@ export default function MeterReadingTable({
                 })
               ) : (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-500">
+                  <td colSpan={colSpanVal} className="py-12 text-center text-slate-500">
                     ไม่มีรายการห้องพักที่ใช้งานหรือจ้างเช่าอยู่ในขณะนี้
                   </td>
                 </tr>
