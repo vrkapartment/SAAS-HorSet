@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, LayoutGrid } from "lucide-react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText } from "lucide-react"
 
 interface MeterReadingTableProps {
   isDark: boolean
@@ -53,7 +53,7 @@ export default function MeterReadingTable({
   handleSaveAll
 }: MeterReadingTableProps) {
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">("all")
-  const colSpanVal = activeTab === "all" ? 11 : 8
+  const colSpanVal = activeTab === "all" ? 7 : 6
 
   return (
     <>
@@ -64,7 +64,7 @@ export default function MeterReadingTable({
           : "bg-blue-50/60 border-blue-100 text-blue-700"
       }`}>
         <Sparkles className={`w-4 h-4 shrink-0 ${isDark ? "text-blue-400" : "text-blue-500"}`} />
-        <span>ระบบจำลองการประมวลผลดึงค่ามิเตอร์ครั้งก่อนหน้าและราคาค่าเช่าอิงตาม Room Type โดยอัตโนมัติ กรอกเพียงเลขมิเตอร์ปัจจุบันเพื่อสร้างบิล</span>
+        <span>ระบบจดบันทึกแบ่งตามหมวดหมู่เพื่อความสะดวกในการทำงาน แถบจัดการบิลใช้สำหรับส่งบิล ตรวจสลิป และรับเงินเท่านั้น หากต้องการจดบันทึกให้ไปที่แถบ มิเตอร์ไฟ หรือ มิเตอร์น้ำ</span>
       </div>
 
       {/* ตารางควบคุมหลัก */}
@@ -73,43 +73,43 @@ export default function MeterReadingTable({
           ? "md:bg-slate-900/30 md:border md:border-slate-800/80" 
           : "md:bg-white md:border md:border-slate-200"
       }`}>
-        {/* แถบแยกมิเตอร์ (Tabs) เพื่อความสะดวกในการจดบันทึก */}
+        {/* แถบควบคุมหลัก (Tabs) */}
         <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
           <div className={`flex p-1 rounded-xl transition-all shadow-inner ${
             isDark ? "bg-slate-950/60 border border-slate-900/50" : "bg-slate-100 border border-slate-200"
           }`}>
             <button
               onClick={() => setActiveTab("all")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === "all"
                   ? (isDark ? "bg-slate-900 text-teal-400 border border-slate-800/45 shadow-sm" : "bg-white text-slate-800 border border-slate-200 shadow-sm")
-                  : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+                  : (isDark ? "text-slate-500 hover:text-slate-450" : "text-slate-500 hover:text-slate-700")
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>ทั้งหมด & จัดการบิล</span>
+              <FileText className="w-3.5 h-3.5 text-teal-500" />
+              <span>จัดการบิล</span>
             </button>
             <button
               onClick={() => setActiveTab("electric")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === "electric"
-                  ? (isDark ? "bg-blue-950/30 text-blue-450 border border-blue-500/20 shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm")
-                  : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+                  ? (isDark ? "bg-blue-950/30 text-blue-400 border border-blue-500/20 shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm")
+                  : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
               }`}
             >
               <Zap className="w-3.5 h-3.5 text-blue-500" />
-              <span>จดเฉพาะมิเตอร์ไฟ</span>
+              <span>มิเตอร์ไฟ</span>
             </button>
             <button
               onClick={() => setActiveTab("water")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === "water"
-                  ? (isDark ? "bg-teal-950/30 text-teal-450 border border-teal-500/20 shadow-sm" : "bg-teal-50 text-teal-700 border border-teal-200 shadow-sm")
-                  : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+                  ? (isDark ? "bg-teal-950/30 text-teal-405 border border-teal-500/20 shadow-sm" : "bg-teal-50 text-teal-700 border border-teal-200 shadow-sm")
+                  : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
               }`}
             >
               <Droplet className="w-3.5 h-3.5 text-teal-500" />
-              <span>จดเฉพาะมิเตอร์น้ำ</span>
+              <span>มิเตอร์น้ำ</span>
             </button>
           </div>
           
@@ -119,13 +119,13 @@ export default function MeterReadingTable({
             <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
               activeTab === "all" ? "bg-teal-500" : activeTab === "electric" ? "bg-blue-500" : "bg-teal-500"
             }`}></span>
-            <span>โหมดจดบันทึก: </span>
+            <span>โหมดการทำงาน: </span>
             <strong className={
               activeTab === "all" ? "text-slate-700 dark:text-slate-300" : 
               activeTab === "electric" ? "text-blue-600 dark:text-blue-400" : "text-teal-600 dark:text-teal-400"
             }>
-              {activeTab === "all" ? "มิเตอร์ทั้งหมด" : 
-               activeTab === "electric" ? "มิเตอร์ไฟฟ้าเท่านั้น" : "มิเตอร์น้ำอย่างเดียว"}
+              {activeTab === "all" ? "จัดการบิลค่าเช่า (ดูเท่านั้น)" : 
+               activeTab === "electric" ? "จดบันทึกมิเตอร์ไฟ" : "จดบันทึกมิเตอร์น้ำ"}
             </strong>
           </div>
         </div>
@@ -172,50 +172,98 @@ export default function MeterReadingTable({
                         }`}>
                           {item.roomNumber}
                         </span>
-                        <span className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-                          !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
-                          item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border border-emerald-200") :
-                          item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border border-amber-200 animate-pulse") :
-                          item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border border-rose-200") :
-                          (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-250")
-                        }`}>
-                          {!item.tenantName ? "ห้องว่าง" :
-                           item.billStatus === "paid" ? "ชำระเงินแล้ว" :
-                           item.billStatus === "pending" ? "รอตรวจสลิป" :
-                           item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
-                        </span>
+                        {activeTab === "all" && (
+                          <span className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
+                            !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
+                            item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border border-emerald-200") :
+                            item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
+                            item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
+                            (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-250")
+                          }`}>
+                            {!item.tenantName ? "ห้องว่าง" :
+                             item.billStatus === "paid" ? "ชำระเงินแล้ว" :
+                             item.billStatus === "pending" ? "รอตรวจสลิป" :
+                             item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
+                          </span>
+                        )}
                       </div>
                       <div className={`font-bold mt-2 ${isDark ? "text-slate-300" : "text-slate-800"}`}>
                         {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                       </div>
-                      <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                        {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.- | ส่วนกลาง ${commonFee}.-` : "ห้องว่าง"}
-                      </div>
-                    </div>
-                    
-                    {/* Total Display */}
-                    <div className="text-right">
-                      <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมสุทธิ</div>
-                      <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
-                        {item.tenantName ? `${calculatedAmount.toLocaleString()}.-` : "-"}
-                      </div>
-                      {item.tenantName && isModified && (
-                        <span className={`inline-block text-[9px] bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1 ${
-                          isDark ? "text-amber-400" : "text-amber-600"
-                        }`}>
-                          ยอดเงินเปลี่ยน
-                        </span>
+                      {activeTab === "all" && (
+                        <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                          {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.- | ส่วนกลาง ${commonFee}.-` : "ห้องว่าง"}
+                        </div>
                       )}
                     </div>
+                    
+                    {/* Total Display (Only in Manage Bills Tab) */}
+                    {activeTab === "all" && (
+                      <div className="text-right">
+                        <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมสุทธิ</div>
+                        <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
+                          {item.tenantName ? `${calculatedAmount.toLocaleString()}.-` : "-"}
+                        </div>
+                        {item.tenantName && isModified && (
+                          <span className={`inline-block text-[9px] bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1 ${
+                            isDark ? "text-amber-400" : "text-amber-600"
+                          }`}>
+                            ยอดเงินเปลี่ยน
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className={`h-px ${isDark ? "bg-slate-900/60" : "bg-slate-200"}`} />
 
-                  {/* Meter Inputs */}
-                  <div className={`grid grid-cols-1 gap-4 ${activeTab === "all" ? "sm:grid-cols-2" : ""}`}>
-                    {/* Electricity Meter Card Section */}
-                    {(activeTab === "all" || activeTab === "electric") && (
-                      <div className={`rounded-xl p-3 border space-y-3 ${
+                  {/* 1. แถบจัดการบิล (อ่านอย่างเดียว ไม่มีแบบกรอก ไม่มีปุ่มเซฟ) */}
+                  {activeTab === "all" && (
+                    <div className="grid grid-cols-2 gap-3.5">
+                      {/* ไฟฟ้า Read-only */}
+                      <div className={`rounded-xl p-3 border ${
+                        isDark ? "bg-blue-950/15 border-blue-900/40" : "bg-blue-50/30 border-blue-100"
+                      }`}>
+                        <div className={`text-xs font-bold flex items-center gap-1 mb-1.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                          <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
+                        </div>
+                        <div className="font-mono text-xs">
+                          <span className="text-slate-400">ก่อน: {item.elecPrev}</span>
+                          <span className="mx-1 text-slate-400">➔</span>
+                          <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.elecCurr || "-"}</span>
+                        </div>
+                        {hasElecCurr && (
+                          <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                            {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* น้ำประปา Read-only */}
+                      <div className={`rounded-xl p-3 border ${
+                        isDark ? "bg-teal-950/15 border-teal-900/40" : "bg-teal-50/30 border-teal-100"
+                      }`}>
+                        <div className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 mb-1.5">
+                          <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
+                        </div>
+                        <div className="font-mono text-xs">
+                          <span className="text-slate-400">ก่อน: {item.waterPrev}</span>
+                          <span className="mx-1 text-slate-400">➔</span>
+                          <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.waterCurr || "-"}</span>
+                        </div>
+                        {hasWaterCurr && (
+                          <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
+                            {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. แถบมิเตอร์ไฟ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์ไฟ) */}
+                  {activeTab === "electric" && (
+                    <div className="space-y-3">
+                      <div className={`rounded-xl p-3.5 border space-y-3 ${
                         isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/50 border-blue-100"
                       }`}>
                         <div className="flex justify-between items-center gap-2">
@@ -276,11 +324,25 @@ export default function MeterReadingTable({
                           </span>
                         </div>
                       </div>
-                    )}
 
-                    {/* Water Meter Card Section */}
-                    {(activeTab === "all" || activeTab === "water") && (
-                      <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3 border border-teal-100 dark:border-teal-500/10 space-y-3">
+                      <button
+                        onClick={() => handleSaveRow(item.roomNumber)}
+                        disabled={isSaveDisabled}
+                        className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                          isSaveDisabled
+                            ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
+                        }`}
+                      >
+                        <Save className="w-4 h-4" /> บันทึกมิเตอร์ไฟห้อง {item.roomNumber}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 3. แถบมิเตอร์น้ำ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์น้ำ) */}
+                  {activeTab === "water" && (
+                    <div className="space-y-3">
+                      <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3.5 border border-teal-100 dark:border-teal-500/10 space-y-3">
                         <div className="flex justify-between items-center gap-2">
                           <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
                             <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
@@ -333,83 +395,83 @@ export default function MeterReadingTable({
                           </span>
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Action Buttons Section */}
-                  <div className="pt-2 space-y-2">
-                    {/* Save Button (Primary Action) */}
-                    <button
-                      onClick={() => handleSaveRow(item.roomNumber)}
-                      disabled={isSaveDisabled}
-                      className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        isSaveDisabled
-                          ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                          : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
-                      }`}
-                    >
-                      <Save className="w-4 h-4" /> {item.tenantName ? `บันทึกและออกบิลห้อง ${item.roomNumber}` : `บันทึกมิเตอร์ห้อง ${item.roomNumber}`}
-                    </button>
-
-                    {/* Sub/Secondary Actions Grid */}
-                    {item.billStatus === "pending" ? (
                       <button
-                        onClick={() => {
-                          setSelectedBill(item)
-                          setSlipModalOpen(true)
-                        }}
-                        className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/10 cursor-pointer"
+                        onClick={() => handleSaveRow(item.roomNumber)}
+                        disabled={isSaveDisabled}
+                        className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                          isSaveDisabled
+                            ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                            : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
+                        }`}
                       >
-                        <Eye className="w-4 h-4" /> ตรวจสอบสลิปโอนเงิน
+                        <Save className="w-4 h-4" /> บันทึกมิเตอร์น้ำห้อง {item.roomNumber}
                       </button>
-                    ) : item.billStatus !== "not_created" ? (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-2">
-                          {/* Download PDF */}
-                          <button
-                            onClick={() => handleDownloadBillPdf(item)}
-                            disabled={downloadingPdfId !== null}
-                            className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                          >
-                            {downloadingPdfId === item.roomNumber ? (
-                              <div className="w-4 h-4 border border-slate-400 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <>
-                                <Download className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                                <span>ดาวน์โหลด PDF</span>
-                              </>
-                            )}
-                          </button>
+                    </div>
+                  )}
 
-                          {/* Send Line OA */}
-                          <button
-                            onClick={() => handleSendLine(item.roomNumber)}
-                            className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                          >
-                            <Send className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                            <span>ส่ง LINE OA</span>
-                          </button>
+                  {/* Action Buttons Section (เฉพาะแถบจัดการบิลเท่านั้น) */}
+                  {activeTab === "all" && item.billStatus !== "not_created" && (
+                    <div className="pt-2 space-y-2">
+                      {item.billStatus === "pending" ? (
+                        <button
+                          onClick={() => {
+                            setSelectedBill(item)
+                            setSlipModalOpen(true)
+                          }}
+                          className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/10 cursor-pointer"
+                        >
+                          <Eye className="w-4 h-4" /> ตรวจสอบสลิปโอนเงิน
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            {/* ดาวน์โหลด PDF */}
+                            <button
+                              onClick={() => handleDownloadBillPdf(item)}
+                              disabled={downloadingPdfId !== null}
+                              className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                            >
+                              {downloadingPdfId === item.roomNumber ? (
+                                <div className="w-4 h-4 border border-slate-400 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <Download className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                                  <span>ดาวน์โหลด PDF</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* ส่ง LINE OA */}
+                            <button
+                              onClick={() => handleSendLine(item.roomNumber)}
+                              className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                            >
+                              <Send className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                              <span>ส่ง LINE OA</span>
+                            </button>
+                          </div>
+
+                          {/* บันทึกชำระเงินค้างชำระ */}
+                          {item.billStatus === "unpaid" && (
+                            <button
+                              onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
+                              disabled={currentUserRole === "staff"}
+                              className={`w-full h-12 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
+                                currentUserRole === "staff"
+                                  ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-400 dark:text-slate-600"
+                                  : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer"
+                              }`}
+                              title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด / บันทึกชำระเงินตรง"}
+                            >
+                              <CheckCircle className={`w-4 h-4 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
+                              <span>รับเงินสด / บันทึกชำระเงินตรง</span>
+                            </button>
+                          )}
                         </div>
-
-                        {/* If unpaid, direct payment record (Cash/Manual) */}
-                        {item.billStatus === "unpaid" && (
-                          <button
-                            onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                            disabled={currentUserRole === "staff"}
-                            className={`w-full h-12 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
-                              currentUserRole === "staff"
-                                ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-400 dark:text-slate-600"
-                                : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer"
-                            }`}
-                            title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด / บันทึกชำระเงินตรง"}
-                          >
-                            <CheckCircle className={`w-4 h-4 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
-                            <span>รับเงินสด / บันทึกชำระเงินตรง</span>
-                          </button>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -428,27 +490,36 @@ export default function MeterReadingTable({
                 <th className="pb-3 pl-3 w-16">ห้อง</th>
                 <th className="pb-3 w-40">ผู้เช่า / ค่าเช่า</th>
                 
-                {/* กลุ่มไฟฟ้า */}
-                {(activeTab === "all" || activeTab === "electric") && (
+                {/* 1. แถบจัดการบิล */}
+                {activeTab === "all" && (
+                  <>
+                    <th className="pb-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า (kWh)</th>
+                    <th className="pb-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ (m³)</th>
+                    <th className="pb-3 text-right pr-4 w-32">ยอดรวมบิล</th>
+                    <th className="pb-3 text-center w-28">สถานะ</th>
+                    <th className="pb-3 text-center w-52 pr-2">การจัดการบิล</th>
+                  </>
+                )}
+
+                {/* 2. แถบมิเตอร์ไฟ */}
+                {activeTab === "electric" && (
                   <>
                     <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 rounded-t-xl w-32 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">ไฟก่อนหน้า</th>
                     <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 w-36 text-blue-600 dark:text-blue-400 font-bold">ไฟรอบนี้</th>
-                    <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">หน่วย/ยอด</th>
+                    <th className="pb-3 text-center bg-blue-50/60 dark:bg-blue-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">หน่วย/ยอดไฟ</th>
+                    <th className="pb-3 text-center w-40 pr-2">บันทึกข้อมูล</th>
                   </>
                 )}
-                
-                {/* กลุ่มน้ำ */}
-                {(activeTab === "all" || activeTab === "water") && (
+
+                {/* 3. แถบมิเตอร์น้ำ */}
+                {activeTab === "water" && (
                   <>
-                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 rounded-t-xl w-32 text-teal-600 dark:text-teal-400 font-bold">น้ำก่อนหน้า</th>
-                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-36 text-teal-600 dark:text-teal-400 font-bold font-bold">น้ำรอบนี้</th>
-                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">หน่วย/ยอด</th>
+                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 rounded-t-xl w-32 border-l border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">น้ำก่อนหน้า</th>
+                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-36 text-teal-600 dark:text-teal-400 font-bold">น้ำรอบนี้</th>
+                    <th className="pb-3 text-center bg-teal-50/60 dark:bg-teal-500/5 w-28 rounded-t-xl border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">หน่วย/ยอดน้ำ</th>
+                    <th className="pb-3 text-center w-40 pr-2">บันทึกข้อมูล</th>
                   </>
                 )}
-                
-                <th className="pb-3 text-right pr-4 w-32">ยอดรวมบิล</th>
-                <th className="pb-3 text-center w-28">สถานะ</th>
-                <th className="pb-3 text-center w-40 pr-2">การจัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -475,7 +546,6 @@ export default function MeterReadingTable({
                     ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
                   
-                  // คำนวณยอดเงินเรียลไทม์
                   const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
 
                   const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
@@ -494,14 +564,177 @@ export default function MeterReadingTable({
                           {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                         </div>
                         <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.- + ส่วนกลาง ${commonFee}.-` : "ห้องว่าง"}
+                          {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.-` : "ห้องว่าง"}
                         </div>
                       </td>
-                      
-                      {/* ไฟฟ้า */}
-                      {(activeTab === "all" || activeTab === "electric") && (
+
+                      {/* --- 1. แถบจัดการบิล (อ่านอย่างเดียว) --- */}
+                      {activeTab === "all" && (
                         <>
-                          {/* ไฟฟ้า - ก่อนหน้า */}
+                          {/* มิเตอร์ไฟฟ้า (kWh) - อ่านอย่างเดียว */}
+                          <td className="py-4 text-center bg-blue-50/10 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-3">
+                            <div className="font-mono text-xs font-semibold">
+                              <span className={isDark ? "text-slate-400" : "text-slate-500"}>{item.elecPrev}</span>
+                              <span className="mx-1.5 text-slate-400">➔</span>
+                              <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{item.elecCurr || "-"}</span>
+                            </div>
+                            <div className="mt-1">
+                              {hasElecCurr ? (
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  elecUnitsUsed < 0 
+                                    ? "bg-rose-500/10 text-rose-500" 
+                                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                }`}>
+                                  {elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">รอจดในแถบไฟ</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* มิเตอร์น้ำ (m³) - อ่านอย่างเดียว */}
+                          <td className="py-4 text-center bg-teal-50/10 dark:bg-teal-500/5 border-l border-r border-slate-200 dark:border-slate-800/40 px-3">
+                            <div className="font-mono text-xs font-semibold">
+                              <span className={isDark ? "text-slate-400" : "text-slate-500"}>{item.waterPrev}</span>
+                              <span className="mx-1.5 text-slate-400">➔</span>
+                              <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{item.waterCurr || "-"}</span>
+                            </div>
+                            <div className="mt-1">
+                              {hasWaterCurr ? (
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  waterUnitsUsed < 0 
+                                    ? "bg-rose-500/10 text-rose-500" 
+                                    : "bg-teal-500/10 text-teal-600 dark:text-teal-400"
+                                }`}>
+                                  {waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">รอจดในแถบน้ำ</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* ยอดบิลรวม */}
+                          <td className="py-4 text-right pr-4 font-mono">
+                            {item.tenantName ? (
+                              <>
+                                <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                                  {calculatedAmount.toLocaleString()}.-
+                                </div>
+                                {isModified && (
+                                  <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold ${
+                                    isDark ? "text-amber-400" : "text-amber-600"
+                                  }`}>
+                                    ยอดเงินเปลี่ยน
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <div className={`text-sm font-bold ${isDark ? "text-slate-600" : "text-slate-400"}`}>
+                                -
+                              </div>
+                            )}
+                          </td>
+
+                          {/* สถานะบิล */}
+                          <td className="py-4 text-center">
+                            <span className={`inline-block text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                              !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
+                              item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
+                              item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
+                              item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
+                              (isDark ? "bg-slate-900 text-slate-400 border-slate-800" : "bg-slate-100 text-slate-500 border-slate-250")
+                            }`}>
+                              {!item.tenantName ? "ห้องว่าง" :
+                               item.billStatus === "paid" ? "ชำระเงินแล้ว" :
+                               item.billStatus === "pending" ? "รอตรวจสลิป" :
+                               item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
+                            </span>
+                          </td>
+
+                          {/* แถบการจัดการบิล */}
+                          <td className="py-4 text-center pr-2">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {item.billStatus === "pending" ? (
+                                <button
+                                  onClick={() => {
+                                    setSelectedBill(item)
+                                    setSlipModalOpen(true)
+                                  }}
+                                  className={`p-1.5 rounded-xl border transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer ${
+                                    isDark ? "bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500 hover:text-white" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-500 hover:text-white"
+                                  }`}
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span className="text-[10px]">ตรวจสลิป</span>
+                                </button>
+                              ) : item.billStatus !== "not_created" ? (
+                                <>
+                                  {/* ดาวน์โหลด PDF */}
+                                  <button
+                                    onClick={() => handleDownloadBillPdf(item)}
+                                    disabled={downloadingPdfId !== null}
+                                    className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
+                                      isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-500/40"
+                                    }`}
+                                    title="ดาวน์โหลดบิล PDF"
+                                  >
+                                    {downloadingPdfId === item.roomNumber ? (
+                                      <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <Download className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+
+                                  {/* ส่ง LINE OA */}
+                                  <button
+                                    onClick={() => handleSendLine(item.roomNumber)}
+                                    className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
+                                      isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-teal-400 hover:border-teal-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-teal-600 hover:border-teal-500/40"
+                                    }`}
+                                    title="ส่งเข้า LINE OA"
+                                  >
+                                    <Send className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* บันทึกชำระเงินค้างชำระ */}
+                                  {item.billStatus === "unpaid" && (
+                                    <button
+                                      onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
+                                      disabled={currentUserRole === "staff"}
+                                      className={`p-1.5 border rounded-xl transition-all flex items-center gap-1 shadow-sm ${
+                                        currentUserRole === "staff"
+                                          ? "opacity-40 cursor-not-allowed"
+                                          : "hover:scale-105 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
+                                      } ${
+                                        isDark ? "bg-slate-900 border-slate-800 text-slate-500" : "bg-white border-slate-200 text-slate-400"
+                                      }`}
+                                      title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด/บันทึกชำระเงินตรง"}
+                                    >
+                                      <CheckCircle className={`w-3.5 h-3.5 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
+                                      <span className={`text-[10px] hidden xl:inline font-bold ${
+                                        currentUserRole === "staff"
+                                          ? "text-slate-400 dark:text-slate-600"
+                                          : isDark ? "text-slate-400 hover:text-emerald-300" : "text-slate-500 hover:text-emerald-600"
+                                      }`}>
+                                        รับเงินแล้ว
+                                      </span>
+                                    </button>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">ยังไม่ออกบิล</span>
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      )}
+
+                      {/* --- 2. แถบมิเตอร์ไฟ --- */}
+                      {activeTab === "electric" && (
+                        <>
+                          {/* ไฟก่อนหน้า */}
                           <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-2">
                             {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
                               <input
@@ -523,7 +756,7 @@ export default function MeterReadingTable({
                             )}
                           </td>
 
-                          {/* ไฟฟ้า - อินพุตปัจจุบัน */}
+                          {/* ไฟรอบนี้ (Input) */}
                           <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 px-2">
                             <div className="relative inline-block">
                               <input
@@ -543,7 +776,7 @@ export default function MeterReadingTable({
                             </div>
                           </td>
 
-                          {/* ไฟฟ้า - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
+                          {/* หน่วย / ยอดไฟ */}
                           <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
                             <div className={`font-black text-xs ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
                               {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
@@ -554,14 +787,30 @@ export default function MeterReadingTable({
                                 : "-"}
                             </div>
                           </td>
+
+                          {/* บันทึก */}
+                          <td className="py-4 text-center pr-2">
+                            <button
+                              onClick={() => handleSaveRow(item.roomNumber)}
+                              disabled={isSaveDisabled}
+                              className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
+                                isSaveDisabled
+                                  ? (isDark ? "border-slate-800 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
+                                  : (isDark ? "border-blue-500/30 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white hover:scale-105 shadow-sm" : "border-blue-200 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white hover:scale-105 shadow-sm")
+                              }`}
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                              <span>บันทึกมิเตอร์ไฟ</span>
+                            </button>
+                          </td>
                         </>
                       )}
 
-                      {/* น้ำประปา */}
-                      {(activeTab === "all" || activeTab === "water") && (
+                      {/* --- 3. แถบมิเตอร์น้ำ --- */}
+                      {activeTab === "water" && (
                         <>
-                          {/* น้ำประปา - ก่อนหน้า */}
-                          <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 px-2">
+                          {/* น้ำก่อนหน้า */}
+                          <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 border-l border-slate-200 dark:border-slate-800/40 px-2">
                             {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
                               <input
                                 type="text"
@@ -582,7 +831,7 @@ export default function MeterReadingTable({
                             )}
                           </td>
 
-                          {/* น้ำประปา - อินพุตปัจจุบัน */}
+                          {/* น้ำรอบนี้ (Input) */}
                           <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 px-2">
                             <div className="relative inline-block">
                               <input
@@ -602,7 +851,7 @@ export default function MeterReadingTable({
                             </div>
                           </td>
 
-                          {/* น้ำประปา - สรุปหน่วยที่ใช้ / ค่าใช้จ่าย */}
+                          {/* หน่วย / ยอดน้ำ */}
                           <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
                             <div className={`font-black text-xs ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
                               {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
@@ -613,136 +862,24 @@ export default function MeterReadingTable({
                                 : "-"}
                             </div>
                           </td>
-                        </>
-                      )}
 
-                      {/* ยอดบิลรวม */}
-                      <td className="py-4 text-right pr-4 font-mono">
-                        {item.tenantName ? (
-                          <>
-                            <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                              {calculatedAmount.toLocaleString()}.-
-                            </div>
-                            {isModified && (
-                              <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold ${
-                                isDark ? "text-amber-400" : "text-amber-600"
-                              }`}>
-                                ยอดเงินเปลี่ยน
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <div className={`text-sm font-bold ${isDark ? "text-slate-600" : "text-slate-400"}`}>
-                            -
-                          </div>
-                        )}
-                      </td>
-
-                      {/* สถานะบิล */}
-                      <td className="py-4 text-center">
-                        <span className={`inline-block text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-                          !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
-                          item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
-                          item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
-                          item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
-                          (isDark ? "bg-slate-900 text-slate-400 border-slate-800" : "bg-slate-100 text-slate-500 border-slate-250")
-                        }`}>
-                          {!item.tenantName ? "ห้องว่าง" :
-                           item.billStatus === "paid" ? "ชำระเงินแล้ว" :
-                           item.billStatus === "pending" ? "รอตรวจสลิป" :
-                           item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
-                        </span>
-                      </td>
-
-                      {/* แถบการจัดการบิล */}
-                      <td className="py-4 text-center pr-2">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {/* ปุ่มเซฟและออกบิล */}
-                          <button
-                            onClick={() => handleSaveRow(item.roomNumber)}
-                            disabled={isSaveDisabled}
-                            className={`p-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                              isSaveDisabled
-                                ? (isDark ? "border-slate-800/40 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
-                                : (isDark ? "border-teal-500/30 bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white hover:scale-105 shadow-sm" : "border-teal-250 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white hover:scale-105 shadow-sm")
-                            }`}
-                            title={item.tenantName ? "บันทึกมิเตอร์และออกบิล" : "บันทึกมิเตอร์"}
-                          >
-                            <Save className="w-3.5 h-3.5" />
-                            <span className="text-[10px]">{item.tenantName ? "บันทึกบิล" : "บันทึกมิเตอร์"}</span>
-                          </button>
-
-                          {/* ปุ่มตรวจสลิป กรณีชำระเงินเข้ามา */}
-                          {item.billStatus === "pending" ? (
+                          {/* บันทึก */}
+                          <td className="py-4 text-center pr-2">
                             <button
-                              onClick={() => {
-                                setSelectedBill(item)
-                                setSlipModalOpen(true)
-                              }}
-                              className={`p-1.5 rounded-xl border transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer ${
-                                isDark ? "bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500 hover:text-white" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-500 hover:text-white"
+                              onClick={() => handleSaveRow(item.roomNumber)}
+                              disabled={isSaveDisabled}
+                              className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
+                                isSaveDisabled
+                                  ? (isDark ? "border-slate-800 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
+                                  : (isDark ? "border-teal-500/30 bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white hover:scale-105 shadow-sm" : "border-teal-200 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white hover:scale-105 shadow-sm")
                               }`}
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span className="text-[10px]">ตรวจสลิป</span>
+                              <Save className="w-3.5 h-3.5" />
+                              <span>บันทึกมิเตอร์น้ำ</span>
                             </button>
-                          ) : item.billStatus !== "not_created" ? (
-                            <>
-                              {/* ดาวน์โหลด PDF */}
-                              <button
-                                onClick={() => handleDownloadBillPdf(item)}
-                                disabled={downloadingPdfId !== null}
-                                className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
-                                  isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-500/40"
-                                }`}
-                                title="ดาวน์โหลดบิล PDF"
-                              >
-                                {downloadingPdfId === item.roomNumber ? (
-                                  <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <Download className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-
-                              {/* ส่ง LINE OA */}
-                              <button
-                                onClick={() => handleSendLine(item.roomNumber)}
-                                className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
-                                  isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-teal-400 hover:border-teal-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-teal-600 hover:border-teal-500/40"
-                                }`}
-                                title="ส่งเข้า LINE OA"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* บันทึกรับเงินโดยตรง (สำหรับค้างชำระ) */}
-                              {item.billStatus === "unpaid" && (
-                                <button
-                                  onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                                  disabled={currentUserRole === "staff"}
-                                  className={`p-1.5 border rounded-xl transition-all flex items-center gap-1 shadow-sm ${
-                                    currentUserRole === "staff"
-                                      ? "opacity-40 cursor-not-allowed"
-                                      : "hover:scale-105 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
-                                  } ${
-                                    isDark ? "bg-slate-900 border-slate-800 text-slate-500" : "bg-white border-slate-200 text-slate-400"
-                                  }`}
-                                  title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด/บันทึกชำระเงินตรง"}
-                                >
-                                  <CheckCircle className={`w-3.5 h-3.5 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
-                                  <span className={`text-[10px] hidden xl:inline font-bold ${
-                                    currentUserRole === "staff"
-                                      ? "text-slate-400 dark:text-slate-600"
-                                      : isDark ? "text-slate-400 hover:text-emerald-300" : "text-slate-500 hover:text-emerald-600"
-                                  }`}>
-                                    รับเงินแล้ว
-                                  </span>
-                                </button>
-                              )}
-                            </>
-                          ) : null}
-                        </div>
-                      </td>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   )
                 })
@@ -757,15 +894,23 @@ export default function MeterReadingTable({
           </table>
         </div>
 
-        {/* ปุ่มบันทึกบิลทั้งหมด (Save All Bills Button at the bottom of the last room) */}
-        {!loading && unifiedItems.length > 0 && (
+        {/* ปุ่มบันทึกข้อมูลมิเตอร์ทั้งหมด (Bulk Save - แสดงเฉพาะในแถบมิเตอร์ไฟ / มิเตอร์น้ำ) */}
+        {!loading && unifiedItems.length > 0 && activeTab !== "all" && (
           <div className="mt-8 flex justify-center px-4 md:px-0 pb-4">
             <button
               onClick={handleSaveAll}
-              className="w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg shadow-teal-600/20 hover:shadow-teal-500/30 transition-all cursor-pointer active:scale-[0.98] border border-teal-500/30 animate-pulse hover:animate-none"
+              className={`w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg transition-all cursor-pointer active:scale-[0.98] border animate-pulse hover:animate-none ${
+                activeTab === "electric"
+                  ? "from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-600/20 hover:shadow-blue-500/30 border-blue-500/30"
+                  : "from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 shadow-teal-600/20 hover:shadow-teal-500/30 border-teal-500/30"
+              }`}
             >
-              <Save className="w-5 h-5 md:w-4.5 md:h-4.5 text-teal-100" />
-              <span>บันทึกข้อมูลมิเตอร์ & ออกบิลทุกห้อง ({unifiedItems.length} ห้อง)</span>
+              <Save className="w-5 h-5 md:w-4.5 md:h-4.5 text-white/90" />
+              <span>
+                {activeTab === "electric"
+                  ? `บันทึกมิเตอร์ไฟทุกห้อง (${unifiedItems.length} ห้อง)`
+                  : `บันทึกมิเตอร์น้ำทุกห้อง (${unifiedItems.length} ห้อง)`}
+              </span>
             </button>
           </div>
         )}
