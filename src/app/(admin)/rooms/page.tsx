@@ -42,6 +42,7 @@ import {
   updateTenant 
 } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -76,6 +77,7 @@ export default function RoomsPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeItem[]>([])
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -141,6 +143,13 @@ export default function RoomsPage() {
     try {
       const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
       
+      // ดึงข้อมูลตั้งค่าการเงินและบัญชีรับเงิน (เพื่อใช้แสดงค่ามัดจำ/ค่าเช่าล่วงหน้าในโมดอลลิงก์)
+      getFinanceSettings(wsId).then(res => {
+        if (res.success && res.data) {
+          setFinanceSettings(res.data)
+        }
+      })
+
       if (forceRefresh && wsId) {
         clearWorkspaceCache(wsId)
       }
@@ -1434,6 +1443,24 @@ export default function RoomsPage() {
                   <div className="flex justify-between py-2">
                     <span className="text-slate-400">หมายเลขห้อง:</span> 
                     <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-t border-slate-100/50 dark:border-slate-800/50">
+                    <span className="text-slate-400">อัตราค่าเช่าห้อง:</span> 
+                    <span className="font-bold text-slate-850 dark:text-slate-200">{(selectedRoom.baseRent || 0).toLocaleString()} บาท/เดือน</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-slate-400">เงินประกัน (มัดจำ):</span> 
+                    <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
+                      {financeSettings ? `${financeSettings.deposit_amount || 0} เดือน` : "กำลังโหลด..."}{" "}
+                      {financeSettings && `(${((selectedRoom.baseRent || 0) * (financeSettings.deposit_amount || 0)).toLocaleString()} บาท)`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-slate-400">ค่าเช่าล่วงหน้า:</span> 
+                    <span className="font-extrabold text-blue-600 dark:text-blue-400">
+                      {financeSettings ? `${financeSettings.advance_rent || 0} เดือน` : "กำลังโหลด..."}{" "}
+                      {financeSettings && `(${((selectedRoom.baseRent || 0) * (financeSettings.advance_rent || 0)).toLocaleString()} บาท)`}
+                    </span>
                   </div>
                 </div>
 
