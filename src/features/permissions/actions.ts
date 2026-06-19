@@ -3,20 +3,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
-// Default permissions for staff
-export interface StaffPermissions {
-  manage_rooms_tenants: boolean
-  manage_meters_bills: boolean
-  manage_finance_expenses: boolean
-  access_tax: boolean
-}
-
-export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
-  manage_rooms_tenants: true,
-  manage_meters_bills: true,
-  manage_finance_expenses: true,
-  access_tax: false
-}
+import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "./types"
 
 // Check if we are running in Demo mode
 const isDemoMode = () => {

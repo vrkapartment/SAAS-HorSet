@@ -30,10 +30,12 @@ import {
   getWorkspaceStaffAction, 
   createWorkspaceStaffAction, 
   updateStaffPermissionsAction, 
-  deleteStaffAction,
-  StaffPermissions,
-  DEFAULT_STAFF_PERMISSIONS
+  deleteStaffAction
 } from "@/features/permissions/actions"
+import { 
+  type StaffPermissions,
+  DEFAULT_STAFF_PERMISSIONS
+} from "@/features/permissions/types"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 
 interface StaffMember {
