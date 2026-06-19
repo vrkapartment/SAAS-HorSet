@@ -66,7 +66,7 @@ export default function Sidebar({
   return (
     <>
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0">
+      <aside className="hidden md:flex flex-col w-64 h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0">
         <div className="flex items-center gap-3 mb-8">
           <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-lg shadow-blue-500/10">
             <Building className="w-5 h-5 text-white" />
@@ -170,7 +170,7 @@ export default function Sidebar({
         )}
 
         {/* รายการเมนู */}
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 overflow-y-auto no-scrollbar space-y-1">
           {!isProfileLoaded && !isDemo ? (
             <div className="space-y-2 px-1">
               <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
@@ -346,7 +346,7 @@ export default function Sidebar({
               </div>
             )}
 
-            <nav className="flex-1 space-y-1">
+            <nav className="flex-1 overflow-y-auto no-scrollbar space-y-1">
               {!isProfileLoaded && !isDemo ? (
                 <div className="space-y-2 px-1">
                   <div className="h-10 bg-slate-100 dark:bg-slate-900/60 rounded-xl animate-pulse" />
