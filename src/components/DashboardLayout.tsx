@@ -558,6 +558,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "super_admin"]
     },
     {
+      name: "จัดการสิทธิ์ & Staff",
+      path: "/permissions",
+      icon: Users,
+      roles: ["admin", "super_admin"]
+    },
+    {
       name: t("nav.test_connection") || "เช็คการเชื่อมต่อ Supabase",
       path: "/test-connection",
       icon: Database,
@@ -596,7 +602,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         "/billing",
         "/daily-bills",
         "/tax",
-        "/finance-settings"
+        "/finance-settings",
+        "/permissions"
       ]
       if (hiddenPaths.includes(item.path)) {
         return false
