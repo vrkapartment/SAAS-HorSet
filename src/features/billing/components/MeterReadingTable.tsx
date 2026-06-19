@@ -589,33 +589,6 @@ export default function MeterReadingTable({
                         </button>
                       ) : (
                         <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            {/* ดาวน์โหลด PDF */}
-                            <button
-                              onClick={() => handleDownloadBillPdf(item)}
-                              disabled={downloadingPdfId !== null}
-                              className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                            >
-                              {downloadingPdfId === item.roomNumber ? (
-                                <div className="w-4 h-4 border border-slate-400 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <>
-                                  <Download className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                                  <span>ดาวน์โหลด PDF</span>
-                                </>
-                              )}
-                            </button>
-
-                            {/* ส่ง LINE OA */}
-                            <button
-                              onClick={() => handleSendLine(item.roomNumber)}
-                              className="h-12 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                            >
-                              <Send className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                              <span>ส่ง LINE OA</span>
-                            </button>
-                          </div>
-
                           {/* บันทึกชำระเงินค้างชำระ */}
                           {item.billStatus === "unpaid" && (
                             <button
@@ -835,33 +808,6 @@ export default function MeterReadingTable({
                                 </button>
                               ) : item.billStatus !== "not_created" ? (
                                 <>
-                                  {/* ดาวน์โหลด PDF */}
-                                  <button
-                                    onClick={() => handleDownloadBillPdf(item)}
-                                    disabled={downloadingPdfId !== null}
-                                    className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
-                                      isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-500/40"
-                                    }`}
-                                    title="ดาวน์โหลดบิล PDF"
-                                  >
-                                    {downloadingPdfId === item.roomNumber ? (
-                                      <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
-                                    ) : (
-                                      <Download className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-
-                                  {/* ส่ง LINE OA */}
-                                  <button
-                                    onClick={() => handleSendLine(item.roomNumber)}
-                                    className={`p-1.5 border rounded-xl transition-all cursor-pointer ${
-                                      isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-teal-400 hover:border-teal-500/40" : "bg-white border-slate-200 text-slate-600 hover:text-teal-600 hover:border-teal-500/40"
-                                    }`}
-                                    title="ส่งเข้า LINE OA"
-                                  >
-                                    <Send className="w-3.5 h-3.5" />
-                                  </button>
-
                                   {/* บันทึกชำระเงินค้างชำระ */}
                                   {item.billStatus === "unpaid" && (
                                     <button
@@ -1160,7 +1106,7 @@ export default function MeterReadingTable({
                     : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
                 }`}
               >
-                คัดลอกส่งเอง ({unconnectedRooms.length})
+                ส่งบิล Manual ({unconnectedRooms.length})
               </button>
             </div>
 
@@ -1195,9 +1141,17 @@ export default function MeterReadingTable({
                           
                           <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                             {bulkSendingStatus === "idle" && (
-                              <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
-                                พร้อมส่ง LINE OA
-                              </span>
+                              <button
+                                onClick={() => handleSendLine(item.roomNumber)}
+                                className={`h-7 px-2.5 rounded-lg text-[10px] font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                                  isDark 
+                                    ? "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/30 hover:text-emerald-300" 
+                                    : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800"
+                                }`}
+                              >
+                                <Send className="w-3 h-3" />
+                                <span className="whitespace-nowrap">ส่ง LINE OA</span>
+                              </button>
                             )}
                             {bulkSendingStatus === "sending" && bulkSendingProgress.currentRoom === item.roomNumber && (
                               <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 animate-pulse whitespace-nowrap">
@@ -1240,7 +1194,7 @@ export default function MeterReadingTable({
                   }`}>
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>
-                      <strong>คำแนะนำ:</strong> เนื่องจากผู้เช่ายังไม่ได้ลงทะเบียนผูกบัญชี LINE OA คุณสามารถคลิกปุ่ม <strong>"คัดลอกสรุปบิล"</strong> เพื่อนำสรุปยอดบิลและลิงก์ออนไลน์ ไปวางส่งในแชทปกติ (เช่น LINE, Facebook, SMS) ได้ทันที
+                      <strong>คำแนะนำ:</strong> เนื่องจากผู้เช่ายังไม่ได้ลงทะเบียนผูกบัญชี LINE OA คุณสามารถคลิกปุ่ม <strong>"คัดลอกสรุปบิล"</strong> หรือ <strong>"ดาวน์โหลด PDF"</strong> เพื่อนำสรุปยอดบิลและลิงก์ออนไลน์ หรือดาวน์โหลดไฟล์ PDF ไปส่งในแชทปกติ (เช่น LINE, Facebook, SMS) ได้ทันที
                     </span>
                   </div>
 
@@ -1251,40 +1205,63 @@ export default function MeterReadingTable({
                         <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border text-xs gap-3 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
-                          <div>
-                            <span className={`font-black px-2 py-0.5 rounded-lg border mr-2 ${
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`font-black px-2 py-0.5 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-250"
                             }`}>
                               ห้อง {item.roomNumber}
                             </span>
-                            <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                            <span className={`font-bold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                               {item.tenantName}
                             </span>
-                            <span className={`ml-2 text-[10px] font-mono font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                            <span className={`text-[10px] font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                               ({item.billAmount?.toLocaleString()}.-)
                             </span>
                           </div>
                           
-                          <button
-                            onClick={() => handleCopySummary(item)}
-                            className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto ${
-                              isCopied
-                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                : (isDark ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200" : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700")
-                            }`}
-                          >
-                            {isCopied ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>คัดลอกสรุปบิลแล้ว!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" />
-                                <span>คัดลอกสรุปบิล</span>
-                              </>
-                            )}
-                          </button>
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                            {/* ดาวน์โหลด PDF */}
+                            <button
+                              onClick={() => handleDownloadBillPdf(item)}
+                              disabled={downloadingPdfId !== null}
+                              className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                                isDark 
+                                  ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 hover:text-blue-400" 
+                                  : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 hover:text-blue-600"
+                              }`}
+                            >
+                              {downloadingPdfId === item.roomNumber ? (
+                                <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <Download className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+                                  <span className="whitespace-nowrap">ดาวน์โหลด PDF</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* คัดลอกสรุปบิล */}
+                            <button
+                              onClick={() => handleCopySummary(item)}
+                              className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                                isCopied
+                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                  : (isDark ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200" : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700")
+                              }`}
+                            >
+                              {isCopied ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="whitespace-nowrap">คัดลอกสรุปบิลแล้ว!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span className="whitespace-nowrap">คัดลอกสรุปบิล</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       )
                     })
