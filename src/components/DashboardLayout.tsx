@@ -607,8 +607,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       return false
     }
 
-    // Super Admin เข้าได้หมดทุกอย่าง
-    if (userRole === "super_admin") return true
+    // Super Admin เข้าได้หมดทุกอย่าง เฉพาะเมื่อได้รับอนุมัติสิทธิ์ Support ใน Workspace นั้นแล้ว เท่านั้น
+    if (userRole === "super_admin") {
+      if (supportStatus !== "approved") {
+        return path === "/super-admin" || path === "#profile" || path === "/login"
+      }
+      return true
+    }
 
     if (path === "/super-admin") {
       return false
@@ -660,20 +665,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     // ตรวจสอบสิทธิ์ของเส้นทางนี้โดยดูจากคอลัมน์ permissions โดยตรง (ตัดการดูสิทธิ์จากบทบาท Role ออกไป)
     if (!hasPermissionForPath(item.path)) return false
 
-    // หากเป็น Super Admin และไม่มีสิทธิ์ช่วยเหลือของ Workspace ปัจจุบัน ให้ซ่อนแท็บเกี่ยวกับตัวข้อมูลหอพัก/ผู้เช่า/บิล/ภาษี/การเงิน
-    // (ซ่อนเฉพาะตอนที่อยู่ที่หน้า /super-admin เพื่อป้องกันการกระพริบหายไปของแท็บขณะสลับหน้าระหว่างทำงานใน Workspace)
-    if (userRole === "super_admin" && supportStatus !== "approved" && pathname === "/super-admin") {
-      const hiddenPaths = [
-        "/dashboard",
-        "/rooms",
-        "/tenants",
-        "/billing",
-        "/daily-bills",
-        "/tax",
-        "/finance-settings",
-        "/permissions"
-      ]
-      if (hiddenPaths.includes(item.path)) {
+    // หากเป็น Super Admin และไม่มีสิทธิ์ช่วยเหลือของ Workspace ปัจจุบัน ให้ซ่อนแท็บอื่นๆ ทั้งหมด ตลอดเวลา
+    if (userRole === "super_admin" && supportStatus !== "approved") {
+      const allowedPaths = ["/super-admin", "#profile"]
+      if (!allowedPaths.includes(item.path)) {
         return false
       }
     }
