@@ -80,6 +80,7 @@ export default function RoomsPage() {
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeItem[]>([])
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
+  const [roomTypeDeposits, setRoomTypeDeposits] = useState<{ [roomTypeId: string]: number }>({})
   const [cancelledContracts, setCancelledContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -215,6 +216,33 @@ export default function RoomsPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // ซิงค์ค่ามัดจำ/เงินประกันแยกตามประเภทห้องจาก Local Storage หรือ Database
+  useEffect(() => {
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    let localRtDeposits: { [key: string]: number } = {}
+    if (typeof window !== "undefined") {
+      try {
+        const localSaved = localStorage.getItem(`room_type_deposits_${wsId}`)
+        if (localSaved) {
+          localRtDeposits = JSON.parse(localSaved)
+        }
+      } catch (e) {
+        console.error("Failed to parse local room type deposits", e)
+      }
+    }
+    
+    // Merge กับค่าจาก DB (deposit_amount บน room_types) หากมีและยังไม่มีใน localStorage
+    roomTypes.forEach((rt: any) => {
+      if (rt.deposit_amount !== undefined && rt.deposit_amount !== null) {
+        if (localRtDeposits[rt.id] === undefined) {
+          localRtDeposits[rt.id] = rt.deposit_amount
+        }
+      }
+    })
+    
+    setRoomTypeDeposits(localRtDeposits)
+  }, [roomTypes])
 
   // สลับประเภทห้องในหน้าจอฟอร์มห้องพัก -> ดึงราคาอัตโนมัติ
   const handleRoomTypeChange = (typeId: string) => {
@@ -499,11 +527,12 @@ export default function RoomsPage() {
     
     setCheckoutDate(new Date().toISOString().split("T")[0])
     
-    // คำนวณเงินประกันสะสมตามโหมด: คิดตามจำนวนเดือน หรือ ยอดเงินคงที่
+    // คำนวณเงินประกันสะสมตามโหมด: คิดตามจำนวนเดือน หรือ ยอดเงินคงที่ (แยกตามประเภทห้อง)
     let calculatedDeposit = 0
     if (financeSettings) {
       if (financeSettings.deposit_type === "fixed") {
-        calculatedDeposit = financeSettings.deposit_amount || 0
+        const roomTypeDeposit = selectedRoom.roomTypeId ? roomTypeDeposits[selectedRoom.roomTypeId] : undefined
+        calculatedDeposit = roomTypeDeposit !== undefined ? roomTypeDeposit : (financeSettings.deposit_amount || 0)
       } else {
         const depositMonths = financeSettings.deposit_amount || 0
         calculatedDeposit = selectedRoom.baseRent * depositMonths
@@ -1666,7 +1695,11 @@ export default function RoomsPage() {
                     <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
                       {financeSettings ? (
                         financeSettings.deposit_type === "fixed" ? (
-                          `${(financeSettings.deposit_amount || 0).toLocaleString()} บาท (คงที่)`
+                          (() => {
+                            const roomTypeDeposit = selectedRoom.roomTypeId ? roomTypeDeposits[selectedRoom.roomTypeId] : undefined
+                            const amount = roomTypeDeposit !== undefined ? roomTypeDeposit : (financeSettings.deposit_amount || 0)
+                            return `${amount.toLocaleString()} บาท (คงที่ตามประเภทห้อง)`
+                          })()
                         ) : (
                           `${financeSettings.deposit_amount || 0} เดือน (${((selectedRoom.baseRent || 0) * (financeSettings.deposit_amount || 0)).toLocaleString()} บาท)`
                         )

@@ -190,3 +190,23 @@ export async function deleteRoom(id: string) {
     return { success: false, error: errorMessage }
   }
 }
+
+/**
+ * อัปเดตเงินประกันของประเภทห้องพักเฉพาะ (ใช้ในโหมด ระบุจำนวนเงินคงที่แยกตามประเภทห้อง)
+ */
+export async function updateRoomTypeDeposit(id: string, depositAmount: number) {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("room_types")
+      .update({ deposit_amount: depositAmount })
+      .eq("id", id)
+      .select()
+
+    if (error) throw error
+    return { success: true, data: data[0] }
+  } catch (error: any) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการแก้ไขค่าเงินประกันประเภทห้องพัก")
+    return { success: false, error: errorMessage }
+  }
+}

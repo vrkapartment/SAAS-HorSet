@@ -6,6 +6,7 @@ import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/feat
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { getRoomTypes, updateRoomTypeDeposit } from "@/features/room/actions"
 
 function setCookie(name: string, value: string, days = 7) {
   if (typeof document === "undefined") return
@@ -183,6 +184,8 @@ export default function FinanceSettingsPage() {
   const [depositAmount, setDepositAmount] = useState<number>(0)
   const [depositType, setDepositType] = useState<"months" | "fixed">("months")
   const [advanceRent, setAdvanceRent] = useState<number>(0)
+  const [roomTypes, setRoomTypes] = useState<any[]>([])
+  const [roomTypeDeposits, setRoomTypeDeposits] = useState<{ [roomTypeId: string]: number }>({})
 
   // สำหรับราคาหน่วย ค่าน้ำ ค่าไฟ และขั้นต่ำ
   const [waterRate, setWaterRate] = useState<number>(18)
@@ -242,8 +245,19 @@ export default function FinanceSettingsPage() {
         if (currentWsId) {
           setWorkspaceId(currentWsId)
 
+          // Load room types
+          const typesRes = await getRoomTypes()
+          let fetchedRoomTypes: any[] = []
+          if (typesRes.success && typesRes.data) {
+            fetchedRoomTypes = typesRes.data
+            setRoomTypes(fetchedRoomTypes)
+          }
+
           const cacheKey = "finance_settings"
           const cached = getCachedData<FinanceSettings>(currentWsId, cacheKey)
+          let currentDepositAmount = 0
+          let currentDepositType: "months" | "fixed" = "months"
+          
           if (cached) {
             setFirstName(cached.tax_firstname || "")
             setLastName(cached.tax_lastname || "")
@@ -263,6 +277,8 @@ export default function FinanceSettingsPage() {
             setLatePenaltyRate(cached.late_penalty_rate !== undefined ? cached.late_penalty_rate : 0)
             setDepositAmount(cached.deposit_amount !== undefined ? cached.deposit_amount : 0)
             setDepositType(cached.deposit_type || "months")
+            currentDepositAmount = cached.deposit_amount !== undefined ? cached.deposit_amount : 0
+            currentDepositType = cached.deposit_type || "months"
             setAdvanceRent(cached.advance_rent !== undefined ? cached.advance_rent : 0)
             setWaterRate(cached.water_rate !== undefined ? cached.water_rate : 18)
             setElectricRate(cached.electric_rate !== undefined ? cached.electric_rate : 7)
@@ -271,42 +287,67 @@ export default function FinanceSettingsPage() {
             setElectricMinChecked(cached.electric_min_checked !== undefined ? cached.electric_min_checked : true)
             setElectricMinUnit(cached.electric_min_unit !== undefined ? cached.electric_min_unit : 10)
             setIsDatabaseBacked(true)
-            setLoading(false)
-            return
+          } else {
+            const res = await getFinanceSettings(currentWsId)
+            if (res.success && res.data) {
+              setFirstName(res.data.tax_firstname || "")
+              setLastName(res.data.tax_lastname || "")
+              setTaxId(res.data.tax_id || "")
+              const parsed = parseAddress(res.data.tax_address || "")
+              setAddressNo(parsed.no)
+              setAddressRoad(parsed.road)
+              setAddressSubdistrict(parsed.subdistrict)
+              setAddressDistrict(parsed.district)
+              setAddressProvince(parsed.province)
+              setAddressZipcode(parsed.zipcode)
+              setPhone(res.data.tax_phone || "")
+              setPromptPayType(res.data.promptpay_type || "phone")
+              setPromptPayId(res.data.promptpay_id || "")
+              setPromptPayName(res.data.promptpay_name || "")
+              setCommonFee(res.data.common_fee !== undefined ? res.data.common_fee : 50)
+              setLatePenaltyRate(res.data.late_penalty_rate !== undefined ? res.data.late_penalty_rate : 0)
+              setDepositAmount(res.data.deposit_amount !== undefined ? res.data.deposit_amount : 0)
+              setDepositType(res.data.deposit_type || "months")
+              currentDepositAmount = res.data.deposit_amount !== undefined ? res.data.deposit_amount : 0
+              currentDepositType = res.data.deposit_type || "months"
+              setAdvanceRent(res.data.advance_rent !== undefined ? res.data.advance_rent : 0)
+              setWaterRate(res.data.water_rate !== undefined ? res.data.water_rate : 18)
+              setElectricRate(res.data.electric_rate !== undefined ? res.data.electric_rate : 7)
+              setWaterMinChecked(res.data.water_min_checked !== undefined ? res.data.water_min_checked : true)
+              setWaterMinUnit(res.data.water_min_unit !== undefined ? res.data.water_min_unit : 3)
+              setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
+              setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
+              setIsDatabaseBacked(true)
+              setCachedData(currentWsId, cacheKey, res.data)
+            } else if (res.error) {
+              setErrorMsg(res.error)
+            }
           }
 
-          const res = await getFinanceSettings(currentWsId)
-          if (res.success && res.data) {
-            setFirstName(res.data.tax_firstname || "")
-            setLastName(res.data.tax_lastname || "")
-            setTaxId(res.data.tax_id || "")
-            const parsed = parseAddress(res.data.tax_address || "")
-            setAddressNo(parsed.no)
-            setAddressRoad(parsed.road)
-            setAddressSubdistrict(parsed.subdistrict)
-            setAddressDistrict(parsed.district)
-            setAddressProvince(parsed.province)
-            setAddressZipcode(parsed.zipcode)
-            setPhone(res.data.tax_phone || "")
-            setPromptPayType(res.data.promptpay_type || "phone")
-            setPromptPayId(res.data.promptpay_id || "")
-            setPromptPayName(res.data.promptpay_name || "")
-            setCommonFee(res.data.common_fee !== undefined ? res.data.common_fee : 50)
-            setLatePenaltyRate(res.data.late_penalty_rate !== undefined ? res.data.late_penalty_rate : 0)
-            setDepositAmount(res.data.deposit_amount !== undefined ? res.data.deposit_amount : 0)
-            setDepositType(res.data.deposit_type || "months")
-            setAdvanceRent(res.data.advance_rent !== undefined ? res.data.advance_rent : 0)
-            setWaterRate(res.data.water_rate !== undefined ? res.data.water_rate : 18)
-            setElectricRate(res.data.electric_rate !== undefined ? res.data.electric_rate : 7)
-            setWaterMinChecked(res.data.water_min_checked !== undefined ? res.data.water_min_checked : true)
-            setWaterMinUnit(res.data.water_min_unit !== undefined ? res.data.water_min_unit : 3)
-            setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
-            setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
-            setIsDatabaseBacked(true)
-            setCachedData(currentWsId, cacheKey, res.data)
-          } else if (res.error) {
-            setErrorMsg(res.error)
+          // Build roomTypeDeposits map from local storage and DB fields
+          let rtDeposits: { [key: string]: number } = {}
+          if (typeof window !== "undefined") {
+            try {
+              const localSaved = localStorage.getItem(`room_type_deposits_${currentWsId}`)
+              if (localSaved) {
+                rtDeposits = JSON.parse(localSaved)
+              }
+            } catch (err) {
+              console.error("Failed to parse local room type deposits", err)
+            }
           }
+          fetchedRoomTypes.forEach((rt: any) => {
+            if (rt.deposit_amount !== undefined && rt.deposit_amount !== null) {
+              if (rtDeposits[rt.id] === undefined) {
+                rtDeposits[rt.id] = rt.deposit_amount
+              }
+            } else {
+              if (rtDeposits[rt.id] === undefined) {
+                rtDeposits[rt.id] = currentDepositType === "fixed" ? currentDepositAmount : 5000
+              }
+            }
+          })
+          setRoomTypeDeposits(rtDeposits)
         } else {
           setErrorMsg("ไม่พบข้อมูล Workspace ID ของบัญชีผู้ใช้งานนี้")
         }
@@ -370,6 +411,20 @@ export default function FinanceSettingsPage() {
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
       const res = await saveFinanceSettings(workspaceId, payload)
       if (res.success) {
+        // บันทึกเงินประกันแยกตามประเภทห้องพัก
+        if (roomTypes.length > 0) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`room_type_deposits_${workspaceId}`, JSON.stringify(roomTypeDeposits))
+          }
+          for (const rt of roomTypes) {
+            const amt = roomTypeDeposits[rt.id] !== undefined ? roomTypeDeposits[rt.id] : depositAmount
+            try {
+              await updateRoomTypeDeposit(rt.id, amt)
+            } catch (err) {
+              console.error(`ไม่สามารถบันทึกเงินประกันของประเภทห้อง ${rt.name} ได้:`, err)
+            }
+          }
+        }
         clearWorkspaceCache(workspaceId)
         setCachedData(workspaceId, "finance_settings", payload)
         showToast("บันทึกข้อมูลเข้าสู่เซิร์ฟเวอร์ระบบคลาวด์สำเร็จเรียบร้อย!")
@@ -700,9 +755,52 @@ export default function FinanceSettingsPage() {
                 <p className="text-[10px] text-slate-500 mt-1 leading-normal">
                   {depositType === "months" 
                     ? "ระบุจำนวนเดือนของเงินประกัน (เช่น 2 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อพักยอดเงินประกันไว้ในสถานะหนี้สิน และคำนวณหักกลบลบด้วยยอดคืนเงินจริงเมื่อยกเลิกสัญญาเพื่อส่งเป็นรายได้ 40(8)"
-                    : "ระบุจำนวนเงินประกันเป็นจำนวนเงินคงที่ (เช่น 5,000 บาท) ทุกๆ ห้องพักจะใช้ยอดเงินประกันเท่ากันนี้โดยตรง ไม่ขึ้นอยู่กับราคาค่าเช่าห้องพัก เพื่อพักยอดเงินประกันไว้และคำนวณคืนเงินจริงเมื่อยกเลิกสัญญา"
+                    : "ระบุจำนวนเงินประกันเริ่มต้น (เช่น 5,000 บาท) สำหรับห้องพักทั่วไปหรือใช้เป็นค่าเริ่มต้นหากประเภทห้องพักนั้นๆ ไม่ได้ระบุแยกเอาไว้ด้านล่าง"
                   }
                 </p>
+
+                {/* แยกตามประเภทห้องพัก */}
+                {depositType === "fixed" && roomTypes.length > 0 && (
+                  <div className="space-y-4 border-t border-slate-100 dark:border-slate-900/40 pt-4 mt-2 animate-fade-in">
+                    <div className="flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5 text-teal-400" />
+                      <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        ระบุเงินประกันแยกตามประเภทห้องพัก
+                      </h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {roomTypes.map((rt) => {
+                        const val = roomTypeDeposits[rt.id] !== undefined ? roomTypeDeposits[rt.id] : depositAmount;
+                        return (
+                          <div key={rt.id} className="relative group/input flex flex-col gap-1 bg-slate-50/50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/60 dark:border-slate-850/60 hover:border-teal-500/30 transition-all duration-300">
+                            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover/input:text-teal-400 transition-colors">
+                              ประเภท: {rt.name}
+                            </span>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                required
+                                min={0}
+                                step={100}
+                                placeholder={depositAmount.toString()}
+                                className="w-full pr-12 pl-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-xs tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                value={val}
+                                onChange={(e) => {
+                                  const updated = { ...roomTypeDeposits, [rt.id]: Number(e.target.value) }
+                                  setRoomTypeDeposits(updated)
+                                }}
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+                                บาท
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ค่าเช่าล่วงหน้า */}
