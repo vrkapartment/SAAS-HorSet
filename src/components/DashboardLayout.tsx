@@ -613,8 +613,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   ]
 
   const hasPermissionForPath = (path: string) => {
-    // โหมดเดโมหรือข้อมูลยังโหลดไม่เสร็จ ให้ข้ามไปก่อนเพื่อป้องกันกระพริบหน้าจอ
-    if (!isProfileLoaded) return true
+    // ถ้าโปรไฟล์ยังโหลดไม่เสร็จ ให้คืนค่า false สำหรับเมนูทั่วไป เพื่อป้องกันแถบเมนูกระพริบขึ้นมาทั้งหมดตอน Refresh
+    if (!isProfileLoaded) {
+      if (path === "#profile" || path === "/login") {
+        return true
+      }
+      return false
+    }
 
     // Super Admin เข้าได้หมดทุกอย่าง
     if (userRole === "super_admin") return true
@@ -660,7 +665,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   const isPathAllowed = () => {
     if (!pathname) return true
-    // ใช้ฟังก์ชันเดียวกันเพื่อความสม่ำเสมอ ตัดการดูสิทธิ์จาก Role บทบาทหลักออกไปโดยสมบูรณ์
+    // หากโปรไฟล์ยังโหลดไม่เสร็จ ให้สิทธิ์ผ่านไปก่อน (เพื่อป้องกันการแสดงผล Access Denied กระพริบขึ้นมาก่อนโหลดเสร็จ)
+    if (!isProfileLoaded) return true
     return hasPermissionForPath(pathname)
   }
 
