@@ -50,50 +50,65 @@ export async function saveMeterRecord(
     return { success: false, fallback: true }
   }
 
-  try {
-    const supabase = await createClient()
-    
+  const supabase = await createClient()
+
+  // Helper function to perform the insert or update in Supabase
+  async function attemptSave(elecVal: number | null, waterVal: number | null) {
     // Check if record already exists for this room and cycle
     const { data: existing } = await supabase
       .from("meter_records")
       .select("id")
       .eq("room_number", roomNumber)
       .eq("billing_cycle", billingCycle)
-      .single()
+      .maybeSingle()
 
-    const elecCurrVal = elecCurr === "" ? null : Number(elecCurr)
-    const waterCurrVal = waterCurr === "" ? null : Number(waterCurr)
-
-    let result
     if (existing) {
-      result = await supabase
+      return await supabase
         .from("meter_records")
         .update({
           elec_prev: elecPrev,
-          elec_curr: elecCurrVal,
+          elec_curr: elecVal,
           water_prev: waterPrev,
-          water_curr: waterCurrVal
+          water_curr: waterVal
         })
         .eq("id", existing.id)
         .select()
     } else {
-      result = await supabase
+      return await supabase
         .from("meter_records")
         .insert([{
           room_number: roomNumber,
           billing_cycle: billingCycle,
           elec_prev: elecPrev,
-          elec_curr: elecCurrVal,
+          elec_curr: elecVal,
           water_prev: waterPrev,
-          water_curr: waterCurrVal
+          water_curr: waterVal
         }])
         .select()
+    }
+  }
+
+  try {
+    const elecCurrVal = elecCurr === "" ? null : Number(elecCurr)
+    const waterCurrVal = waterCurr === "" ? null : Number(waterCurr)
+
+    let result = await attemptSave(elecCurrVal, waterCurrVal)
+
+    // Handle database NOT NULL constraint violation (Postgrest code 23502)
+    if (result.error && result.error.code === "23502") {
+      console.warn("Database column is NOT NULL. Falling back to previous values. Please run migration to drop NOT NULL constraints.");
+      
+      // Fallback: Substitute empty (null) values with previous values
+      const fallbackElec = elecCurrVal === null ? Number(elecPrev) : elecCurrVal
+      const fallbackWater = waterCurrVal === null ? Number(waterPrev) : waterCurrVal
+      
+      result = await attemptSave(fallbackElec, fallbackWater)
     }
 
     if (result.error) throw result.error
     return { success: true, data: result.data[0] }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์น้ำไฟ"
+  } catch (error: any) {
+    const errorMessage = error && error.message ? error.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์น้ำไฟ"
     return { success: false, error: errorMessage }
   }
 }
