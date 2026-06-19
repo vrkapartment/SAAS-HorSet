@@ -19,7 +19,7 @@ interface MeterReadingTableProps {
   handleElecChange: (roomNumber: string, value: string) => void
   handleWaterPrevChange: (roomNumber: string, value: string) => void
   handleWaterChange: (roomNumber: string, value: string) => void
-  handleSaveRow: (roomNumber: string) => Promise<void>
+  handleSaveRow: (roomNumber: string, type?: "electric" | "water" | "all") => Promise<void>
   setSelectedBill: (item: any) => void
   setSlipModalOpen: (open: boolean) => void
   handleDownloadBillPdf: (item: any) => Promise<void>
@@ -512,7 +512,7 @@ export default function MeterReadingTable({
                       </div>
 
                       <button
-                        onClick={() => handleSaveRow(item.roomNumber)}
+                        onClick={() => handleSaveRow(item.roomNumber, "electric")}
                         disabled={isSaveDisabled}
                         className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                           isSaveDisabled
@@ -583,7 +583,7 @@ export default function MeterReadingTable({
                       </div>
 
                       <button
-                        onClick={() => handleSaveRow(item.roomNumber)}
+                        onClick={() => handleSaveRow(item.roomNumber, "water")}
                         disabled={isSaveDisabled}
                         className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                           isSaveDisabled
@@ -923,7 +923,7 @@ export default function MeterReadingTable({
                           {/* บันทึก */}
                           <td className="py-4 text-center pr-2">
                             <button
-                              onClick={() => handleSaveRow(item.roomNumber)}
+                              onClick={() => handleSaveRow(item.roomNumber, "electric")}
                               disabled={isSaveDisabled}
                               className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
                                 isSaveDisabled
@@ -998,7 +998,7 @@ export default function MeterReadingTable({
                           {/* บันทึก */}
                           <td className="py-4 text-center pr-2">
                             <button
-                              onClick={() => handleSaveRow(item.roomNumber)}
+                              onClick={() => handleSaveRow(item.roomNumber, "water")}
                               disabled={isSaveDisabled}
                               className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
                                 isSaveDisabled

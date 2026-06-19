@@ -556,7 +556,7 @@ export default function UnifiedBillingPage() {
   }
 
   // บันทึกเฉพาะห้องและสร้างบิล
-  const handleSaveRow = async (roomNumber: string) => {
+  const handleSaveRow = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
     if (!item) return
 
@@ -565,29 +565,64 @@ export default function UnifiedBillingPage() {
     const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
     const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-    if (elecVal === "" || waterVal === "" || isNaN(elecVal as number) || isNaN(waterVal as number)) {
-      alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
-      return
+    // ตรวจสอบเงื่อนไขตามประเภทปุ่มที่กดบันทึก
+    if (type === "electric") {
+      if (elecVal === "" || isNaN(elecVal as number)) {
+        alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าให้ครบถ้วน")
+        return
+      }
+      if (isNaN(elecPrevVal)) {
+        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+        return
+      }
+      if ((elecVal as number) < elecPrevVal) {
+        alert("⚠️ ตัวเลขมิเตอร์ไฟฟ้าปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
+        return
+      }
+    } else if (type === "water") {
+      if (waterVal === "" || isNaN(waterVal as number)) {
+        alert("กรุณากรอกตัวเลขมิเตอร์น้ำประปาให้ครบถ้วน")
+        return
+      }
+      if (isNaN(waterPrevVal)) {
+        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+        return
+      }
+      if ((waterVal as number) < waterPrevVal) {
+        alert("⚠️ ตัวเลขมิเตอร์น้ำประปาปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
+        return
+      }
+    } else {
+      // โหมด "all" (จัดการบิล) หรือแบบดั้งเดิม ต้องตรวจสอบทั้งคู่
+      if (elecVal === "" || waterVal === "" || isNaN(elecVal as number) || isNaN(waterVal as number)) {
+        alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
+        return
+      }
+      if (isNaN(elecPrevVal) || isNaN(waterPrevVal)) {
+        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+        return
+      }
+      if ((elecVal as number) < elecPrevVal || (waterVal as number) < waterPrevVal) {
+        alert("⚠️ ตัวเลขมิเตอร์ปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
+        return
+      }
     }
 
-    if (isNaN(elecPrevVal) || isNaN(waterPrevVal)) {
-      alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
-      return
-    }
+    const eUnits = elecVal === "" ? 0 : (elecVal as number) - elecPrevVal
+    const wUnits = waterVal === "" ? 0 : (waterVal as number) - waterPrevVal
+    
+    const elecCost = elecVal === "" 
+      ? 0 
+      : (electricMinChecked && eUnits <= electricMinUnit
+          ? electricMinUnit * elecRate
+          : eUnits * elecRate)
 
-    if ((elecVal as number) < elecPrevVal || (waterVal as number) < waterPrevVal) {
-      alert("⚠️ ตัวเลขมิเตอร์ปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
-      return
-    }
-
-    const eUnits = (elecVal as number) - elecPrevVal
-    const wUnits = (waterVal as number) - waterPrevVal
-    const elecCost = electricMinChecked && eUnits <= electricMinUnit
-      ? electricMinUnit * elecRate
-      : eUnits * elecRate
-    const waterCost = waterMinChecked && wUnits <= waterMinUnit
-      ? waterMinUnit * waterRate
-      : wUnits * waterRate
+    const waterCost = waterVal === "" 
+      ? 0 
+      : (waterMinChecked && wUnits <= waterMinUnit
+          ? waterMinUnit * waterRate
+          : wUnits * waterRate)
+          
     const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
     setSavingAll(true)
