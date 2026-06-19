@@ -364,105 +364,45 @@ WHERE role IN ('admin', 'super_admin');`;
                     สิทธิ์ที่ได้รับมอบหมาย:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {/* Permission: View Dashboard Stats */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.view_dashboard_stats
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.view_dashboard_stats ? "opacity-100" : "opacity-20"}`} />
-                      <span>ดูสถิติภาพรวม</span>
-                    </span>
+                    {(() => {
+                      const items = [
+                        { key: "view_dashboard_stats", label: "ดูสถิติภาพรวม" },
+                        { key: "manage_rooms_tenants", label: "จัดการห้องพัก & ผู้เช่า" },
+                        { key: "manage_meters_bills", label: "จดมิเตอร์ & ออกบิล" },
+                        { key: "manage_finance_expenses", label: "จัดการการเงิน & รายจ่าย" },
+                        { key: "access_tax", label: "จัดการข้อมูลภาษี" },
+                        { key: "manage_finance_settings", label: "ตั้งค่าระบบบัญชี/การเงิน" },
+                        { key: "manage_staff_permissions", label: "จัดการสิทธิ์พนักงาน" },
+                        { key: "billing_send_line", label: "ส่ง Line OA" },
+                        { key: "billing_download_pdf", label: "ดาวน์โหลด PDF" },
+                        { key: "billing_copy_summary", label: "คัดลอกสรุปบิล" }
+                      ] as const;
 
-                    {/* Permission: Rooms & Tenants */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.manage_rooms_tenants
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.manage_rooms_tenants ? "opacity-100" : "opacity-20"}`} />
-                      <span>จัดการห้องพัก & ผู้เช่า</span>
-                    </span>
+                      const sortedItems = [...items].sort((a, b) => {
+                        const hasA = !!staff.permissions[a.key];
+                        const hasB = !!staff.permissions[b.key];
+                        if (hasA && !hasB) return -1;
+                        if (!hasA && hasB) return 1;
+                        return 0;
+                      });
 
-                    {/* Permission: Meters & Bills */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.manage_meters_bills
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.manage_meters_bills ? "opacity-100" : "opacity-20"}`} />
-                      <span>จดมิเตอร์ & ออกบิล</span>
-                    </span>
-
-                    {/* Permission: Finance & Expenses */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.manage_finance_expenses
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.manage_finance_expenses ? "opacity-100" : "opacity-20"}`} />
-                      <span>จัดการการเงิน & รายจ่าย</span>
-                    </span>
-
-                    {/* Permission: Tax Access */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.access_tax
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.access_tax ? "opacity-100" : "opacity-20"}`} />
-                      <span>จัดการข้อมูลภาษี</span>
-                    </span>
-
-                    {/* Permission: Finance Settings */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.manage_finance_settings
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.manage_finance_settings ? "opacity-100" : "opacity-20"}`} />
-                      <span>ตั้งค่าระบบบัญชี/การเงิน</span>
-                    </span>
-
-                    {/* Permission: Staff & Permissions */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.manage_staff_permissions
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.manage_staff_permissions ? "opacity-100" : "opacity-20"}`} />
-                      <span>จัดการสิทธิ์พนักงาน</span>
-                    </span>
-
-                    {/* Permission: Send Line OA */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.billing_send_line
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.billing_send_line ? "opacity-100" : "opacity-20"}`} />
-                      <span>ส่ง Line OA</span>
-                    </span>
-
-                    {/* Permission: Download PDF */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.billing_download_pdf
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.billing_download_pdf ? "opacity-100" : "opacity-20"}`} />
-                      <span>ดาวน์โหลด PDF</span>
-                    </span>
-
-                    {/* Permission: Copy Summary */}
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
-                      staff.permissions.billing_copy_summary
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
-                    }`}>
-                      <Check className={`w-3 h-3 ${staff.permissions.billing_copy_summary ? "opacity-100" : "opacity-20"}`} />
-                      <span>คัดลอกสรุปบิล</span>
-                    </span>
+                      return sortedItems.map(item => {
+                        const hasPermission = !!staff.permissions[item.key];
+                        return (
+                          <span
+                            key={item.key}
+                            className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                              hasPermission
+                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                                : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
+                            }`}
+                          >
+                            <Check className={`w-3 h-3 ${hasPermission ? "opacity-100" : "opacity-20"}`} />
+                            <span>{item.label}</span>
+                          </span>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
