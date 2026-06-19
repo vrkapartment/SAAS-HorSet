@@ -23,6 +23,8 @@ export interface FinanceSettings {
   deposit_amount?: number
   advance_rent?: number
   deposit_type?: "months" | "fixed"
+  lease_duration?: number
+  lease_expiry_action?: "renew" | "original"
 }
 
 /**
@@ -101,7 +103,28 @@ export async function getFinanceSettings(workspaceId: string) {
         }
       }
     } catch (e) {
-      console.warn("Columns deposit_amount, advance_rent, or deposit_type not available in workspaces. Defaulting.")
+      console.warn("Column deposit_type or other deposit columns not available in workspaces. Defaulting.")
+    }
+
+    // 5. ดึงข้อมูลระยะเวลาสัญญาเช่าเริ่มต้นและสถานะเมื่อสัญญาหมดอายุ (แยกการดึงเพื่อความปลอดภัย)
+    let leaseDuration = 6
+    let leaseExpiryAction: "renew" | "original" = "renew"
+    try {
+      const { data: leaseData, error: leaseError } = await supabase
+        .from("workspaces")
+        .select("lease_duration, lease_expiry_action")
+        .eq("id", workspaceId)
+        .single()
+      if (!leaseError && leaseData) {
+        if (leaseData.lease_duration !== null && leaseData.lease_duration !== undefined) {
+          leaseDuration = Number(leaseData.lease_duration)
+        }
+        if (leaseData.lease_expiry_action) {
+          leaseExpiryAction = leaseData.lease_expiry_action as "renew" | "original"
+        }
+      }
+    } catch (e) {
+      console.warn("Columns lease_duration or lease_expiry_action not available in workspaces. Defaulting.")
     }
 
     const merged = {
@@ -117,7 +140,9 @@ export async function getFinanceSettings(workspaceId: string) {
       late_penalty_rate: latePenaltyRate,
       deposit_amount: depositAmount,
       advance_rent: advanceRent,
-      deposit_type: depositType
+      deposit_type: depositType,
+      lease_duration: leaseDuration,
+      lease_expiry_action: leaseExpiryAction
     }
 
     return { 
@@ -142,7 +167,9 @@ export async function getFinanceSettings(workspaceId: string) {
         late_penalty_rate: Number(merged.late_penalty_rate !== null && merged.late_penalty_rate !== undefined ? merged.late_penalty_rate : 0),
         deposit_amount: Number(merged.deposit_amount !== null && merged.deposit_amount !== undefined ? merged.deposit_amount : 0),
         advance_rent: Number(merged.advance_rent !== null && merged.advance_rent !== undefined ? merged.advance_rent : 0),
-        deposit_type: merged.deposit_type as "months" | "fixed"
+        deposit_type: merged.deposit_type as "months" | "fixed",
+        lease_duration: Number(merged.lease_duration !== null && merged.lease_duration !== undefined ? merged.lease_duration : 6),
+        lease_expiry_action: (merged.lease_expiry_action as "renew" | "original") || "renew"
       } as FinanceSettings 
     }
   } catch (error) {
@@ -182,7 +209,6 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
       return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
     }
 
-    // 2. พยายามอัปเดตข้อมูลทั้งหมดรวมทั้งค่าน้ำค่าไฟ ค่าปรับสะสม และเงินประกัน/เช่าล่วงหน้าในตาราง workspaces
     const { error: updateError } = await supabase
       .from("workspaces")
       .update({
@@ -204,7 +230,9 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         late_penalty_rate: Number(settings.late_penalty_rate || 0),
         deposit_amount: Number(settings.deposit_amount || 0),
         advance_rent: Number(settings.advance_rent || 0),
-        deposit_type: settings.deposit_type || "months"
+        deposit_type: settings.deposit_type || "months",
+        lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
+        lease_expiry_action: settings.lease_expiry_action || "renew"
       })
       .eq("id", workspaceId)
 

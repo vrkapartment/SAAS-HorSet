@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Building, Save, ShieldCheck, Check, AlertTriangle, Loader2, Droplet, Zap, Sliders, Clock } from "lucide-react"
+import { Building, Save, ShieldCheck, Check, AlertTriangle, Loader2, Droplet, Zap, Sliders, Clock, FileText } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
@@ -55,6 +55,10 @@ export default function PropertySettingsPage() {
   const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
   const [electricMinChecked, setElectricMinChecked] = useState<boolean>(true)
   const [electricMinUnit, setElectricMinUnit] = useState<number>(10)
+  
+  // ตั้งค่าระยะเวลาสัญญาเช่าเริ่มต้นและประเภทสัญญา
+  const [leaseDuration, setLeaseDuration] = useState<number>(6)
+  const [leaseExpiryAction, setLeaseExpiryAction] = useState<"renew" | "original">("renew")
 
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -137,6 +141,8 @@ export default function PropertySettingsPage() {
             setWaterMinUnit(cached.water_min_unit !== undefined ? cached.water_min_unit : 3)
             setElectricMinChecked(cached.electric_min_checked !== undefined ? cached.electric_min_checked : true)
             setElectricMinUnit(cached.electric_min_unit !== undefined ? cached.electric_min_unit : 10)
+            setLeaseDuration(cached.lease_duration !== undefined ? cached.lease_duration : 6)
+            setLeaseExpiryAction(cached.lease_expiry_action || "renew")
             setIsDatabaseBacked(true)
           } else {
             const res = await getFinanceSettings(currentWsId)
@@ -164,6 +170,8 @@ export default function PropertySettingsPage() {
               setWaterMinUnit(res.data.water_min_unit !== undefined ? res.data.water_min_unit : 3)
               setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
               setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
+              setLeaseDuration(res.data.lease_duration !== undefined ? res.data.lease_duration : 6)
+              setLeaseExpiryAction(res.data.lease_expiry_action || "renew")
               setIsDatabaseBacked(true)
               setCachedData(currentWsId, cacheKey, res.data)
             } else if (res.error) {
@@ -234,7 +242,9 @@ export default function PropertySettingsPage() {
         electric_min_unit: electricMinUnit,
         deposit_amount: depositAmount,
         deposit_type: depositType,
-        advance_rent: advanceRent
+        advance_rent: advanceRent,
+        lease_duration: leaseDuration,
+        lease_expiry_action: leaseExpiryAction
       }
 
       const res = await saveFinanceSettings(workspaceId, payload)
@@ -252,6 +262,10 @@ export default function PropertySettingsPage() {
               console.error(`ไม่สามารถบันทึกเงินประกันของประเภทห้อง ${rt.name} ได้:`, err)
             }
           }
+        }
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`lease_duration_${workspaceId}`, leaseDuration.toString())
+          localStorage.setItem(`lease_expiry_action_${workspaceId}`, leaseExpiryAction)
         }
         clearWorkspaceCache(workspaceId)
         setCachedData(workspaceId, "finance_settings", payload)
@@ -640,6 +654,95 @@ export default function PropertySettingsPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+            
+            {/* กล่อง 4: ตั้งค่าสัญญาเช่าเริ่มต้น (Default Lease Settings) */}
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3 font-sans">
+                <FileText className="w-4 h-4 text-emerald-400" /> ตั้งค่าสัญญาเช่าเริ่มต้น
+              </h3>
+
+              {/* ระยะเวลาสัญญาเช่า */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <Clock className="w-4 h-4 text-teal-400" /> ระยะเวลาสัญญาเช่าเริ่มต้น
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium">ระยะเวลาสัญญาเริ่มต้น (เดือน)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      placeholder="6"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={leaseDuration}
+                      onChange={(e) => setLeaseDuration(Number(e.target.value))}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">เดือน</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                    เมื่อเพิ่มผู้เช่าใหม่ ระบบจะคำนวณวันสิ้นสุดสัญญาอัตโนมัติจาก วันเริ่มสัญญา + ระยะเวลาสัญญานี้
+                  </p>
+                </div>
+              </div>
+
+              {/* รูปแบบการหมดสัญญา */}
+              <div className="space-y-3 border-t border-slate-200 dark:border-slate-900/40 pt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="text-xs text-slate-400 font-medium">
+                    รูปแบบสัญญาเมื่อครบกำหนด
+                  </label>
+                  
+                  {/* Toggle Mode */}
+                  <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850/80">
+                    <button
+                      type="button"
+                      onClick={() => setLeaseExpiryAction("renew")}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        leaseExpiryAction === "renew"
+                          ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
+                          : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                      }`}
+                    >
+                      ต่อสัญญาใหม่
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLeaseExpiryAction("original")}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        leaseExpiryAction === "original"
+                          ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
+                          : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                      }`}
+                    >
+                      ฉบับเดิม
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-teal-500/5 dark:bg-teal-950/20 border border-teal-500/10 rounded-xl space-y-1.5 animate-fade-in">
+                  <h4 className="text-[11px] text-slate-700 dark:text-slate-300 font-bold">
+                    คำอธิบาย Logic สัญญาเช่า:
+                  </h4>
+                  <ul className="list-disc list-inside text-[10px] text-slate-500 space-y-1 leading-normal">
+                    {leaseExpiryAction === "renew" ? (
+                      <>
+                        <li className="text-amber-500 font-medium dark:text-amber-400">
+                          ช่วง 2 เดือนสุดท้ายก่อนหมดสัญญา: แสดงสถานะ <strong className="font-semibold">"เหลืออายุสัญญาอีก X เดือน"</strong>
+                        </li>
+                        <li className="text-red-500 font-medium dark:text-red-400">
+                          เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">"สัญญาหมดอายุ"</strong>
+                        </li>
+                      </>
+                    ) : (
+                      <li className="text-emerald-500 font-medium dark:text-emerald-400">
+                        เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">"อยู่ครบสัญญา"</strong>
+                      </li>
+                    )}
+                  </ul>
+                </div>
               </div>
             </div>
 

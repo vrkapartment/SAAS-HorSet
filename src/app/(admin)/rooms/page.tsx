@@ -424,20 +424,42 @@ export default function RoomsPage() {
   // Unified Tenant Management logic
   // ---------------------------------------------------------
   
+  // ตัวจัดการเปลี่ยนวันเริ่มสัญญา และคำนวณวันสิ้นสุดให้อัตโนมัติจากระยะเวลาสัญญาเริ่มต้น
+  const handleContractStartChange = (val: string) => {
+    setContractStartInput(val)
+    if (!val) return
+
+    const start = new Date(val)
+    if (isNaN(start.getTime())) return
+
+    const duration = financeSettings?.lease_duration ?? 6
+    const end = new Date(start.getFullYear(), start.getMonth() + duration, start.getDate())
+    
+    const year = end.getFullYear()
+    const month = String(end.getMonth() + 1).padStart(2, "0")
+    const day = String(end.getDate()).padStart(2, "0")
+    
+    setContractEndInput(`${year}-${month}-${day}`)
+  }
+
   // เปิดสำหรับทำสัญญาใหม่
   const handleOpenContractModal = (room: RoomItem) => {
     setSelectedRoom(room)
     setTenantNameInput("")
     setTenantPhoneInput("")
     
-    // ตั้งค่าเริ่มต้นของวันที่วันนี้และสิ้นสุดปีถัดไป
     const today = new Date()
-    const nextYear = new Date()
-    nextYear.setFullYear(nextYear.getFullYear() + 1)
-    nextYear.setDate(nextYear.getDate() - 1)
+    const duration = financeSettings?.lease_duration ?? 6
+    const end = new Date(today.getFullYear(), today.getMonth() + duration, today.getDate())
     
-    setContractStartInput(today.toISOString().split("T")[0])
-    setContractEndInput(nextYear.toISOString().split("T")[0])
+    const startStr = today.toISOString().split("T")[0]
+    setContractStartInput(startStr)
+    
+    const endYear = end.getFullYear()
+    const endMonth = String(end.getMonth() + 1).padStart(2, "0")
+    const endDay = String(end.getDate()).padStart(2, "0")
+    setContractEndInput(`${endYear}-${endMonth}-${endDay}`)
+    
     setContractModalOpen(true)
   }
 
@@ -525,7 +547,8 @@ export default function RoomsPage() {
   const handleCheckoutTenantTrigger = () => {
     if (!selectedRoom || !selectedRoom.tenantId) return
     
-    setCheckoutDate(new Date().toISOString().split("T")[0])
+    const initialDate = new Date().toISOString().split("T")[0]
+    setCheckoutDate(initialDate)
     
     // คำนวณเงินประกันสะสมตามโหมด: คิดตามจำนวนเดือน หรือ ยอดเงินคงที่ (แยกตามประเภทห้อง)
     let calculatedDeposit = 0
@@ -539,7 +562,24 @@ export default function RoomsPage() {
       }
     }
     setCheckoutDeposit(calculatedDeposit)
-    setCheckoutRefund(0)
+    
+    // ตั้งยอดเงินคืนจริงตามเงื่อนไขวันสิ้นสุดสัญญา
+    if (selectedRoom.leaseEnd) {
+      const checkDate = new Date(initialDate)
+      const leaseEndDate = new Date(selectedRoom.leaseEnd)
+      
+      const isBreak = checkDate.getFullYear() < leaseEndDate.getFullYear() || 
+                      (checkDate.getFullYear() === leaseEndDate.getFullYear() && checkDate.getMonth() < leaseEndDate.getMonth())
+      
+      if (isBreak) {
+        setCheckoutRefund(0)
+      } else {
+        setCheckoutRefund(calculatedDeposit)
+      }
+    } else {
+      setCheckoutRefund(0)
+    }
+
     setCheckoutError(null)
     setCheckoutSubmitting(false)
     
@@ -623,6 +663,99 @@ export default function RoomsPage() {
     setCancelledContracts(updated)
     localStorage.setItem(`cancelled_contracts_${wsId}`, JSON.stringify(updated))
     showToast("✓ ลบประวัติการยกเลิกสัญญาเรียบร้อยแล้ว", "success")
+  }
+
+  // คำนวณสถานะสัญญาเช่าผู้เช่า (สัญญาปกติ / เหลืออายุสัญญา X เดือน / สัญญาหมดอายุ / อยู่ครบสัญญา)
+  const getContractStatus = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined) => {
+    if (!leaseStart || !leaseEnd) return null
+
+    const now = new Date()
+    // ล้างเวลาเพื่อความแม่นยำในการเปรียบเทียบวันที่
+    const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    const endDate = new Date(leaseEnd)
+    const endDateTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+
+    // ตรวจสอบว่าหมดอายุหรือยัง
+    if (currentDate > endDateTime) {
+      const action = financeSettings?.lease_expiry_action || "renew"
+      if (action === "renew") {
+        return {
+          label: "สัญญาหมดอายุ",
+          style: "bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 font-bold",
+          dotColor: "bg-red-500"
+        }
+      } else {
+        return {
+          label: "อยู่ครบสัญญา",
+          style: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 font-bold",
+          dotColor: "bg-emerald-500"
+        }
+      }
+    }
+
+    // คำนวณความแตกต่างของจำนวนเดือน
+    const diffYears = endDate.getFullYear() - now.getFullYear()
+    const diffMonths = endDate.getMonth() - now.getMonth()
+    const totalMonths = diffYears * 12 + diffMonths
+
+    // คำนวณความแตกต่างของจำนวนวันจริงที่เหลือ
+    const diffTime = endDateTime.getTime() - currentDate.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    const action = financeSettings?.lease_expiry_action || "renew"
+
+    if (action === "renew") {
+      // ช่วง 2 เดือนสุดท้าย (60 วัน หรือ totalMonths <= 2)
+      if (totalMonths <= 2 && totalMonths >= 0) {
+        let label = ""
+        if (diffDays <= 30) {
+          label = "เหลืออายุสัญญาอีก 1 เดือน"
+        } else if (diffDays <= 60) {
+          label = "เหลืออายุสัญญาอีก 2 เดือน"
+        } else {
+          label = `เหลืออายุสัญญาอีก ${totalMonths} เดือน`
+        }
+        return {
+          label: label,
+          style: "bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400 font-bold",
+          dotColor: "bg-amber-500 animate-pulse"
+        }
+      }
+    }
+
+    // สัญญาเช่ายังปกติอยู่
+    return {
+      label: "สัญญาปกติ",
+      style: "bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 font-bold",
+      dotColor: "bg-blue-500"
+    }
+  }
+
+  // ตรวจสอบเงื่อนไขออกก่อนกำหนด (Break Contract) เปรียบเทียบปีและเดือนที่คืนห้องเทียบกับเดือนที่หมดสัญญา
+  const checkIfBreakContract = (dateStr: string) => {
+    if (!selectedRoom || !selectedRoom.leaseEnd || !dateStr) return false
+    const checkDate = new Date(dateStr)
+    const leaseEndDate = new Date(selectedRoom.leaseEnd)
+    
+    const checkYear = checkDate.getFullYear()
+    const checkMonth = checkDate.getMonth()
+    
+    const leaseYear = leaseEndDate.getFullYear()
+    const leaseMonth = leaseEndDate.getMonth()
+    
+    if (checkYear < leaseYear) return true
+    if (checkYear === leaseYear && checkMonth < leaseMonth) return true
+    
+    return false
+  }
+
+  // ตัวจัดการการเปลี่ยนวันแจ้งออกจริง
+  const handleCheckoutDateChange = (val: string) => {
+    setCheckoutDate(val)
+    if (checkIfBreakContract(val)) {
+      setCheckoutRefund(0)
+    }
   }
 
   // คำนวณสถานะห้อง (ว่าง / รอลงทะเบียน / มีผู้เช่าแล้ว)
@@ -900,6 +1033,7 @@ export default function RoomsPage() {
                       <th className="p-4">ประเภทห้อง</th>
                       <th className="p-4">ผู้เช่าสัญญา</th>
                       <th className="p-4">เบอร์โทรศัพท์</th>
+                      <th className="p-4 w-36">สถานะสัญญา</th>
                       <th className="p-4 text-center w-[270px]">การดำเนินการ</th>
                       <th className="p-4 text-center w-24">ตั้งค่าห้อง</th>
                     </tr>
@@ -953,6 +1087,24 @@ export default function RoomsPage() {
                                   <span>{room.tenantPhone}</span>
                                 </div>
                               ) : (
+                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                              )}
+                            </td>
+
+                            {/* 6.5 Contract Status Column */}
+                            <td className="p-4">
+                              {room.tenantName ? (() => {
+                                const status = getContractStatus(room.leaseStart, room.leaseEnd)
+                                if (status) {
+                                  return (
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] ${status.style}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                                      {status.label}
+                                    </span>
+                                  )
+                                }
+                                return <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                              })() : (
                                 <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
                               )}
                             </td>
@@ -1028,7 +1180,7 @@ export default function RoomsPage() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={8} className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs">
+                        <td colSpan={9} className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs">
                           {/* Empty State Block */}
                           <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
                             <div className="p-3 bg-slate-100 dark:bg-slate-900 text-slate-400 rounded-full border border-slate-200/50">
@@ -1103,6 +1255,27 @@ export default function RoomsPage() {
                               )}
                             </span>
                           </div>
+
+                          {/* Contract Status (Mobile) */}
+                          {room.tenantName && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">สถานะสัญญา:</span>
+                              <span>
+                                {(() => {
+                                  const status = getContractStatus(room.leaseStart, room.leaseEnd)
+                                  if (status) {
+                                    return (
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] ${status.style}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                                        {status.label}
+                                      </span>
+                                    )
+                                  }
+                                  return <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                                })()}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Mobile Footer Buttons (Dynamic lease triggers and setting buttons) */}
@@ -1573,7 +1746,7 @@ export default function RoomsPage() {
                       required
                       className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-colors cursor-pointer"
                       value={contractStartInput}
-                      onChange={(e) => setContractStartInput(e.target.value)}
+                      onChange={(e) => handleContractStartChange(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1754,13 +1927,16 @@ export default function RoomsPage() {
                         setTenantNameInput("")
                         setTenantPhoneInput("")
                         
-                        const todayStr = new Date().toISOString().split("T")[0]
-                        setContractStartInput(todayStr)
+                        const today = new Date()
+                        const duration = financeSettings?.lease_duration ?? 6
+                        const end = new Date(today.getFullYear(), today.getMonth() + duration, today.getDate())
                         
-                        const nextYear = new Date()
-                        nextYear.setFullYear(nextYear.getFullYear() + 1)
-                        nextYear.setDate(nextYear.getDate() - 1)
-                        setContractEndInput(nextYear.toISOString().split("T")[0])
+                        setContractStartInput(today.toISOString().split("T")[0])
+                        
+                        const endYear = end.getFullYear()
+                        const endMonth = String(end.getMonth() + 1).padStart(2, "0")
+                        const endDay = String(end.getDate()).padStart(2, "0")
+                        setContractEndInput(`${endYear}-${endMonth}-${endDay}`)
 
                         setTimeout(() => {
                           setContractModalOpen(true)
@@ -2014,7 +2190,7 @@ export default function RoomsPage() {
                       type="date"
                       required
                       value={checkoutDate}
-                      onChange={(e) => setCheckoutDate(e.target.value)}
+                      onChange={(e) => handleCheckoutDateChange(e.target.value)}
                       className="w-full h-12 md:h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors font-bold font-mono cursor-pointer"
                     />
                   </div>
@@ -2055,9 +2231,19 @@ export default function RoomsPage() {
                         max={checkoutDeposit}
                         value={checkoutRefund}
                         onChange={(e) => setCheckoutRefund(Number(e.target.value))}
-                        className="w-full h-12 md:h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors font-extrabold font-mono"
+                        disabled={checkIfBreakContract(checkoutDate)}
+                        className={`w-full h-12 md:h-10 pl-9 pr-4 border rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors font-extrabold font-mono ${
+                          checkIfBreakContract(checkoutDate)
+                            ? "bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-75"
+                            : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-850 cursor-text"
+                        }`}
                       />
                     </div>
+                    {checkIfBreakContract(checkoutDate) && (
+                      <span className="text-[10px] text-amber-500 font-bold mt-1 block">
+                        * ออกก่อนกำหนด (ผิดสัญญา): งดคืนเงินประกันตามเงื่อนไข
+                      </span>
+                    )}
                   </div>
                 </div>
 
