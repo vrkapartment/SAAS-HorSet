@@ -1045,6 +1045,10 @@ export default function UnifiedBillingPage() {
         handleSendLine={handleSendLine}
         handleMarkAsPaid={handleMarkAsPaid}
         handleSaveAll={handleSaveAll}
+        roomsList={roomsList}
+        billingCycle={billingCycle}
+        workspaceName={workspaceName}
+        currentWorkspaceId={currentWorkspaceId}
       />
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}

@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText } from "lucide-react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare } from "lucide-react"
 
 interface MeterReadingTableProps {
   isDark: boolean
@@ -25,6 +25,11 @@ interface MeterReadingTableProps {
   handleSendLine: (roomNumber: string) => void | Promise<void>
   handleMarkAsPaid: (billId: string, roomNumber: string) => Promise<void>
   handleSaveAll: () => Promise<void>
+  // New props for bulk LINE OA feature
+  roomsList: any[]
+  billingCycle: string
+  workspaceName: string
+  currentWorkspaceId: string
 }
 
 export default function MeterReadingTable({
@@ -50,10 +55,153 @@ export default function MeterReadingTable({
   handleDownloadBillPdf,
   handleSendLine,
   handleMarkAsPaid,
-  handleSaveAll
+  handleSaveAll,
+  roomsList,
+  billingCycle,
+  workspaceName,
+  currentWorkspaceId
 }: MeterReadingTableProps) {
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">("all")
   const colSpanVal = activeTab === "all" ? 7 : 6
+
+  const [bulkSendModalOpen, setBulkSendModalOpen] = useState(false)
+  const [modalActiveTab, setModalActiveTab] = useState<"connected" | "unconnected">("connected")
+  const [bulkSendingStatus, setBulkSendingStatus] = useState<"idle" | "sending" | "completed">("idle")
+  const [bulkSendingProgress, setBulkSendingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
+  const [bulkSendResults, setBulkSendResults] = useState<{ [room: string]: { success: boolean; error?: string } }>({})
+  const [copiedRooms, setCopiedRooms] = useState<{ [room: string]: boolean }>({})
+
+  // กรองห้องที่มีผู้เช่าและออกบิลประจำรอบนั้นแล้ว (ไม่รวมห้องว่าง หรือยังไม่ออกบิล)
+  const activeRooms = unifiedItems.filter(item => item.tenantName && item.billStatus !== "not_created")
+
+  const connectedRooms = activeRooms.filter(item => {
+    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+    return !!roomInfo?.lineUserId
+  })
+
+  const unconnectedRooms = activeRooms.filter(item => {
+    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+    return !roomInfo?.lineUserId
+  })
+
+  // ฟังก์ชันจัดรูปแบบภาษาไทยรอบบิลสำหรับใช้ในหน้านี้
+  function formatBillingCycleThaiLocal(cycleStr: string): string {
+    if (!cycleStr) return ""
+    if (cycleStr.includes("-")) {
+      const [year, month] = cycleStr.split("-")
+      const monthsThai = [
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+      ]
+      const monthIdx = parseInt(month, 10) - 1
+      if (monthIdx >= 0 && monthIdx < 12) {
+        return `${monthsThai[monthIdx]} ${year}`
+      }
+    }
+    return cycleStr
+  }
+
+  // ฟังก์ชันสำหรับคัดลอกข้อมูลใบแจ้งหนี้แบบสรุป เพื่ออำนวยความสะดวกในห้องที่ไม่ได้ผูก LINE UID
+  const handleCopySummary = (item: any) => {
+    const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+    const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+
+    const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+    const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+
+    const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
+    const portalLink = currentWorkspaceId
+      ? `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_number=${encodeURIComponent(item.roomNumber)}`
+      : `${safeAppUrl}/portal`
+
+    const thaiCycle = formatBillingCycleThaiLocal(billingCycle)
+    const totalAmount = item.billAmount || (item.baseRent + elecCost + waterCost + commonFee)
+
+    const text = `🏠 ${workspaceName || "หอพัก"} - ใบแจ้งค่าใช้จ่ายประจำเดือน ${thaiCycle}
+เลขห้อง: ${item.roomNumber}
+ผู้เช่า: ${item.tenantName || "ผู้เช่า"}
+----------------------------------
+• ค่าเช่าห้อง: ${item.baseRent.toLocaleString()} บาท
+• ค่าไฟฟ้า: ${elecCost.toLocaleString()} บาท (ใช้ไป ${elecUnitsUsed} หน่วย)
+• ค่าน้ำประปา: ${waterCost.toLocaleString()} บาท (ใช้ไป ${waterUnitsUsed} หน่วย)
+• ค่าส่วนกลาง: ${commonFee.toLocaleString()} บาท
+----------------------------------
+💰 ยอดสุทธิที่ต้องชำระ: ${totalAmount.toLocaleString()} บาท
+
+คุณสามารถดูบิลออนไลน์และแจ้งชำระเงินได้ที่ลิงก์นี้:
+🔗 ${portalLink}
+
+ขอบคุณค่ะ/ครับ 🙏`
+
+    navigator.clipboard.writeText(text)
+    setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: true }))
+    
+    setTimeout(() => {
+      setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: false }))
+    }, 3500)
+  }
+
+  // ฟังก์ชันเริ่มส่ง LINE OA แบบกลุ่มทีละห้อง
+  const startBulkSend = async () => {
+    if (connectedRooms.length === 0) return
+    
+    setBulkSendingStatus("sending")
+    setBulkSendingProgress({ current: 0, total: connectedRooms.length, currentRoom: "" })
+    const results: { [room: string]: { success: boolean; error?: string } } = {}
+
+    try {
+      const { sendLineBillNotificationAction } = await import("@/features/notification/actions")
+
+      for (let i = 0; i < connectedRooms.length; i++) {
+        const item = connectedRooms[i]
+        setBulkSendingProgress({ current: i + 1, total: connectedRooms.length, currentRoom: item.roomNumber })
+        
+        const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+        const lineUserId = roomInfo?.lineUserId
+
+        if (!lineUserId) {
+          results[item.roomNumber] = { success: false, error: "ไม่พบข้อมูลรหัส LINE User ID" }
+          continue
+        }
+
+        try {
+          const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+          const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+
+          const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+          const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+
+          const result = await sendLineBillNotificationAction({
+            lineUserId,
+            roomNumber: item.roomNumber,
+            tenantName: item.tenantName || "ผู้เช่า",
+            billingCycle: formatBillingCycleThaiLocal(billingCycle),
+            baseRent: item.baseRent,
+            electricUnits: elecUnitsUsed,
+            electricAmount: elecCost,
+            waterUnits: waterUnitsUsed,
+            waterAmount: waterCost,
+            commonFee: commonFee,
+            totalAmount: item.billAmount,
+            workspaceName: workspaceName || "หอพักของเรา",
+            workspaceId: currentWorkspaceId,
+          })
+
+          results[item.roomNumber] = { success: result.success, error: result.error }
+        } catch (err: any) {
+          console.error(`Error sending LINE to room ${item.roomNumber}:`, err)
+          results[item.roomNumber] = { success: false, error: err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ" }
+        }
+      }
+
+      setBulkSendResults(results)
+      setBulkSendingStatus("completed")
+    } catch (err: any) {
+      console.error("Bulk Send Action failed:", err)
+      setBulkSendingStatus("idle")
+      alert("เกิดข้อผิดพลาดในการเรียกใช้ระบบส่งข้อความแจ้งเตือน LINE")
+    }
+  }
 
   return (
     <>
@@ -113,20 +261,36 @@ export default function MeterReadingTable({
             </button>
           </div>
           
-          <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-semibold border ${
-            isDark ? "bg-slate-900/30 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-              activeTab === "all" ? "bg-teal-500" : activeTab === "electric" ? "bg-blue-500" : "bg-teal-500"
-            }`}></span>
-            <span>โหมดการทำงาน: </span>
-            <strong className={
-              activeTab === "all" ? "text-slate-700 dark:text-slate-300" : 
-              activeTab === "electric" ? "text-blue-600 dark:text-blue-400" : "text-teal-600 dark:text-teal-400"
-            }>
-              {activeTab === "all" ? "จัดการบิลค่าเช่า (ดูเท่านั้น)" : 
-               activeTab === "electric" ? "จดบันทึกมิเตอร์ไฟ" : "จดบันทึกมิเตอร์น้ำ"}
-            </strong>
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold border ${
+              isDark ? "bg-slate-900/30 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                activeTab === "all" ? "bg-teal-500" : activeTab === "electric" ? "bg-blue-500" : "bg-teal-500"
+              }`}></span>
+              <span>โหมดการทำงาน: </span>
+              <strong className={
+                activeTab === "all" ? "text-slate-700 dark:text-slate-300" : 
+                activeTab === "electric" ? "text-blue-600 dark:text-blue-400" : "text-teal-600 dark:text-teal-400"
+              }>
+                {activeTab === "all" ? "จัดการบิลค่าเช่า (ดูเท่านั้น)" : 
+                 activeTab === "electric" ? "จดบันทึกมิเตอร์ไฟ" : "จดบันทึกมิเตอร์น้ำ"}
+              </strong>
+            </div>
+
+            {activeTab === "all" && unifiedItems.length > 0 && (
+              <button
+                onClick={() => {
+                  setBulkSendResults({})
+                  setBulkSendingStatus("idle")
+                  setBulkSendModalOpen(true)
+                }}
+                className="w-full sm:w-auto h-9 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>ส่ง LINE OA ทุกห้องพร้อมกัน</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -915,6 +1079,291 @@ export default function MeterReadingTable({
           </div>
         )}
       </div>
+
+      {/* โมดอลสำหรับส่ง LINE OA แบบกลุ่ม */}
+      {bulkSendModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+          <div className={`w-full max-w-2xl max-h-[85vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl border flex flex-col ${
+            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+          }`}>
+            {/* ปุ่มปิด */}
+            <button
+              onClick={() => {
+                if (bulkSendingStatus !== "sending") {
+                  setBulkSendModalOpen(false)
+                }
+              }}
+              disabled={bulkSendingStatus === "sending"}
+              className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all ${
+                bulkSendingStatus === "sending" ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+              } ${
+                isDark ? "text-slate-400 hover:text-white hover:bg-slate-900/50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* ส่วนหัวโมดอล */}
+            <div className="mb-4">
+              <h3 className={`text-base font-black flex items-center gap-2 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                <MessageSquare className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} />
+                <span>ส่ง LINE OA และบิลค่าเช่าประจำเดือน</span>
+              </h3>
+              <p className={`text-xs mt-1.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                ส่งแจ้งเตือนยอดบิลพรีเมียมและลิงก์ออนไลน์เข้าแชท LINE OA ของผู้เช่าทุกคนพร้อมกัน
+              </p>
+            </div>
+
+            {/* การ์ดสรุปสถานะการผูก LINE */}
+            <div className="grid grid-cols-3 gap-2.5 mb-5">
+              <div className={`p-3 rounded-xl border text-center ${
+                isDark ? "bg-slate-950/40 border-slate-850" : "bg-slate-50 border-slate-150"
+              }`}>
+                <div className={`text-[10px] font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>ผู้เช่าที่มีบิล</div>
+                <div className={`text-sm md:text-lg font-black mt-1 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                  {activeRooms.length} <span className="text-xs font-medium">ห้อง</span>
+                </div>
+              </div>
+              <div className={`p-3 rounded-xl border text-center bg-emerald-500/5 border-emerald-500/20`}>
+                <div className="text-[10px] font-bold text-emerald-500">ผูก LINE แล้ว</div>
+                <div className="text-sm md:text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                  {connectedRooms.length} <span className="text-xs font-medium">ห้อง</span>
+                </div>
+              </div>
+              <div className={`p-3 rounded-xl border text-center bg-amber-500/5 border-amber-500/20`}>
+                <div className="text-[10px] font-bold text-amber-500">ยังไม่ผูก LINE</div>
+                <div className="text-sm md:text-lg font-black text-amber-600 dark:text-amber-400 mt-1">
+                  {unconnectedRooms.length} <span className="text-xs font-medium">ห้อง</span>
+                </div>
+              </div>
+            </div>
+
+            {/* แถบเลือกสลับกลุ่ม (พร้อมส่ง vs ไม่ได้ผูก) */}
+            <div className={`flex p-1 rounded-xl mb-4 self-start shadow-inner border ${
+              isDark ? "bg-slate-950/40 border-slate-850" : "bg-slate-100 border-slate-200"
+            }`}>
+              <button
+                onClick={() => setModalActiveTab("connected")}
+                className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                  modalActiveTab === "connected"
+                    ? (isDark ? "bg-slate-900 text-emerald-405 border border-slate-800" : "bg-white text-emerald-600 border border-slate-200 shadow-sm")
+                    : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+                }`}
+              >
+                พร้อมส่งอัตโนมัติ ({connectedRooms.length})
+              </button>
+              <button
+                onClick={() => setModalActiveTab("unconnected")}
+                className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                  modalActiveTab === "unconnected"
+                    ? (isDark ? "bg-slate-900 text-amber-405 border border-slate-800" : "bg-white text-amber-600 border border-slate-200 shadow-sm")
+                    : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
+                }`}
+              >
+                คัดลอกส่งเอง ({unconnectedRooms.length})
+              </button>
+            </div>
+
+            {/* เนื้อหาหลักในโมดอล */}
+            <div className={`flex-1 border rounded-2xl p-4 overflow-y-auto min-h-[220px] max-h-[350px] mb-5 ${
+              isDark ? "bg-slate-950/20 border-slate-850" : "bg-slate-50 border-slate-150"
+            }`}>
+              
+              {/* แถบผู้ที่เชื่อมต่อ LINE แล้ว */}
+              {modalActiveTab === "connected" && (
+                <div className="space-y-2.5">
+                  {connectedRooms.length > 0 ? (
+                    connectedRooms.map(item => {
+                      const result = bulkSendResults[item.roomNumber]
+                      return (
+                        <div key={item.roomNumber} className={`flex items-center justify-between p-3 rounded-xl border text-xs transition-all ${
+                          isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
+                        }`}>
+                          <div>
+                            <span className={`font-black px-2 py-0.5 rounded-lg border mr-2 ${
+                              isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-250"
+                            }`}>
+                              ห้อง {item.roomNumber}
+                            </span>
+                            <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                              {item.tenantName}
+                            </span>
+                            <span className={`ml-2 text-[10px] font-mono font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                              ({item.billAmount?.toLocaleString()}.-)
+                            </span>
+                          </div>
+                          
+                          <div>
+                            {bulkSendingStatus === "idle" && (
+                              <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                พร้อมส่งบิล LINE OA
+                              </span>
+                            )}
+                            {bulkSendingStatus === "sending" && bulkSendingProgress.currentRoom === item.roomNumber && (
+                              <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 animate-pulse">
+                                กำลังส่งข้อความ...
+                              </span>
+                            )}
+                            {bulkSendingStatus === "sending" && !result && bulkSendingProgress.currentRoom !== item.roomNumber && (
+                              <span className="text-[10px] font-semibold text-slate-450 dark:text-slate-500">
+                                รอคิว...
+                              </span>
+                            )}
+                            {result && (
+                              result.success ? (
+                                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                  สำเร็จแล้ว ✅
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20" title={result.error}>
+                                  ล้มเหลว ❌
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="py-12 text-center text-slate-500 text-xs">
+                      ไม่มีห้องที่มีผู้เช่าและเชื่อมต่อ LINE ในรอบบิลนี้
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* แถบผู้ที่ยังไม่ได้เชื่อมต่อ LINE */}
+              {modalActiveTab === "unconnected" && (
+                <div className="space-y-3">
+                  <div className={`p-3 rounded-xl border text-[11px] font-medium leading-relaxed mb-1 flex gap-2 ${
+                    isDark ? "bg-amber-500/5 border-amber-500/10 text-amber-400" : "bg-amber-50/50 border-amber-100 text-amber-700"
+                  }`}>
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>
+                      <strong>คำแนะนำ:</strong> เนื่องจากผู้เช่ายังไม่ได้ลงทะเบียนผูกบัญชี LINE OA คุณสามารถคลิกปุ่ม <strong>"คัดลอกสรุปบิล"</strong> เพื่อนำสรุปยอดบิลและลิงก์ออนไลน์ ไปวางส่งในแชทปกติ (เช่น LINE, Facebook, SMS) ได้ทันที
+                    </span>
+                  </div>
+
+                  {unconnectedRooms.length > 0 ? (
+                    unconnectedRooms.map(item => {
+                      const isCopied = copiedRooms[item.roomNumber]
+                      return (
+                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border text-xs gap-3 transition-all ${
+                          isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
+                        }`}>
+                          <div>
+                            <span className={`font-black px-2 py-0.5 rounded-lg border mr-2 ${
+                              isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-250"
+                            }`}>
+                              ห้อง {item.roomNumber}
+                            </span>
+                            <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                              {item.tenantName}
+                            </span>
+                            <span className={`ml-2 text-[10px] font-mono font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                              ({item.billAmount?.toLocaleString()}.-)
+                            </span>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleCopySummary(item)}
+                            className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto ${
+                              isCopied
+                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                : (isDark ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200" : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700")
+                            }`}
+                          >
+                            {isCopied ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>คัดลอกสรุปบิลแล้ว!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>คัดลอกสรุปบิล</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="py-12 text-center text-slate-500 text-xs">
+                      ผู้เช่าทุกห้องผูก LINE OA ครบแล้ว ไม่มีห้องคงค้างในส่วนนี้
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* แถบแจ้งเตือนความคืบหน้าขณะกำลังส่ง (Progress bar) */}
+            {bulkSendingStatus === "sending" && (
+              <div className={`p-4 rounded-2xl border mb-5 space-y-2 ${
+                isDark ? "bg-slate-950 border-slate-850" : "bg-blue-50/30 border-blue-100"
+              }`}>
+                <div className="flex justify-between text-xs font-bold font-mono">
+                  <span className={isDark ? "text-slate-300" : "text-slate-700"}>
+                    กำลังส่ง: ห้อง {bulkSendingProgress.currentRoom}
+                  </span>
+                  <span className="text-blue-500">
+                    {bulkSendingProgress.current} / {bulkSendingProgress.total} ห้อง
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-teal-500 to-emerald-500 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${(bulkSendingProgress.current / bulkSendingProgress.total) * 100}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center animate-pulse">
+                  กรุณาอย่าปิดหน้านี้ขณะที่กำลังดำเนินการส่งข้อมูล...
+                </p>
+              </div>
+            )}
+
+            {/* กล่องแสดงสรุปเมื่อส่งเสร็จสิ้น */}
+            {bulkSendingStatus === "completed" && (
+              <div className={`p-4 rounded-2xl border mb-5 text-center ${
+                isDark ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
+              }`}>
+                <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                <h4 className="text-xs font-black">ส่งบิลเข้า LINE OA กลุ่มเรียบร้อย!</h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  ส่งยอดค่าเช่าเข้าแชท LINE OA สำเร็จทั้งหมด{" "}
+                  {Object.values(bulkSendResults).filter(r => r.success).length} ห้อง จากทั้งหมด {connectedRooms.length} ห้อง
+                </p>
+              </div>
+            )}
+
+            {/* ส่วนควบคุมท้ายสุด */}
+            <div className="flex justify-end gap-2 text-xs font-bold pt-2 border-t dark:border-slate-800">
+              <button
+                onClick={() => setBulkSendModalOpen(false)}
+                disabled={bulkSendingStatus === "sending"}
+                className={`px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                  isDark ? "bg-slate-950 border-slate-850 text-slate-400 hover:text-white" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                } ${bulkSendingStatus === "sending" ? "opacity-30 cursor-not-allowed" : ""}`}
+              >
+                {bulkSendingStatus === "completed" ? "ปิดหน้าต่าง" : "ยกเลิก"}
+              </button>
+
+              {modalActiveTab === "connected" && bulkSendingStatus !== "completed" && connectedRooms.length > 0 && (
+                <button
+                  onClick={startBulkSend}
+                  disabled={bulkSendingStatus === "sending"}
+                  className={`px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/10 cursor-pointer active:scale-[0.98] ${
+                    bulkSendingStatus === "sending" ? "opacity-30 cursor-not-allowed animate-pulse" : ""
+                  }`}
+                >
+                  <Send className="w-4 h-4" />
+                  <span>เริ่มส่งเข้า LINE OA ({connectedRooms.length} ห้อง)</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
