@@ -83,10 +83,10 @@ export default function PermissionsPage() {
   const sqlScript = `-- Database Patch: Add staff permissions to profiles table
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS permissions JSONB 
-DEFAULT '{"manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": false}'::jsonb;
+DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_staff_permissions": false}'::jsonb;
 
 UPDATE public.profiles
-SET permissions = '{"manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": true}'::jsonb
+SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_staff_permissions": true}'::jsonb
 WHERE role IN ('admin', 'super_admin');`;
 
   // Check demo mode
@@ -298,7 +298,7 @@ WHERE role IN ('admin', 'super_admin');`;
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">สิทธิ์การทำงานละเอียด</span>
-            <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 mt-0.5">4 ด้านแยกอิสระ</h3>
+            <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 mt-0.5">7 ด้านแยกอิสระ</h3>
           </div>
         </div>
 
@@ -364,6 +364,16 @@ WHERE role IN ('admin', 'super_admin');`;
                     สิทธิ์ที่ได้รับมอบหมาย:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
+                    {/* Permission: View Dashboard Stats */}
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                      staff.permissions.view_dashboard_stats
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
+                    }`}>
+                      <Check className={`w-3 h-3 ${staff.permissions.view_dashboard_stats ? "opacity-100" : "opacity-20"}`} />
+                      <span>ดูสถิติภาพรวม</span>
+                    </span>
+
                     {/* Permission: Rooms & Tenants */}
                     <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
                       staff.permissions.manage_rooms_tenants
@@ -391,7 +401,7 @@ WHERE role IN ('admin', 'super_admin');`;
                         : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
                     }`}>
                       <Check className={`w-3 h-3 ${staff.permissions.manage_finance_expenses ? "opacity-100" : "opacity-20"}`} />
-                      <span>การเงิน & บันทึกรายจ่าย</span>
+                      <span>จัดการการเงิน & รายจ่าย</span>
                     </span>
 
                     {/* Permission: Tax Access */}
@@ -401,7 +411,27 @@ WHERE role IN ('admin', 'super_admin');`;
                         : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
                     }`}>
                       <Check className={`w-3 h-3 ${staff.permissions.access_tax ? "opacity-100" : "opacity-20"}`} />
-                      <span>รายงานและแบบฟอร์มภาษี</span>
+                      <span>จัดการข้อมูลภาษี</span>
+                    </span>
+
+                    {/* Permission: Finance Settings */}
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                      staff.permissions.manage_finance_settings
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
+                    }`}>
+                      <Check className={`w-3 h-3 ${staff.permissions.manage_finance_settings ? "opacity-100" : "opacity-20"}`} />
+                      <span>ตั้งค่าระบบบัญชี/การเงิน</span>
+                    </span>
+
+                    {/* Permission: Staff & Permissions */}
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                      staff.permissions.manage_staff_permissions
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
+                    }`}>
+                      <Check className={`w-3 h-3 ${staff.permissions.manage_staff_permissions ? "opacity-100" : "opacity-20"}`} />
+                      <span>จัดการสิทธิ์พนักงาน</span>
                     </span>
                   </div>
                 </div>
@@ -557,6 +587,23 @@ WHERE role IN ('admin', 'super_admin');`;
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">กำหนดสิทธิ์ทีมงาน:</span>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* view_dashboard_stats */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "view_dashboard_stats")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.view_dashboard_stats
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ดูแดชบอร์ดสถิติภาพรวม</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูสถิติรายรับ-รายจ่าย ข้อมูลสรุปในหน้าแรก</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.view_dashboard_stats ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
                 {/* manage_rooms_tenants */}
                 <button
                   type="button"
@@ -569,7 +616,7 @@ WHERE role IN ('admin', 'super_admin');`;
                 >
                   <div className="flex flex-col">
                     <span>จัดการห้องพัก & ผู้เช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/ย้าย/ลบสัญญารายการห้องพัก</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก บันทึกสัญญาเช่า</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_rooms_tenants ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -586,7 +633,7 @@ WHERE role IN ('admin', 'super_admin');`;
                 >
                   <div className="flex flex-col">
                     <span>จดเลขมิเตอร์ & จัดการบิล</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และออกบิลค่าเช่า</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และออกใบแจ้งหนี้รายเดือน</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_meters_bills ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -602,8 +649,8 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>บันทึกการเงิน & บัญชี</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">บันทึกรายจ่าย ยืนยันสลิปเข้าบัญชี</span>
+                    <span>จัดการการเงิน & รายจ่าย</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">บันทึกบิลรายจ่ายรายวัน ตรวจสอบสลิปโอน</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_finance_expenses ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -620,9 +667,43 @@ WHERE role IN ('admin', 'super_admin');`;
                 >
                   <div className="flex flex-col">
                     <span>จัดการข้อมูลภาษีหอพัก</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูข้อมูลสรุปภาษี ภ.ง.ด. 90/94</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูและพิมพ์รายงานภาษีหอพัก ภ.ง.ด. 90/94</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.access_tax ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_finance_settings */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "manage_finance_settings")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.manage_finance_settings
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ตั้งค่าระบบบัญชีและการเงิน</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร วิธีรับชำระเงินและค่าน้ำไฟ</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_finance_settings ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_staff_permissions */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "manage_staff_permissions")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.manage_staff_permissions
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>จัดการสิทธิ์พนักงาน (Staff)</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/ลบพนักงาน และกำหนดสิทธิ์การใช้งานระบบ</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_staff_permissions ? "opacity-100" : "opacity-0"}`} />
                 </button>
               </div>
             </div>
@@ -711,6 +792,23 @@ WHERE role IN ('admin', 'super_admin');`;
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">ปรับสิทธิ์การเข้าทำรายการ:</span>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* view_dashboard_stats */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "view_dashboard_stats")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.view_dashboard_stats
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ดูแดชบอร์ดสถิติภาพรวม</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูสถิติรายรับ-รายจ่าย ข้อมูลสรุปในหน้าแรก</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.view_dashboard_stats ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
                 {/* manage_rooms_tenants */}
                 <button
                   type="button"
@@ -723,7 +821,7 @@ WHERE role IN ('admin', 'super_admin');`;
                 >
                   <div className="flex flex-col">
                     <span>จัดการห้องพัก & ผู้เช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/ย้าย/ลบสัญญารายการห้องพัก</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก บันทึกสัญญาเช่า</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_rooms_tenants ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -756,8 +854,8 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>บันทึกการเงิน & บัญชี</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">บันทึกรายจ่าย ยืนยันสลิปเข้าบัญชี</span>
+                    <span>จัดการการเงิน & รายจ่าย</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">บันทึกบิลรายจ่ายรายวัน ตรวจสอบสลิปโอน</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_finance_expenses ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -774,9 +872,43 @@ WHERE role IN ('admin', 'super_admin');`;
                 >
                   <div className="flex flex-col">
                     <span>จัดการข้อมูลภาษีหอพัก</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูข้อมูลสรุปภาษี ภ.ง.ด. 90/94</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูและพิมพ์รายงานภาษีหอพัก ภ.ง.ด. 90/94</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.access_tax ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_finance_settings */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "manage_finance_settings")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.manage_finance_settings
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ตั้งค่าระบบบัญชีและการเงิน</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร วิธีรับชำระเงินและค่าน้ำไฟ</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_finance_settings ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_staff_permissions */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "manage_staff_permissions")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.manage_staff_permissions
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>จัดการสิทธิ์พนักงาน (Staff)</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/ลบพนักงาน และกำหนดสิทธิ์การใช้งานระบบ</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_staff_permissions ? "opacity-100" : "opacity-0"}`} />
                 </button>
               </div>
             </div>

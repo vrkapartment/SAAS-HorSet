@@ -38,6 +38,7 @@ import SupportModal from "./dashboard/SupportModal"
 import ProfileModal from "./dashboard/ProfileModal"
 import { useSupportAccess } from "@/hooks/useSupportAccess"
 import { getCurrentUserProfileClient, setCachedUserProfile, clearCachedUserProfile } from "@/features/auth/client"
+import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISSIONS } from "@/features/permissions/types"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRooms, getRoomTypes } from "@/features/room/actions"
 import { getTenants } from "@/features/tenant/actions"
@@ -118,6 +119,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
+  const [userPermissions, setUserPermissions] = useState<StaffPermissions | null>(null)
 
   // ตรวจสอบโหมดทดสอบ / เชื่อมต่อจริง
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
@@ -270,6 +272,27 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             setFullName(res.data.full_name || res.data.email || "ผู้ดูแลระบบ")
             setProfileName(res.data.full_name || "")
             setProfilePhone(res.data.phone || "")
+            
+            // โหลดสิทธิ์การเข้าถึงแบบละเอียด (Permissions)
+            const isUserAdminOrSuper = res.data.role === "admin" || res.data.role === "super_admin"
+            const defaultPerms = isUserAdminOrSuper ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS
+
+            if (res.data.permissions) {
+              let perms = res.data.permissions
+              if (typeof perms === "string") {
+                try {
+                  perms = JSON.parse(perms)
+                } catch {
+                  perms = defaultPerms
+                }
+              }
+              setUserPermissions({
+                ...defaultPerms,
+                ...perms
+              })
+            } else {
+              setUserPermissions(defaultPerms)
+            }
           }
         } catch (err) {
           console.error("Error loading user profile:", err)
@@ -286,6 +309,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         setFullName(savedName || defaultName)
         setProfileName(savedName || defaultName)
         setProfilePhone(savedPhone || defaultPhone)
+        setUserPermissions(userRole === "super_admin" || userRole === "admin" ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS)
         setIsProfileLoaded(true)
       }
     }
@@ -588,9 +612,61 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
   ]
 
+  const hasPermissionForPath = (path: string) => {
+    // โหมดเดโมหรือข้อมูลยังโหลดไม่เสร็จ ให้ข้ามไปก่อนเพื่อป้องกันกระพริบหน้าจอ
+    if (!isProfileLoaded) return true
+
+    // Super Admin เข้าได้หมดทุกอย่าง
+    if (userRole === "super_admin") return true
+
+    if (path === "/super-admin") {
+      return false
+    }
+
+    if (path === "#profile" || path === "/login") {
+      return true
+    }
+
+    // สำหรับบทบาทอื่นๆ ดึงสิทธิ์จาก userPermissions ที่แอดมินตั้งค่าไว้ใน DB JSONB
+    if (!userPermissions) return false
+
+    if (path === "/dashboard") {
+      return !!userPermissions.view_dashboard_stats
+    }
+    if (path === "/rooms" || path === "/tenants") {
+      return !!userPermissions.manage_rooms_tenants
+    }
+    if (path === "/billing" || path === "/meter") {
+      return !!userPermissions.manage_meters_bills
+    }
+    if (path === "/daily-bills") {
+      return !!userPermissions.manage_finance_expenses
+    }
+    if (path === "/tax") {
+      return !!userPermissions.access_tax
+    }
+    if (path === "/finance-settings") {
+      return !!userPermissions.manage_finance_settings
+    }
+    if (path === "/permissions") {
+      return !!userPermissions.manage_staff_permissions
+    }
+    if (path === "/test-connection") {
+      return !!userPermissions.manage_staff_permissions
+    }
+
+    return false
+  }
+
+  const isPathAllowed = () => {
+    if (!pathname) return true
+    // ใช้ฟังก์ชันเดียวกันเพื่อความสม่ำเสมอ ตัดการดูสิทธิ์จาก Role บทบาทหลักออกไปโดยสมบูรณ์
+    return hasPermissionForPath(pathname)
+  }
+
   const filteredMenu = menuItems.filter(item => {
-    // กรองตามสิทธิ์ปกติก่อน
-    if (!item.roles.includes(userRole)) return false
+    // ตรวจสอบสิทธิ์ของเส้นทางนี้โดยดูจากคอลัมน์ permissions โดยตรง (ตัดการดูสิทธิ์จากบทบาท Role ออกไป)
+    if (!hasPermissionForPath(item.path)) return false
 
     // หากเป็น Super Admin และไม่มีสิทธิ์ช่วยเหลือของ Workspace ปัจจุบัน ให้ซ่อนแท็บเกี่ยวกับตัวข้อมูลหอพัก/ผู้เช่า/บิล/ภาษี/การเงิน
     // (ซ่อนเฉพาะตอนที่อยู่ที่หน้า /super-admin เพื่อป้องกันการกระพริบหายไปของแท็บขณะสลับหน้าระหว่างทำงานใน Workspace)
@@ -732,7 +808,53 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
         {/* ตัวเนื้อหาภายในหน้าเว็บ (Page Content Injection) */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6 overflow-x-hidden">
-          {children}
+          {isPathAllowed() ? (
+            children
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
+              <div className="glass-panel p-8 sm:p-12 rounded-3xl max-w-md border border-red-500/20 shadow-xl relative overflow-hidden bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl">
+                {/* Glowing red accent */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent" />
+                
+                <div className="mx-auto w-16 h-16 bg-red-500/10 dark:bg-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-6 animate-pulse">
+                  <Lock className="w-8 h-8" />
+                </div>
+                
+                <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mb-3">
+                  คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+                </h2>
+                
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+                  สิทธิ์การใช้งานของพนักงาน (Staff) ของคุณถูกกำหนดไม่ให้เข้าถึงเมนูนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การเข้าใช้งาน
+                </p>
+
+                <div className="space-y-3">
+                  {userPermissions?.manage_meters_bills && (
+                    <button
+                      onClick={() => safeNavigate("/billing")}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                      ไปยังหน้าจดมิเตอร์ & จัดการบิล
+                    </button>
+                  )}
+                  {userPermissions?.manage_rooms_tenants && (
+                    <button
+                      onClick={() => safeNavigate("/rooms")}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-slate-600 to-slate-800 hover:from-slate-500 hover:to-slate-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-slate-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                      ไปยังหน้าจัดการห้องพักและผู้เช่า
+                    </button>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full py-2.5 px-4 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors text-xs font-bold"
+                  >
+                    ออกจากระบบ (Logout)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 

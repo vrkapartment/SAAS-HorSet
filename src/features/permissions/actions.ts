@@ -63,10 +63,13 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
           workspace_id: targetWorkspaceId,
           created_at: new Date().toISOString(),
           permissions: {
+            view_dashboard_stats: false,
             manage_rooms_tenants: true,
             manage_meters_bills: true,
             manage_finance_expenses: false,
-            access_tax: false
+            access_tax: false,
+            manage_finance_settings: false,
+            manage_staff_permissions: false
           }
         },
         {
@@ -78,10 +81,13 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
           workspace_id: targetWorkspaceId,
           created_at: new Date().toISOString(),
           permissions: {
+            view_dashboard_stats: true,
             manage_rooms_tenants: false,
             manage_meters_bills: true,
             manage_finance_expenses: true,
-            access_tax: false
+            access_tax: false,
+            manage_finance_settings: false,
+            manage_staff_permissions: false
           }
         }
       ]
@@ -128,10 +134,13 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
       return {
         ...p,
         permissions: {
+          view_dashboard_stats: perms.view_dashboard_stats !== undefined ? perms.view_dashboard_stats : DEFAULT_STAFF_PERMISSIONS.view_dashboard_stats,
           manage_rooms_tenants: perms.manage_rooms_tenants !== undefined ? perms.manage_rooms_tenants : DEFAULT_STAFF_PERMISSIONS.manage_rooms_tenants,
           manage_meters_bills: perms.manage_meters_bills !== undefined ? perms.manage_meters_bills : DEFAULT_STAFF_PERMISSIONS.manage_meters_bills,
           manage_finance_expenses: perms.manage_finance_expenses !== undefined ? perms.manage_finance_expenses : DEFAULT_STAFF_PERMISSIONS.manage_finance_expenses,
           access_tax: perms.access_tax !== undefined ? perms.access_tax : DEFAULT_STAFF_PERMISSIONS.access_tax,
+          manage_finance_settings: perms.manage_finance_settings !== undefined ? perms.manage_finance_settings : DEFAULT_STAFF_PERMISSIONS.manage_finance_settings,
+          manage_staff_permissions: perms.manage_staff_permissions !== undefined ? perms.manage_staff_permissions : DEFAULT_STAFF_PERMISSIONS.manage_staff_permissions,
         }
       }
     })

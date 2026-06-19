@@ -96,7 +96,7 @@ export async function getCurrentUserProfileAction() {
     // ดึงข้อมูลจากตาราง profiles
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, email, role, full_name, phone, tfa_enabled, workspace_id, created_at")
+      .select("id, email, role, full_name, phone, tfa_enabled, workspace_id, created_at, permissions")
       .eq("id", user.id)
       .single()
 
