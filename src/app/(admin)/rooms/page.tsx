@@ -24,7 +24,9 @@ import {
   LogOut,
   Share2,
   ClipboardCheck,
-  Building
+  Building,
+  ShieldCheck,
+  AlertTriangle
 } from "lucide-react"
 import { 
   getRooms, 
@@ -78,6 +80,7 @@ export default function RoomsPage() {
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeItem[]>([])
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
+  const [cancelledContracts, setCancelledContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -121,6 +124,24 @@ export default function RoomsPage() {
   const [contractStartInput, setContractStartInput] = useState("")
   const [contractEndInput, setContractEndInput] = useState("")
   const [contractSubmitting, setContractSubmitting] = useState(false)
+  
+  // Checkout (Move-out) Form State
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false)
+  const [checkoutDate, setCheckoutDate] = useState("")
+  const [checkoutDeposit, setCheckoutDeposit] = useState<number>(0)
+  const [checkoutRefund, setCheckoutRefund] = useState<number>(0)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false)
+
+  // Manual Cancellation Modal State
+  const [cancellationModalOpen, setCancellationModalOpen] = useState(false)
+  const [cancelTenantId, setCancelTenantId] = useState("")
+  const [cancelRoomNumber, setCancelRoomNumber] = useState("")
+  const [cancelTenantName, setCancelTenantName] = useState("")
+  const [cancelDate, setCancelDate] = useState("")
+  const [cancelDeposit, setCancelDeposit] = useState<number>(0)
+  const [cancelRefund, setCancelRefund] = useState<number>(0)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   // Custom Toast State
   const [toast, setToast] = useState<{
@@ -143,6 +164,18 @@ export default function RoomsPage() {
     try {
       const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
       
+      // โหลดข้อมูลประวัติยกเลิกสัญญาจาก localStorage
+      const savedCancellations = localStorage.getItem(`cancelled_contracts_${wsId}`)
+      if (savedCancellations) {
+        try {
+          setCancelledContracts(JSON.parse(savedCancellations))
+        } catch (e) {
+          console.error("Failed to parse saved cancellations", e)
+        }
+      } else {
+        setCancelledContracts([])
+      }
+
       // ดึงข้อมูลตั้งค่าการเงินและบัญชีรับเงิน (เพื่อใช้แสดงค่ามัดจำ/ค่าเช่าล่วงหน้าในโมดอลลิงก์)
       getFinanceSettings(wsId).then(res => {
         if (res.success && res.data) {
@@ -468,16 +501,146 @@ export default function RoomsPage() {
     setTenantDetailModalOpen(true)
   }
 
-  // จัดการย้ายออกผู้เช่า
+  // จัดการย้ายออกผู้เช่า (เปิดฟอร์มคืนห้องและยกเลิกสัญญา มาตรา 40(8))
   const handleCheckoutTenantTrigger = () => {
     if (!selectedRoom || !selectedRoom.tenantId) return
-    setDeleteTarget({
-      id: selectedRoom.tenantId,
-      type: "tenant",
-      name: `ผู้เช่าคุณ ${selectedRoom.tenantName}`,
-      extraId: selectedRoom.roomNumber
-    })
-    setDeleteConfirmOpen(true)
+    
+    setCheckoutDate(new Date().toISOString().split("T")[0])
+    
+    // คำนวณเงินประกันสะสมตามจำนวนเดือนดีฟอลต์ * ราคาค่าเช่าห้องพัก
+    const depositMonths = financeSettings?.deposit_amount || 0
+    const calculatedDeposit = selectedRoom.baseRent * depositMonths
+    setCheckoutDeposit(calculatedDeposit)
+    setCheckoutRefund(0)
+    setCheckoutError(null)
+    setCheckoutSubmitting(false)
+    
+    setTenantDetailModalOpen(false)
+    setCheckoutModalOpen(true)
+  }
+
+  // ดำเนินการย้ายออกผู้เช่า บันทึกเงินประกันริบเข้าตารางยกเลิกสัญญา และลบผู้เช่า
+  const handleConfirmCheckout = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRoom || !selectedRoom.tenantId) return
+    
+    if (!checkoutDate) {
+      setCheckoutError("กรุณากรอกวันที่ยกเลิกสัญญา/ย้ายออก")
+      return
+    }
+    if (checkoutRefund < 0) {
+      setCheckoutError("จำนวนเงินโอนคืนต้องไม่ต่ำกว่า 0 บาท")
+      return
+    }
+    if (checkoutRefund > checkoutDeposit) {
+      setCheckoutError("จำนวนเงินโอนคืนต้องไม่เกินยอดเงินประกัน")
+      return
+    }
+
+    setCheckoutSubmitting(true)
+    setCheckoutError(null)
+
+    try {
+      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      
+      // 1. บันทึกประวัติการยกเลิกสัญญาเพื่อใช้คำนวณภาษีเงินได้ประเภท 40(8) ที่ริบไว้
+      const newCancellation = {
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+        tenantId: selectedRoom.tenantId,
+        roomNumber: selectedRoom.roomNumber,
+        tenantName: selectedRoom.tenantName,
+        cancellationDate: checkoutDate,
+        depositAmount: Number(checkoutDeposit),
+        refundedAmount: Number(checkoutRefund),
+        actualRefund: Number(checkoutRefund), // Added for 100% compatibility with Tax page!
+        forfeitedAmount: Math.max(0, Number(checkoutDeposit) - Number(checkoutRefund))
+      }
+
+      let savedCancellations: any[] = []
+      const localData = localStorage.getItem(`cancelled_contracts_${wsId}`)
+      if (localData) {
+        try {
+          savedCancellations = JSON.parse(localData)
+        } catch (e) {
+          console.error("Failed to parse saved cancellations from localStorage", e)
+        }
+      }
+
+      savedCancellations = [newCancellation, ...savedCancellations]
+      localStorage.setItem(`cancelled_contracts_${wsId}`, JSON.stringify(savedCancellations))
+
+      // 2. ย้ายออกผู้เช่าออกจากห้องพักใน Supabase
+      const res = await deleteTenant(selectedRoom.tenantId, selectedRoom.roomNumber)
+      if (res.success) {
+        showToast(`✓ ดำเนินการย้ายออกผู้เช่าห้อง ${selectedRoom.roomNumber} และบันทึกประวัติภาษีสัญญายกเลิกเรียบร้อยแล้ว`, "success")
+        setCheckoutModalOpen(false)
+        await loadData(true)
+      } else {
+        setCheckoutError(res.error || "เกิดข้อผิดพลาดในการคืนห้องพัก")
+      }
+    } catch (err) {
+      setCheckoutError("เกิดข้อผิดพลาดในการดำเนินการคืนห้องพัก")
+    } finally {
+      setCheckoutSubmitting(false)
+    }
+  }
+
+  // บันทึกประวัติการยกเลิกสัญญาและเงินประกันริบแบบกรอกมือ (Manual)
+  const handleAddCancellationSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!cancelTenantId) {
+      setCancelError("กรุณาเลือกผู้เช่า/ห้องพัก")
+      return
+    }
+    if (!cancelDate) {
+      setCancelError("กรุณากรอกวันที่ยกเลิกสัญญา")
+      return
+    }
+    if (cancelRefund < 0) {
+      setCancelError("จำนวนเงินโอนคืนต้องไม่ต่ำกว่า 0 บาท")
+      return
+    }
+    if (cancelRefund > cancelDeposit) {
+      setCancelError("จำนวนเงินโอนคืนต้องไม่เกินยอดเงินประกัน")
+      return
+    }
+
+    const forfeited = Math.max(0, cancelDeposit - cancelRefund)
+    const newCancellation = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+      tenantId: cancelTenantId,
+      roomNumber: cancelRoomNumber,
+      tenantName: cancelTenantName,
+      cancellationDate: cancelDate,
+      depositAmount: Number(cancelDeposit),
+      refundedAmount: Number(cancelRefund),
+      actualRefund: Number(cancelRefund), // Added for 100% compatibility with Tax page!
+      forfeitedAmount: forfeited
+    }
+
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const updated = [newCancellation, ...cancelledContracts]
+    setCancelledContracts(updated)
+    localStorage.setItem(`cancelled_contracts_${wsId}`, JSON.stringify(updated))
+    
+    setCancellationModalOpen(false)
+    setCancelTenantId("")
+    setCancelRoomNumber("")
+    setCancelTenantName("")
+    setCancelDeposit(0)
+    setCancelRefund(0)
+    setCancelError(null)
+    showToast("✓ บันทึกประวัติการยกเลิกสัญญาเรียบร้อยแล้ว", "success")
+  }
+
+  // ลบประวัติการยกเลิกสัญญา มาตรา 40(8)
+  const handleDeleteCancellation = (id: string) => {
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการยกเลิกสัญญานี้? สำหรับยอดภาษีจะคำนวณใหม่โดยอัตโนมัติ")) return
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const updated = cancelledContracts.filter(c => c.id !== id)
+    setCancelledContracts(updated)
+    localStorage.setItem(`cancelled_contracts_${wsId}`, JSON.stringify(updated))
+    showToast("✓ ลบประวัติการยกเลิกสัญญาเรียบร้อยแล้ว", "success")
   }
 
   // คำนวณสถานะห้อง (ว่าง / รอลงทะเบียน / มีผู้เช่าแล้ว)
@@ -1018,6 +1181,103 @@ export default function RoomsPage() {
               </div>
             </>
           )}
+
+          {/* ========================================================= */}
+          {/* SECTION: SECURITY DEPOSIT AND CANCELLATION LEDGER 40(8) */}
+          {/* ========================================================= */}
+          <div className="glass-panel rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-5 md:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-red-500" /> 
+                  ประวัติเงินประกันและสัญญายกเลิก มาตรา 40(8)
+                </h3>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                  รายการยกเลิกสัญญาเช่าห้องพักและคำนวณเงินประกันริบ [ เงินประกัน - เงินคืนจริง ] เพื่อนำไปใช้คำนวณภาษีเงินได้ประเภท 40(8) โดยอ้างอิงตามปีปฏิทินที่มีการย้ายออก
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelTenantId("")
+                  setCancelRoomNumber("")
+                  setCancelTenantName("")
+                  setCancelDate(new Date().toISOString().split("T")[0])
+                  setCancelDeposit(0)
+                  setCancelRefund(0)
+                  setCancelError(null)
+                  setCancellationModalOpen(true)
+                }}
+                className="glow-btn bg-red-600 hover:bg-red-500 text-white font-bold py-1.5 px-3.5 rounded-xl flex items-center gap-1.5 text-[11px] shadow-lg shadow-red-600/10 transition-all cursor-pointer shrink-0 active:scale-[0.98]"
+              >
+                <Plus className="w-3.5 h-3.5" /> บันทึกสัญญายกเลิก
+              </button>
+            </div>
+
+            {cancelledContracts.length > 0 ? (
+              <div className="overflow-x-auto rounded-xl border border-slate-200/50 dark:border-slate-800/80 bg-white dark:bg-slate-950/20">
+                <table className="w-full text-left text-xs border-collapse min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold text-[11px]">
+                      <th className="py-3 px-4">ห้องพัก / ผู้เช่า</th>
+                      <th className="py-3 px-4 text-center">วันที่ยกเลิก</th>
+                      <th className="py-3 px-4 text-right">เงินประกัน (บาท)</th>
+                      <th className="py-3 px-4 text-right">โอนคืนจริง (บาท)</th>
+                      <th className="py-3 px-4 text-right">ยอดที่ริบ (บาท)</th>
+                      <th className="py-3 px-4 text-center w-16">ลบ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                    {cancelledContracts.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/5 transition-colors">
+                        <td className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">
+                          ห้อง {c.roomNumber} - {c.tenantName}
+                        </td>
+                        <td className="py-3 px-4 text-center text-slate-500 dark:text-slate-400 font-semibold font-mono text-[11px]">
+                          {c.cancellationDate ? new Date(c.cancellationDate).toLocaleDateString("th-TH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          }) : "-"}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
+                          {Number(c.depositAmount || 0).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
+                          {Number((c.actualRefund ?? c.refundedAmount) ?? 0).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-extrabold text-red-600 dark:text-red-400 bg-red-500/5">
+                          {Number(c.forfeitedAmount || 0).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            onClick={() => handleDeleteCancellation(c.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-red-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90"
+                            title="ลบประวัติ"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex flex-col sm:flex-row justify-between items-center p-4 bg-slate-50/50 dark:bg-slate-900/5 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 gap-2 font-bold">
+                  <span>จำนวนสัญญาที่ยกเลิกสะสมในระบบ: {cancelledContracts.length} รายการ</span>
+                  <span className="text-red-600 dark:text-red-400 font-extrabold font-mono text-xs md:text-sm bg-red-50 dark:bg-red-950/20 px-3 py-1 rounded-xl border border-red-150 dark:border-red-900/30 shadow-sm shadow-red-500/5 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4" />
+                    รวมยอดเงินริบสะสม: {cancelledContracts.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0).toLocaleString()} บาท
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="py-10 text-center rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-dashed border-slate-250 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 text-xs">
+                <ShieldCheck className="w-8 h-8 text-slate-350 dark:text-slate-600 mx-auto mb-2.5 opacity-60" />
+                <p className="font-bold">ยังไม่มีข้อมูลการแจ้งคืนห้องพักหรือสัญญายกเลิก</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500/80 mt-1">ประวัติจะได้รับการบันทึกที่นี่โดยอัตโนมัติเมื่อท่านทำการ "แจ้งย้ายออก" ในปุ่มรายละเอียดห้องพัก</p>
+              </div>
+            )}
+          </div>
 
         </div>
 
@@ -1694,6 +1954,341 @@ export default function RoomsPage() {
                   {deleteTarget.type === "tenant" ? "ยืนยันการคืนห้องพัก" : "ยืนยันลบข้อมูลถาวร"}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL 7: DETAILED TENANT CHECKOUT & CONTRACT CANCELLATION */}
+        {/* ========================================================= */}
+        {checkoutModalOpen && selectedRoom && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300 animate-in fade-in duration-200">
+            <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5 relative overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-red-500/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex justify-between items-center shrink-0 relative z-10">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 rounded-xl border border-red-100 dark:border-red-900/30">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                      แจ้งคืนห้องและยกเลิกสัญญา
+                    </h3>
+                    <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5 font-bold uppercase tracking-wider">คำนวณเงินประกันริบ ม. 40(8)</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setCheckoutModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {checkoutError && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2 shrink-0">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{checkoutError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleConfirmCheckout} className="space-y-4 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                
+                {/* Tenant & Room summary */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/60 rounded-xl text-xs space-y-2 text-slate-650 dark:text-slate-450">
+                  <div className="flex justify-between font-bold">
+                    <span>ห้องเช่าพัก:</span>
+                    <span className="text-slate-850 dark:text-slate-200 font-extrabold">ห้อง {selectedRoom.roomNumber} ({selectedRoom.roomTypeName})</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span>ผู้เช่าปัจจุบัน:</span>
+                    <span className="text-blue-600 dark:text-blue-450 font-extrabold">{selectedRoom.tenantName}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-155 dark:border-slate-800 pt-2 text-[11px] font-semibold">
+                    <span>อัตราค่าเช่ารายเดือน:</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-300">{selectedRoom.baseRent.toLocaleString()} บาท/เดือน</span>
+                  </div>
+                </div>
+
+                {/* Cancellation date selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] md:text-[11px] text-slate-550 dark:text-slate-400 font-bold uppercase tracking-wider block">วันที่คืนห้อง / ย้ายออกจริง <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                      <Calendar className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                    </span>
+                    <input
+                      type="date"
+                      required
+                      value={checkoutDate}
+                      onChange={(e) => setCheckoutDate(e.target.value)}
+                      className="w-full h-12 md:h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors font-bold font-mono cursor-pointer"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-1 leading-normal">
+                    <Info className="w-3.5 h-3.5 shrink-0" />
+                    ยอดเงินที่ริบไว้จะคิดเป็นรายได้ตาม พ.ศ. ของวันที่แจ้งออกนี้ เพื่อคำนวณภาษี ม. 40(8)
+                  </span>
+                </div>
+
+                {/* Refund & Deposit fields side by side */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-[11px] text-slate-550 dark:text-slate-400 font-bold uppercase tracking-wider block">เงินประกันที่ถืออยู่ (บาท)</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                        <DollarSign className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                      </span>
+                      <input
+                        type="number"
+                        required
+                        value={checkoutDeposit}
+                        onChange={(e) => setCheckoutDeposit(Number(e.target.value))}
+                        className="w-full h-12 md:h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors font-extrabold font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-[11px] text-slate-550 dark:text-slate-400 font-bold uppercase tracking-wider block">จำนวนเงินคืนจริง (บาท)</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                        <DollarSign className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                      </span>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        max={checkoutDeposit}
+                        value={checkoutRefund}
+                        onChange={(e) => setCheckoutRefund(Number(e.target.value))}
+                        className="w-full h-12 md:h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors font-extrabold font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Forfeited summary card */}
+                <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/5 border border-red-150 dark:border-red-900/20 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-red-700 dark:text-red-400">ยอดเงินริบเข้าหอพัก (บาท)</span>
+                    <span className="text-[10px] text-red-600/70 dark:text-red-450/70 block font-semibold">[ เงินประกัน - เงินคืนจริง ]</span>
+                  </div>
+                  <div className="text-right space-y-0.5">
+                    <span className="text-xl md:text-2xl font-extrabold font-mono text-red-600 dark:text-red-400">
+                      {Math.max(0, checkoutDeposit - checkoutRefund).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-bold text-red-600 dark:text-red-400 block">บาท</span>
+                  </div>
+                </div>
+
+                {/* Submission and Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutModalOpen(false)}
+                    disabled={checkoutSubmitting}
+                    className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-55"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={checkoutSubmitting}
+                    className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 text-sm md:text-xs shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    {checkoutSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 md:w-3.5 md:h-3.5 animate-spin" />
+                        กำลังดำเนินการ...
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                        ยืนยันการคืนห้องพัก
+                      </>
+                    )}
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 8: MANUAL CANCELLATION ENTRY (PREMIUM GLASS-MORPHISM DESIGN) */}
+        {cancellationModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+            <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
+                    <ShieldCheck className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                      บันทึกการยกเลิกสัญญาและเงินประกัน
+                    </h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">คำนวณภาษีเงินประกันริบ มาตรา 40(8)</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCancellationModalOpen(false)}
+                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleAddCancellationSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
+                {cancelError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{cancelError}</span>
+                  </div>
+                )}
+
+                {/* เลือกผู้เช่า */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    ห้องพัก / ชื่อผู้เช่า <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={cancelTenantId}
+                    onChange={(e) => {
+                      const selectedId = e.target.value
+                      setCancelTenantId(selectedId)
+                      const selectedRoomItem = rooms.find(r => r.tenantId === selectedId)
+                      if (selectedRoomItem) {
+                        setCancelRoomNumber(selectedRoomItem.roomNumber || "")
+                        setCancelTenantName(selectedRoomItem.tenantName || "")
+                        const depositMonths = financeSettings?.deposit_amount || 0
+                        setCancelDeposit(selectedRoomItem.baseRent * depositMonths)
+                        setCancelRefund(0)
+                      } else {
+                        setCancelRoomNumber("")
+                        setCancelTenantName("")
+                        setCancelDeposit(0)
+                        setCancelRefund(0)
+                      }
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 transition-all cursor-pointer"
+                  >
+                    <option value="">-- เลือกห้องพัก/ผู้เช่า --</option>
+                    {rooms.filter(r => r.tenantId).map(r => (
+                      <option key={r.tenantId} value={r.tenantId!}>
+                        ห้อง {r.roomNumber} - {r.tenantName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ข้อมูลแฝงที่เลือก */}
+                {cancelTenantId && (
+                  <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-850 text-[11px] space-y-2 text-slate-550 dark:text-slate-400">
+                    <div className="flex justify-between">
+                      <span>ผู้เช่า:</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{cancelTenantName} (ห้อง {cancelRoomNumber})</span>
+                    </div>
+                    {rooms.find(r => r.tenantId === cancelTenantId)?.leaseStart && (
+                      <div className="flex justify-between">
+                        <span>วันที่เริ่มสัญญา:</span>
+                        <span className="font-mono">
+                          {rooms.find(r => r.tenantId === cancelTenantId)?.leaseStart}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* วันที่ยกเลิกสัญญา */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    วันที่ยกเลิกสัญญา <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={cancelDate}
+                    onChange={(e) => setCancelDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 font-mono transition-all"
+                  />
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
+                    * ปีภาษีที่ยกเลิกคือปี พ.ศ. ของวันที่ระบุด้านบน ยอดเงินประกันที่ริบไว้จะถูกนำไปคิดภาษีมาตรา 40(8) ของปีนั้นๆ ทันที
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* เงินประกัน (เงินมัดจำ) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      ยอดเงินประกัน (บาท)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={cancelDeposit}
+                      onChange={(e) => setCancelDeposit(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 font-bold font-mono transition-all"
+                    />
+                  </div>
+
+                  {/* เงินคืนผู้เช่าจริง */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      เงินโอนคืนผู้เช่าจริง (บาท)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      max={cancelDeposit}
+                      value={cancelRefund}
+                      onChange={(e) => setCancelRefund(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500/20 outline-none text-slate-800 dark:text-slate-100 font-bold font-mono transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* ยอดเงินประกันที่ริบไว้ */}
+                <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/10 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-red-700 dark:text-red-400">ยอดเงินมัดจำส่วนที่ริบไว้ (รายได้)</h4>
+                    <p className="text-[10px] text-red-650 dark:text-red-450 mt-0.5">สูตร: [ เงินประกัน - เงินคืนจริง ]</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-lg font-extrabold font-mono text-red-600 dark:text-red-400">
+                      {Math.max(0, cancelDeposit - cancelRefund).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-bold text-red-650 dark:text-red-400/90 ml-1">บาท</span>
+                  </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCancellationModalOpen(false)}
+                    className="order-2 sm:order-1 px-4 py-2 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="order-1 sm:order-2 px-4 py-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-red-500/10 hover:shadow-red-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    บันทึกยกเลิกสัญญา
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
