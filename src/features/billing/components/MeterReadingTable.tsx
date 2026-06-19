@@ -25,7 +25,7 @@ interface MeterReadingTableProps {
   handleDownloadBillPdf: (item: any) => Promise<void>
   handleSendLine: (roomNumber: string) => void | Promise<void>
   handleMarkAsPaid: (billId: string, roomNumber: string) => Promise<void>
-  handleSaveAll: () => Promise<void>
+  handleSaveAll: (type: "electric" | "water") => Promise<void>
   // New props for bulk LINE OA feature
   roomsList: any[]
   billingCycle: string
@@ -1030,7 +1030,7 @@ export default function MeterReadingTable({
         {!loading && unifiedItems.length > 0 && activeTab !== "all" && (
           <div className="mt-8 flex justify-center px-4 md:px-0 pb-4">
             <button
-              onClick={handleSaveAll}
+              onClick={() => handleSaveAll(activeTab as "electric" | "water")}
               className={`w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg transition-all cursor-pointer active:scale-[0.98] border animate-pulse hover:animate-none ${
                 activeTab === "electric"
                   ? "from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-600/20 hover:shadow-blue-500/30 border-blue-500/30"

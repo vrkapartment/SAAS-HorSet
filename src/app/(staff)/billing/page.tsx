@@ -642,28 +642,35 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  // บันทึกและออกบิลให้ทุกห้องที่ข้อมูลสมบูรณ์
-  const handleSaveAll = async () => {
-    // กรองหาห้องที่กรอกไม่ครบหรือผิดพลาด
+  // บันทึกและออกบิลให้ทุกห้องที่ข้อมูลสมบูรณ์ (แยกตามประเภท ไฟฟ้า หรือ น้ำประปา)
+  const handleSaveAll = async (type: "electric" | "water") => {
+    // กรองหาห้องที่กรอกไม่ครบหรือผิดพลาดตามประเภท
     const invalidItems = unifiedItems.filter(item => {
       const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
       const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
       const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
       const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
-      return (
-        elecVal === "" ||
-        waterVal === "" ||
-        isNaN(elecVal as number) ||
-        isNaN(waterVal as number) ||
-        isNaN(elecPrevVal) ||
-        isNaN(waterPrevVal) ||
-        (elecVal as number) < elecPrevVal ||
-        (waterVal as number) < waterPrevVal
-      )
+      
+      if (type === "electric") {
+        return (
+          elecVal === "" ||
+          isNaN(elecVal as number) ||
+          isNaN(elecPrevVal) ||
+          (elecVal as number) < elecPrevVal
+        )
+      } else {
+        return (
+          waterVal === "" ||
+          isNaN(waterVal as number) ||
+          isNaN(waterPrevVal) ||
+          (waterVal as number) < waterPrevVal
+        )
+      }
     })
 
     if (invalidItems.length > 0) {
-      alert(`ไม่สามารถประมวลผลทั้งหมดได้ เนื่องจากมี ${invalidItems.length} ห้องพักที่ข้อมูลเลขมิเตอร์ไม่ครบถ้วน หรือค่าปัจจุบันน้อยกว่าครั้งก่อนหน้า`)
+      const typeText = type === "electric" ? "ไฟฟ้า" : "น้ำประปา"
+      alert(`ไม่สามารถประมวลผลทั้งหมดได้ เนื่องจากมี ${invalidItems.length} ห้องพักที่ข้อมูลเลขมิเตอร์${typeText}ไม่ครบถ้วน หรือค่าปัจจุบันน้อยกว่าครั้งก่อนหน้า`)
       return
     }
 
@@ -677,19 +684,26 @@ export default function UnifiedBillingPage() {
         currentIdx++
         setSavingProgress({ current: currentIdx, total: unifiedItems.length, currentRoom: item.roomNumber })
 
-        const elecVal = Number(item.elecCurr)
-        const waterVal = Number(item.waterCurr)
+        const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
+        const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
         const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
         const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-        const eUnits = elecVal - elecPrevVal
-        const wUnits = waterVal - waterPrevVal
-        const elecCost = electricMinChecked && eUnits <= electricMinUnit
-          ? electricMinUnit * elecRate
-          : eUnits * elecRate
-        const waterCost = waterMinChecked && wUnits <= waterMinUnit
-          ? waterMinUnit * waterRate
-          : wUnits * waterRate
+        const eUnits = elecVal === "" ? 0 : (elecVal as number) - elecPrevVal
+        const wUnits = waterVal === "" ? 0 : (waterVal as number) - waterPrevVal
+        
+        const elecCost = elecVal === "" 
+          ? 0 
+          : (electricMinChecked && eUnits <= electricMinUnit
+              ? electricMinUnit * elecRate
+              : eUnits * elecRate)
+
+        const waterCost = waterVal === "" 
+          ? 0 
+          : (waterMinChecked && wUnits <= waterMinUnit
+              ? waterMinUnit * waterRate
+              : wUnits * waterRate)
+              
         const totalAmount = item.baseRent + elecCost + waterCost + commonFee
 
         // 1. บันทึกเลขมิเตอร์
@@ -728,7 +742,8 @@ export default function UnifiedBillingPage() {
         }
       }
 
-      showToast("บันทึกข้อมูลมิเตอร์และคำนวณบิลสำเร็จเรียบร้อย!")
+      const successText = type === "electric" ? "มิเตอร์ไฟ" : "มิเตอร์น้ำ"
+      showToast(`บันทึกข้อมูล${successText}และคำนวณบิลสำเร็จเรียบร้อย!`)
       await loadData(billingCycle, true)
     } catch (err) {
       console.error(err)
