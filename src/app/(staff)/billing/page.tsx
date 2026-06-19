@@ -256,16 +256,8 @@ export default function UnifiedBillingPage() {
         } else {
           const activePerms = rawPerms || DEFAULT_STAFF_PERMISSIONS
           setUserPermissions({
-            view_dashboard_stats: activePerms.view_dashboard_stats !== undefined ? activePerms.view_dashboard_stats : DEFAULT_STAFF_PERMISSIONS.view_dashboard_stats,
-            manage_rooms_tenants: activePerms.manage_rooms_tenants !== undefined ? activePerms.manage_rooms_tenants : DEFAULT_STAFF_PERMISSIONS.manage_rooms_tenants,
-            manage_meters_bills: activePerms.manage_meters_bills !== undefined ? activePerms.manage_meters_bills : DEFAULT_STAFF_PERMISSIONS.manage_meters_bills,
-            manage_finance_expenses: activePerms.manage_finance_expenses !== undefined ? activePerms.manage_finance_expenses : DEFAULT_STAFF_PERMISSIONS.manage_finance_expenses,
-            access_tax: activePerms.access_tax !== undefined ? activePerms.access_tax : DEFAULT_STAFF_PERMISSIONS.access_tax,
-            manage_finance_settings: activePerms.manage_finance_settings !== undefined ? activePerms.manage_finance_settings : DEFAULT_STAFF_PERMISSIONS.manage_finance_settings,
-            manage_staff_permissions: activePerms.manage_staff_permissions !== undefined ? activePerms.manage_staff_permissions : DEFAULT_STAFF_PERMISSIONS.manage_staff_permissions,
-            billing_send_line: activePerms.billing_send_line !== undefined ? activePerms.billing_send_line : DEFAULT_STAFF_PERMISSIONS.billing_send_line,
-            billing_download_pdf: activePerms.billing_download_pdf !== undefined ? activePerms.billing_download_pdf : DEFAULT_STAFF_PERMISSIONS.billing_download_pdf,
-            billing_copy_summary: activePerms.billing_copy_summary !== undefined ? activePerms.billing_copy_summary : DEFAULT_STAFF_PERMISSIONS.billing_copy_summary,
+            ...DEFAULT_STAFF_PERMISSIONS,
+            ...activePerms
           })
         }
 

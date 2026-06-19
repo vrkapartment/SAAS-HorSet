@@ -366,6 +366,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         }
         break
       case "/finance-settings":
+      case "/property-settings":
         if (!getCachedData(wsId, "finance_settings")) {
           getFinanceSettings(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "finance_settings", res.data)
@@ -568,6 +569,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "super_admin"]
     },
     {
+      name: t("nav.property_settings") || "ตั้งค่าหอพัก",
+      path: "/property-settings",
+      icon: Building,
+      roles: ["admin", "super_admin"]
+    },
+    {
       name: "จัดการสิทธิ์ & Staff",
       path: "/permissions",
       icon: Users,
@@ -643,6 +650,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
     if (path === "/finance-settings") {
       return !!userPermissions.manage_finance_settings
+    }
+    if (path === "/property-settings") {
+      return !!userPermissions.manage_property_settings
     }
     if (path === "/permissions") {
       return !!userPermissions.manage_staff_permissions
@@ -733,6 +743,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   {pathname === "/daily-bills" && "จัดการบิลรายจ่ายรายวัน (40(5) / 40(8))"}
                   {pathname === "/tax" && (t("nav.tax") || "ระบบรายงานภาษีอพาร์ทเมนท์ ภ.ง.ด.")}
                   {pathname === "/finance-settings" && (t("nav.finance") || "ตั้งค่าการเงินและบัญชีรับเงิน")}
+                  {pathname === "/property-settings" && (t("nav.property_settings") || "ตั้งค่าข้อมูลหอพัก")}
                   {pathname === "/test-connection" && (t("nav.test_connection") || "เช็คระบบตรวจสอบการเชื่อมต่อ Supabase")}
                 </span>
                 

@@ -21,6 +21,7 @@
     "billing": "Billing & Meters",
     "tax": "Tax Reports",
     "finance": "Finance Settings",
+    "property_settings": "Dormitory Settings",
     "test_connection": "Supabase Connection",
     "super_admin": "Super Admin Control",
     "profile": "Edit Profile & Password"

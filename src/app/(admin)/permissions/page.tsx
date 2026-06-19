@@ -83,10 +83,10 @@ export default function PermissionsPage() {
   const sqlScript = `-- Database Patch: Add staff permissions to profiles table
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS permissions JSONB 
-DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_staff_permissions": false, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb;
+DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_property_settings": false, "manage_staff_permissions": false, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb;
 
 UPDATE public.profiles
-SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_staff_permissions": true, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb
+SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_property_settings": true, "manage_staff_permissions": true, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb
 WHERE role IN ('admin', 'super_admin');`;
 
   // Check demo mode
@@ -372,6 +372,7 @@ WHERE role IN ('admin', 'super_admin');`;
                         { key: "manage_finance_expenses", label: "จัดการการเงิน & รายจ่าย" },
                         { key: "access_tax", label: "จัดการข้อมูลภาษี" },
                         { key: "manage_finance_settings", label: "ตั้งค่าระบบบัญชี/การเงิน" },
+                        { key: "manage_property_settings", label: "ตั้งค่าหอพัก" },
                         { key: "manage_staff_permissions", label: "จัดการสิทธิ์พนักงาน" },
                         { key: "billing_send_line", label: "ส่ง Line OA" },
                         { key: "billing_download_pdf", label: "ดาวน์โหลด PDF" },
@@ -654,9 +655,26 @@ WHERE role IN ('admin', 'super_admin');`;
                 >
                   <div className="flex flex-col">
                     <span>ตั้งค่าระบบบัญชีและการเงิน</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร วิธีรับชำระเงินและค่าน้ำไฟ</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร และตั้งค่าวิธีรับเงินสำหรับการออกบิล</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_finance_settings ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_property_settings */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "manage_property_settings")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.manage_property_settings
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ตั้งค่าข้อมูลหอพัก</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดอัตราส่วนกลาง ค่าปรับจ่ายล่าช้า อัตราค่าน้ำค่าไฟ และเงินประกัน</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_property_settings ? "opacity-100" : "opacity-0"}`} />
                 </button>
 
                 {/* manage_staff_permissions */}
@@ -910,9 +928,26 @@ WHERE role IN ('admin', 'super_admin');`;
                 >
                   <div className="flex flex-col">
                     <span>ตั้งค่าระบบบัญชีและการเงิน</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร วิธีรับชำระเงินและค่าน้ำไฟ</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร และตั้งค่าวิธีรับเงินสำหรับการออกบิล</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_finance_settings ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_property_settings */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "manage_property_settings")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.manage_property_settings
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ตั้งค่าข้อมูลหอพัก</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดอัตราส่วนกลาง ค่าปรับจ่ายล่าช้า อัตราค่าน้ำค่าไฟ และเงินประกัน</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_property_settings ? "opacity-100" : "opacity-0"}`} />
                 </button>
 
                 {/* manage_staff_permissions */}
