@@ -69,7 +69,10 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
             manage_finance_expenses: false,
             access_tax: false,
             manage_finance_settings: false,
-            manage_staff_permissions: false
+            manage_staff_permissions: false,
+            billing_send_line: true,
+            billing_download_pdf: true,
+            billing_copy_summary: true
           }
         },
         {
@@ -87,7 +90,10 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
             manage_finance_expenses: true,
             access_tax: false,
             manage_finance_settings: false,
-            manage_staff_permissions: false
+            manage_staff_permissions: false,
+            billing_send_line: false,
+            billing_download_pdf: true,
+            billing_copy_summary: false
           }
         }
       ]
@@ -141,6 +147,9 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
           access_tax: perms.access_tax !== undefined ? perms.access_tax : DEFAULT_STAFF_PERMISSIONS.access_tax,
           manage_finance_settings: perms.manage_finance_settings !== undefined ? perms.manage_finance_settings : DEFAULT_STAFF_PERMISSIONS.manage_finance_settings,
           manage_staff_permissions: perms.manage_staff_permissions !== undefined ? perms.manage_staff_permissions : DEFAULT_STAFF_PERMISSIONS.manage_staff_permissions,
+          billing_send_line: perms.billing_send_line !== undefined ? perms.billing_send_line : DEFAULT_STAFF_PERMISSIONS.billing_send_line,
+          billing_download_pdf: perms.billing_download_pdf !== undefined ? perms.billing_download_pdf : DEFAULT_STAFF_PERMISSIONS.billing_download_pdf,
+          billing_copy_summary: perms.billing_copy_summary !== undefined ? perms.billing_copy_summary : DEFAULT_STAFF_PERMISSIONS.billing_copy_summary,
         }
       }
     })

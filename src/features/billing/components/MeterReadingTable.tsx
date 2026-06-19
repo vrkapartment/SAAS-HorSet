@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare } from "lucide-react"
+import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 
 interface MeterReadingTableProps {
   isDark: boolean
@@ -30,6 +31,7 @@ interface MeterReadingTableProps {
   billingCycle: string
   workspaceName: string
   currentWorkspaceId: string
+  userPermissions?: StaffPermissions
 }
 
 export default function MeterReadingTable({
@@ -59,8 +61,10 @@ export default function MeterReadingTable({
   roomsList,
   billingCycle,
   workspaceName,
-  currentWorkspaceId
+  currentWorkspaceId,
+  userPermissions
 }: MeterReadingTableProps) {
+  const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">("all")
   const colSpanVal = activeTab === "all" ? 7 : 6
 
@@ -103,6 +107,10 @@ export default function MeterReadingTable({
 
   // ฟังก์ชันสำหรับคัดลอกข้อมูลใบแจ้งหนี้แบบสรุป เพื่ออำนวยความสะดวกในห้องที่ไม่ได้ผูก LINE UID
   const handleCopySummary = (item: any) => {
+    if (!permissions.billing_copy_summary) {
+      alert("คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      return
+    }
     const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
     const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
 
@@ -143,6 +151,10 @@ export default function MeterReadingTable({
 
   // ฟังก์ชันเริ่มส่ง LINE OA แบบกลุ่มทีละห้อง
   const startBulkSend = async () => {
+    if (!permissions.billing_send_line) {
+      alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      return
+    }
     if (connectedRooms.length === 0) return
     
     setBulkSendingStatus("sending")
@@ -281,11 +293,21 @@ export default function MeterReadingTable({
             {activeTab === "all" && unifiedItems.length > 0 && (
               <button
                 onClick={() => {
+                  if (!permissions.billing_send_line) {
+                    alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+                    return
+                  }
                   setBulkSendResults({})
                   setBulkSendingStatus("idle")
                   setBulkSendModalOpen(true)
                 }}
-                className="w-full sm:w-auto h-9 px-5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2 whitespace-nowrap"
+                disabled={!permissions.billing_send_line}
+                className={`w-full sm:w-auto h-9 px-5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+                  !permissions.billing_send_line
+                    ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-800 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
+                    : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98]"
+                }`}
+                title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>ส่ง LINE OA ทุกห้องพร้อมกัน</span>
@@ -1143,11 +1165,15 @@ export default function MeterReadingTable({
                             {bulkSendingStatus === "idle" && (
                               <button
                                 onClick={() => handleSendLine(item.roomNumber)}
-                                className={`h-7 px-2.5 rounded-lg text-[10px] font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                                  isDark 
-                                    ? "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/30 hover:text-emerald-300" 
-                                    : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800"
+                                disabled={!permissions.billing_send_line}
+                                className={`h-7 px-2.5 rounded-lg text-[10px] font-black flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                                  !permissions.billing_send_line
+                                    ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-650 cursor-not-allowed opacity-50"
+                                    : isDark 
+                                      ? "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/30 hover:text-emerald-300 cursor-pointer" 
+                                      : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800 cursor-pointer"
                                 }`}
+                                title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
                               >
                                 <Send className="w-3 h-3" />
                                 <span className="whitespace-nowrap">ส่ง LINE OA</span>
@@ -1223,12 +1249,17 @@ export default function MeterReadingTable({
                             {/* ดาวน์โหลด PDF */}
                             <button
                               onClick={() => handleDownloadBillPdf(item)}
-                              disabled={downloadingPdfId !== null}
-                              className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-                                isDark 
-                                  ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 hover:text-blue-400" 
-                                  : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 hover:text-blue-600"
+                              disabled={downloadingPdfId !== null || !permissions.billing_download_pdf}
+                              className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                                !permissions.billing_download_pdf
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-650 cursor-not-allowed opacity-50"
+                                  : downloadingPdfId !== null
+                                    ? "opacity-45 cursor-not-allowed"
+                                    : isDark 
+                                      ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 hover:text-blue-400 cursor-pointer" 
+                                      : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 hover:text-blue-600 cursor-pointer"
                               }`}
+                              title={!permissions.billing_download_pdf ? "คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF" : undefined}
                             >
                               {downloadingPdfId === item.roomNumber ? (
                                 <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
@@ -1243,11 +1274,17 @@ export default function MeterReadingTable({
                             {/* คัดลอกสรุปบิล */}
                             <button
                               onClick={() => handleCopySummary(item)}
-                              className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-                                isCopied
-                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                  : (isDark ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200" : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700")
+                              disabled={!permissions.billing_copy_summary}
+                              className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                                !permissions.billing_copy_summary
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-650 cursor-not-allowed opacity-50"
+                                  : isCopied
+                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                    : isDark 
+                                      ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
+                                      : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
                               }`}
+                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล" : undefined}
                             >
                               {isCopied ? (
                                 <>
@@ -1328,10 +1365,15 @@ export default function MeterReadingTable({
               {modalActiveTab === "connected" && bulkSendingStatus !== "completed" && connectedRooms.length > 0 && (
                 <button
                   onClick={startBulkSend}
-                  disabled={bulkSendingStatus === "sending"}
-                  className={`px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/10 cursor-pointer active:scale-[0.98] ${
-                    bulkSendingStatus === "sending" ? "opacity-30 cursor-not-allowed animate-pulse" : ""
+                  disabled={bulkSendingStatus === "sending" || !permissions.billing_send_line}
+                  className={`px-6 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-md active:scale-[0.98] ${
+                    !permissions.billing_send_line
+                      ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-800 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed shadow-none"
+                      : bulkSendingStatus === "sending"
+                        ? "opacity-30 cursor-not-allowed animate-pulse bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-emerald-500/10"
+                        : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white cursor-pointer shadow-emerald-500/10 hover:shadow-emerald-500/20"
                   }`}
+                  title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
                 >
                   <Send className="w-4 h-4" />
                   <span>เริ่มส่งเข้า LINE OA ({connectedRooms.length} ห้อง)</span>

@@ -83,10 +83,10 @@ export default function PermissionsPage() {
   const sqlScript = `-- Database Patch: Add staff permissions to profiles table
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS permissions JSONB 
-DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_staff_permissions": false}'::jsonb;
+DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_staff_permissions": false, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb;
 
 UPDATE public.profiles
-SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_staff_permissions": true}'::jsonb
+SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_staff_permissions": true, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb
 WHERE role IN ('admin', 'super_admin');`;
 
   // Check demo mode
@@ -433,6 +433,36 @@ WHERE role IN ('admin', 'super_admin');`;
                       <Check className={`w-3 h-3 ${staff.permissions.manage_staff_permissions ? "opacity-100" : "opacity-20"}`} />
                       <span>จัดการสิทธิ์พนักงาน</span>
                     </span>
+
+                    {/* Permission: Send Line OA */}
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                      staff.permissions.billing_send_line
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
+                    }`}>
+                      <Check className={`w-3 h-3 ${staff.permissions.billing_send_line ? "opacity-100" : "opacity-20"}`} />
+                      <span>ส่ง Line OA</span>
+                    </span>
+
+                    {/* Permission: Download PDF */}
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                      staff.permissions.billing_download_pdf
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
+                    }`}>
+                      <Check className={`w-3 h-3 ${staff.permissions.billing_download_pdf ? "opacity-100" : "opacity-20"}`} />
+                      <span>ดาวน์โหลด PDF</span>
+                    </span>
+
+                    {/* Permission: Copy Summary */}
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                      staff.permissions.billing_copy_summary
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
+                    }`}>
+                      <Check className={`w-3 h-3 ${staff.permissions.billing_copy_summary ? "opacity-100" : "opacity-20"}`} />
+                      <span>คัดลอกสรุปบิล</span>
+                    </span>
                   </div>
                 </div>
 
@@ -705,6 +735,57 @@ WHERE role IN ('admin', 'super_admin');`;
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_staff_permissions ? "opacity-100" : "opacity-0"}`} />
                 </button>
+
+                {/* billing_send_line */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "billing_send_line")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.billing_send_line
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ส่ง Line OA</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ส่งใบแจ้งหนี้ผ่านทาง Line OA ประจำห้องพัก</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.billing_send_line ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* billing_download_pdf */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "billing_download_pdf")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.billing_download_pdf
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ดาวน์โหลด PDF</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดาวน์โหลดเอกสารบิล/ใบเสร็จเป็น PDF</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.billing_download_pdf ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* billing_copy_summary */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "billing_copy_summary")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.billing_copy_summary
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>คัดลอกสรุปบิล</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">คัดลอกข้อความสรุปค่าเช่าส่งผู้เช่า</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.billing_copy_summary ? "opacity-100" : "opacity-0"}`} />
+                </button>
               </div>
             </div>
 
@@ -909,6 +990,57 @@ WHERE role IN ('admin', 'super_admin');`;
                     <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/ลบพนักงาน และกำหนดสิทธิ์การใช้งานระบบ</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_staff_permissions ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* billing_send_line */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "billing_send_line")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.billing_send_line
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ส่ง Line OA</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ส่งใบแจ้งหนี้ผ่านทาง Line OA ประจำห้องพัก</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.billing_send_line ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* billing_download_pdf */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "billing_download_pdf")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.billing_download_pdf
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>ดาวน์โหลด PDF</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดาวน์โหลดเอกสารบิล/ใบเสร็จเป็น PDF</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.billing_download_pdf ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* billing_copy_summary */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "billing_copy_summary")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.billing_copy_summary
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>คัดลอกสรุปบิล</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">คัดลอกข้อความสรุปค่าเช่าส่งผู้เช่า</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.billing_copy_summary ? "opacity-100" : "opacity-0"}`} />
                 </button>
               </div>
             </div>

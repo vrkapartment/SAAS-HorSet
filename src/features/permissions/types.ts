@@ -9,6 +9,9 @@ export interface StaffPermissions {
   access_tax: boolean                 // จัดการภาษี ภ.ง.ด. (/tax)
   manage_finance_settings: boolean    // ตั้งค่าการเงิน (/finance-settings)
   manage_staff_permissions: boolean   // จัดการสิทธิ์ & Staff (/permissions)
+  billing_send_line: boolean          // ส่ง Line OA
+  billing_download_pdf: boolean       // ดาวน์โหลด PDF
+  billing_copy_summary: boolean       // คัดลอกสรุปบิล
 }
 
 export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
@@ -18,7 +21,10 @@ export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
   manage_finance_expenses: false,
   access_tax: false,
   manage_finance_settings: false,
-  manage_staff_permissions: false
+  manage_staff_permissions: false,
+  billing_send_line: true,
+  billing_download_pdf: true,
+  billing_copy_summary: true
 }
 
 export const ADMIN_DEFAULT_PERMISSIONS: StaffPermissions = {
@@ -28,5 +34,8 @@ export const ADMIN_DEFAULT_PERMISSIONS: StaffPermissions = {
   manage_finance_expenses: true,
   access_tax: true,
   manage_finance_settings: true,
-  manage_staff_permissions: true
+  manage_staff_permissions: true,
+  billing_send_line: true,
+  billing_download_pdf: true,
+  billing_copy_summary: true
 }

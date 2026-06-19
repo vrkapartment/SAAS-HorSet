@@ -29,6 +29,8 @@ import { getMeterRecords, saveMeterRecord } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 
+import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISSIONS } from "@/features/permissions/types"
+
 // Extracted Billing Sub-components
 import BillingSummaryStats from "@/features/billing/components/BillingSummaryStats"
 import SavingProgressOverlay from "@/features/billing/components/SavingProgressOverlay"
@@ -136,6 +138,7 @@ export default function UnifiedBillingPage() {
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
+  const [userPermissions, setUserPermissions] = useState<StaffPermissions>(ADMIN_DEFAULT_PERMISSIONS)
 
   useEffect(() => {
     setMounted(true)
@@ -238,6 +241,34 @@ export default function UnifiedBillingPage() {
       let regCycleVal = ""
       if (userProfile) {
         setCurrentUserRole(userProfile.role || "staff")
+        
+        let rawPerms = userProfile.permissions
+        if (typeof rawPerms === "string") {
+          try {
+            rawPerms = JSON.parse(rawPerms)
+          } catch {
+            rawPerms = null
+          }
+        }
+
+        if (userProfile.role === "admin" || userProfile.role === "super_admin") {
+          setUserPermissions(ADMIN_DEFAULT_PERMISSIONS)
+        } else {
+          const activePerms = rawPerms || DEFAULT_STAFF_PERMISSIONS
+          setUserPermissions({
+            view_dashboard_stats: activePerms.view_dashboard_stats !== undefined ? activePerms.view_dashboard_stats : DEFAULT_STAFF_PERMISSIONS.view_dashboard_stats,
+            manage_rooms_tenants: activePerms.manage_rooms_tenants !== undefined ? activePerms.manage_rooms_tenants : DEFAULT_STAFF_PERMISSIONS.manage_rooms_tenants,
+            manage_meters_bills: activePerms.manage_meters_bills !== undefined ? activePerms.manage_meters_bills : DEFAULT_STAFF_PERMISSIONS.manage_meters_bills,
+            manage_finance_expenses: activePerms.manage_finance_expenses !== undefined ? activePerms.manage_finance_expenses : DEFAULT_STAFF_PERMISSIONS.manage_finance_expenses,
+            access_tax: activePerms.access_tax !== undefined ? activePerms.access_tax : DEFAULT_STAFF_PERMISSIONS.access_tax,
+            manage_finance_settings: activePerms.manage_finance_settings !== undefined ? activePerms.manage_finance_settings : DEFAULT_STAFF_PERMISSIONS.manage_finance_settings,
+            manage_staff_permissions: activePerms.manage_staff_permissions !== undefined ? activePerms.manage_staff_permissions : DEFAULT_STAFF_PERMISSIONS.manage_staff_permissions,
+            billing_send_line: activePerms.billing_send_line !== undefined ? activePerms.billing_send_line : DEFAULT_STAFF_PERMISSIONS.billing_send_line,
+            billing_download_pdf: activePerms.billing_download_pdf !== undefined ? activePerms.billing_download_pdf : DEFAULT_STAFF_PERMISSIONS.billing_download_pdf,
+            billing_copy_summary: activePerms.billing_copy_summary !== undefined ? activePerms.billing_copy_summary : DEFAULT_STAFF_PERMISSIONS.billing_copy_summary,
+          })
+        }
+
         const workspaceDate = userProfile.workspace_created_at || userProfile.created_at
         if (workspaceDate) {
           regCycleVal = getCycleFromTimestamp(workspaceDate)
@@ -717,6 +748,11 @@ export default function UnifiedBillingPage() {
 
   // ส่งข้อมูลเข้า LINE OA ของจริง
   const handleSendLine = async (roomNumber: string) => {
+    if (!userPermissions.billing_send_line) {
+      alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      return
+    }
+
     // 1. ค้นหาข้อมูลห้องพักจาก List เพื่อหยิบ lineUserId ของผู้เช่าจริงออกมา
     const roomInfo = roomsList.find((r: any) => r.roomNumber === roomNumber)
     const lineUserId = roomInfo?.lineUserId
@@ -775,6 +811,10 @@ export default function UnifiedBillingPage() {
 
   // ดาวน์โหลดบิล PDF
   const handleDownloadBillPdf = async (item: UnifiedRoomBillingItem) => {
+    if (!userPermissions.billing_download_pdf) {
+      alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      return
+    }
     setDownloadingPdfId(item.roomNumber)
     try {
       const { generateBillPdf } = await import("@/lib/pdfHelper")
@@ -825,6 +865,11 @@ export default function UnifiedBillingPage() {
 
   // ดาวน์โหลดบิล PDF ทุกห้องพร้อมกันเป็นไฟล์ ZIP
   const handleDownloadAllBillsPdf = async () => {
+    if (!userPermissions.billing_download_pdf) {
+      alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      return
+    }
+
     if (unifiedItems.length === 0) {
       alert("ไม่มีรายการบิลที่จะดาวน์โหลด")
       return
@@ -979,12 +1024,15 @@ export default function UnifiedBillingPage() {
           {/* ดาวน์โหลด PDF ทั้งหมด */}
           <button
             onClick={handleDownloadAllBillsPdf}
-            disabled={downloadingAllPdf}
+            disabled={downloadingAllPdf || !userPermissions.billing_download_pdf}
             className={`w-full md:w-auto h-12 md:h-9 text-white font-semibold px-4 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs transition-all cursor-pointer ${
-              downloadingAllPdf
-                ? (isDark ? "bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed" : "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed")
-                : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-600/20 active:scale-95"
+              !userPermissions.billing_download_pdf
+                ? "bg-slate-400 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
+                : downloadingAllPdf
+                  ? (isDark ? "bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed" : "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed")
+                  : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-600/20 active:scale-95"
             }`}
+            title={!userPermissions.billing_download_pdf ? "คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF" : undefined}
           >
             {downloadingAllPdf ? (
               <>
@@ -1024,6 +1072,7 @@ export default function UnifiedBillingPage() {
       <MeterReadingTable
         isDark={isDark}
         loading={loading}
+        userPermissions={userPermissions}
         unifiedItems={unifiedItems}
         commonFee={commonFee}
         electricMinChecked={electricMinChecked}
