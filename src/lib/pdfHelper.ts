@@ -324,9 +324,8 @@ export async function generateBillPdf(data: BillPdfData) {
   const elecAmount = isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate
   const waterAmount = isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate
   
-  // คำนวณค่าเช่าห้องพักที่หักส่วนลด (ถ้ามี) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
-  const adjustedBaseRent = Math.max(0, Math.min(data.baseRent, data.amount - elecAmount - waterAmount - commonFee))
-  const penaltyAmount = Math.max(0, data.amount - adjustedBaseRent - elecAmount - waterAmount - commonFee)
+  // คำนวณค่าเช่าห้องพักที่หักส่วนลด (หรือรวมค่าปรับ/ค่าใช้จ่ายอื่นๆ เผื่อไว้) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
+  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee)
 
   const elecDesc = isElecMin 
     ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
@@ -361,13 +360,6 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
-
-  y -= 25
-  // รายการ 5: ค่าปรับ
-  drawText("5. ค่าปรับ (Penalty / Fine)", 50, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(penaltyAmount.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(penaltyAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   // ขีดเส้นใต้ตาราง
   page.drawLine({
