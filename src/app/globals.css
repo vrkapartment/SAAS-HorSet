@@ -158,5 +158,15 @@ div, nav, header, aside, section, main, footer, button, p, h1, h2, h3, h4, h5, h
   scrollbar-width: none;  /* Firefox */
 }
 
+@keyframes pulse-subtle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 4s infinite ease-in-out;
+}
+
+
 
 
