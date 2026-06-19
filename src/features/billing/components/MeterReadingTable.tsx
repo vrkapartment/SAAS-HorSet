@@ -285,7 +285,7 @@ export default function MeterReadingTable({
                   setBulkSendingStatus("idle")
                   setBulkSendModalOpen(true)
                 }}
-                className="w-full sm:w-auto h-9 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+                className="w-full sm:w-auto h-9 px-5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>ส่ง LINE OA ทุกห้องพร้อมกัน</span>
