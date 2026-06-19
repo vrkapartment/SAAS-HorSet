@@ -1146,7 +1146,7 @@ export default function MeterReadingTable({
                 onClick={() => setModalActiveTab("connected")}
                 className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
                   modalActiveTab === "connected"
-                    ? (isDark ? "bg-slate-900 text-emerald-405 border border-slate-800" : "bg-white text-emerald-600 border border-slate-200 shadow-sm")
+                    ? (isDark ? "bg-slate-900 text-emerald-400 border border-slate-800" : "bg-white text-emerald-600 border border-slate-200 shadow-sm")
                     : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
                 }`}
               >
@@ -1156,7 +1156,7 @@ export default function MeterReadingTable({
                 onClick={() => setModalActiveTab("unconnected")}
                 className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
                   modalActiveTab === "unconnected"
-                    ? (isDark ? "bg-slate-900 text-amber-405 border border-slate-800" : "bg-white text-amber-600 border border-slate-200 shadow-sm")
+                    ? (isDark ? "bg-slate-900 text-amber-400 border border-slate-800" : "bg-white text-amber-600 border border-slate-200 shadow-sm")
                     : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
                 }`}
               >
@@ -1176,46 +1176,46 @@ export default function MeterReadingTable({
                     connectedRooms.map(item => {
                       const result = bulkSendResults[item.roomNumber]
                       return (
-                        <div key={item.roomNumber} className={`flex items-center justify-between p-3 rounded-xl border text-xs transition-all ${
+                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border text-xs gap-3 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
-                          <div>
-                            <span className={`font-black px-2 py-0.5 rounded-lg border mr-2 ${
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`font-black px-2 py-0.5 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-250"
                             }`}>
                               ห้อง {item.roomNumber}
                             </span>
-                            <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                            <span className={`font-bold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                               {item.tenantName}
                             </span>
-                            <span className={`ml-2 text-[10px] font-mono font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                            <span className={`text-[10px] font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                               ({item.billAmount?.toLocaleString()}.-)
                             </span>
                           </div>
                           
-                          <div>
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                             {bulkSendingStatus === "idle" && (
-                              <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                พร้อมส่งบิล LINE OA
+                              <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
+                                พร้อมส่ง LINE OA
                               </span>
                             )}
                             {bulkSendingStatus === "sending" && bulkSendingProgress.currentRoom === item.roomNumber && (
-                              <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 animate-pulse">
-                                กำลังส่งข้อความ...
+                              <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 animate-pulse whitespace-nowrap">
+                                กำลังส่ง...
                               </span>
                             )}
                             {bulkSendingStatus === "sending" && !result && bulkSendingProgress.currentRoom !== item.roomNumber && (
-                              <span className="text-[10px] font-semibold text-slate-450 dark:text-slate-500">
+                              <span className="text-[10px] font-semibold text-slate-450 dark:text-slate-500 whitespace-nowrap">
                                 รอคิว...
                               </span>
                             )}
                             {result && (
                               result.success ? (
-                                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
                                   สำเร็จแล้ว ✅
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20" title={result.error}>
+                                <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20 whitespace-nowrap" title={result.error}>
                                   ล้มเหลว ❌
                                 </span>
                               )
