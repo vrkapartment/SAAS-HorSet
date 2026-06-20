@@ -249,6 +249,27 @@ export default function UnifiedBillingPage() {
     return diffDays > 0 ? diffDays : 0
   }
 
+  const isTenantActiveInCycle = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined, cycle: string): boolean => {
+    if (!leaseStart) return false
+    
+    const [cYear, cMonth] = cycle.split("-").map(Number)
+    const cycleStart = new Date(cYear, cMonth - 1, 1)
+    const cycleEnd = new Date(cYear, cMonth, 0, 23, 59, 59, 999) // วันสุดท้ายของเดือนรอบบิล
+    
+    const start = new Date(leaseStart)
+    start.setHours(0, 0, 0, 0)
+    
+    if (start > cycleEnd) return false // เริ่มสัญญาหลังสิ้นสุดเดือนรอบบิลนี้
+    
+    if (leaseEnd) {
+      const end = new Date(leaseEnd)
+      end.setHours(23, 59, 59, 999)
+      if (end < cycleStart) return false // สัญญาสิ้นสุดลงก่อนเริ่มเดือนรอบบิลนี้
+    }
+    
+    return true
+  }
+
   const loadData = async (cycle = billingCycle, forceRefresh = false) => {
     setLoading(true)
     
@@ -359,6 +380,21 @@ export default function UnifiedBillingPage() {
         const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
         const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
         
+        // ค้นหาผู้เช่าที่ครอบคลุมในรอบบิลปัจจุบันตามประวัติสัญญาเช่า
+        let resolvedTenantName: string | null = null
+        if (roomBill && roomBill.tenantName) {
+          // 1. หากมีบิลถูกบันทึกไว้แล้วในฐานข้อมูล ให้ใช้ชื่อผู้เช่าของบิลใบนั้นๆ เสมอเพื่อคงความถูกต้องตามประวัติศาสตร์จริง
+          resolvedTenantName = roomBill.tenantName
+        } else {
+          // 2. หากยังไม่มีบิลในฐานข้อมูล ให้ค้นหาผู้เช่าที่สัญญายังคงแอคทีฟในช่วงรอบเดือนนี้
+          const activeTenant = (r.allTenants || []).find((t: any) => 
+            isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle)
+          )
+          resolvedTenantName = activeTenant ? activeTenant.tenantName : null
+        }
+        
+        const isOccupiedInCycle = resolvedTenantName !== null
+
         // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
         const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
@@ -410,9 +446,9 @@ export default function UnifiedBillingPage() {
 
         return {
           roomNumber: r.roomNumber,
-          tenantName: r.tenantName,
+          tenantName: resolvedTenantName,
           baseRent: Number(r.baseRent) || 4500,
-          status: r.status,
+          status: isOccupiedInCycle ? "occupied" : "available",
           
           meterRecordId: roomMeter?.id || undefined,
           elecPrev,
@@ -1164,9 +1200,16 @@ export default function UnifiedBillingPage() {
     
     let targetTenant = ""
     const room = roomsList.find(r => r.roomNumber === newRoomNumber)
-    if (room && room.tenantName) {
-      targetTenant = room.tenantName
-    } else {
+    if (room) {
+      const activeTenant = (room.allTenants || []).find((t: any) => 
+        isTenantActiveInCycle(t.leaseStart, t.leaseEnd, billingCycle)
+      )
+      if (activeTenant && activeTenant.tenantName) {
+        targetTenant = activeTenant.tenantName
+      }
+    }
+
+    if (!targetTenant) {
       alert("ห้องพักนี้ยังไม่มีผู้เช่า หรือสัญญาหมดอายุ ไม่สามารถออกบิลได้")
       return
     }
@@ -1192,8 +1235,8 @@ export default function UnifiedBillingPage() {
   }
 
   // คำนวณสรุปสถิติด้านบนของแดชบอร์ด (ปรับเปลี่ยนให้เหมาะสมกับห้องว่าง/ไม่มีผู้เช่า)
-  const totalOccupied = unifiedItems.length
-  const billedCount = unifiedItems.filter(item => item.isMeterSaved).length
+  const totalOccupied = unifiedItems.filter(item => item.tenantName).length
+  const billedCount = unifiedItems.filter(item => item.tenantName && item.isMeterSaved).length
   const paidCount = unifiedItems.filter(item => item.billStatus === "paid").length
   const pendingCount = unifiedItems.filter(item => item.billStatus === "pending").length
   const unpaidCount = unifiedItems.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length

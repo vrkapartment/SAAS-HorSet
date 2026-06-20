@@ -114,7 +114,15 @@ export async function getRooms() {
         leaseStart: tenant ? tenant.lease_start : null,
         leaseEnd: tenant ? tenant.lease_end : null,
         roomTypeId: room.room_type_id,
-        roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ"
+        roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ",
+        allTenants: (room.tenants || []).map((t: any) => ({
+          id: t.id,
+          tenantName: t.tenant_name,
+          tenantPhone: t.tenant_phone,
+          lineUserId: t.line_user_id,
+          leaseStart: t.lease_start,
+          leaseEnd: t.lease_end
+        }))
       }
     })
 

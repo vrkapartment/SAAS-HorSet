@@ -236,8 +236,8 @@ export async function getTenantPortalData() {
       return { success: false, error: "ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน" }
     }
 
-    // 3. Find tenant by matching phone number
-    const { data: tenant, error: tenantError } = await supabase
+    // 3. Find tenant by matching phone number (เรียงลำดับสัญญาเข้าอยู่ล่าสุดก่อนเพื่อความถูกต้องกรณีเคยอยู่หลายสัญญา)
+    const { data: tenantsList, error: tenantError } = await supabase
       .from("tenants")
       .select(`
         *,
@@ -251,9 +251,11 @@ export async function getTenantPortalData() {
         )
       `)
       .eq("tenant_phone", profile.phone)
-      .maybeSingle()
+      .order("lease_start", { ascending: false })
 
     if (tenantError) throw tenantError
+
+    const tenant = tenantsList && tenantsList.length > 0 ? tenantsList[0] : null
 
     let promptPayId = ""
     let promptPayName = ""
@@ -337,7 +339,19 @@ export async function getTenantPortalData() {
       if (billsError) throw billsError
 
       if (bills) {
-        formattedBills = bills.map((b: any) => ({
+        // กรองเฉพาะบิลที่อยู่ในช่วงรอบสัญญาของผู้เช่ารายนี้เพื่อความปลอดภัยและความเป็นส่วนตัว
+        const leaseStartCycle = tenant.lease_start ? tenant.lease_start.substring(0, 7) : ""
+        const leaseEndCycle = tenant.lease_end ? tenant.lease_end.substring(0, 7) : ""
+
+        let filteredBills = bills
+        if (leaseStartCycle) {
+          filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
+        }
+        if (leaseEndCycle) {
+          filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
+        }
+
+        formattedBills = filteredBills.map((b: any) => ({
           id: b.id,
           roomNumber: b.room_number,
           tenantName: b.tenant_name,
@@ -411,13 +425,16 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
     }
 
-    // 2. ค้นหาข้อมูลผู้เช่าของห้องนี้
-    const { data: tenant, error: tenantError } = await supabase
+    // 2. ค้นหาข้อมูลผู้เช่าของห้องนี้ (ดึงสัญญาล่าสุดของห้องนี้เพื่อป้องกันข้อผิดพลาดกรณีมีประวัติสัญญาเช่าหลายใบ)
+    const { data: tenantsList, error: tenantError } = await supabase
       .from("tenants")
       .select("*")
       .eq("room_id", room.id)
       .eq("workspace_id", workspaceId)
-      .maybeSingle()
+      .order("lease_start", { ascending: false })
+
+    if (tenantError) throw tenantError
+    const tenant = tenantsList && tenantsList.length > 0 ? tenantsList[0] : null
 
     // 3. ค้นหารายละเอียดของ Workspace และการตั้งค่าพร้อมเพย์
     const { data: ws } = await supabase
@@ -475,7 +492,19 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
 
     let formattedBills: any[] = []
     if (bills) {
-      formattedBills = bills.map((b: any) => ({
+      // กรองเฉพาะบิลที่อยู่ในช่วงรอบสัญญาของผู้เช่ารายนี้เพื่อความปลอดภัยและความเป็นส่วนตัว
+      const leaseStartCycle = tenant?.lease_start ? tenant.lease_start.substring(0, 7) : ""
+      const leaseEndCycle = tenant?.lease_end ? tenant.lease_end.substring(0, 7) : ""
+
+      let filteredBills = bills
+      if (leaseStartCycle) {
+        filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
+      }
+      if (leaseEndCycle) {
+        filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
+      }
+
+      formattedBills = filteredBills.map((b: any) => ({
         id: b.id,
         roomNumber: b.room_number,
         tenantName: b.tenant_name,
