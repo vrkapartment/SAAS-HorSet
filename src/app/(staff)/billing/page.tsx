@@ -383,8 +383,24 @@ export default function UnifiedBillingPage() {
         // ค้นหาผู้เช่าที่ครอบคลุมในรอบบิลปัจจุบันตามประวัติสัญญาเช่า
         let resolvedTenantName: string | null = null
         if (roomBill && roomBill.tenantName) {
-          // 1. หากมีบิลถูกบันทึกไว้แล้วในฐานข้อมูล ให้ใช้ชื่อผู้เช่าของบิลใบนั้นๆ เสมอเพื่อคงความถูกต้องตามประวัติศาสตร์จริง
-          resolvedTenantName = roomBill.tenantName
+          // 1. หากมีบิลถูกบันทึกไว้แล้วในฐานข้อมูล ให้ตรวจสอบว่าผู้เช่าชื่อนี้ยังมีอยู่และสัญญากลางปีนั้นถูกต้องหรือไม่
+          const matchingTenant = (r.allTenants || []).find((t: any) => t.tenantName === roomBill.tenantName)
+          if (matchingTenant) {
+            // หากผู้เช่าชื่อนี้ยังมีตัวตนในตาราง tenants ให้ตรวจสอบความ Active ในรอบบิลนี้จริง ๆ
+            const isActive = isTenantActiveInCycle(matchingTenant.leaseStart, matchingTenant.leaseEnd, cycle)
+            if (isActive) {
+              resolvedTenantName = roomBill.tenantName
+            } else {
+              // หากในรอบบิลนั้นเขายังไม่เข้าอยู่ แสดงว่าเป็นประวัติศาสตร์จากบั๊กเก่า ให้ค้นหาผู้เช่าที่ Active จริง ณ ตอนนั้นแทน
+              const actualActiveTenant = (r.allTenants || []).find((t: any) => 
+                isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle)
+              )
+              resolvedTenantName = actualActiveTenant ? actualActiveTenant.tenantName : null
+            }
+          } else {
+            // หากไม่พบชื่อผู้เช่านี้ในตาราง tenants แสดงว่าเป็นผู้เช่าเก่าที่ย้ายออกและถูกลบประวัติไปแล้ว ให้เชื่อประวัติศาสตร์ในบิล
+            resolvedTenantName = roomBill.tenantName
+          }
         } else {
           // 2. หากยังไม่มีบิลในฐานข้อมูล ให้ค้นหาผู้เช่าที่สัญญายังคงแอคทีฟในช่วงรอบเดือนนี้
           const activeTenant = (r.allTenants || []).find((t: any) => 
