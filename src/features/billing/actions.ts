@@ -32,8 +32,8 @@ export async function getBills(billingCycle?: string) {
       slipUrl: b.slip_url,
       electricUnits: Number(b.electric_units),
       waterUnits: Number(b.water_units),
-      penaltyAmount: Number(b.penalty_amount || 0),
-      lateDays: Number(b.late_days || 0)
+      penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
+      lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
     }))
 
     return { success: true, data: formatted }
@@ -94,7 +94,9 @@ export async function createBill(
           status,
           billing_cycle: billingCycle,
           electric_units: electricUnits,
-          water_units: waterUnits
+          water_units: waterUnits,
+          late_days: null,
+          penalty_amount: null
         }])
         .select()
     }
@@ -292,40 +294,50 @@ export async function deleteBill(id: string) {
 }
 
 export async function updateBillPenalty(id: string, lateDays: number, penaltyAmount: number, amount: number) {
+  console.log("🖥️ [Server Action] updateBillPenalty started:", { id, lateDays, penaltyAmount, amount })
   if (!isSupabaseConfigured) {
+    console.error("🖥️ [Server Action] Supabase is NOT configured")
     return { success: false, fallback: true }
   }
 
   try {
     // 1. ตรวจสอบสิทธิ์ผู้ใช้งานบน Server (เฉพาะ Staff, Admin หรือ Super Admin เท่านั้น) เพื่อความปลอดภัยสูงสุด
     const profileRes = await getCurrentUserProfileAction()
+    console.log("🖥️ [Server Action] Checked profile response success:", profileRes.success)
     if (!profileRes.success || !profileRes.data) {
+      console.error("🖥️ [Server Action] Profile lookup failed or unauthorized")
       return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
     }
     
     const role = profileRes.data.role
+    console.log("🖥️ [Server Action] User role:", role)
     if (role !== "admin" && role !== "staff" && role !== "super_admin") {
+      console.error("🖥️ [Server Action] Role is unauthorized:", role)
       return { success: false, error: "⚠️ ขออภัย คุณไม่มีสิทธิ์ในการบันทึกค่าปรับล่าช้า" }
     }
 
     // 2. เชื่อมต่อฐานข้อมูลโดยสลับไปใช้ Admin Client หากตั้งค่า Service Role Key ไว้
-    // วิธีนี้ช่วยแก้ปัญหา RLS policy ขัดข้องเมื่อเรียกใช้งานจาก Staff/Admin role ในบางเซสชัน
     const supabase = await createClient()
     let activeClient = supabase
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const hasServiceKey = url && serviceKey && !serviceKey.includes("placeholder")
+    const hasServiceKey = !!(url && serviceKey && !serviceKey.includes("placeholder"))
+    console.log("🖥️ [Server Action] Service Role Key present:", hasServiceKey)
 
     if (hasServiceKey) {
+      console.log("🖥️ [Server Action] Instantiating Admin Client to bypass RLS...")
       activeClient = createSupabaseClient(url, serviceKey, {
         auth: {
           persistSession: false,
           autoRefreshToken: false,
         }
       }) as any
+    } else {
+      console.log("🖥️ [Server Action] No Service Role Key found. Using default User Client...")
     }
 
+    console.log("🖥️ [Server Action] Executing UPDATE query on 'bills' for ID:", id)
     const { data, error } = await activeClient
       .from("bills")
       .update({
@@ -336,19 +348,27 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
       .eq("id", id)
       .select()
 
-    if (error) throw error
+    if (error) {
+      console.error("🖥️ [Server Action] Database error during UPDATE:", error)
+      throw error
+    }
+
+    console.log("🖥️ [Server Action] Database returned rows count:", data ? data.length : 0, "rows:", data)
 
     // ตรวจสอบว่ามีแถวถูกแก้ไขจริงหรือไม่ เพื่อจับกรณี RLS บล็อก หรือส่ง ID ผิด โดยไม่ส่งผลให้สำเร็จหลอกๆ บนหน้าบ้าน
     if (!data || data.length === 0) {
       const rlsContext = !hasServiceKey 
         ? " (ตรวจไม่พบ SUPABASE_SERVICE_ROLE_KEY ใน Environment Variables ของท่าน ทำให้ระบบต้องใช้สิทธิ์ของท่านตามนโยบาย RLS ดั้งเดิม)" 
         : ""
-      throw new Error(`ไม่สามารถอัปเดตข้อมูลบิลได้: ไม่พบข้อมูลบิลที่มีรหัส '${id}' ในระบบ หรือบัญชีของท่านไม่มีสิทธิ์เข้าถึงเพื่อแก้ไข${rlsContext}`)
+      const noRowsError = `ไม่สามารถอัปเดตข้อมูลบิลได้: ไม่พบข้อมูลบิลที่มีรหัส '${id}' ในระบบ หรือบัญชีของท่านไม่มีสิทธิ์เข้าถึงเพื่อแก้ไข${rlsContext}`
+      console.error("🖥️ [Server Action] Error: 0 rows modified. Threw:", noRowsError)
+      throw new Error(noRowsError)
     }
 
+    console.log("🖥️ [Server Action] Penalty updated successfully. Returning first row:", data[0])
     return { success: true, data: data[0] }
   } catch (error: any) {
-    console.error("Error in updateBillPenalty action:", error)
+    console.error("🖥️ [Server Action] Exception caught:", error)
     
     let errorMessage = error?.message || (error instanceof Error ? error.message : typeof error === "object" ? JSON.stringify(error) : String(error))
     

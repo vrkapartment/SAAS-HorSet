@@ -346,7 +346,8 @@ export default function MeterReadingTable({
                 : 0
               
               const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
-              const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
+              const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
+              const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
               const isSaveDisabled = item.tenantName
                 ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
                 : item.isMeterSaved
@@ -394,7 +395,7 @@ export default function MeterReadingTable({
                       <div className="text-right">
                         <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมสุทธิ</div>
                         <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
-                          {item.tenantName ? `${calculatedAmount.toLocaleString()}.-` : "-"}
+                          {item.tenantName ? `${displayedTotal.toLocaleString()}.-` : "-"}
                         </div>
                         {item.tenantName && isModified && (
                           <span className={`inline-block text-[9px] bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1 ${
@@ -756,8 +757,9 @@ export default function MeterReadingTable({
                     : 0
                   
                   const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
+                  const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
 
-                  const isModified = item.billStatus !== "not_created" && item.billAmount !== calculatedAmount
+                  const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
                   const isSaveDisabled = item.tenantName
                     ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
                     : item.isMeterSaved
@@ -857,7 +859,7 @@ export default function MeterReadingTable({
                             {item.tenantName ? (
                               <>
                                 <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                                  {calculatedAmount.toLocaleString()}.-
+                                  {displayedTotal.toLocaleString()}.-
                                 </div>
                                 {isModified && (
                                   <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold ${

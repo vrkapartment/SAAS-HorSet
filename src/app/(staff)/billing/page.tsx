@@ -382,27 +382,28 @@ export default function UnifiedBillingPage() {
         let finalBillAmount = 0
         
         if (roomBill) {
-          const dbLateDays = Number(roomBill.lateDays || 0)
-          const dbPenaltyAmount = Number(roomBill.penaltyAmount || 0)
+          const dbLateDays = roomBill.lateDays
+          const dbPenaltyAmount = roomBill.penaltyAmount
           const dbBillAmount = Number(roomBill.amount || 0)
           const isUnpaidOrPending = roomBill.status === "unpaid" || roomBill.status === "pending"
           
-          if (isUnpaidOrPending && dbLateDays === 0) {
-            // คำนวณวันปรับล่าช้าอัตโนมัติตามเวลาปัจจุบัน
+          if (isUnpaidOrPending && dbLateDays === null) {
+            // คำนวณวันปรับล่าช้าอัตโนมัติตามเวลาปัจจุบัน (เนื่องจากคอลัมน์ late_days เป็น null ยังไม่เคยคำนวณหรือบันทึกมาก่อน)
             const calculatedDays = calculateLateDays(cycle)
             if (calculatedDays > 0) {
               finalLateDays = calculatedDays
               finalPenaltyAmount = calculatedDays * currentPenaltyRate
-              // ยอดเงินรวมจะถูกบวกเพิ่มด้วยส่วนต่างค่าปรับที่คำนวณมาใหม่
-              finalBillAmount = dbBillAmount + finalPenaltyAmount - dbPenaltyAmount
+              // ยอดเงินรวมจะถูกบวกเพิ่มด้วยค่าปรับที่คำนวณมาใหม่
+              finalBillAmount = dbBillAmount + finalPenaltyAmount
             } else {
-              finalLateDays = dbLateDays
-              finalPenaltyAmount = dbPenaltyAmount
+              finalLateDays = 0
+              finalPenaltyAmount = 0
               finalBillAmount = dbBillAmount
             }
           } else {
-            finalLateDays = dbLateDays
-            finalPenaltyAmount = dbPenaltyAmount
+            // ใช้ค่าจากตารางฐานข้อมูลโดยตรง (ไม่ว่าจะเป็น 0 หรือค่าที่แอดมินบันทึกไว้ และไม่ให้ทำการคำนวณซ้ำซ้อน)
+            finalLateDays = dbLateDays !== null && dbLateDays !== undefined ? Number(dbLateDays) : 0
+            finalPenaltyAmount = dbPenaltyAmount !== null && dbPenaltyAmount !== undefined ? Number(dbPenaltyAmount) : 0
             finalBillAmount = dbBillAmount
           }
         }
@@ -602,35 +603,66 @@ export default function UnifiedBillingPage() {
 
   // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
   const handleSaveLateDays = async (roomNumber: string) => {
+    console.log("🚀 [Client] handleSaveLateDays started for room:", roomNumber)
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
-    if (!item || !item.billId) return
+    
+    if (!item) {
+      console.error("❌ [Client] Room item not found in unifiedItems for room:", roomNumber)
+      alert(`⚠️ ไม่พบข้อมูลสำหรับห้อง ${roomNumber} กรุณาลองใหม่อีกครั้ง`)
+      return
+    }
+    
+    if (!item.billId) {
+      console.error("❌ [Client] billId is missing for room:", roomNumber, "item:", item)
+      alert(`⚠️ ห้อง ${roomNumber} ไม่มีรหัสบิล (Bill ID) บนระบบ กรุณาลองรีเฟรชหน้าเว็บ หรือกดสร้างบิลก่อนทำการบันทึกค่าปรับ`)
+      return
+    }
+    
+    const sendLateDays = item.lateDays || 0
+    const sendPenaltyAmount = item.penaltyAmount || 0
+    const sendBillAmount = item.billAmount
+    
+    console.log("👉 [Client] Preparing to call updateBillPenalty:", {
+      billId: item.billId,
+      lateDays: sendLateDays,
+      penaltyAmount: sendPenaltyAmount,
+      billAmount: sendBillAmount
+    })
     
     setSavingAll(true)
     setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
     
     try {
       const { updateBillPenalty } = await import("@/features/billing/actions")
+      console.log("👉 [Client] Server Action updateBillPenalty imported successfully. Invoking...")
+      
       const res = await updateBillPenalty(
         item.billId,
-        item.lateDays || 0,
-        item.penaltyAmount || 0,
-        item.billAmount
+        sendLateDays,
+        sendPenaltyAmount,
+        sendBillAmount
       )
+      
+      console.log("✅ [Client] updateBillPenalty responded:", res)
       
       if (res.success) {
         showToast(`บันทึกจำนวนวันปรับล่าช้าห้อง ${roomNumber} สำเร็จ!`)
         setUnifiedItems(prev =>
           prev.map(i => i.roomNumber === roomNumber ? { ...i, isEdited: false } : i)
         )
+        console.log("👉 [Client] Refreshing page data via loadData...")
         await loadData(billingCycle, true)
+        console.log("👉 [Client] loadData completed after update")
       } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการบันทึกค่าปรับ")
+        console.error("❌ [Client] Server Action returned success=false:", res.error)
+        alert(`❌ บันทึกไม่สำเร็จ: ${res.error || "เกิดข้อผิดพลาดในการบันทึกค่าปรับ"}`)
       }
     } catch (err) {
-      console.error(err)
-      alert("เกิดข้อผิดพลาดในการบันทึกค่าปรับ")
+      console.error("💥 [Client] Exception caught in handleSaveLateDays:", err)
+      alert(`💥 เกิดข้อผิดพลาดร้ายแรงในการบันทึกค่าปรับ:\n${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setSavingAll(false)
+      console.log("🏁 [Client] handleSaveLateDays finished execution flow")
     }
   }
 

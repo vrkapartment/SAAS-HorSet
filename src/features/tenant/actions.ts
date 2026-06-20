@@ -347,8 +347,8 @@ export async function getTenantPortalData() {
           slipUrl: b.slip_url,
           electricUnits: Number(b.electric_units),
           waterUnits: Number(b.water_units),
-          penaltyAmount: Number(b.penalty_amount || 0),
-          lateDays: Number(b.late_days || 0)
+          penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
+          lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
         }))
       }
     }
@@ -485,8 +485,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         slipUrl: b.slip_url,
         electricUnits: Number(b.electric_units),
         waterUnits: Number(b.water_units),
-        penaltyAmount: Number(b.penalty_amount || 0),
-        lateDays: Number(b.late_days || 0)
+        penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
+        lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
       }))
     }
 
