@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -296,26 +297,27 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
   }
 
   try {
-    // 1. ตรวจสอบสิทธิ์ผู้ใช้งานบน Server (เฉพาะ Staff หรือ Admin เท่านั้น) เพื่อความปลอดภัยสูงสุด
+    // 1. ตรวจสอบสิทธิ์ผู้ใช้งานบน Server (เฉพาะ Staff, Admin หรือ Super Admin เท่านั้น) เพื่อความปลอดภัยสูงสุด
     const profileRes = await getCurrentUserProfileAction()
     if (!profileRes.success || !profileRes.data) {
       return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
     }
     
     const role = profileRes.data.role
-    if (role !== "admin" && role !== "staff") {
+    if (role !== "admin" && role !== "staff" && role !== "super_admin") {
       return { success: false, error: "⚠️ ขออภัย คุณไม่มีสิทธิ์ในการบันทึกค่าปรับล่าช้า" }
     }
 
     // 2. เชื่อมต่อฐานข้อมูลโดยสลับไปใช้ Admin Client หากตั้งค่า Service Role Key ไว้
-    // วิธีนี้ช่วยแก้ปัญหา RLS policy ขัดข้องเมื่อเรียกใช้งานจาก Staff role ในบางเซสชัน
+    // วิธีนี้ช่วยแก้ปัญหา RLS policy ขัดข้องเมื่อเรียกใช้งานจาก Staff/Admin role ในบางเซสชัน
     const supabase = await createClient()
     let activeClient = supabase
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (url && serviceKey && !serviceKey.includes("placeholder")) {
-      const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+    const hasServiceKey = url && serviceKey && !serviceKey.includes("placeholder")
+
+    if (hasServiceKey) {
       activeClient = createSupabaseClient(url, serviceKey, {
         auth: {
           persistSession: false,
@@ -335,9 +337,26 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
       .select()
 
     if (error) throw error
-    return { success: true, data: data ? data[0] : null }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปเดตค่าปรับ"
+
+    // ตรวจสอบว่ามีแถวถูกแก้ไขจริงหรือไม่ เพื่อจับกรณี RLS บล็อก หรือส่ง ID ผิด โดยไม่ส่งผลให้สำเร็จหลอกๆ บนหน้าบ้าน
+    if (!data || data.length === 0) {
+      const rlsContext = !hasServiceKey 
+        ? " (ตรวจไม่พบ SUPABASE_SERVICE_ROLE_KEY ใน Environment Variables ของท่าน ทำให้ระบบต้องใช้สิทธิ์ของท่านตามนโยบาย RLS ดั้งเดิม)" 
+        : ""
+      throw new Error(`ไม่สามารถอัปเดตข้อมูลบิลได้: ไม่พบข้อมูลบิลที่มีรหัส '${id}' ในระบบ หรือบัญชีของท่านไม่มีสิทธิ์เข้าถึงเพื่อแก้ไข${rlsContext}`)
+    }
+
+    return { success: true, data: data[0] }
+  } catch (error: any) {
+    console.error("Error in updateBillPenalty action:", error)
+    
+    let errorMessage = error?.message || (error instanceof Error ? error.message : typeof error === "object" ? JSON.stringify(error) : String(error))
+    
+    // ตรวจจับข้อผิดพลาด Schema Cache เพื่อแจ้งคู่มือแก้ปัญหาแบบละเอียดให้ผู้ใช้เห็นทันทีบน Alert Dialog
+    if (errorMessage.includes("column") && (errorMessage.includes("schema cache") || errorMessage.includes("late_days") || errorMessage.includes("penalty_amount"))) {
+      errorMessage = `⚠️ ตรวจพบว่าระบบยังมองไม่เห็นคอลัมน์ 'late_days' หรือ 'penalty_amount' ในตาราง bills (Schema Cache ใน Supabase ยังไม่อัปเดต)\n\nกรุณาทำตามขั้นตอนต่อไปนี้เพื่อแก้ไข:\n1. ไปที่แดชบอร์ด Supabase ของท่าน\n2. เข้าเมนู SQL Editor ทางด้านซ้าย\n3. สร้าง Query ใหม่แล้วพิมพ์คำสั่งดังนี้:\n   NOTIFY pgrst, 'reload schema';\n4. กดปุ่ม Run เพื่อล้างแคช จากนั้นกลับมาทดสอบบันทึกบิลใหม่อีกครั้ง!`
+    }
+    
     return { success: false, error: errorMessage }
   }
 }
