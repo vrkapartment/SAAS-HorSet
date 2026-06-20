@@ -482,14 +482,6 @@ export default function MeterReadingTable({
                               onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
                             />
                             <span className="text-xs font-bold text-slate-500">วัน</span>
-                            {item.isEdited && (
-                              <button
-                                onClick={() => handleSaveLateDays?.(item.roomNumber)}
-                                className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-sm flex items-center justify-center cursor-pointer ml-1"
-                              >
-                                <Save className="w-3.5 h-3.5" />
-                              </button>
-                            )}
                           </div>
                         </div>
                       )}
@@ -649,7 +641,14 @@ export default function MeterReadingTable({
                   {/* Action Buttons Section (เฉพาะแถบจัดการบิลเท่านั้น) */}
                   {activeTab === "all" && item.billStatus !== "not_created" && (
                     <div className="pt-2 space-y-2">
-                      {item.billStatus === "pending" ? (
+                      {item.isEdited ? (
+                        <button
+                          onClick={() => handleSaveLateDays?.(item.roomNumber)}
+                          className="w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/30 text-white shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
+                        >
+                          <Save className="w-4 h-4" /> บันทึกบิล
+                        </button>
+                      ) : item.billStatus === "pending" ? (
                         <button
                           onClick={() => {
                             setSelectedBill(item)
@@ -841,15 +840,6 @@ export default function MeterReadingTable({
                                     onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
                                   />
                                   <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>วัน</span>
-                                  {item.isEdited && (
-                                    <button
-                                      onClick={() => handleSaveLateDays?.(item.roomNumber)}
-                                      className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-sm flex items-center justify-center cursor-pointer hover:scale-105 ml-1"
-                                      title="บันทึกจำนวนวันปรับ"
-                                    >
-                                      <Save className="w-3 h-3" />
-                                    </button>
-                                  )}
                                 </div>
                                 {latePenaltyRate > 0 && (
                                   <span className={`text-[9px] mt-1 font-bold ${isDark ? "text-rose-450" : "text-rose-500"}`} title={`ค่าปรับวันละ ${latePenaltyRate} บาท`}>
@@ -903,7 +893,20 @@ export default function MeterReadingTable({
                           {/* แถบการจัดการบิล */}
                           <td className="py-4 text-center pr-2">
                             <div className="flex items-center justify-center gap-1.5">
-                              {item.billStatus === "pending" ? (
+                              {item.isEdited ? (
+                                <button
+                                  onClick={() => handleSaveLateDays?.(item.roomNumber)}
+                                  className={`p-1.5 rounded-xl border transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer ${
+                                    isDark
+                                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 hover:text-white"
+                                      : "bg-emerald-50 text-emerald-700 border-emerald-250 hover:bg-emerald-500 hover:text-white"
+                                  }`}
+                                  title="บันทึกจำนวนวันปรับล่าช้าลงระบบ"
+                                >
+                                  <Save className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold">บันทึกบิล</span>
+                                </button>
+                              ) : item.billStatus === "pending" ? (
                                 <button
                                   onClick={() => {
                                     setSelectedBill(item)
