@@ -226,6 +226,29 @@ export default function UnifiedBillingPage() {
     }
   }
 
+  const calculateLateDays = (cycleStr: string): number => {
+    if (!cycleStr || !cycleStr.includes("-")) return 0
+    const [yearStr, monthStr] = cycleStr.split("-")
+    const year = parseInt(yearStr, 10)
+    
+    // สำหรับบิลรอบเดือน มิถุนายน (06) กำหนดจ่ายคือวันที่ 5 ของเดือนถัดไป (กรกฎาคม / index 6)
+    const dueMonth = parseInt(monthStr, 10) 
+    
+    const dueDate = new Date(year, dueMonth, 5, 23, 59, 59, 999)
+    const now = new Date()
+    
+    if (now <= dueDate) return 0
+    
+    const dueMidnight = new Date(year, dueMonth, 5)
+    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    const diffTime = nowMidnight.getTime() - dueMidnight.getTime()
+    if (diffTime <= 0) return 0
+    
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays > 0 ? diffDays : 0
+  }
+
   const loadData = async (cycle = billingCycle, forceRefresh = false) => {
     setLoading(true)
     
@@ -318,6 +341,17 @@ export default function UnifiedBillingPage() {
         if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
       }
       
+      // 5. ดึงข้อมูลการเงินเพื่อใช้หาอัตราค่าปรับจ่ายล่าช้าแบบไดนามิก
+      let financeData = wsId ? getCachedData(wsId, "finance_settings") : null
+      if (wsId && (!financeData || forceRefresh)) {
+        const financeRes = await getFinanceSettings(wsId)
+        if (financeRes.success && financeRes.data) {
+          financeData = financeRes.data
+          setCachedData(wsId, "finance_settings", financeData)
+        }
+      }
+      const currentPenaltyRate = financeData ? Number(financeData.late_penalty_rate || 0) : 0
+
       // โหมด Supabase ดั้งเดิมและถาวร (รวมทุกห้องแม้ไม่มีผู้เช่า)
       const activeRooms = rooms
       const compiled = activeRooms.map((r: any) => {
@@ -342,6 +376,37 @@ export default function UnifiedBillingPage() {
         const isElecPrevEditable = isFirstMonth
         const isWaterPrevEditable = isFirstMonth
 
+        // จัดการเรื่องวันจ่ายล่าช้าและคำนวณค่าปรับแบบเรียลไทม์ตามเวลาปัจจุบัน
+        let finalLateDays = 0
+        let finalPenaltyAmount = 0
+        let finalBillAmount = 0
+        
+        if (roomBill) {
+          const dbLateDays = Number(roomBill.lateDays || 0)
+          const dbPenaltyAmount = Number(roomBill.penaltyAmount || 0)
+          const dbBillAmount = Number(roomBill.amount || 0)
+          const isUnpaidOrPending = roomBill.status === "unpaid" || roomBill.status === "pending"
+          
+          if (isUnpaidOrPending && dbLateDays === 0) {
+            // คำนวณวันปรับล่าช้าอัตโนมัติตามเวลาปัจจุบัน
+            const calculatedDays = calculateLateDays(cycle)
+            if (calculatedDays > 0) {
+              finalLateDays = calculatedDays
+              finalPenaltyAmount = calculatedDays * currentPenaltyRate
+              // ยอดเงินรวมจะถูกบวกเพิ่มด้วยส่วนต่างค่าปรับที่คำนวณมาใหม่
+              finalBillAmount = dbBillAmount + finalPenaltyAmount - dbPenaltyAmount
+            } else {
+              finalLateDays = dbLateDays
+              finalPenaltyAmount = dbPenaltyAmount
+              finalBillAmount = dbBillAmount
+            }
+          } else {
+            finalLateDays = dbLateDays
+            finalPenaltyAmount = dbPenaltyAmount
+            finalBillAmount = dbBillAmount
+          }
+        }
+
         return {
           roomNumber: r.roomNumber,
           tenantName: r.tenantName,
@@ -358,13 +423,13 @@ export default function UnifiedBillingPage() {
           isWaterPrevEditable,
           
           billId: roomBill?.id || undefined,
-          billAmount: roomBill ? Number(roomBill.amount) : 0,
+          billAmount: finalBillAmount,
           billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created",
           slipUrl: roomBill ? roomBill.slipUrl : null,
           electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
           waterUnits: roomBill ? Number(roomBill.waterUnits) : 0,
-          penaltyAmount: roomBill ? Number(roomBill.penaltyAmount || 0) : 0,
-          lateDays: roomBill ? Number(roomBill.lateDays || 0) : 0
+          penaltyAmount: finalPenaltyAmount,
+          lateDays: finalLateDays
         }
       })
       setUnifiedItems(compiled)
