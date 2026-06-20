@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -60,18 +61,22 @@ export async function createBill(
     // Check if a bill already exists for this room and cycle
     const { data: existing } = await supabase
       .from("bills")
-      .select("id")
+      .select("id, penalty_amount")
       .eq("room_number", roomNumber)
       .eq("billing_cycle", billingCycle)
-      .single()
+      .maybeSingle()
 
     let result
     if (existing) {
+      // ป้องกันยอดเงินรวมโดนทับ หากมีค่าปรับบันทึกไว้อยู่แล้ว
+      const existingPenalty = Number(existing.penalty_amount || 0)
+      const finalAmount = amount + existingPenalty
+
       result = await supabase
         .from("bills")
         .update({
           tenant_name: tenantName,
-          amount,
+          amount: finalAmount,
           status,
           electric_units: electricUnits,
           water_units: waterUnits
@@ -291,8 +296,35 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
   }
 
   try {
+    // 1. ตรวจสอบสิทธิ์ผู้ใช้งานบน Server (เฉพาะ Staff หรือ Admin เท่านั้น) เพื่อความปลอดภัยสูงสุด
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || !profileRes.data) {
+      return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
+    }
+    
+    const role = profileRes.data.role
+    if (role !== "admin" && role !== "staff") {
+      return { success: false, error: "⚠️ ขออภัย คุณไม่มีสิทธิ์ในการบันทึกค่าปรับล่าช้า" }
+    }
+
+    // 2. เชื่อมต่อฐานข้อมูลโดยสลับไปใช้ Admin Client หากตั้งค่า Service Role Key ไว้
+    // วิธีนี้ช่วยแก้ปัญหา RLS policy ขัดข้องเมื่อเรียกใช้งานจาก Staff role ในบางเซสชัน
     const supabase = await createClient()
-    const { data, error } = await supabase
+    let activeClient = supabase
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (url && serviceKey && !serviceKey.includes("placeholder")) {
+      const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+      activeClient = createSupabaseClient(url, serviceKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      }) as any
+    }
+
+    const { data, error } = await activeClient
       .from("bills")
       .update({
         late_days: lateDays,
@@ -303,7 +335,7 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
       .select()
 
     if (error) throw error
-    return { success: true, data: data[0] }
+    return { success: true, data: data ? data[0] : null }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปเดตค่าปรับ"
     return { success: false, error: errorMessage }
