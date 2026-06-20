@@ -64,6 +64,7 @@ interface UnifiedRoomBillingItem {
   electricUnits: number
   waterUnits: number
   penaltyAmount?: number
+  lateDays?: number
 
   isEdited?: boolean
 }
@@ -185,6 +186,7 @@ export default function UnifiedBillingPage() {
   const [workspacePhone, setWorkspacePhone] = useState<string>("")
   const [workspaceTaxId, setWorkspaceTaxId] = useState<string>("")
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>("")
+  const [latePenaltyRate, setLatePenaltyRate] = useState<number>(0)
   
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
@@ -361,7 +363,8 @@ export default function UnifiedBillingPage() {
           slipUrl: roomBill ? roomBill.slipUrl : null,
           electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
           waterUnits: roomBill ? Number(roomBill.waterUnits) : 0,
-          penaltyAmount: roomBill ? Number(roomBill.penaltyAmount || 0) : 0
+          penaltyAmount: roomBill ? Number(roomBill.penaltyAmount || 0) : 0,
+          lateDays: roomBill ? Number(roomBill.lateDays || 0) : 0
         }
       })
       setUnifiedItems(compiled)
@@ -446,6 +449,7 @@ export default function UnifiedBillingPage() {
             if (financeData.water_min_unit !== undefined) setWaterMinUnit(financeData.water_min_unit)
             setElectricMinChecked(!!financeData.electric_min_checked)
             if (financeData.electric_min_unit !== undefined) setElectricMinUnit(financeData.electric_min_unit)
+            if (financeData.late_penalty_rate !== undefined) setLatePenaltyRate(financeData.late_penalty_rate)
             if (financeData.promptpay_id) setPromptPayId(financeData.promptpay_id)
             if (financeData.promptpay_name) setPromptPayName(financeData.promptpay_name)
             if (financeData.name) setWorkspaceName(financeData.name)
@@ -502,6 +506,67 @@ export default function UnifiedBillingPage() {
         item.roomNumber === roomNumber ? { ...item, waterPrev: value, isMeterSaved: false, isEdited: true } : item
       )
     )
+  }
+
+  // อัปเดตและคำนวณวันปรับล่าช้าในหน้าจอแบบเรียลไทม์
+  const handleLateDaysChange = (roomNumber: string, value: string) => {
+    setUnifiedItems(prev =>
+      prev.map(item => {
+        if (item.roomNumber !== roomNumber) return item
+        
+        const days = value === "" ? 0 : Number(value)
+        if (isNaN(days)) return item
+        
+        const newPenaltyAmount = days * latePenaltyRate
+        
+        // คำนวณความแตกต่างของค่าปรับเพื่อปรับเปลี่ยนยอดรวมรวม billAmount
+        const prevPenalty = item.penaltyAmount || 0
+        const penaltyDiff = newPenaltyAmount - prevPenalty
+        const newBillAmount = item.billAmount + penaltyDiff
+        
+        return {
+          ...item,
+          lateDays: days,
+          penaltyAmount: newPenaltyAmount,
+          billAmount: newBillAmount,
+          isEdited: true
+        }
+      })
+    )
+  }
+
+  // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
+  const handleSaveLateDays = async (roomNumber: string) => {
+    const item = unifiedItems.find(i => i.roomNumber === roomNumber)
+    if (!item || !item.billId) return
+    
+    setSavingAll(true)
+    setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
+    
+    try {
+      const { updateBillPenalty } = await import("@/features/billing/actions")
+      const res = await updateBillPenalty(
+        item.billId,
+        item.lateDays || 0,
+        item.penaltyAmount || 0,
+        item.billAmount
+      )
+      
+      if (res.success) {
+        showToast(`บันทึกจำนวนวันปรับล่าช้าห้อง ${roomNumber} สำเร็จ!`)
+        setUnifiedItems(prev =>
+          prev.map(i => i.roomNumber === roomNumber ? { ...i, isEdited: false } : i)
+        )
+        await loadData(billingCycle, true)
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการบันทึกค่าปรับ")
+      }
+    } catch (err) {
+      console.error(err)
+      alert("เกิดข้อผิดพลาดในการบันทึกค่าปรับ")
+    } finally {
+      setSavingAll(false)
+    }
   }
 
   // อนุมัติสลิปโอนเงิน
@@ -890,7 +955,9 @@ export default function UnifiedBillingPage() {
         workspaceAddress,
         workspacePhone,
         workspaceTaxId,
-        penaltyAmount: item.penaltyAmount || 0
+        penaltyAmount: item.penaltyAmount || 0,
+        lateDays: item.lateDays || 0,
+        latePenaltyRate: latePenaltyRate
       })
 
       const link = document.createElement("a")
@@ -960,7 +1027,9 @@ export default function UnifiedBillingPage() {
           workspaceAddress,
           workspacePhone,
           workspaceTaxId,
-          penaltyAmount: item.penaltyAmount || 0
+          penaltyAmount: item.penaltyAmount || 0,
+          lateDays: item.lateDays || 0,
+          latePenaltyRate: latePenaltyRate
         })
 
         const fileName = `bill_room${item.roomNumber}_${billingCycle}.pdf`
@@ -1144,6 +1213,9 @@ export default function UnifiedBillingPage() {
         billingCycle={billingCycle}
         workspaceName={workspaceName}
         currentWorkspaceId={currentWorkspaceId}
+        handleLateDaysChange={handleLateDaysChange}
+        handleSaveLateDays={handleSaveLateDays}
+        latePenaltyRate={latePenaltyRate}
       />
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}

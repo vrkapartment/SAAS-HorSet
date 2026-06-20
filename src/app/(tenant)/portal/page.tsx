@@ -261,10 +261,12 @@ export default function TenantPortal() {
   const rentPrice = baseRent
 
   // คำนวณจำนวนวันและค่าปรับล่าช้าแบบพลวัต
-  const lateDays = (bill && billStatus === "unpaid") ? calculateLateDays(bill.billingCycle) : 0
+  const lateDays = (bill && billStatus === "unpaid")
+    ? (bill.lateDays !== undefined && bill.lateDays > 0 ? bill.lateDays : calculateLateDays(bill.billingCycle))
+    : (bill ? (bill.lateDays || 0) : 0)
   
   const penaltyAmount = (bill && billStatus === "unpaid")
-    ? (lateDays * latePenaltyRate)
+    ? (bill.penaltyAmount !== undefined && bill.penaltyAmount > 0 ? bill.penaltyAmount : (lateDays * latePenaltyRate))
     : (bill ? (bill.penaltyAmount || Math.max(0, bill.amount - (baseRent + elecAmount + waterAmount + commonAreaFee))) : 0)
 
   const totalAmount = (bill && billStatus === "unpaid")
@@ -293,7 +295,9 @@ export default function TenantPortal() {
         workspaceAddress,
         workspacePhone,
         workspaceTaxId,
-        penaltyAmount
+        penaltyAmount,
+        lateDays,
+        latePenaltyRate
       })
 
       const link = document.createElement("a")

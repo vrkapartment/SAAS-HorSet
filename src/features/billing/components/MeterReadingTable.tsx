@@ -32,6 +32,9 @@ interface MeterReadingTableProps {
   workspaceName: string
   currentWorkspaceId: string
   userPermissions?: StaffPermissions
+  handleLateDaysChange?: (roomNumber: string, value: string) => void
+  handleSaveLateDays?: (roomNumber: string) => Promise<void>
+  latePenaltyRate?: number
 }
 
 export default function MeterReadingTable({
@@ -62,11 +65,14 @@ export default function MeterReadingTable({
   billingCycle,
   workspaceName,
   currentWorkspaceId,
-  userPermissions
+  userPermissions,
+  handleLateDaysChange,
+  handleSaveLateDays,
+  latePenaltyRate = 0
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">("all")
-  const colSpanVal = activeTab === "all" ? 7 : 6
+  const colSpanVal = activeTab === "all" ? 8 : 6
 
   const [bulkSendModalOpen, setBulkSendModalOpen] = useState(false)
   const [modalActiveTab, setModalActiveTab] = useState<"connected" | "unconnected">("connected")
@@ -405,44 +411,88 @@ export default function MeterReadingTable({
 
                   {/* 1. แถบจัดการบิล (อ่านอย่างเดียว ไม่มีแบบกรอก ไม่มีปุ่มเซฟ) */}
                   {activeTab === "all" && (
-                    <div className="grid grid-cols-2 gap-3.5">
-                      {/* ไฟฟ้า Read-only */}
-                      <div className={`rounded-xl p-3 border ${
-                        isDark ? "bg-blue-950/15 border-blue-900/40" : "bg-blue-50/30 border-blue-100"
-                      }`}>
-                        <div className={`text-xs font-bold flex items-center gap-1 mb-1.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                          <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
-                        </div>
-                        <div className="font-mono text-xs">
-                          <span className="text-slate-400">ก่อน: {item.elecPrev}</span>
-                          <span className="mx-1 text-slate-400">➔</span>
-                          <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.elecCurr || "-"}</span>
-                        </div>
-                        {hasElecCurr && (
-                          <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                            {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3.5">
+                        {/* ไฟฟ้า Read-only */}
+                        <div className={`rounded-xl p-3 border ${
+                          isDark ? "bg-blue-950/15 border-blue-900/40" : "bg-blue-50/30 border-blue-100"
+                        }`}>
+                          <div className={`text-xs font-bold flex items-center gap-1 mb-1.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                            <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
                           </div>
-                        )}
+                          <div className="font-mono text-xs">
+                            <span className="text-slate-400">ก่อน: {item.elecPrev}</span>
+                            <span className="mx-1 text-slate-400">➔</span>
+                            <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.elecCurr || "-"}</span>
+                          </div>
+                          {hasElecCurr && (
+                            <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                              {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* น้ำประปา Read-only */}
+                        <div className={`rounded-xl p-3 border ${
+                          isDark ? "bg-teal-950/15 border-teal-900/40" : "bg-teal-50/30 border-teal-100"
+                        }`}>
+                          <div className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 mb-1.5">
+                            <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
+                          </div>
+                          <div className="font-mono text-xs">
+                            <span className="text-slate-400">ก่อน: {item.waterPrev}</span>
+                            <span className="mx-1 text-slate-400">➔</span>
+                            <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.waterCurr || "-"}</span>
+                          </div>
+                          {hasWaterCurr && (
+                            <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
+                              {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* น้ำประปา Read-only */}
-                      <div className={`rounded-xl p-3 border ${
-                        isDark ? "bg-teal-950/15 border-teal-900/40" : "bg-teal-50/30 border-teal-100"
-                      }`}>
-                        <div className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 mb-1.5">
-                          <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
-                        </div>
-                        <div className="font-mono text-xs">
-                          <span className="text-slate-400">ก่อน: {item.waterPrev}</span>
-                          <span className="mx-1 text-slate-400">➔</span>
-                          <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.waterCurr || "-"}</span>
-                        </div>
-                        {hasWaterCurr && (
-                          <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
-                            {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                      {/* แก้ไขจำนวนวันปรับล่าช้าในโมบาย */}
+                      {item.tenantName && item.billStatus !== "not_created" && (
+                        <div className={`rounded-xl p-3 border flex items-center justify-between gap-3 ${
+                          isDark ? "bg-rose-950/10 border-rose-950/45" : "bg-rose-50/20 border-rose-100/70"
+                        }`}>
+                          <div className="flex flex-col">
+                            <div className="text-xs font-bold text-rose-500 dark:text-rose-400">
+                              ปรับล่าช้า (วัน)
+                            </div>
+                            {latePenaltyRate > 0 && (
+                              <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                วันละ {latePenaltyRate}.-
+                                <span className="ml-1.5 text-rose-500 font-extrabold">
+                                  (+{((item.lateDays || 0) * latePenaltyRate).toLocaleString()}.-)
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0"
+                              className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold ${
+                                isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                              }`}
+                              value={item.lateDays !== undefined ? item.lateDays : 0}
+                              onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
+                            />
+                            <span className="text-xs font-bold text-slate-500">วัน</span>
+                            {item.isEdited && (
+                              <button
+                                onClick={() => handleSaveLateDays?.(item.roomNumber)}
+                                className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-sm flex items-center justify-center cursor-pointer ml-1"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -654,6 +704,7 @@ export default function MeterReadingTable({
                   <>
                     <th className="pb-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า (kWh)</th>
                     <th className="pb-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ (m³)</th>
+                    <th className="pb-3 text-center w-36 text-slate-500 dark:text-slate-450 font-bold">ปรับล่าช้า (วัน)</th>
                     <th className="pb-3 text-right pr-4 w-32">ยอดรวมบิล</th>
                     <th className="pb-3 text-center w-28">สถานะ</th>
                     <th className="pb-3 text-center w-52 pr-2">การจัดการบิล</th>
@@ -772,6 +823,43 @@ export default function MeterReadingTable({
                                 <span className="text-[10px] text-slate-400 italic">รอจดในแถบน้ำ</span>
                               )}
                             </div>
+                          </td>
+
+                          {/* ปรับล่าช้า (วัน) */}
+                          <td className="py-4 text-center px-2 border-r border-slate-100 dark:border-slate-800/40">
+                            {item.tenantName && item.billStatus !== "not_created" ? (
+                              <div className="flex flex-col items-center">
+                                <div className="flex items-center gap-1 justify-center">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="0"
+                                    className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold ${
+                                      isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                    }`}
+                                    value={item.lateDays !== undefined ? item.lateDays : 0}
+                                    onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
+                                  />
+                                  <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>วัน</span>
+                                  {item.isEdited && (
+                                    <button
+                                      onClick={() => handleSaveLateDays?.(item.roomNumber)}
+                                      className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-sm flex items-center justify-center cursor-pointer hover:scale-105 ml-1"
+                                      title="บันทึกจำนวนวันปรับ"
+                                    >
+                                      <Save className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                                {latePenaltyRate > 0 && (
+                                  <span className={`text-[9px] mt-1 font-bold ${isDark ? "text-rose-450" : "text-rose-500"}`} title={`ค่าปรับวันละ ${latePenaltyRate} บาท`}>
+                                    ปรับ +{((item.lateDays || 0) * latePenaltyRate).toLocaleString()}.-
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 dark:text-slate-600">-</span>
+                            )}
                           </td>
 
                           {/* ยอดบิลรวม */}

@@ -30,7 +30,8 @@ export async function getBills(billingCycle?: string) {
       slipUrl: b.slip_url,
       electricUnits: Number(b.electric_units),
       waterUnits: Number(b.water_units),
-      penaltyAmount: Number(b.penalty_amount || 0)
+      penaltyAmount: Number(b.penalty_amount || 0),
+      lateDays: Number(b.late_days || 0)
     }))
 
     return { success: true, data: formatted }
@@ -280,6 +281,31 @@ export async function deleteBill(id: string) {
     return { success: true }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบบิล"
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function updateBillPenalty(id: string, lateDays: number, penaltyAmount: number, amount: number) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("bills")
+      .update({
+        late_days: lateDays,
+        penalty_amount: penaltyAmount,
+        amount: amount
+      })
+      .eq("id", id)
+      .select()
+
+    if (error) throw error
+    return { success: true, data: data[0] }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปเดตค่าปรับ"
     return { success: false, error: errorMessage }
   }
 }

@@ -240,6 +240,8 @@ export interface BillPdfData {
   workspacePhone?: string
   workspaceTaxId?: string
   penaltyAmount?: number
+  lateDays?: number
+  latePenaltyRate?: number
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -367,9 +369,12 @@ export async function generateBillPdf(data: BillPdfData) {
   // รายการ 5: ค่าปรับจ่ายล่าช้า (แสดงต่อเมื่อมียอดค่าปรับ)
   if (penaltyAmount > 0) {
     y -= 25
+    const days = data.lateDays !== undefined ? data.lateDays : 0
+    const rate = data.latePenaltyRate !== undefined ? data.latePenaltyRate : (days > 0 ? Math.round(penaltyAmount / days) : penaltyAmount)
+
     drawText("5. ค่าปรับจ่ายล่าช้า (Late Payment Penalty / Fine)", 50, y, 9, rgb(0.8, 0.1, 0.1))
-    drawText("1", 280, y, 9, rgb(0.8, 0.1, 0.1))
-    drawText(penaltyAmount.toLocaleString(), 380, y, 9, rgb(0.8, 0.1, 0.1))
+    drawText(days > 0 ? `${days} วัน` : "1", 280, y, 9, rgb(0.8, 0.1, 0.1))
+    drawText(rate.toLocaleString(), 380, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(penaltyAmount.toLocaleString(), 475, y, 9, rgb(0.8, 0.1, 0.1))
   }
 
