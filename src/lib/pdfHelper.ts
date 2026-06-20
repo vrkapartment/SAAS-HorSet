@@ -239,6 +239,7 @@ export interface BillPdfData {
   workspaceAddress?: string
   workspacePhone?: string
   workspaceTaxId?: string
+  penaltyAmount?: number
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -324,8 +325,10 @@ export async function generateBillPdf(data: BillPdfData) {
   const elecAmount = isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate
   const waterAmount = isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate
   
+  const penaltyAmount = data.penaltyAmount !== undefined ? Number(data.penaltyAmount || 0) : 0
+  
   // คำนวณค่าเช่าห้องพักที่หักส่วนลด (หรือรวมค่าปรับ/ค่าใช้จ่ายอื่นๆ เผื่อไว้) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
-  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee)
+  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount)
 
   const elecDesc = isElecMin 
     ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
@@ -360,6 +363,15 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+
+  // รายการ 5: ค่าปรับจ่ายล่าช้า (แสดงต่อเมื่อมียอดค่าปรับ)
+  if (penaltyAmount > 0) {
+    y -= 25
+    drawText("5. ค่าปรับจ่ายล่าช้า (Late Payment Penalty / Fine)", 50, y, 9, rgb(0.8, 0.1, 0.1))
+    drawText("1", 280, y, 9, rgb(0.8, 0.1, 0.1))
+    drawText(penaltyAmount.toLocaleString(), 380, y, 9, rgb(0.8, 0.1, 0.1))
+    drawText(penaltyAmount.toLocaleString(), 475, y, 9, rgb(0.8, 0.1, 0.1))
+  }
 
   // ขีดเส้นใต้ตาราง
   page.drawLine({

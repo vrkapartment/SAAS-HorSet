@@ -76,6 +76,7 @@ create table public.bills (
   slip_url text,
   electric_units numeric not null default 0,
   water_units numeric not null default 0,
+  penalty_amount numeric not null default 0,
   created_at timestamptz not null default now()
 );
 

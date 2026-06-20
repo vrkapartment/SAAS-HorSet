@@ -63,6 +63,7 @@ interface UnifiedRoomBillingItem {
   slipUrl: string | null
   electricUnits: number
   waterUnits: number
+  penaltyAmount?: number
 
   isEdited?: boolean
 }
@@ -359,7 +360,8 @@ export default function UnifiedBillingPage() {
           billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created",
           slipUrl: roomBill ? roomBill.slipUrl : null,
           electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
-          waterUnits: roomBill ? Number(roomBill.waterUnits) : 0
+          waterUnits: roomBill ? Number(roomBill.waterUnits) : 0,
+          penaltyAmount: roomBill ? Number(roomBill.penaltyAmount || 0) : 0
         }
       })
       setUnifiedItems(compiled)
@@ -887,7 +889,8 @@ export default function UnifiedBillingPage() {
         workspaceName,
         workspaceAddress,
         workspacePhone,
-        workspaceTaxId
+        workspaceTaxId,
+        penaltyAmount: item.penaltyAmount || 0
       })
 
       const link = document.createElement("a")
@@ -956,7 +959,8 @@ export default function UnifiedBillingPage() {
           workspaceName,
           workspaceAddress,
           workspacePhone,
-          workspaceTaxId
+          workspaceTaxId,
+          penaltyAmount: item.penaltyAmount || 0
         })
 
         const fileName = `bill_room${item.roomNumber}_${billingCycle}.pdf`

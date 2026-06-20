@@ -346,7 +346,8 @@ export async function getTenantPortalData() {
           billingCycle: b.billing_cycle,
           slipUrl: b.slip_url,
           electricUnits: Number(b.electric_units),
-          waterUnits: Number(b.water_units)
+          waterUnits: Number(b.water_units),
+          penaltyAmount: Number(b.penalty_amount || 0)
         }))
       }
     }
@@ -482,7 +483,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         billingCycle: b.billing_cycle,
         slipUrl: b.slip_url,
         electricUnits: Number(b.electric_units),
-        waterUnits: Number(b.water_units)
+        waterUnits: Number(b.water_units),
+        penaltyAmount: Number(b.penalty_amount || 0)
       }))
     }
 

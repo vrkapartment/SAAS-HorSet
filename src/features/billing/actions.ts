@@ -29,7 +29,8 @@ export async function getBills(billingCycle?: string) {
       billingCycle: b.billing_cycle,
       slipUrl: b.slip_url,
       electricUnits: Number(b.electric_units),
-      waterUnits: Number(b.water_units)
+      waterUnits: Number(b.water_units),
+      penaltyAmount: Number(b.penalty_amount || 0)
     }))
 
     return { success: true, data: formatted }
@@ -99,6 +100,30 @@ export async function createBill(
   }
 }
 
+// Helper to calculate late days (equivalent to the one in Portal)
+function calculateLateDays(cycleStr: string): number {
+  if (!cycleStr || !cycleStr.includes("-")) return 0
+  const [yearStr, monthStr] = cycleStr.split("-")
+  const year = parseInt(yearStr, 10)
+  
+  // สำหรับบิลรอบเดือน มิถุนายน (06) กำหนดจ่ายคือวันที่ 5 ของเดือนถัดไป (กรกฎาคม / index 6)
+  const dueMonth = parseInt(monthStr, 10) 
+  
+  const dueDate = new Date(year, dueMonth, 5, 23, 59, 59, 999)
+  const now = new Date()
+  
+  if (now <= dueDate) return 0
+  
+  const dueMidnight = new Date(year, dueMonth, 5)
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  const diffTime = nowMidnight.getTime() - dueMidnight.getTime()
+  if (diffTime <= 0) return 0
+  
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays > 0 ? diffDays : 0
+}
+
 export async function updateBillStatus(id: string, status: "unpaid" | "pending" | "paid", slipUrl?: string | null, amount?: number) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -125,12 +150,104 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
       }
     }
 
+    // ดึงข้อมูลบิลเดิมมาคำนวณและเก็บค่าปรับล่าช้าลงฐานข้อมูลอัตโนมัติ
+    let billData: any = null
+    try {
+      const { data } = await activeClient
+        .from("bills")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle()
+      billData = data
+    } catch (e) {
+      console.error("Error fetching bill for penalty calculation:", e)
+    }
+
     const updateData: any = { status }
     if (slipUrl !== undefined) {
       updateData.slip_url = slipUrl
     }
-    if (amount !== undefined && amount !== null) {
-      updateData.amount = Number(amount)
+
+    if (billData) {
+      if (status === "paid") {
+        // หากเปลี่ยนเป็นสถานะชำระแล้ว และก่อนหน้านี้ยังไม่ใช่ paid
+        if (billData.status !== "paid") {
+          let latePenaltyRate = 0
+          const workspaceId = billData.workspace_id
+          if (workspaceId) {
+            try {
+              const { data: wsData } = await activeClient
+                .from("workspaces")
+                .select("late_penalty_rate")
+                .eq("id", workspaceId)
+                .maybeSingle()
+              if (wsData && wsData.late_penalty_rate !== null && wsData.late_penalty_rate !== undefined) {
+                latePenaltyRate = Number(wsData.late_penalty_rate)
+              }
+            } catch (err) {
+              console.warn("Could not query late_penalty_rate for workspace:", err)
+            }
+          }
+
+          const lateDays = calculateLateDays(billData.billing_cycle)
+          const penaltyAmount = lateDays * latePenaltyRate
+
+          if (penaltyAmount > 0) {
+            updateData.penalty_amount = penaltyAmount
+            // หากบิลเดิมมีสถานะค้างชำระ (unpaid) และแอดมินกดรับเงินโดยตรง ยอดเงินรวมควรเพิ่มค่าปรับเข้าไป
+            if (amount !== undefined && amount !== null) {
+              updateData.amount = Number(amount)
+            } else if (billData.status === "unpaid") {
+              updateData.amount = Number(billData.amount) + penaltyAmount
+            }
+          } else {
+            updateData.penalty_amount = 0
+            if (amount !== undefined && amount !== null) {
+              updateData.amount = Number(amount)
+            }
+          }
+        } else {
+          if (amount !== undefined && amount !== null) {
+            updateData.amount = Number(amount)
+          }
+        }
+      } else if (status === "pending") {
+        // คำนวณและบันทึกค่าปรับล่าช้าในขั้นตอนส่งสลิปตรวจ
+        let latePenaltyRate = 0
+        const workspaceId = billData.workspace_id
+        if (workspaceId) {
+          try {
+            const { data: wsData } = await activeClient
+              .from("workspaces")
+              .select("late_penalty_rate")
+              .eq("id", workspaceId)
+              .maybeSingle()
+            if (wsData && wsData.late_penalty_rate !== null && wsData.late_penalty_rate !== undefined) {
+              latePenaltyRate = Number(wsData.late_penalty_rate)
+            }
+          } catch (err) {
+            console.warn("Could not query late_penalty_rate for workspace:", err)
+          }
+        }
+
+        const lateDays = calculateLateDays(billData.billing_cycle)
+        const penaltyAmount = lateDays * latePenaltyRate
+        updateData.penalty_amount = penaltyAmount
+
+        if (amount !== undefined && amount !== null) {
+          updateData.amount = Number(amount)
+        }
+      } else if (status === "unpaid") {
+        // คืนค่าค่าปรับเป็น 0 หากถูกรีเซ็ตหรือปฏิเสธสลิปกลับเป็นค้างชำระ
+        updateData.penalty_amount = 0
+        if (amount !== undefined && amount !== null) {
+          updateData.amount = Number(amount)
+        }
+      }
+    } else {
+      if (amount !== undefined && amount !== null) {
+        updateData.amount = Number(amount)
+      }
     }
 
     const { data, error } = await activeClient

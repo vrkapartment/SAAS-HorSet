@@ -265,7 +265,7 @@ export default function TenantPortal() {
   
   const penaltyAmount = (bill && billStatus === "unpaid")
     ? (lateDays * latePenaltyRate)
-    : (bill ? Math.max(0, bill.amount - (baseRent + elecAmount + waterAmount + commonAreaFee)) : 0)
+    : (bill ? (bill.penaltyAmount || Math.max(0, bill.amount - (baseRent + elecAmount + waterAmount + commonAreaFee))) : 0)
 
   const totalAmount = (bill && billStatus === "unpaid")
     ? (baseRent + elecAmount + waterAmount + commonAreaFee + penaltyAmount)
@@ -292,7 +292,8 @@ export default function TenantPortal() {
         workspaceName,
         workspaceAddress,
         workspacePhone,
-        workspaceTaxId
+        workspaceTaxId,
+        penaltyAmount
       })
 
       const link = document.createElement("a")
