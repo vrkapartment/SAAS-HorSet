@@ -339,7 +339,15 @@ export async function getTenantPortalData() {
       if (billsError) throw billsError
 
       if (bills) {
-        // กรองเฉพาะบิลที่อยู่ในช่วงรอบสัญญาของผู้เช่ารายนี้เพื่อความปลอดภัยและความเป็นส่วนตัว
+        // ตรวจสอบว่ามีผู้เช่ารายใหม่เข้ามาอยู่ต่อหลังจากคนนี้หรือไม่
+        const { data: newer } = await supabase
+          .from("tenants")
+          .select("id")
+          .eq("room_id", tenant.room_id)
+          .gt("lease_start", tenant.lease_start)
+          .limit(1)
+        const isLatestTenant = !newer || newer.length === 0
+
         const leaseStartCycle = tenant.lease_start ? tenant.lease_start.substring(0, 7) : ""
         const leaseEndCycle = tenant.lease_end ? tenant.lease_end.substring(0, 7) : ""
 
@@ -347,7 +355,7 @@ export async function getTenantPortalData() {
         if (leaseStartCycle) {
           filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
         }
-        if (leaseEndCycle) {
+        if (leaseEndCycle && !isLatestTenant) {
           filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
         }
 
@@ -492,7 +500,9 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
 
     let formattedBills: any[] = []
     if (bills) {
-      // กรองเฉพาะบิลที่อยู่ในช่วงรอบสัญญาของผู้เช่ารายนี้เพื่อความปลอดภัยและความเป็นส่วนตัว
+      // ใน NoLogin โหลดข้อมูลสัญญาของผู้เช่าล่าสุดของห้องนี้โดยตรงอยู่แล้ว จึงถือว่าเป็นผู้เช่าคนล่าสุด (isLatestTenant = true)
+      const isLatestTenant = true
+
       const leaseStartCycle = tenant?.lease_start ? tenant.lease_start.substring(0, 7) : ""
       const leaseEndCycle = tenant?.lease_end ? tenant.lease_end.substring(0, 7) : ""
 
@@ -500,7 +510,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       if (leaseStartCycle) {
         filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
       }
-      if (leaseEndCycle) {
+      if (leaseEndCycle && !isLatestTenant) {
         filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
       }
 
