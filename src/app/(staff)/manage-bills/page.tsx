@@ -38,8 +38,6 @@ import SlipVerificationModal from "@/features/billing/components/SlipVerificatio
 import CreateBillModal from "@/features/billing/components/CreateBillModal"
 import MeterReadingTable from "@/features/billing/components/MeterReadingTable"
 
-
-
 interface UnifiedRoomBillingItem {
   roomNumber: string
   tenantName: string | null
@@ -136,7 +134,7 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
   return options
 }
 
-export default function UnifiedBillingPage() {
+export default function ManageBillsPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -150,11 +148,9 @@ export default function UnifiedBillingPage() {
   const isDark = mounted ? resolvedTheme === "dark" : true
 
   const [billingCycle, setBillingCycle] = useState("2026-06")
-  const [pageActiveTab, setPageActiveTab] = useState<"meters" | "summary">("meters")
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
   useEffect(() => {
-    // ปรับรอบบิลตามเดือนปฏิทินปัจจุบันเมื่อเรนเดอร์ฝั่ง Client สำเร็จเพื่อความไหลลื่นและป้องกัน Hydration Mismatch
     const current = getCurrentBillingCycle()
     if (registrationCycle && current < registrationCycle) {
       setBillingCycle(registrationCycle)
@@ -168,6 +164,7 @@ export default function UnifiedBillingPage() {
       setBillingCycle(registrationCycle)
     }
   }, [registrationCycle, billingCycle])
+
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -234,9 +231,8 @@ export default function UnifiedBillingPage() {
     const [yearStr, monthStr] = cycleStr.split("-")
     const year = parseInt(yearStr, 10)
     
-    // สำหรับบิลรอบเดือน มิถุนายน (06) กำหนดจ่ายคือวันที่ 5 ของเดือนถัดไป (กรกฎาคม / index 6)
+    // สำหรับบิลรอบเดือน มิถุนายน (06) กำหนดจ่ายคือวันที่ 5 ของเดือนถัดไป (กรกฎาคม)
     const dueMonth = parseInt(monthStr, 10) 
-    
     const dueDate = new Date(year, dueMonth, 5, 23, 59, 59, 999)
     const now = new Date()
     
@@ -257,17 +253,17 @@ export default function UnifiedBillingPage() {
     
     const [cYear, cMonth] = cycle.split("-").map(Number)
     const cycleStart = new Date(cYear, cMonth - 1, 1)
-    const cycleEnd = new Date(cYear, cMonth, 0, 23, 59, 59, 999) // วันสุดท้ายของเดือนรอบบิล
+    const cycleEnd = new Date(cYear, cMonth, 0, 23, 59, 59, 999)
     
     const start = new Date(leaseStart)
     start.setHours(0, 0, 0, 0)
     
-    if (start > cycleEnd) return false // เริ่มสัญญาหลังสิ้นสุดเดือนรอบบิลนี้
+    if (start > cycleEnd) return false
     
     if (leaseEnd && !isLatest) {
       const end = new Date(leaseEnd)
       end.setHours(23, 59, 59, 999)
-      if (end < cycleStart) return false // สัญญาสิ้นสุดลงก่อนเริ่มเดือนรอบบิลนี้
+      if (end < cycleStart) return false
     }
     
     return true
@@ -277,7 +273,6 @@ export default function UnifiedBillingPage() {
     setLoading(true)
     
     try {
-      // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
       let userProfile = getCachedData("global", "profile")
       if (!userProfile || forceRefresh) {
         const userRes = await getCurrentUserProfileAction()
@@ -326,12 +321,10 @@ export default function UnifiedBillingPage() {
         setCurrentWorkspaceId(wsId)
       }
 
-      // ถ้าเป็นการ Force Refresh (เช่น มีการบันทึกมิเตอร์สำเร็จ หรือกดปุ่มอัปเดต) ให้ล้างแคชเก่าออก
       if (forceRefresh && wsId) {
         clearWorkspaceCache(wsId)
       }
 
-      // 1. ดึงข้อมูลห้องพักทั้งหมด
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
       if (!rooms || forceRefresh) {
         const roomsRes = await getRooms()
@@ -340,7 +333,6 @@ export default function UnifiedBillingPage() {
       }
       setRoomsList(rooms)
       
-      // 2. ดึงข้อมูลบิลทั้งหมดประจำรอบบิลนี้
       let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
       if (!dbBills || forceRefresh) {
         const billsRes = await getBills(cycle)
@@ -348,7 +340,6 @@ export default function UnifiedBillingPage() {
         if (wsId) setCachedData(wsId, `bills_${cycle}`, dbBills)
       }
       
-      // 3. ดึงข้อมูลมิเตอร์น้ำไฟรอบนี้
       let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
       if (!dbMeters || forceRefresh) {
         const meterRes = await getMeterRecords(cycle)
@@ -356,7 +347,6 @@ export default function UnifiedBillingPage() {
         if (wsId) setCachedData(wsId, `meters_${cycle}`, dbMeters)
       }
       
-      // 4. ดึงข้อมูลมิเตอร์น้ำไฟรอบก่อน เพื่อใช้อ้างอิงเป็นเลขมิเตอร์ครั้งก่อนหน้า
       const prevCycle = getPreviousCycle(cycle)
       let dbPrevMeters = wsId ? getCachedData(wsId, `meters_${prevCycle}`) : null
       if (!dbPrevMeters || forceRefresh) {
@@ -365,7 +355,6 @@ export default function UnifiedBillingPage() {
         if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
       }
       
-      // 5. ดึงข้อมูลการเงินเพื่อใช้หาอัตราค่าปรับจ่ายล่าช้าแบบไดนามิก
       let financeData = wsId ? getCachedData(wsId, "finance_settings") : null
       if (wsId && (!financeData || forceRefresh)) {
         const financeRes = await getFinanceSettings(wsId)
@@ -376,14 +365,12 @@ export default function UnifiedBillingPage() {
       }
       const currentPenaltyRate = financeData ? Number(financeData.late_penalty_rate || 0) : 0
 
-      // โหมด Supabase ดั้งเดิมและถาวร (รวมทุกห้องแม้ไม่มีผู้เช่า)
       const activeRooms = rooms
       const compiled = activeRooms.map((r: any) => {
         const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
         const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
         const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
         
-        // ค้นหาผู้เช่าที่ครอบคลุมในรอบบิลปัจจุบันตามประวัติสัญญาเช่า
         let resolvedTenantName: string | null = null
         const sortedTenants = [...(r.allTenants || [])].sort((a: any, b: any) => {
           const aTime = a.leaseStart ? new Date(a.leaseStart).getTime() : 0
@@ -392,16 +379,13 @@ export default function UnifiedBillingPage() {
         })
 
         if (roomBill && roomBill.tenantName) {
-          // 1. หากมีบิลถูกบันทึกไว้แล้วในฐานข้อมูล ให้ตรวจสอบว่าผู้เช่าชื่อนี้ยังมีอยู่และสัญญากลางปีนั้นถูกต้องหรือไม่
           const matchingTenant = (r.allTenants || []).find((t: any) => t.tenantName === roomBill.tenantName)
           if (matchingTenant) {
-            // หากผู้เช่าชื่อนี้ยังมีตัวตนในตาราง tenants ให้ตรวจสอบความ Active ในรอบบิลนี้จริง ๆ
             const matchingTenantIsLatest = sortedTenants[0]?.id === matchingTenant.id
             const isActive = isTenantActiveInCycle(matchingTenant.leaseStart, matchingTenant.leaseEnd, cycle, matchingTenantIsLatest)
             if (isActive) {
               resolvedTenantName = roomBill.tenantName
             } else {
-              // หากในรอบบิลนั้นเขายังไม่เข้าอยู่ แสดงว่าเป็นประวัติศาสตร์จากบั๊กเก่า ให้ค้นหาผู้เช่าที่ Active จริง ณ ตอนนั้นแทน
               const actualActiveTenant = (r.allTenants || []).find((t: any) => {
                 const tIsLatest = sortedTenants[0]?.id === t.id
                 return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle, tIsLatest)
@@ -409,11 +393,9 @@ export default function UnifiedBillingPage() {
               resolvedTenantName = actualActiveTenant ? actualActiveTenant.tenantName : null
             }
           } else {
-            // หากไม่พบชื่อผู้เช่านี้ในตาราง tenants แสดงว่าเป็นผู้เช่าเก่าที่ย้ายออกและถูกลบประวัติไปแล้ว ให้เชื่อประวัติศาสตร์ในบิล
             resolvedTenantName = roomBill.tenantName
           }
         } else {
-          // 2. หากยังไม่มีบิลในฐานข้อมูล ให้ค้นหาผู้เช่าที่สัญญายังคงแอคทีฟในช่วงรอบเดือนนี้
           const activeTenant = (r.allTenants || []).find((t: any) => {
             const tIsLatest = sortedTenants[0]?.id === t.id
             return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle, tIsLatest)
@@ -423,7 +405,6 @@ export default function UnifiedBillingPage() {
         
         const isOccupiedInCycle = resolvedTenantName !== null
 
-        // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
         const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
         const hasPrevMeterWater = !!(prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
@@ -435,12 +416,10 @@ export default function UnifiedBillingPage() {
           ? Number(prevMeter.waterCurr)
           : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
         
-        // กำหนดความสามารถในการแก้ไขเลขหน่วยครั้งก่อนหน้า (เฉพาะเดือนแรกที่สมัครใช้บริการเท่านั้น เดือนถัดไปจะถูกล็อกถาวร)
         const isFirstMonth = regCycleVal ? (cycle === regCycleVal) : true
         const isElecPrevEditable = isFirstMonth
         const isWaterPrevEditable = isFirstMonth
 
-        // จัดการเรื่องวันจ่ายล่าช้าและคำนวณค่าปรับแบบเรียลไทม์ตามเวลาปัจจุบัน
         let finalLateDays = 0
         let finalPenaltyAmount = 0
         let finalBillAmount = 0
@@ -452,12 +431,10 @@ export default function UnifiedBillingPage() {
           const isUnpaidOrPending = roomBill.status === "unpaid" || roomBill.status === "pending"
           
           if (isUnpaidOrPending && dbLateDays === null) {
-            // คำนวณวันปรับล่าช้าอัตโนมัติตามเวลาปัจจุบัน (เนื่องจากคอลัมน์ late_days เป็น null ยังไม่เคยคำนวณหรือบันทึกมาก่อน)
             const calculatedDays = calculateLateDays(cycle)
             if (calculatedDays > 0) {
               finalLateDays = calculatedDays
               finalPenaltyAmount = calculatedDays * currentPenaltyRate
-              // ยอดเงินรวมจะถูกบวกเพิ่มด้วยค่าปรับที่คำนวณมาใหม่
               finalBillAmount = dbBillAmount + finalPenaltyAmount
             } else {
               finalLateDays = 0
@@ -465,7 +442,6 @@ export default function UnifiedBillingPage() {
               finalBillAmount = dbBillAmount
             }
           } else {
-            // ใช้ค่าจากตารางฐานข้อมูลโดยตรง (ไม่ว่าจะเป็น 0 หรือค่าที่แอดมินบันทึกไว้ และไม่ให้ทำการคำนวณซ้ำซ้อน)
             finalLateDays = dbLateDays !== null && dbLateDays !== undefined ? Number(dbLateDays) : 0
             finalPenaltyAmount = dbPenaltyAmount !== null && dbPenaltyAmount !== undefined ? Number(dbPenaltyAmount) : 0
             finalBillAmount = dbBillAmount
@@ -552,10 +528,8 @@ export default function UnifiedBillingPage() {
           const isSuperAdmin = userProfile.role === "super_admin"
           
           if (!isSuperAdmin && userProfile.workspace_id) {
-            // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
             wsId = userProfile.workspace_id
           } else {
-            // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
             const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
             wsId = cookieWsId || userProfile.workspace_id || undefined
           }
@@ -603,7 +577,6 @@ export default function UnifiedBillingPage() {
     }, 3000)
   }
 
-  // อัปเดตช่องอินพุตเลขมิเตอร์ไฟฟ้าในหน้าจอ
   const handleElecChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
@@ -612,7 +585,6 @@ export default function UnifiedBillingPage() {
     )
   }
 
-  // อัปเดตช่องอินพุตเลขมิเตอร์น้ำในหน้าจอ
   const handleWaterChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
@@ -621,7 +593,6 @@ export default function UnifiedBillingPage() {
     )
   }
 
-  // อัปเดตช่องอินพุตเลขมิเตอร์ไฟฟ้าก่อนหน้าในหน้าจอ
   const handleElecPrevChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
@@ -630,7 +601,6 @@ export default function UnifiedBillingPage() {
     )
   }
 
-  // อัปเดตช่องอินพุตเลขมิเตอร์น้ำก่อนหน้าในหน้าจอ
   const handleWaterPrevChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
@@ -639,7 +609,6 @@ export default function UnifiedBillingPage() {
     )
   }
 
-  // อัปเดตและคำนวณวันปรับล่าช้าในหน้าจอแบบเรียลไทม์
   const handleLateDaysChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item => {
@@ -650,7 +619,6 @@ export default function UnifiedBillingPage() {
         
         const newPenaltyAmount = days * latePenaltyRate
         
-        // คำนวณความแตกต่างของค่าปรับเพื่อปรับเปลี่ยนยอดรวมรวม billAmount
         const prevPenalty = item.penaltyAmount || 0
         const penaltyDiff = newPenaltyAmount - prevPenalty
         const newBillAmount = item.billAmount + penaltyDiff
@@ -666,7 +634,6 @@ export default function UnifiedBillingPage() {
     )
   }
 
-  // อัปเดตและคำนวณยอดเงินรวมเมื่อเปลี่ยนค่าบริการอื่นๆ แบบเรียลไทม์
   const handleOtherServiceChange = (roomNumber: string, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item => {
@@ -714,7 +681,8 @@ export default function UnifiedBillingPage() {
       billId: item.billId,
       lateDays: sendLateDays,
       penaltyAmount: sendPenaltyAmount,
-      billAmount: sendBillAmount
+      billAmount: sendBillAmount,
+      otherServiceAmount: item.otherServiceAmount || 0
     })
     
     setSavingAll(true)
@@ -728,7 +696,8 @@ export default function UnifiedBillingPage() {
         item.billId,
         sendLateDays,
         sendPenaltyAmount,
-        sendBillAmount
+        sendBillAmount,
+        item.otherServiceAmount || 0
       )
       
       console.log("✅ [Client] updateBillPenalty responded:", res)
@@ -754,7 +723,6 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  // อนุมัติสลิปโอนเงิน
   const handleApproveSlip = async (id: string) => {
     if (currentUserRole === "staff") {
       alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์อนุมัติสลิปโอนเงิน")
@@ -772,7 +740,6 @@ export default function UnifiedBillingPage() {
     setSelectedBill(null)
   }
 
-  // ปฏิเสธสลิปโอนเงิน
   const handleRejectSlip = async (id: string) => {
     if (currentUserRole === "staff") {
       alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์ปฏิเสธสลิปโอนเงิน")
@@ -790,7 +757,6 @@ export default function UnifiedBillingPage() {
     setSelectedBill(null)
   }
 
-  // เปลี่ยนสถานะเป็นชำระเงินแล้วโดยตรง (สำหรับกรณีแอดมินรับเงินสด/โอนตรง)
   const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
     if (currentUserRole === "staff") {
       alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์กดรับเงินและบันทึกการชำระเงินโดยตรง")
@@ -807,7 +773,6 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  // บันทึกเฉพาะห้องและสร้างบิล
   const handleSaveRow = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
     if (!item) return
@@ -817,7 +782,6 @@ export default function UnifiedBillingPage() {
     const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
     const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-    // ตรวจสอบเงื่อนไขตามประเภทปุ่มที่กดบันทึก
     if (type === "electric") {
       if (elecVal === "" || isNaN(elecVal as number)) {
         alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าให้ครบถ้วน")
@@ -845,159 +809,107 @@ export default function UnifiedBillingPage() {
         return
       }
     } else {
-      // โหมด "all" (จัดการบิล) หรือแบบดั้งเดิม ต้องตรวจสอบทั้งคู่
       if (elecVal === "" || waterVal === "" || isNaN(elecVal as number) || isNaN(waterVal as number)) {
         alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
         return
       }
       if (isNaN(elecPrevVal) || isNaN(waterPrevVal)) {
-        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้ถูกต้อง")
         return
       }
       if ((elecVal as number) < elecPrevVal || (waterVal as number) < waterPrevVal) {
-        alert("⚠️ ตัวเลขมิเตอร์ปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
+        alert("⚠️ ตัวเลขมิเตอร์ไฟฟ้าและน้ำปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
         return
       }
     }
 
-    const eUnits = elecVal === "" ? 0 : (elecVal as number) - elecPrevVal
-    const wUnits = waterVal === "" ? 0 : (waterVal as number) - waterPrevVal
-    
-    const elecCost = elecVal === "" 
-      ? 0 
-      : (electricMinChecked && eUnits <= electricMinUnit
-          ? electricMinUnit * elecRate
-          : eUnits * elecRate)
-
-    const waterCost = waterVal === "" 
-      ? 0 
-      : (waterMinChecked && wUnits <= waterMinUnit
-          ? waterMinUnit * waterRate
-          : wUnits * waterRate)
-          
-    const otherServiceVal = Number(item.otherServiceAmount || 0)
-    const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal
-
     setSavingAll(true)
-    setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
-
     try {
-      // 1. บันทึกมิเตอร์ใน DB
-      const meterRes = await saveMeterRecord(
+      const activeElecCurr = elecVal === "" ? 0 : Number(elecVal)
+      const activeWaterCurr = waterVal === "" ? 0 : Number(waterVal)
+      const activeElecPrev = elecPrevVal
+      const activeWaterPrev = waterPrevVal
+
+      const meterResult = await saveMeterRecord(
         roomNumber,
         billingCycle,
-        elecPrevVal,
-        elecVal,
-        waterPrevVal,
-        waterVal
+        activeElecPrev,
+        activeElecCurr,
+        activeWaterPrev,
+        activeWaterCurr
       )
-      if (!meterRes.success) {
-        alert(meterRes.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์")
+
+      if (!meterResult.success) {
+        alert(meterResult.error || "บันทึกข้อมูลมิเตอร์ไม่สำเร็จ")
         setSavingAll(false)
         return
       }
 
-      // 2. สร้าง/อัปเดตบิลใน DB (เฉพาะกรณีมีผู้เช่าเท่านั้น)
-      if (!item.tenantName) {
-        showToast(`บันทึกข้อมูลมิเตอร์ห้อง ${roomNumber} สำเร็จ! (ไม่มีผู้เช่า จึงไม่ได้ออกบิล)`)
-        await loadData(billingCycle, true)
-        setSavingAll(false)
-        return
+      if (item.tenantName) {
+        const calculatedElecUnits = activeElecCurr - activeElecPrev
+        const calculatedWaterUnits = activeWaterCurr - activeWaterPrev
+
+        const finalElecUnits = electricMinChecked && calculatedElecUnits <= electricMinUnit ? electricMinUnit : calculatedElecUnits
+        const finalWaterUnits = waterMinChecked && calculatedWaterUnits <= waterMinUnit ? waterMinUnit : calculatedWaterUnits
+
+        const elecCost = finalElecUnits * elecRate
+        const waterCost = finalWaterUnits * waterRate
+
+        const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0)
+
+        const billResult = await createBill(
+          roomNumber,
+          item.tenantName,
+          billTotalAmount,
+          item.billStatus === "not_created" ? "unpaid" : item.billStatus,
+          billingCycle,
+          calculatedElecUnits,
+          calculatedWaterUnits,
+          item.otherServiceAmount || 0
+        )
+
+        if (!billResult.success) {
+          alert(billResult.error || "สร้างบิลไม่สำเร็จ แต่บันทึกมิเตอร์สำเร็จแล้ว")
+          setSavingAll(false)
+          return
+        }
       }
 
-      const billRes = await createBill(
-        roomNumber,
-        item.tenantName || "ผู้เช่า",
-        totalAmount,
-        item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
-        billingCycle,
-        eUnits,
-        wUnits,
-        otherServiceVal
-      )
-      if (!billRes.success) {
-        alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
-        setSavingAll(false)
-        return
-      }
-
-      showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
+      showToast(`บันทึกมิเตอร์และใบแจ้งยอดห้อง ${roomNumber} สำเร็จ!`)
       await loadData(billingCycle, true)
-    } catch (err) {
-      console.error(err)
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
+    } catch (e) {
+      console.error(e)
+      alert("เกิดข้อผิดพลาดไม่คาดคิด")
     } finally {
       setSavingAll(false)
     }
   }
 
-  // บันทึกและออกบิลให้ทุกห้องที่ข้อมูลสมบูรณ์ (แยกตามประเภท ไฟฟ้า หรือ น้ำประปา)
-  const handleSaveAll = async (type: "electric" | "water") => {
-    // กรองหาห้องที่กรอกไม่ครบหรือผิดพลาดตามประเภท
-    const invalidItems = unifiedItems.filter(item => {
-      const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
-      const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
-      const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
-      const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
-      
-      if (type === "electric") {
-        return (
-          elecVal === "" ||
-          isNaN(elecVal as number) ||
-          isNaN(elecPrevVal) ||
-          (elecVal as number) < elecPrevVal
-        )
-      } else {
-        return (
-          waterVal === "" ||
-          isNaN(waterVal as number) ||
-          isNaN(waterPrevVal) ||
-          (waterVal as number) < waterPrevVal
-        )
-      }
-    })
-
-    if (invalidItems.length > 0) {
-      const typeText = type === "electric" ? "ไฟฟ้า" : "น้ำประปา"
-      alert(`ไม่สามารถประมวลผลทั้งหมดได้ เนื่องจากมี ${invalidItems.length} ห้องพักที่ข้อมูลเลขมิเตอร์${typeText}ไม่ครบถ้วน หรือค่าปัจจุบันน้อยกว่าครั้งก่อนหน้า`)
+  const handleSaveAll = async () => {
+    const editedItems = unifiedItems.filter(item => !item.isMeterSaved && item.elecCurr !== "" && item.waterCurr !== "")
+    if (editedItems.length === 0) {
+      alert("ไม่มีห้องที่ต้องการบันทึก (กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและประปาให้ครบถ้วนในแถวที่แก้ไข)")
       return
     }
 
     setSavingAll(true)
-    setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: "" })
+    setSavingProgress({ current: 0, total: editedItems.length, currentRoom: "" })
 
     try {
-      let currentIdx = 0
-      // โหมด Supabase
-      for (const item of unifiedItems) {
-        currentIdx++
-        setSavingProgress({ current: currentIdx, total: unifiedItems.length, currentRoom: item.roomNumber })
+      for (let i = 0; i < editedItems.length; i++) {
+        const item = editedItems[i]
+        setSavingProgress({ current: i + 1, total: editedItems.length, currentRoom: item.roomNumber })
 
-        const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
-        const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
-        const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
-        const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
+        const elecVal = Number(item.elecCurr)
+        const waterVal = Number(item.waterCurr)
+        const elecPrevVal = Number(item.elecPrev)
+        const waterPrevVal = Number(item.waterPrev)
 
-        const eUnits = elecVal === "" ? 0 : (elecVal as number) - elecPrevVal
-        const wUnits = waterVal === "" ? 0 : (waterVal as number) - waterPrevVal
-        
-        const elecCost = elecVal === "" 
-          ? 0 
-          : (electricMinChecked && eUnits <= electricMinUnit
-              ? electricMinUnit * elecRate
-              : eUnits * elecRate)
+        if (isNaN(elecVal) || isNaN(waterVal) || elecVal < elecPrevVal || waterVal < waterPrevVal) {
+          continue
+        }
 
-        const waterCost = waterVal === "" 
-          ? 0 
-          : (waterMinChecked && wUnits <= waterMinUnit
-              ? waterMinUnit * waterRate
-              : wUnits * waterRate)
-              
-        const otherServiceVal = Number(item.otherServiceAmount || 0)
-        const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal
-
-        // 1. บันทึกเลขมิเตอร์
-        const meterRes = await saveMeterRecord(
+        const meterResult = await saveMeterRecord(
           item.roomNumber,
           billingCycle,
           elecPrevVal,
@@ -1005,40 +917,41 @@ export default function UnifiedBillingPage() {
           waterPrevVal,
           waterVal
         )
-        if (!meterRes.success) {
-          alert(`เกิดข้อผิดพลาดในการบันทึกมิเตอร์ห้อง ${item.roomNumber}: ${meterRes.error}`)
-          setSavingAll(false)
-          return
-        }
 
-        // 2. บันทึกและออกบิล (เฉพาะกรณีมีผู้เช่าเท่านั้น)
-        if (!item.tenantName) {
+        if (!meterResult.success) {
           continue
         }
 
-        const billRes = await createBill(
-          item.roomNumber,
-          item.tenantName || "ผู้เช่า",
-          totalAmount,
-          item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
-          billingCycle,
-          eUnits,
-          wUnits,
-          otherServiceVal
-        )
-        if (!billRes.success) {
-          alert(`เกิดข้อผิดพลาดในการสร้างบิลห้อง ${item.roomNumber}: ${billRes.error}`)
-          setSavingAll(false)
-          return
+        if (item.tenantName) {
+          const calculatedElecUnits = elecVal - elecPrevVal
+          const calculatedWaterUnits = waterVal - waterPrevVal
+
+          const finalElecUnits = electricMinChecked && calculatedElecUnits <= electricMinUnit ? electricMinUnit : calculatedElecUnits
+          const finalWaterUnits = waterMinChecked && calculatedWaterUnits <= waterMinUnit ? waterMinUnit : calculatedWaterUnits
+
+          const elecCost = finalElecUnits * elecRate
+          const waterCost = finalWaterUnits * waterRate
+
+          const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0)
+
+          await createBill(
+            item.roomNumber,
+            item.tenantName,
+            billTotalAmount,
+            item.billStatus === "not_created" ? "unpaid" : item.billStatus,
+            billingCycle,
+            calculatedElecUnits,
+            calculatedWaterUnits,
+            item.otherServiceAmount || 0
+          )
         }
       }
 
-      const successText = type === "electric" ? "มิเตอร์ไฟ" : "มิเตอร์น้ำ"
-      showToast(`บันทึกข้อมูล${successText}และคำนวณบิลสำเร็จเรียบร้อย!`)
+      showToast(`บันทึกมิเตอร์น้ำไฟและสร้างบิลสำเร็จทั้งหมด ${editedItems.length} ห้อง!`)
       await loadData(billingCycle, true)
-    } catch (err) {
-      console.error(err)
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
+    } catch (e) {
+      console.error(e)
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลทั้งหมด")
     } finally {
       setSavingAll(false)
     }
@@ -1107,7 +1020,6 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  // ดาวน์โหลดบิล PDF
   const handleDownloadBillPdf = async (item: UnifiedRoomBillingItem) => {
     if (!userPermissions.billing_download_pdf) {
       alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
@@ -1164,7 +1076,6 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  // ดาวน์โหลดบิล PDF ทุกห้องพร้อมกันเป็นไฟล์ ZIP
   const handleDownloadAllBillsPdf = async () => {
     if (!userPermissions.billing_download_pdf) {
       alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
@@ -1185,7 +1096,6 @@ export default function UnifiedBillingPage() {
       let addedCount = 0
 
       for (const item of unifiedItems) {
-        // เฉพาะห้องที่มีผู้เช่าและข้อมูลครบถ้วนสำหรับการทำบิล
         if (!item.tenantName) continue
 
         const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
@@ -1232,7 +1142,6 @@ export default function UnifiedBillingPage() {
         return
       }
 
-      // สร้างไฟล์ zip และทริกเกอร์ดาวน์โหลด
       const content = await zip.generateAsync({ type: "blob" })
       const link = document.createElement("a")
       link.href = URL.createObjectURL(content)
@@ -1250,7 +1159,6 @@ export default function UnifiedBillingPage() {
     }
   }
 
-  // สร้างบิลด้วยตนเอง (สำหรับกรณีพิเศษ)
   const handleCreateBillManual = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -1297,7 +1205,6 @@ export default function UnifiedBillingPage() {
     setCreateBillModalOpen(false)
   }
 
-  // คำนวณสรุปสถิติด้านบนของแดชบอร์ด (ปรับเปลี่ยนให้เหมาะสมกับห้องว่าง/ไม่มีผู้เช่า)
   const totalOccupied = unifiedItems.filter(item => item.tenantName).length
   const billedCount = unifiedItems.filter(item => item.tenantName && item.isMeterSaved).length
   const paidCount = unifiedItems.filter(item => item.billStatus === "paid").length
@@ -1317,15 +1224,58 @@ export default function UnifiedBillingPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Gauge className="w-5 h-5 text-blue-500" />
-            <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</h2>
+            <Receipt className="w-5 h-5 text-indigo-500" />
+            <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>จัดการบิล</h2>
           </div>
           <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-            ระบบบันทึกจดเลขมิเตอร์ไฟฟ้า มิเตอร์น้ำประปา และตรวจสอบสรุปยอดบิลอย่างง่ายประจำหอพัก
+            ระบบจัดการบิลค่าเช่าหอพัก ตรวจสอบสลิปโอนเงิน ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดเพิ่มเติม
           </p>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
+          {/* ปุ่มดาวน์โหลด PDF บิลรวมทุกห้อง */}
+          {userPermissions.billing_download_pdf && (
+            <button
+              onClick={handleDownloadAllBillsPdf}
+              disabled={downloadingAllPdf}
+              className={`h-12 md:h-9 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer ${
+                downloadingAllPdf
+                  ? "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
+                  : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/20"
+              }`}
+            >
+              {downloadingAllPdf ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>กำลังบีบอัด ZIP...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>ดาวน์โหลด PDF ทั้งหมด (.ZIP)</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* ปุ่มสร้างบิลพิเศษกำหนดเอง */}
+          {(currentUserRole === "admin" || currentUserRole === "super_admin") && (
+            <button
+              onClick={() => {
+                // เลือกห้องว่างห้องแรกในอาคารเป็นค่าตั้งต้นในโมดอล
+                const occupiedRooms = unifiedItems.filter(i => i.tenantName).map(i => i.roomNumber)
+                if (occupiedRooms.length > 0) {
+                  setNewRoomNumber(occupiedRooms[0])
+                }
+                setCreateBillModalOpen(true)
+              }}
+              className="h-12 md:h-9 px-4 rounded-xl bg-slate-850 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 border border-slate-700/30 dark:border-slate-300 shadow-md text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>สร้างบิลด้วยตนเอง</span>
+            </button>
+          )}
+
           {/* แถบเลือกเดือนรอบบิล */}
           <select
             className={`w-full md:w-auto h-12 md:h-9 px-3.5 border rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold transition-all cursor-pointer ${
@@ -1341,298 +1291,52 @@ export default function UnifiedBillingPage() {
         </div>
       </div>
 
-      {/* Tab Switcher */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 mt-6 mb-6">
-        <button
-          onClick={() => setPageActiveTab("meters")}
-          className={`px-5 py-2.5 font-bold text-xs md:text-sm transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2 ${
-            pageActiveTab === "meters"
-              ? "border-blue-500 text-blue-600 dark:text-blue-400 font-extrabold"
-              : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-          }`}
-        >
-          <Gauge className="w-4 h-4 text-blue-500" />
-          <span>จดเลขมิเตอร์</span>
-        </button>
-        <button
-          onClick={() => setPageActiveTab("summary")}
-          className={`px-5 py-2.5 font-bold text-xs md:text-sm transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2 ${
-            pageActiveTab === "summary"
-              ? "border-teal-500 text-teal-600 dark:text-teal-400 font-extrabold"
-              : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-          }`}
-        >
-          <FileText className="w-4 h-4 text-teal-500" />
-          <span>สรุปบิล</span>
-        </button>
-      </div>
+      {/* Stats Dashboard */}
+      <BillingSummaryStats
+        isDark={isDark}
+        billedCount={billedCount}
+        totalOccupied={totalOccupied}
+        paidCount={paidCount}
+        pendingCount={pendingCount}
+        unpaidCount={unpaidCount}
+      />
 
-      {/* Render based on Page Tab */}
-      {pageActiveTab === "meters" ? (
-        <MeterReadingTable
-          isDark={isDark}
-          loading={loading}
-          userPermissions={userPermissions}
-          unifiedItems={unifiedItems}
-          commonFee={commonFee}
-          electricMinChecked={electricMinChecked}
-          electricMinUnit={electricMinUnit}
-          elecRate={elecRate}
-          waterMinChecked={waterMinChecked}
-          waterMinUnit={waterMinUnit}
-          waterRate={waterRate}
-          currentUserRole={currentUserRole}
-          downloadingPdfId={downloadingPdfId}
-          handleElecPrevChange={handleElecPrevChange}
-          handleElecChange={handleElecChange}
-          handleWaterPrevChange={handleWaterPrevChange}
-          handleWaterChange={handleWaterChange}
-          handleSaveRow={handleSaveRow}
-          setSelectedBill={setSelectedBill}
-          setSlipModalOpen={setSlipModalOpen}
-          handleDownloadBillPdf={handleDownloadBillPdf}
-          handleSendLine={handleSendLine}
-          handleMarkAsPaid={handleMarkAsPaid}
-          handleSaveAll={handleSaveAll}
-          roomsList={roomsList}
-          billingCycle={billingCycle}
-          workspaceName={workspaceName}
-          currentWorkspaceId={currentWorkspaceId}
-          handleLateDaysChange={handleLateDaysChange}
-          handleSaveLateDays={handleSaveLateDays}
-          latePenaltyRate={latePenaltyRate}
-          handleOtherServiceChange={handleOtherServiceChange}
-          mode="meters"
-        />
-      ) : (
-        <div className={`p-4 md:p-5 bg-transparent md:rounded-2xl md:shadow-sm ${
-          isDark 
-            ? "md:bg-slate-900/30 md:border md:border-slate-800/80" 
-            : "md:bg-white md:border md:border-slate-200"
-        }`}>
-          {/* Desktop Summary Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold bg-slate-50/50 dark:bg-slate-900/10">
-                  <th className="py-3 pl-3 w-20">เลขห้อง</th>
-                  <th className="py-3 w-44">ผู้เช่า / ค่าเช่าห้อง</th>
-                  <th className="py-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-52 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า (kWh)</th>
-                  <th className="py-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-52 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ (m³)</th>
-                  <th className="py-3 text-right pr-4 w-48 font-bold">ยอดบิลรวม (เช่า+ไฟ+น้ำ)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-500">
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
-                        <span>กำลังโหลดข้อมูลรวม...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : unifiedItems.length > 0 ? (
-                  unifiedItems.map((item) => {
-                    const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                    const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
-                    const elecCost = hasElecCurr && elecUnitsUsed >= 0
-                      ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
-                      : 0
-
-                    const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                    const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
-                    const waterCost = hasWaterCurr && waterUnitsUsed >= 0
-                      ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
-                      : 0
-
-                    const simplifiedTotal = item.baseRent + elecCost + waterCost
-
-                    return (
-                      <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
-                        <td className={`py-4 pl-3 font-black text-sm ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
-                        <td className="py-4">
-                          <div className={`font-bold truncate max-w-[140px] ${isDark ? "text-slate-300" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
-                            {item.tenantName || <span className={isDark ? "text-slate-650 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
-                          </div>
-                          <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                            {item.tenantName ? `ค่าเช่าห้อง: ${item.baseRent.toLocaleString()}.-` : "ห้องว่าง"}
-                          </div>
-                        </td>
-                        
-                        {/* มิเตอร์ไฟ */}
-                        <td className="py-4 text-center bg-blue-50/10 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-3">
-                          {hasElecCurr ? (
-                            <>
-                              <div className="font-mono text-xs font-semibold">
-                                <span className={isDark ? "text-slate-400" : "text-slate-500"}>{item.elecPrev}</span>
-                                <span className="mx-1.5 text-slate-400">➔</span>
-                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{item.elecCurr}</span>
-                              </div>
-                              <div className="mt-1">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                  {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
-                          )}
-                        </td>
-
-                        {/* มิเตอร์น้ำ */}
-                        <td className="py-4 text-center bg-teal-50/10 dark:bg-teal-500/5 border-l border-r border-slate-200 dark:border-slate-800/40 px-3">
-                          {hasWaterCurr ? (
-                            <>
-                              <div className="font-mono text-xs font-semibold">
-                                <span className={isDark ? "text-slate-400" : "text-slate-500"}>{item.waterPrev}</span>
-                                <span className="mx-1.5 text-slate-400">➔</span>
-                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{item.waterCurr}</span>
-                              </div>
-                              <div className="mt-1">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-500/10 text-teal-600 dark:text-teal-400">
-                                  {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
-                          )}
-                        </td>
-
-                        {/* ยอดบิลรวม (ที่แสดงแค่ค่าน้ำ + ค่าไฟ+ค่าเช่าห้อง) */}
-                        <td className="py-4 text-right pr-4 font-mono">
-                          {item.tenantName ? (
-                            <div className="flex flex-col items-end">
-                              <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                                {simplifiedTotal.toLocaleString()}.-
-                              </div>
-                              <div className="text-[9px] text-slate-400 dark:text-slate-500">
-                                {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className={`text-sm font-bold ${isDark ? "text-slate-655" : "text-slate-400"}`}>-</div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500">
-                      ไม่มีรายการห้องพัก
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Summary Cards */}
-          <div className="block md:hidden space-y-4">
-            {loading ? (
-              <div className="py-12 text-center text-slate-500">
-                <RefreshCw className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
-                <span>กำลังโหลดข้อมูล...</span>
-              </div>
-            ) : unifiedItems.length > 0 ? (
-              unifiedItems.map((item) => {
-                const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
-                const elecCost = hasElecCurr && elecUnitsUsed >= 0
-                  ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
-                  : 0
-
-                const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
-                const waterCost = hasWaterCurr && waterUnitsUsed >= 0
-                  ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
-                  : 0
-
-                const simplifiedTotal = item.baseRent + elecCost + waterCost
-
-                return (
-                  <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-3 shadow-sm ${
-                    isDark ? "bg-slate-950/35 border-slate-900/60" : "bg-white border-slate-200"
-                  }`}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className={`text-base font-black px-3 py-1 rounded-xl border ${
-                          isDark ? "text-slate-100 bg-slate-900 border-slate-800" : "text-slate-800 bg-slate-100 border-slate-200"
-                        }`}>
-                          {item.roomNumber}
-                        </span>
-                        <div className={`font-bold mt-2.5 ${isDark ? "text-slate-300" : "text-slate-800"}`}>
-                          {item.tenantName || <span className={isDark ? "text-slate-650 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
-                        </div>
-                      </div>
-                      
-                      {item.tenantName && (
-                        <div className="text-right">
-                          <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมอย่างง่าย</div>
-                          <div className="text-base font-black text-teal-600 dark:text-teal-400 font-mono">
-                            {simplifiedTotal.toLocaleString()}.-
-                          </div>
-                          <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-                            {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className={`h-px ${isDark ? "bg-slate-900/60" : "bg-slate-200"}`} />
-
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* ไฟฟ้า */}
-                      <div className={`rounded-xl p-3 border ${
-                        isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/30 border-blue-100"
-                      }`}>
-                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                          <Zap className="w-3 h-3" /> ไฟฟ้า (kWh)
-                        </div>
-                        {hasElecCurr ? (
-                          <div className="font-mono text-xs">
-                            <span className="text-slate-400">{item.elecPrev} ➔ {item.elecCurr}</span>
-                            <div className="mt-1 font-bold text-blue-600 dark:text-blue-400 text-[10px]">
-                              {elecUnitsUsed} หน่วย ({elecCost.toLocaleString()}.-)
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">ไม่มีข้อมูล</span>
-                        )}
-                      </div>
-
-                      {/* น้ำประปา */}
-                      <div className={`rounded-xl p-3 border ${
-                        isDark ? "bg-teal-500/5 border-teal-500/10" : "bg-teal-50/30 border-teal-100"
-                      }`}>
-                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-teal-400" : "text-teal-655"}`}>
-                          <Droplet className="w-3 h-3" /> น้ำประปา (m³)
-                        </div>
-                        {hasWaterCurr ? (
-                          <div className="font-mono text-xs">
-                            <span className="text-slate-400">{item.waterPrev} ➔ {item.waterCurr}</span>
-                            <div className="mt-1 font-bold text-teal-600 dark:text-teal-400 text-[10px]">
-                              {waterUnitsUsed} หน่วย ({waterCost.toLocaleString()}.-)
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">ไม่มีข้อมูล</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="py-8 text-center text-slate-500 bg-white dark:bg-slate-950/10 border border-slate-200 dark:border-slate-900/60 rounded-2xl">
-                ไม่มีรายการห้องพัก
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Main Billing Table */}
+      <MeterReadingTable
+        isDark={isDark}
+        loading={loading}
+        userPermissions={userPermissions}
+        unifiedItems={unifiedItems}
+        commonFee={commonFee}
+        electricMinChecked={electricMinChecked}
+        electricMinUnit={electricMinUnit}
+        elecRate={elecRate}
+        waterMinChecked={waterMinChecked}
+        waterMinUnit={waterMinUnit}
+        waterRate={waterRate}
+        currentUserRole={currentUserRole}
+        downloadingPdfId={downloadingPdfId}
+        handleElecPrevChange={handleElecPrevChange}
+        handleElecChange={handleElecChange}
+        handleWaterPrevChange={handleWaterPrevChange}
+        handleWaterChange={handleWaterChange}
+        handleSaveRow={handleSaveRow}
+        setSelectedBill={setSelectedBill}
+        setSlipModalOpen={setSlipModalOpen}
+        handleDownloadBillPdf={handleDownloadBillPdf}
+        handleSendLine={handleSendLine}
+        handleMarkAsPaid={handleMarkAsPaid}
+        handleSaveAll={handleSaveAll}
+        roomsList={roomsList}
+        billingCycle={billingCycle}
+        workspaceName={workspaceName}
+        currentWorkspaceId={currentWorkspaceId}
+        handleLateDaysChange={handleLateDaysChange}
+        handleSaveLateDays={handleSaveLateDays}
+        latePenaltyRate={latePenaltyRate}
+        handleOtherServiceChange={handleOtherServiceChange}
+        mode="billing"
+      />
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}
       <SlipVerificationModal
@@ -1675,7 +1379,7 @@ export default function UnifiedBillingPage() {
         onSubmit={handleCreateBillManual}
       />
 
-      {/* หน้าต่างกำลังบันทึกข้อมูลและออกบิล (Full-Screen Saving Progress Overlay) */}
+      {/* Saving Overlay */}
       <SavingProgressOverlay
         isDark={isDark}
         savingAll={savingAll}

@@ -36,6 +36,7 @@ interface MeterReadingTableProps {
   handleSaveLateDays?: (roomNumber: string) => Promise<void>
   latePenaltyRate?: number
   handleOtherServiceChange?: (roomNumber: string, value: string) => void
+  mode?: "meters" | "billing"
 }
 
 export default function MeterReadingTable({
@@ -70,10 +71,13 @@ export default function MeterReadingTable({
   handleLateDaysChange,
   handleSaveLateDays,
   latePenaltyRate = 0,
-  handleOtherServiceChange
+  handleOtherServiceChange,
+  mode = "billing"
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
-  const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">("all")
+  const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">(
+    mode === "meters" ? "electric" : "all"
+  )
   const colSpanVal = activeTab === "all" ? 9 : 6
 
   const [bulkSendModalOpen, setBulkSendModalOpen] = useState(false)
@@ -234,7 +238,11 @@ export default function MeterReadingTable({
           : "bg-blue-50/60 border-blue-100 text-blue-700"
       }`}>
         <Sparkles className={`w-4 h-4 shrink-0 ${isDark ? "text-blue-400" : "text-blue-500"}`} />
-        <span>ระบบจดบันทึกแบ่งตามหมวดหมู่เพื่อความสะดวกในการทำงาน แถบจัดการบิลใช้สำหรับส่งบิล ตรวจสลิป และรับเงินเท่านั้น หากต้องการจดบันทึกให้ไปที่แถบ มิเตอร์ไฟ หรือ มิเตอร์น้ำ</span>
+        <span>
+          {mode === "billing" 
+            ? "ระบบจัดการบิลค่าเช่าหอพัก ใช้สำหรับตรวจสอบการชำระเงิน ตรวจสอบสลิป ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดค่าใช้จ่ายเพิ่มเติม"
+            : "ระบบบันทึกจดเลขมิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา กรุณาเลือกแถบมิเตอร์ไฟหรือมิเตอร์น้ำเพื่อระบุค่าปัจจุบันและคลิกบันทึก"}
+        </span>
       </div>
 
       {/* ตารางควบคุมหลัก */}
@@ -245,43 +253,40 @@ export default function MeterReadingTable({
       }`}>
         {/* แถบควบคุมหลัก (Tabs) */}
         <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
-          <div className={`flex p-1 rounded-xl transition-all shadow-inner ${
-            isDark ? "bg-slate-950/60 border border-slate-900/50" : "bg-slate-100 border border-slate-200"
-          }`}>
-            <button
-              onClick={() => setActiveTab("all")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "all"
-                  ? (isDark ? "bg-slate-900 text-teal-400 border border-slate-800/45 shadow-sm" : "bg-white text-slate-800 border border-slate-200 shadow-sm")
-                  : (isDark ? "text-slate-500 hover:text-slate-450" : "text-slate-500 hover:text-slate-700")
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5 text-teal-500" />
-              <span>จัดการบิล</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("electric")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "electric"
-                  ? (isDark ? "bg-blue-950/30 text-blue-400 border border-blue-500/20 shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm")
-                  : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-blue-500" />
-              <span>มิเตอร์ไฟ</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("water")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "water"
-                  ? (isDark ? "bg-teal-950/30 text-teal-405 border border-teal-500/20 shadow-sm" : "bg-teal-50 text-teal-700 border border-teal-200 shadow-sm")
-                  : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
-              }`}
-            >
-              <Droplet className="w-3.5 h-3.5 text-teal-500" />
-              <span>มิเตอร์น้ำ</span>
-            </button>
-          </div>
+          {mode !== "billing" ? (
+            <div className={`flex p-1 rounded-xl transition-all shadow-inner ${
+              isDark ? "bg-slate-950/60 border border-slate-900/50" : "bg-slate-100 border border-slate-200"
+            }`}>
+              <button
+                type="button"
+                onClick={() => setActiveTab("electric")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "electric"
+                    ? (isDark ? "bg-blue-950/30 text-blue-405 border border-blue-500/20 shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm")
+                    : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-blue-500" />
+                <span>มิเตอร์ไฟ</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("water")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "water"
+                    ? (isDark ? "bg-teal-950/30 text-teal-405 border border-teal-500/20 shadow-sm" : "bg-teal-50 text-teal-700 border border-teal-200 shadow-sm")
+                    : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
+                }`}
+              >
+                <Droplet className="w-3.5 h-3.5 text-teal-500" />
+                <span>มิเตอร์น้ำ</span>
+              </button>
+            </div>
+          ) : (
+            <div className={`text-xs font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+              รายการบิลค่าเช่าประจำรอบบิล
+            </div>
+          )}
           
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
             <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold border ${
@@ -289,19 +294,13 @@ export default function MeterReadingTable({
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
                 activeTab === "all" ? "bg-teal-500" : activeTab === "electric" ? "bg-blue-500" : "bg-teal-500"
-              }`}></span>
-              <span>โหมดการทำงาน: </span>
-              <strong className={
-                activeTab === "all" ? "text-slate-700 dark:text-slate-300" : 
-                activeTab === "electric" ? "text-blue-600 dark:text-blue-400" : "text-teal-600 dark:text-teal-400"
-              }>
-                {activeTab === "all" ? "จัดการบิลค่าเช่า (ดูเท่านั้น)" : 
-                 activeTab === "electric" ? "จดบันทึกมิเตอร์ไฟ" : "จดบันทึกมิเตอร์น้ำ"}
-              </strong>
+              }`} />
+              <span>รอบบิล: {formatBillingCycleThaiLocal(billingCycle)}</span>
             </div>
 
             {activeTab === "all" && unifiedItems.length > 0 && (
               <button
+                type="button"
                 onClick={() => {
                   if (!permissions.billing_send_line) {
                     alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
@@ -314,7 +313,7 @@ export default function MeterReadingTable({
                 disabled={!permissions.billing_send_line}
                 className={`w-full sm:w-auto h-9 px-5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
                   !permissions.billing_send_line
-                    ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-800 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
+                    ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
                     : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98]"
                 }`}
                 title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}

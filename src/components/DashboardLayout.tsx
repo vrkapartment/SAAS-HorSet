@@ -545,8 +545,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: t("nav.billing") || "จดมิเตอร์ & จัดการบิล",
+      name: "จดเลขมิเตอร์ & สรุปบิลค่าเช่า",
       path: "/billing",
+      icon: Scroll,
+      roles: ["admin", "staff", "super_admin"]
+    },
+    {
+      name: "จัดการบิล",
+      path: "/manage-bills",
       icon: Receipt,
       roles: ["admin", "staff", "super_admin"]
     },
@@ -639,7 +645,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     if (path === "/rooms" || path === "/tenants") {
       return !!userPermissions.manage_rooms_tenants
     }
-    if (path === "/billing" || path === "/meter") {
+    if (path === "/billing" || path === "/meter" || path === "/manage-bills") {
       return !!userPermissions.manage_meters_bills
     }
     if (path === "/daily-bills") {
@@ -738,8 +744,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 <span className="truncate max-w-[130px] sm:max-w-none">
                   {pathname === "/dashboard" && (t("nav.dashboard") || "หน้าแรกภาพรวมสถิติ")}
                   {pathname === "/rooms" && (t("nav.rooms") || "จัดการห้องพักและผู้เช่า")}
-                  {pathname === "/billing" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
-                  {pathname === "/meter" && (t("nav.billing") || "ระบบบันทึกจดมิเตอร์และจัดบิล")}
+                  {pathname === "/billing" && "จดเลขมิเตอร์ & สรุปบิลค่าเช่า"}
+                  {pathname === "/meter" && "จดเลขมิเตอร์ & สรุปบิลค่าเช่า"}
+                  {pathname === "/manage-bills" && "ระบบจัดการบิลค่าเช่า"}
                   {pathname === "/daily-bills" && "จัดการบิลรายจ่ายรายวัน (40(5) / 40(8))"}
                   {pathname === "/tax" && (t("nav.tax") || "ระบบรายงานภาษีอพาร์ทเมนท์ ภ.ง.ด.")}
                   {pathname === "/finance-settings" && (t("nav.finance") || "ตั้งค่าการเงินและบัญชีรับเงิน")}
