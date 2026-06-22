@@ -36,6 +36,7 @@ interface MeterReadingTableProps {
   handleSaveLateDays?: (roomNumber: string) => Promise<void>
   latePenaltyRate?: number
   handleOtherServiceChange?: (roomNumber: string, value: string) => void
+  handleBillAmountChange?: (roomNumber: string, value: string) => void
   mode?: "meters" | "billing"
 }
 
@@ -72,6 +73,7 @@ export default function MeterReadingTable({
   handleSaveLateDays,
   latePenaltyRate = 0,
   handleOtherServiceChange,
+  handleBillAmountChange,
   mode = "billing"
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
@@ -409,15 +411,43 @@ export default function MeterReadingTable({
                     {activeTab === "all" && (
                       <div className="text-right">
                         <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมสุทธิ</div>
-                        <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
-                          {item.tenantName ? `${displayedTotal.toLocaleString()}.-` : "-"}
-                        </div>
-                        {item.tenantName && isModified && (
-                          <span className={`inline-block text-[9px] bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1 ${
-                            isDark ? "text-amber-400" : "text-amber-600"
-                          }`}>
-                            ยอดเงินเปลี่ยน
-                          </span>
+                        {item.tenantName ? (
+                          item.billStatus !== "not_created" ? (
+                            <div className="flex flex-col items-end mt-1">
+                              <div className="flex items-center gap-1 justify-end">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  className={`w-24 text-right pr-1.5 py-0.5 border rounded font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-bold ${
+                                    isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                  }`}
+                                  value={item.billAmount !== undefined ? item.billAmount : 0}
+                                  onChange={(e) => handleBillAmountChange?.(item.roomNumber, e.target.value)}
+                                />
+                                <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>บาท</span>
+                              </div>
+                              {isModified && (
+                                <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold mt-1 ${
+                                  isDark ? "text-amber-400" : "text-amber-600"
+                                }`}>
+                                  ยอดเงินเปลี่ยน
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
+                                {displayedTotal.toLocaleString()}.-
+                              </div>
+                              <span className={`inline-block text-[8px] bg-slate-500/10 border border-slate-500/20 px-1 py-0.2 rounded font-bold mt-1 ${
+                                isDark ? "text-slate-450" : "text-slate-500"
+                              }`}>
+                                รอสร้างบิล
+                              </span>
+                            </>
+                          )
+                        ) : (
+                          <div className={`text-sm font-bold ${isDark ? "text-slate-605" : "text-slate-400"}`}>-</div>
                         )}
                       </div>
                     )}
@@ -941,18 +971,40 @@ export default function MeterReadingTable({
                           {/* ยอดบิลรวม */}
                           <td className="py-4 text-right pr-4 font-mono">
                             {item.tenantName ? (
-                              <>
-                                <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                                  {displayedTotal.toLocaleString()}.-
+                              item.billStatus !== "not_created" ? (
+                                <div className="flex flex-col items-end">
+                                  <div className="flex items-center gap-1.5 justify-end">
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      className={`w-28 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-black ${
+                                        isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                      }`}
+                                      value={item.billAmount !== undefined ? item.billAmount : 0}
+                                      onChange={(e) => handleBillAmountChange?.(item.roomNumber, e.target.value)}
+                                    />
+                                    <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>บาท</span>
+                                  </div>
+                                  {isModified && (
+                                    <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold mt-1 ${
+                                      isDark ? "text-amber-400" : "text-amber-600"
+                                    }`}>
+                                      ยอดเงินเปลี่ยน
+                                    </span>
+                                  )}
                                 </div>
-                                {isModified && (
-                                  <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold ${
-                                    isDark ? "text-amber-400" : "text-amber-600"
+                              ) : (
+                                <>
+                                  <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                                    {displayedTotal.toLocaleString()}.-
+                                  </div>
+                                  <span className={`inline-block text-[8px] bg-slate-500/10 border border-slate-500/20 px-1 py-0.2 rounded font-bold mt-1 ${
+                                    isDark ? "text-slate-450" : "text-slate-500"
                                   }`}>
-                                    ยอดเงินเปลี่ยน
+                                    รอสร้างบิล
                                   </span>
-                                )}
-                              </>
+                                </>
+                              )
                             ) : (
                               <div className={`text-sm font-bold ${isDark ? "text-slate-600" : "text-slate-400"}`}>
                                 -

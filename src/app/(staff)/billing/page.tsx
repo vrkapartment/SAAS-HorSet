@@ -691,6 +691,24 @@ export default function UnifiedBillingPage() {
     )
   }
 
+  // อัปเดตยอดเงินรวมเมื่อผู้ใช้แก้ไขตัวเลข ยอดบิลรวม โดยตรง
+  const handleBillAmountChange = (roomNumber: string, value: string) => {
+    setUnifiedItems(prev =>
+      prev.map(item => {
+        if (item.roomNumber !== roomNumber) return item
+        
+        const amountVal = value === "" ? 0 : Number(value)
+        if (isNaN(amountVal)) return item
+
+        return {
+          ...item,
+          billAmount: amountVal,
+          isEdited: true
+        }
+      })
+    )
+  }
+
   // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
   const handleSaveLateDays = async (roomNumber: string) => {
     console.log("🚀 [Client] handleSaveLateDays started for room:", roomNumber)
@@ -1404,6 +1422,7 @@ export default function UnifiedBillingPage() {
           handleSaveLateDays={handleSaveLateDays}
           latePenaltyRate={latePenaltyRate}
           handleOtherServiceChange={handleOtherServiceChange}
+          handleBillAmountChange={handleBillAmountChange}
           mode="meters"
         />
       ) : (
@@ -1516,10 +1535,14 @@ export default function UnifiedBillingPage() {
                           {item.tenantName ? (
                             <div className="flex flex-col items-end">
                               <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                                {simplifiedTotal.toLocaleString()}.-
+                                {(item.billAmount && item.billAmount > 0) ? item.billAmount.toLocaleString() : simplifiedTotal.toLocaleString()}.-
                               </div>
                               <div className="text-[9px] text-slate-400 dark:text-slate-500">
-                                {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()} + {commonFee.toLocaleString()}
+                                {(item.billAmount && item.billAmount > 0 && item.billAmount !== simplifiedTotal) ? (
+                                  <span className="text-amber-500 font-bold">ยอดเงินถูกปรับแต่ง</span>
+                                ) : (
+                                  `${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`
+                                )}
                               </div>
                             </div>
                           ) : (
@@ -1589,10 +1612,14 @@ export default function UnifiedBillingPage() {
                         <div className="text-right">
                           <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</div>
                           <div className="text-base font-black text-teal-600 dark:text-teal-400 font-mono">
-                            {simplifiedTotal.toLocaleString()}.-
+                            {(item.billAmount && item.billAmount > 0) ? item.billAmount.toLocaleString() : simplifiedTotal.toLocaleString()}.-
                           </div>
                           <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-                            {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()} + {commonFee.toLocaleString()}
+                            {(item.billAmount && item.billAmount > 0 && item.billAmount !== simplifiedTotal) ? (
+                              <span className="text-amber-500 font-bold">ยอดเงินถูกปรับแต่ง</span>
+                            ) : (
+                              `${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`
+                            )}
                           </div>
                         </div>
                       )}
