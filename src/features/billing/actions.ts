@@ -117,7 +117,7 @@ export async function createBill(
 }
 
 // Helper to calculate late days (equivalent to the one in Portal)
-function calculateLateDays(cycleStr: string): number {
+export function calculateLateDays(cycleStr: string): number {
   if (!cycleStr || !cycleStr.includes("-")) return 0
   const [yearStr, monthStr] = cycleStr.split("-")
   const year = parseInt(yearStr, 10)

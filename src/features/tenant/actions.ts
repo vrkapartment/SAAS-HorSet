@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import crypto from "crypto"
+import { calculateLateDays } from "@/features/billing/actions"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -360,20 +361,34 @@ export async function getTenantPortalData() {
           filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
         }
 
-        formattedBills = filteredBills.map((b: any) => ({
-          id: b.id,
-          roomNumber: b.room_number,
-          tenantName: b.tenant_name,
-          amount: Number(b.amount),
-          status: b.status,
-          billingCycle: b.billing_cycle,
-          slipUrl: b.slip_url,
-          electricUnits: Number(b.electric_units),
-          waterUnits: Number(b.water_units),
-          penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
-          lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
-          otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
-        }))
+        formattedBills = filteredBills.map((b: any) => {
+          let lateDays = b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
+          let penaltyAmount = b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null
+          let amount = Number(b.amount)
+
+          if (b.status === "unpaid") {
+            const calculatedLateDays = calculateLateDays(b.billing_cycle)
+            const calculatedPenalty = calculatedLateDays * latePenaltyRate
+            lateDays = calculatedLateDays
+            penaltyAmount = calculatedPenalty
+            amount = amount + penaltyAmount
+          }
+
+          return {
+            id: b.id,
+            roomNumber: b.room_number,
+            tenantName: b.tenant_name,
+            amount: amount,
+            status: b.status,
+            billingCycle: b.billing_cycle,
+            slipUrl: b.slip_url,
+            electricUnits: Number(b.electric_units),
+            waterUnits: Number(b.water_units),
+            penaltyAmount: penaltyAmount,
+            lateDays: lateDays,
+            otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
+          }
+        })
       }
     }
 
@@ -561,20 +576,34 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
       }
 
-      formattedBills = filteredBills.map((b: any) => ({
-        id: b.id,
-        roomNumber: b.room_number,
-        tenantName: b.tenant_name,
-        amount: Number(b.amount),
-        status: b.status,
-        billingCycle: b.billing_cycle,
-        slipUrl: b.slip_url,
-        electricUnits: Number(b.electric_units),
-        waterUnits: Number(b.water_units),
-        penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
-        lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
-        otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
-      }))
+      formattedBills = filteredBills.map((b: any) => {
+        let lateDays = b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
+        let penaltyAmount = b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null
+        let amount = Number(b.amount)
+
+        if (b.status === "unpaid") {
+          const calculatedLateDays = calculateLateDays(b.billing_cycle)
+          const calculatedPenalty = calculatedLateDays * latePenaltyRate
+          lateDays = calculatedLateDays
+          penaltyAmount = calculatedPenalty
+          amount = amount + penaltyAmount
+        }
+
+        return {
+          id: b.id,
+          roomNumber: b.room_number,
+          tenantName: b.tenant_name,
+          amount: amount,
+          status: b.status,
+          billingCycle: b.billing_cycle,
+          slipUrl: b.slip_url,
+          electricUnits: Number(b.electric_units),
+          waterUnits: Number(b.water_units),
+          penaltyAmount: penaltyAmount,
+          lateDays: lateDays,
+          otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
+        }
+      })
     }
 
     const baseRent = room.room_types ? Number((room.room_types as any).default_rent) : Number(room.base_rent)

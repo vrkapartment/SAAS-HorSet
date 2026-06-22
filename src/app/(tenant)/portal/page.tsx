@@ -263,20 +263,18 @@ export default function TenantPortal() {
   // ค่าเช่าห้องพักหลัก
   const rentPrice = baseRent
 
-  // คำนวณจำนวนวันและค่าปรับล่าช้าแบบพลวัต
-  const hasDbLateDays = bill && bill.lateDays !== null && bill.lateDays !== undefined
-  const lateDays = (bill && billStatus === "unpaid")
-    ? (hasDbLateDays ? Number(bill.lateDays) : calculateLateDays(bill.billingCycle))
-    : (bill ? Number(bill.lateDays || 0) : 0)
-  
-  const hasDbPenaltyAmount = bill && bill.penaltyAmount !== null && bill.penaltyAmount !== undefined
-  const penaltyAmount = (bill && billStatus === "unpaid")
-    ? (hasDbPenaltyAmount ? Number(bill.penaltyAmount) : (lateDays * latePenaltyRate))
-    : (bill ? Number(bill.penaltyAmount || 0) : 0)
+  // คำนวณจำนวนวันและค่าปรับล่าช้า (ทำบน Backend ทั้งหมดแล้วสำหรับข้อมูลจริง / มี Fallback สำหรับ Demo เท่านั้น)
+  const lateDays = bill 
+    ? (bill.lateDays !== null && bill.lateDays !== undefined ? Number(bill.lateDays) : (isDemo ? calculateLateDays(bill.billingCycle) : 0))
+    : 0
 
-  const totalAmount = (bill && billStatus === "unpaid")
-    ? (baseRent + elecAmount + waterAmount + commonAreaFee + penaltyAmount + otherServiceAmount)
-    : (bill ? bill.amount : (baseRent + elecAmount + waterAmount + commonAreaFee + otherServiceAmount))
+  const penaltyAmount = bill 
+    ? (bill.penaltyAmount !== null && bill.penaltyAmount !== undefined ? Number(bill.penaltyAmount) : (isDemo ? (lateDays * latePenaltyRate) : 0))
+    : 0
+
+  const totalAmount = bill 
+    ? Number(bill.amount) 
+    : (baseRent + elecAmount + waterAmount + commonAreaFee + otherServiceAmount)
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
