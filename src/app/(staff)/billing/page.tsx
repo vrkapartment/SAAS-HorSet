@@ -1415,17 +1415,16 @@ export default function UnifiedBillingPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold bg-slate-50/50 dark:bg-slate-900/10">
-                  <th className="py-3 pl-3 w-20">เลขห้อง</th>
-                  <th className="py-3 w-44">ผู้เช่า / ค่าเช่าห้อง</th>
-                  <th className="py-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-52 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า (kWh)</th>
-                  <th className="py-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-52 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ (m³)</th>
-                  <th className="py-3 text-right pr-4 w-48 font-bold">ยอดบิลรวม (เช่า+ไฟ+น้ำ)</th>
+                  <th className="py-3 pl-3 w-24">เลขห้อง</th>
+                  <th className="py-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-56 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า (kWh)</th>
+                  <th className="py-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-56 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ (m³)</th>
+                  <th className="py-3 text-right pr-4 w-52 font-bold">ยอดบิลรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-500">
+                    <td colSpan={4} className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
                         <span>กำลังโหลดข้อมูลรวม...</span>
@@ -1446,19 +1445,11 @@ export default function UnifiedBillingPage() {
                       ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                       : 0
 
-                    const simplifiedTotal = item.baseRent + elecCost + waterCost
+                    const simplifiedTotal = item.baseRent + elecCost + waterCost + commonFee
 
                     return (
                       <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
                         <td className={`py-4 pl-3 font-black text-sm ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
-                        <td className="py-4">
-                          <div className={`font-bold truncate max-w-[140px] ${isDark ? "text-slate-300" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
-                            {item.tenantName || <span className={isDark ? "text-slate-650 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
-                          </div>
-                          <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                            {item.tenantName ? `ค่าเช่าห้อง: ${item.baseRent.toLocaleString()}.-` : "ห้องว่าง"}
-                          </div>
-                        </td>
                         
                         {/* มิเตอร์ไฟ */}
                         <td className="py-4 text-center bg-blue-50/10 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-3">
@@ -1500,7 +1491,7 @@ export default function UnifiedBillingPage() {
                           )}
                         </td>
 
-                        {/* ยอดบิลรวม (ที่แสดงแค่ค่าน้ำ + ค่าไฟ+ค่าเช่าห้อง) */}
+                        {/* ยอดบิลรวม (ค่าน้ำ + ค่าไฟ + ค่าเช่าห้อง + ค่าส่วนกลาง) */}
                         <td className="py-4 text-right pr-4 font-mono">
                           {item.tenantName ? (
                             <div className="flex flex-col items-end">
@@ -1508,11 +1499,11 @@ export default function UnifiedBillingPage() {
                                 {simplifiedTotal.toLocaleString()}.-
                               </div>
                               <div className="text-[9px] text-slate-400 dark:text-slate-500">
-                                {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()}
+                                {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()} + {commonFee.toLocaleString()}
                               </div>
                             </div>
                           ) : (
-                            <div className={`text-sm font-bold ${isDark ? "text-slate-655" : "text-slate-400"}`}>-</div>
+                            <div className={`text-sm font-bold ${isDark ? "text-slate-650" : "text-slate-400"}`}>-</div>
                           )}
                         </td>
                       </tr>
@@ -1520,7 +1511,7 @@ export default function UnifiedBillingPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                    <td colSpan={4} className="py-8 text-center text-slate-500">
                       ไม่มีรายการห้องพัก
                     </td>
                   </tr>
@@ -1550,7 +1541,7 @@ export default function UnifiedBillingPage() {
                   ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                   : 0
 
-                const simplifiedTotal = item.baseRent + elecCost + waterCost
+                const simplifiedTotal = item.baseRent + elecCost + waterCost + commonFee
 
                 return (
                   <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-3 shadow-sm ${
@@ -1563,19 +1554,16 @@ export default function UnifiedBillingPage() {
                         }`}>
                           {item.roomNumber}
                         </span>
-                        <div className={`font-bold mt-2.5 ${isDark ? "text-slate-300" : "text-slate-800"}`}>
-                          {item.tenantName || <span className={isDark ? "text-slate-650 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
-                        </div>
                       </div>
                       
                       {item.tenantName && (
                         <div className="text-right">
-                          <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมอย่างง่าย</div>
+                          <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</div>
                           <div className="text-base font-black text-teal-600 dark:text-teal-400 font-mono">
                             {simplifiedTotal.toLocaleString()}.-
                           </div>
                           <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-                            {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()}
+                            {item.baseRent.toLocaleString()} + {elecCost.toLocaleString()} + {waterCost.toLocaleString()} + {commonFee.toLocaleString()}
                           </div>
                         </div>
                       )}
