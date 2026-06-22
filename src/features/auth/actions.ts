@@ -2,6 +2,25 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+
+// Helper to create Supabase Admin Client to bypass RLS for registration code marking
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!serviceKey || serviceKey.includes("placeholder")) {
+    throw new Error("กรุณาตั้งค่า SUPABASE_SERVICE_ROLE_KEY ในไฟล์ .env ของเซิร์ฟเวอร์ก่อนใช้งาน")
+  }
+
+  return createSupabaseClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
 
 /**
  * ฟังก์ชันสำหรับการทำ Login ผ่าน Supabase
@@ -248,8 +267,9 @@ export async function registerWithSecretCodeAction(data: {
       return { success: false, error: "สมัครสมาชิกไม่สำเร็จ: ไม่มีข้อมูลผู้ใช้งานที่สร้างขึ้น" }
     }
 
-    // 3. ปรับสถานะ Secret Code ว่าถูกใช้แล้ว
-    const { error: updateErr } = await supabase
+    // 3. ปรับสถานะ Secret Code ว่าถูกใช้แล้ว โดยใช้สิทธิ์ Admin
+    const supabaseAdmin = getSupabaseAdmin()
+    const { error: updateErr } = await supabaseAdmin
       .from("registration_codes")
       .update({
         is_used: true,
