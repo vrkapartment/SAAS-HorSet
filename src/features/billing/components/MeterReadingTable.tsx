@@ -368,7 +368,17 @@ export default function MeterReadingTable({
                         }`}>
                           {item.roomNumber}
                         </span>
-                        {activeTab === "all" && (
+                        {mode === "meters" ? (
+                          item.status === "occupied" ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              มีผู้เช่า
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-500/10 text-slate-500 dark:text-slate-400">
+                              ว่าง
+                            </span>
+                          )
+                        ) : activeTab === "all" && (
                           <span className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
                             !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
                             item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border border-emerald-200") :
@@ -383,10 +393,12 @@ export default function MeterReadingTable({
                           </span>
                         )}
                       </div>
-                      <div className={`font-bold mt-2 ${isDark ? "text-slate-300" : "text-slate-800"}`}>
-                        {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
-                      </div>
-                      {activeTab === "all" && (
+                      {mode !== "meters" && (
+                        <div className={`font-bold mt-2 ${isDark ? "text-slate-300" : "text-slate-800"}`}>
+                          {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
+                        </div>
+                      )}
+                      {mode !== "meters" && activeTab === "all" && (
                         <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                           {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.- | ส่วนกลาง ${commonFee}.-` : "ห้องว่าง"}
                         </div>
@@ -729,7 +741,11 @@ export default function MeterReadingTable({
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold bg-slate-50/50 dark:bg-slate-900/10">
                 <th className="pb-3 pl-3 w-16">ห้อง</th>
-                <th className="pb-3 w-40">ผู้เช่า / ค่าเช่า</th>
+                {mode === "meters" ? (
+                  <th className="pb-3 w-40">สถานะห้อง</th>
+                ) : (
+                  <th className="pb-3 w-40">ผู้เช่า / ค่าเช่า</th>
+                )}
                 
                 {/* 1. แถบจัดการบิล */}
                 {activeTab === "all" && (
@@ -802,14 +818,28 @@ export default function MeterReadingTable({
                       {/* ห้อง */}
                       <td className={`py-4 pl-3 font-black text-sm ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
                       
-                      {/* ผู้เช่า / ค่าเช่าห้อง */}
+                      {/* ผู้เช่า / ค่าเช่าห้อง หรือ สถานะห้อง */}
                       <td className="py-4">
-                        <div className={`font-bold truncate max-w-[140px] ${isDark ? "text-slate-300" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
-                          {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
-                        </div>
-                        <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.-` : "ห้องว่าง"}
-                        </div>
+                        {mode === "meters" ? (
+                          item.status === "occupied" ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              มีผู้เช่า
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
+                              ว่าง
+                            </span>
+                          )
+                        ) : (
+                          <>
+                            <div className={`font-bold truncate max-w-[140px] ${isDark ? "text-slate-300" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
+                              {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
+                            </div>
+                            <div className={`text-[10px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                              {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.-` : "ห้องว่าง"}
+                            </div>
+                          </>
+                        )}
                       </td>
 
                       {/* --- 1. แถบจัดการบิล (อ่านอย่างเดียว) --- */}

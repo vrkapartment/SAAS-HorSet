@@ -21,7 +21,9 @@ import {
   Sparkles,
   RefreshCw,
   Zap,
-  Droplet
+  Droplet,
+  Home,
+  ShieldAlert
 } from "lucide-react"
 import { getBills, createBill, updateBillStatus } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
@@ -1415,16 +1417,19 @@ export default function UnifiedBillingPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold bg-slate-50/50 dark:bg-slate-900/10">
-                  <th className="py-3 pl-3 w-24">เลขห้อง</th>
-                  <th className="py-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-56 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า (kWh)</th>
-                  <th className="py-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-56 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ (m³)</th>
-                  <th className="py-3 text-right pr-4 w-52 font-bold">ยอดบิลรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</th>
+                  <th className="py-3 pl-3 w-20">เลขห้อง</th>
+                  <th className="py-3 text-center w-28">สถานะห้อง</th>
+                  <th className="py-3 text-right w-28">ค่าเช่าห้อง</th>
+                  <th className="py-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า</th>
+                  <th className="py-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ</th>
+                  <th className="py-3 text-right w-28">ค่าส่วนกลาง</th>
+                  <th className="py-3 text-right pr-4 w-44 font-bold">ยอดบิลรวม</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-500">
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
                         <span>กำลังโหลดข้อมูลรวม...</span>
@@ -1451,21 +1456,35 @@ export default function UnifiedBillingPage() {
                       <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
                         <td className={`py-4 pl-3 font-black text-sm ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
                         
-                        {/* มิเตอร์ไฟ */}
+                        {/* สถานะห้อง */}
+                        <td className="py-4 text-center">
+                          {item.status === "occupied" ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              มีผู้เช่า
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
+                              ว่าง
+                            </span>
+                          )}
+                        </td>
+
+                        {/* ค่าเช่าห้อง */}
+                        <td className={`py-4 text-right font-mono text-sm ${isDark ? "text-slate-350" : "text-slate-600"}`}>
+                          {item.tenantName ? `${item.baseRent.toLocaleString()}.-` : "-"}
+                        </td>
+
+                        {/* มิเตอร์ไฟฟ้า */}
                         <td className="py-4 text-center bg-blue-50/10 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-3">
                           {hasElecCurr ? (
-                            <>
-                              <div className="font-mono text-xs font-semibold">
-                                <span className={isDark ? "text-slate-400" : "text-slate-500"}>{item.elecPrev}</span>
-                                <span className="mx-1.5 text-slate-400">➔</span>
-                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{item.elecCurr}</span>
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
+                                {elecCost.toLocaleString()}.-
                               </div>
-                              <div className="mt-1">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                  {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
-                                </span>
+                              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                                {item.elecPrev} ➔ {item.elecCurr} (ใช้ไป {elecUnitsUsed} หน่วย)
                               </div>
-                            </>
+                            </div>
                           ) : (
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
                           )}
@@ -1474,24 +1493,25 @@ export default function UnifiedBillingPage() {
                         {/* มิเตอร์น้ำ */}
                         <td className="py-4 text-center bg-teal-50/10 dark:bg-teal-500/5 border-l border-r border-slate-200 dark:border-slate-800/40 px-3">
                           {hasWaterCurr ? (
-                            <>
-                              <div className="font-mono text-xs font-semibold">
-                                <span className={isDark ? "text-slate-400" : "text-slate-500"}>{item.waterPrev}</span>
-                                <span className="mx-1.5 text-slate-400">➔</span>
-                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{item.waterCurr}</span>
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="text-sm font-black text-teal-600 dark:text-teal-400 font-mono">
+                                {waterCost.toLocaleString()}.-
                               </div>
-                              <div className="mt-1">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-500/10 text-teal-600 dark:text-teal-400">
-                                  {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
-                                </span>
+                              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                                {item.waterPrev} ➔ {item.waterCurr} (ใช้ไป {waterUnitsUsed} หน่วย)
                               </div>
-                            </>
+                            </div>
                           ) : (
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
                           )}
                         </td>
 
-                        {/* ยอดบิลรวม (ค่าน้ำ + ค่าไฟ + ค่าเช่าห้อง + ค่าส่วนกลาง) */}
+                        {/* ค่าส่วนกลาง */}
+                        <td className={`py-4 text-right font-mono text-sm ${isDark ? "text-slate-350" : "text-slate-600"}`}>
+                          {item.tenantName ? `${commonFee.toLocaleString()}.-` : "-"}
+                        </td>
+
+                        {/* ยอดบิลรวม */}
                         <td className="py-4 text-right pr-4 font-mono">
                           {item.tenantName ? (
                             <div className="flex flex-col items-end">
@@ -1511,7 +1531,7 @@ export default function UnifiedBillingPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-500">
+                    <td colSpan={7} className="py-8 text-center text-slate-500">
                       ไม่มีรายการห้องพัก
                     </td>
                   </tr>
@@ -1548,12 +1568,21 @@ export default function UnifiedBillingPage() {
                     isDark ? "bg-slate-950/35 border-slate-900/60" : "bg-white border-slate-200"
                   }`}>
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div className="flex items-center gap-2">
                         <span className={`text-base font-black px-3 py-1 rounded-xl border ${
                           isDark ? "text-slate-100 bg-slate-900 border-slate-800" : "text-slate-800 bg-slate-100 border-slate-200"
                         }`}>
                           {item.roomNumber}
                         </span>
+                        {item.status === "occupied" ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            มีผู้เช่า
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
+                            ว่าง
+                          </span>
+                        )}
                       </div>
                       
                       {item.tenantName && (
@@ -1572,6 +1601,30 @@ export default function UnifiedBillingPage() {
                     <div className={`h-px ${isDark ? "bg-slate-900/60" : "bg-slate-200"}`} />
 
                     <div className="grid grid-cols-2 gap-3">
+                      {/* ค่าเช่าห้อง */}
+                      <div className={`rounded-xl p-3 border ${
+                        isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50/50 border-slate-100"
+                      }`}>
+                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
+                          <Home className="w-3 h-3 text-amber-500" /> ค่าเช่าห้อง
+                        </div>
+                        <div className={`text-sm font-black font-mono ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                          {item.tenantName ? `${item.baseRent.toLocaleString()}.-` : "-"}
+                        </div>
+                      </div>
+
+                      {/* ค่าส่วนกลาง */}
+                      <div className={`rounded-xl p-3 border ${
+                        isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50/50 border-slate-100"
+                      }`}>
+                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
+                          <ShieldAlert className="w-3 h-3 text-indigo-500" /> ค่าส่วนกลาง
+                        </div>
+                        <div className={`text-sm font-black font-mono ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                          {item.tenantName ? `${commonFee.toLocaleString()}.-` : "-"}
+                        </div>
+                      </div>
+
                       {/* ไฟฟ้า */}
                       <div className={`rounded-xl p-3 border ${
                         isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/30 border-blue-100"
@@ -1580,10 +1633,12 @@ export default function UnifiedBillingPage() {
                           <Zap className="w-3 h-3" /> ไฟฟ้า (kWh)
                         </div>
                         {hasElecCurr ? (
-                          <div className="font-mono text-xs">
-                            <span className="text-slate-400">{item.elecPrev} ➔ {item.elecCurr}</span>
-                            <div className="mt-1 font-bold text-blue-600 dark:text-blue-400 text-[10px]">
-                              {elecUnitsUsed} หน่วย ({elecCost.toLocaleString()}.-)
+                          <div>
+                            <div className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
+                              {elecCost.toLocaleString()}.-
+                            </div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                              {item.elecPrev} ➔ {item.elecCurr} ({elecUnitsUsed} หน่วย)
                             </div>
                           </div>
                         ) : (
@@ -1599,10 +1654,12 @@ export default function UnifiedBillingPage() {
                           <Droplet className="w-3 h-3" /> น้ำประปา (m³)
                         </div>
                         {hasWaterCurr ? (
-                          <div className="font-mono text-xs">
-                            <span className="text-slate-400">{item.waterPrev} ➔ {item.waterCurr}</span>
-                            <div className="mt-1 font-bold text-teal-600 dark:text-teal-400 text-[10px]">
-                              {waterUnitsUsed} หน่วย ({waterCost.toLocaleString()}.-)
+                          <div>
+                            <div className="text-sm font-black text-teal-600 dark:text-teal-400 font-mono">
+                              {waterCost.toLocaleString()}.-
+                            </div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                              {item.waterPrev} ➔ {item.waterCurr} ({waterUnitsUsed} หน่วย)
                             </div>
                           </div>
                         ) : (
