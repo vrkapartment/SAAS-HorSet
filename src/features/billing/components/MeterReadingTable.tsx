@@ -35,6 +35,7 @@ interface MeterReadingTableProps {
   handleLateDaysChange?: (roomNumber: string, value: string) => void
   handleSaveLateDays?: (roomNumber: string) => Promise<void>
   latePenaltyRate?: number
+  handleOtherServiceChange?: (roomNumber: string, value: string) => void
 }
 
 export default function MeterReadingTable({
@@ -68,11 +69,12 @@ export default function MeterReadingTable({
   userPermissions,
   handleLateDaysChange,
   handleSaveLateDays,
-  latePenaltyRate = 0
+  latePenaltyRate = 0,
+  handleOtherServiceChange
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">("all")
-  const colSpanVal = activeTab === "all" ? 8 : 6
+  const colSpanVal = activeTab === "all" ? 9 : 6
 
   const [bulkSendModalOpen, setBulkSendModalOpen] = useState(false)
   const [modalActiveTab, setModalActiveTab] = useState<"connected" | "unconnected">("connected")
@@ -129,7 +131,9 @@ export default function MeterReadingTable({
       : `${safeAppUrl}/portal`
 
     const thaiCycle = formatBillingCycleThaiLocal(billingCycle)
-    const totalAmount = item.billAmount || (item.baseRent + elecCost + waterCost + commonFee)
+    const otherServiceAmt = Number(item.otherServiceAmount || 0)
+    const penaltyAmt = Number(item.penaltyAmount || 0)
+    const totalAmount = item.billAmount || (item.baseRent + elecCost + waterCost + commonFee + otherServiceAmt + penaltyAmt)
 
     const text = `🏠 ${workspaceName || "หอพัก"} - ใบแจ้งค่าใช้จ่ายประจำเดือน ${thaiCycle}
 เลขห้อง: ${item.roomNumber}
@@ -138,7 +142,7 @@ export default function MeterReadingTable({
 • ค่าเช่าห้อง: ${item.baseRent.toLocaleString()} บาท
 • ค่าไฟฟ้า: ${elecCost.toLocaleString()} บาท (ใช้ไป ${elecUnitsUsed} หน่วย)
 • ค่าน้ำประปา: ${waterCost.toLocaleString()} บาท (ใช้ไป ${waterUnitsUsed} หน่วย)
-• ค่าส่วนกลาง: ${commonFee.toLocaleString()} บาท
+• ค่าส่วนกลาง: ${commonFee.toLocaleString()} บาท${otherServiceAmt > 0 ? `\n• ค่าบริการอื่น ๆ: ${otherServiceAmt.toLocaleString()} บาท` : ""}${penaltyAmt > 0 ? `\n• ค่าปรับจ่ายล่าช้า: ${penaltyAmt.toLocaleString()} บาท` : ""}
 ----------------------------------
 💰 ยอดสุทธิที่ต้องชำระ: ${totalAmount.toLocaleString()} บาท
 
@@ -345,7 +349,7 @@ export default function MeterReadingTable({
                 ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
               
-              const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
+              const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0)
               const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
               const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
               const isSaveDisabled = item.tenantName
@@ -483,6 +487,35 @@ export default function MeterReadingTable({
                               onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
                             />
                             <span className="text-xs font-bold text-slate-500">วัน</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* แก้ไขค่าบริการอื่นๆในโมบาย */}
+                      {item.tenantName && item.billStatus !== "not_created" && (
+                        <div className={`rounded-xl p-3 border flex items-center justify-between gap-3 ${
+                          isDark ? "bg-teal-950/10 border-teal-950/45" : "bg-teal-50/20 border-teal-100/70"
+                        }`}>
+                          <div className="flex flex-col">
+                            <div className="text-xs font-bold text-teal-600 dark:text-teal-400">
+                              ค่าบริการอื่น ๆ (บาท)
+                            </div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                              จะรวมอยู่ในยอดบิลสุทธิ
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0"
+                              className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                                isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                              }`}
+                              value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
+                              onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
+                            />
+                            <span className="text-xs font-bold text-slate-500">บาท</span>
                           </div>
                         </div>
                       )}
@@ -704,6 +737,7 @@ export default function MeterReadingTable({
                   <>
                     <th className="pb-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า (kWh)</th>
                     <th className="pb-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ (m³)</th>
+                    <th className="pb-3 text-center w-36 text-slate-500 dark:text-slate-450 font-bold border-r border-slate-200 dark:border-slate-800/40">ค่าบริการอื่น ๆ (บาท)</th>
                     <th className="pb-3 text-center w-36 text-slate-500 dark:text-slate-450 font-bold">ปรับล่าช้า (วัน)</th>
                     <th className="pb-3 text-right pr-4 w-32">ยอดรวมบิล</th>
                     <th className="pb-3 text-center w-28">สถานะ</th>
@@ -756,7 +790,7 @@ export default function MeterReadingTable({
                     ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
                   
-                  const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee
+                  const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0)
                   const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
 
                   const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
@@ -824,6 +858,27 @@ export default function MeterReadingTable({
                                 <span className="text-[10px] text-slate-400 italic">รอจดในแถบน้ำ</span>
                               )}
                             </div>
+                          </td>
+
+                          {/* ค่าบริการอื่น ๆ (บาท) */}
+                          <td className="py-4 text-center px-2 border-r border-slate-150 dark:border-slate-800/40">
+                            {item.tenantName && item.billStatus !== "not_created" ? (
+                              <div className="flex items-center gap-1 justify-center">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                                    isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                  }`}
+                                  value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
+                                  onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
+                                />
+                                <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>บาท</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 dark:text-slate-600">-</span>
+                            )}
                           </td>
 
                           {/* ปรับล่าช้า (วัน) */}

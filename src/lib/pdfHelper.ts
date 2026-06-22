@@ -242,6 +242,7 @@ export interface BillPdfData {
   penaltyAmount?: number
   lateDays?: number
   latePenaltyRate?: number
+  otherServiceAmount?: number
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -328,9 +329,10 @@ export async function generateBillPdf(data: BillPdfData) {
   const waterAmount = isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate
   
   const penaltyAmount = data.penaltyAmount !== undefined ? Number(data.penaltyAmount || 0) : 0
+  const otherServiceAmount = data.otherServiceAmount !== undefined ? Number(data.otherServiceAmount || 0) : 0
   
   // คำนวณค่าเช่าห้องพักที่หักส่วนลด (หรือรวมค่าปรับ/ค่าใช้จ่ายอื่นๆ เผื่อไว้) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
-  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount)
+  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount)
 
   const elecDesc = isElecMin 
     ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
@@ -366,13 +368,22 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText(commonFee.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
-  // รายการ 5: ค่าปรับจ่ายล่าช้า (แสดงต่อเมื่อมียอดค่าปรับ)
+  // รายการ 5: ค่าบริการอื่นๆ (แสดงต่อเมื่อมียอด)
+  if (otherServiceAmount > 0) {
+    y -= 25
+    drawText("5. ค่าบริการอื่น ๆ (Other Service Charge)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+    drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
+    drawText(otherServiceAmount.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+    drawText(otherServiceAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+  }
+
+  // รายการ 6: ค่าปรับจ่ายล่าช้า (แสดงต่อเมื่อมียอดค่าปรับ)
   if (penaltyAmount > 0) {
     y -= 25
     const days = data.lateDays !== undefined ? data.lateDays : 0
     const rate = data.latePenaltyRate !== undefined ? data.latePenaltyRate : (days > 0 ? Math.round(penaltyAmount / days) : penaltyAmount)
 
-    drawText("5. ค่าปรับจ่ายล่าช้า (Late Payment Penalty / Fine)", 50, y, 9, rgb(0.8, 0.1, 0.1))
+    drawText("6. ค่าปรับจ่ายล่าช้า (Late Payment Penalty / Fine)", 50, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(days > 0 ? `${days} วัน` : "1", 280, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(rate.toLocaleString(), 380, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(penaltyAmount.toLocaleString(), 475, y, 9, rgb(0.8, 0.1, 0.1))

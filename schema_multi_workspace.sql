@@ -43,6 +43,7 @@ alter table public.meter_records add column if not exists workspace_id uuid refe
 alter table public.bills add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.bills add column if not exists penalty_amount numeric default 0;
 alter table public.bills add column if not exists late_days integer default 0;
+alter table public.bills add column if not exists other_service_amount numeric default 0;
 alter table public.expenses add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.expenses add column if not exists category text check (category in ('40_5', '40_8'));
 

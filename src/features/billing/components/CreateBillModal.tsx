@@ -12,6 +12,8 @@ interface CreateBillModalProps {
   setElecUnitsManual: (val: number) => void
   waterUnitsManual: number
   setWaterUnitsManual: (val: number) => void
+  otherServiceAmountManual: number
+  setOtherServiceAmountManual: (val: number) => void
   rentPrice: number
   commonFee: number
   elecRate: number
@@ -36,6 +38,8 @@ export default function CreateBillModal({
   setElecUnitsManual,
   waterUnitsManual,
   setWaterUnitsManual,
+  otherServiceAmountManual,
+  setOtherServiceAmountManual,
   rentPrice,
   commonFee,
   elecRate,
@@ -131,6 +135,23 @@ export default function CreateBillModal({
             </div>
           </div>
 
+          {/* ค่าบริการอื่น ๆ */}
+          <div className="space-y-1">
+            <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>ค่าบริการอื่น ๆ (บาท)</label>
+            <div className="relative">
+              <input
+                type="number"
+                className={`w-full h-11 md:h-10 px-3 border rounded-xl text-sm md:text-xs font-mono font-bold focus:outline-none focus:border-violet-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
+                }`}
+                placeholder="0"
+                value={otherServiceAmountManual || ""}
+                onChange={(e) => setOtherServiceAmountManual(Number(e.target.value))}
+              />
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black ${isDark ? "text-slate-600" : "text-slate-400"}`}>บาท</span>
+            </div>
+          </div>
+
           {/* สรุปยอดราคาจำลอง */}
           <div className={`p-4 rounded-xl border text-xs space-y-2 font-medium ${
             isDark ? "bg-blue-950/20 border-blue-900/40" : "bg-blue-50/50 border-blue-100"
@@ -159,6 +180,14 @@ export default function CreateBillModal({
                   : `${(waterUnitsManual * waterRate).toLocaleString()} บาท (หน่วยละ ${waterRate}.-)`}
               </span>
             </div>
+            {otherServiceAmountManual > 0 && (
+              <div className="flex justify-between">
+                <span className={isDark ? "text-slate-400" : "text-slate-500"}>ค่าบริการอื่น ๆ:</span>
+                <span className={`font-semibold ${isDark ? "text-violet-400" : "text-violet-600"}`}>
+                  {otherServiceAmountManual.toLocaleString()} บาท
+                </span>
+              </div>
+            )}
             <div className={`h-px my-1.5 ${isDark ? "bg-slate-800/80" : "bg-slate-200"}`} />
             <div className={`flex justify-between font-extrabold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
               <span>ยอดสุทธิที่ต้องชำระ:</span>

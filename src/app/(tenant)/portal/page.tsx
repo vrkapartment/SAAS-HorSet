@@ -256,6 +256,7 @@ export default function TenantPortal() {
   const waterUnits = bill ? bill.waterUnits : 0
   const waterAmount = waterUnits * waterRate
   const commonAreaFee = commonFee
+  const otherServiceAmount = bill ? (bill.otherServiceAmount || 0) : 0
 
   // ค่าเช่าห้องพักหลัก
   const rentPrice = baseRent
@@ -272,8 +273,8 @@ export default function TenantPortal() {
     : (bill ? Number(bill.penaltyAmount || 0) : 0)
 
   const totalAmount = (bill && billStatus === "unpaid")
-    ? (baseRent + elecAmount + waterAmount + commonAreaFee + penaltyAmount)
-    : (bill ? bill.amount : (baseRent + elecAmount + waterAmount + commonAreaFee))
+    ? (baseRent + elecAmount + waterAmount + commonAreaFee + penaltyAmount + otherServiceAmount)
+    : (bill ? bill.amount : (baseRent + elecAmount + waterAmount + commonAreaFee + otherServiceAmount))
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
@@ -299,7 +300,8 @@ export default function TenantPortal() {
         workspaceTaxId,
         penaltyAmount,
         lateDays,
-        latePenaltyRate
+        latePenaltyRate,
+        otherServiceAmount
       })
 
       const link = document.createElement("a")
@@ -479,6 +481,17 @@ export default function TenantPortal() {
               </div>
               <span className="font-semibold text-slate-200">{commonAreaFee.toLocaleString()} บาท</span>
             </div>
+
+            {/* ค่าบริการอื่น ๆ (ถ้ามี) */}
+            {otherServiceAmount > 0 && (
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+                  <span>ค่าบริการอื่น ๆ (Other Services)</span>
+                </div>
+                <span className="font-semibold text-slate-200">{otherServiceAmount.toLocaleString()} บาท</span>
+              </div>
+            )}
 
             {/* 5. ค่าปรับ */}
             <div className="flex justify-between items-start pb-2.5 border-b border-slate-900">

@@ -33,7 +33,8 @@ export async function getBills(billingCycle?: string) {
       electricUnits: Number(b.electric_units),
       waterUnits: Number(b.water_units),
       penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
-      lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
+      lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
+      otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
     }))
 
     return { success: true, data: formatted }
@@ -50,7 +51,8 @@ export async function createBill(
   status: "unpaid" | "pending" | "paid",
   billingCycle: string,
   electricUnits: number,
-  waterUnits: number
+  waterUnits: number,
+  otherServiceAmount: number = 0
 ) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -80,7 +82,8 @@ export async function createBill(
           amount: finalAmount,
           status,
           electric_units: electricUnits,
-          water_units: waterUnits
+          water_units: waterUnits,
+          other_service_amount: otherServiceAmount
         })
         .eq("id", existing.id)
         .select()
@@ -95,6 +98,7 @@ export async function createBill(
           billing_cycle: billingCycle,
           electric_units: electricUnits,
           water_units: waterUnits,
+          other_service_amount: otherServiceAmount,
           late_days: null,
           penalty_amount: null
         }])
@@ -103,8 +107,11 @@ export async function createBill(
 
     if (result.error) throw result.error
     return { success: true, data: result.data[0] }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้"
+  } catch (error: any) {
+    let errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้"
+    if (errorMessage.includes("column") && (errorMessage.includes("other_service_amount"))) {
+      errorMessage = `⚠️ ตรวจพบว่าระบบยังมองไม่เห็นคอลัมน์ 'other_service_amount' ในตาราง bills (Schema Cache ใน Supabase ยังไม่อัปเดต)\n\nกรุณาทำตามขั้นตอนต่อไปนี้เพื่อแก้ไข:\n1. ไปที่แดชบอร์ด Supabase ของท่าน\n2. เข้าเมนู SQL Editor ทางด้านซ้าย\n3. สร้าง Query ใหม่แล้วพิมพ์คำสั่งดังนี้:\n   ALTER TABLE public.bills ADD COLUMN IF NOT EXISTS other_service_amount numeric DEFAULT 0;\n   NOTIFY pgrst, 'reload schema';\n4. กดปุ่ม Run เพื่อเพิ่มคอลัมน์และล้างแคช จากนั้นกลับมาทดสอบบันทึกบิลใหม่อีกครั้ง!`
+    }
     return { success: false, error: errorMessage }
   }
 }
@@ -293,8 +300,8 @@ export async function deleteBill(id: string) {
   }
 }
 
-export async function updateBillPenalty(id: string, lateDays: number, penaltyAmount: number, amount: number) {
-  console.log("🖥️ [Server Action] updateBillPenalty started:", { id, lateDays, penaltyAmount, amount })
+export async function updateBillPenalty(id: string, lateDays: number, penaltyAmount: number, amount: number, otherServiceAmount?: number) {
+  console.log("🖥️ [Server Action] updateBillPenalty started:", { id, lateDays, penaltyAmount, amount, otherServiceAmount })
   if (!isSupabaseConfigured) {
     console.error("🖥️ [Server Action] Supabase is NOT configured")
     return { success: false, fallback: true }
@@ -338,13 +345,19 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
     }
 
     console.log("🖥️ [Server Action] Executing UPDATE query on 'bills' for ID:", id)
+    
+    const updatePayload: any = {
+      late_days: lateDays,
+      penalty_amount: penaltyAmount,
+      amount: amount
+    }
+    if (otherServiceAmount !== undefined) {
+      updatePayload.other_service_amount = otherServiceAmount
+    }
+
     const { data, error } = await activeClient
       .from("bills")
-      .update({
-        late_days: lateDays,
-        penalty_amount: penaltyAmount,
-        amount: amount
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select()
 

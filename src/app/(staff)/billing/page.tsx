@@ -65,6 +65,7 @@ interface UnifiedRoomBillingItem {
   waterUnits: number
   penaltyAmount?: number
   lateDays?: number
+  otherServiceAmount?: number
 
   isEdited?: boolean
 }
@@ -196,6 +197,7 @@ export default function UnifiedBillingPage() {
   const [newRoomNumber, setNewRoomNumber] = useState("105")
   const [elecUnitsManual, setElecUnitsManual] = useState(80)
   const [waterUnitsManual, setWaterUnitsManual] = useState(10)
+  const [otherServiceAmountManual, setOtherServiceAmountManual] = useState(0)
 
   const [savingAll, setSavingAll] = useState(false)
   const [savingProgress, setSavingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
@@ -207,7 +209,7 @@ export default function UnifiedBillingPage() {
   const computedWaterCost = waterMinChecked && waterUnitsManual <= waterMinUnit
     ? waterMinUnit * waterRate
     : waterUnitsManual * waterRate
-  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee
+  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual
 
   const getPreviousCycle = (cycle: string) => {
     const [year, month] = cycle.split("-").map(Number)
@@ -491,7 +493,8 @@ export default function UnifiedBillingPage() {
           electricUnits: roomBill ? Number(roomBill.electricUnits) : 0,
           waterUnits: roomBill ? Number(roomBill.waterUnits) : 0,
           penaltyAmount: finalPenaltyAmount,
-          lateDays: finalLateDays
+          lateDays: finalLateDays,
+          otherServiceAmount: roomBill ? Number(roomBill.otherServiceAmount || 0) : 0
         }
       })
       setUnifiedItems(compiled)
@@ -655,6 +658,29 @@ export default function UnifiedBillingPage() {
           ...item,
           lateDays: days,
           penaltyAmount: newPenaltyAmount,
+          billAmount: newBillAmount,
+          isEdited: true
+        }
+      })
+    )
+  }
+
+  // อัปเดตและคำนวณยอดเงินรวมเมื่อเปลี่ยนค่าบริการอื่นๆ แบบเรียลไทม์
+  const handleOtherServiceChange = (roomNumber: string, value: string) => {
+    setUnifiedItems(prev =>
+      prev.map(item => {
+        if (item.roomNumber !== roomNumber) return item
+        
+        const otherVal = value === "" ? 0 : Number(value)
+        if (isNaN(otherVal)) return item
+
+        const prevOther = item.otherServiceAmount || 0
+        const otherDiff = otherVal - prevOther
+        const newBillAmount = item.billAmount + otherDiff
+
+        return {
+          ...item,
+          otherServiceAmount: otherVal,
           billAmount: newBillAmount,
           isEdited: true
         }
@@ -848,7 +874,8 @@ export default function UnifiedBillingPage() {
           ? waterMinUnit * waterRate
           : wUnits * waterRate)
           
-    const totalAmount = item.baseRent + elecCost + waterCost + commonFee
+    const otherServiceVal = Number(item.otherServiceAmount || 0)
+    const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal
 
     setSavingAll(true)
     setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
@@ -884,7 +911,8 @@ export default function UnifiedBillingPage() {
         item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
         billingCycle,
         eUnits,
-        wUnits
+        wUnits,
+        otherServiceVal
       )
       if (!billRes.success) {
         alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
@@ -964,7 +992,8 @@ export default function UnifiedBillingPage() {
               ? waterMinUnit * waterRate
               : wUnits * waterRate)
               
-        const totalAmount = item.baseRent + elecCost + waterCost + commonFee
+        const otherServiceVal = Number(item.otherServiceAmount || 0)
+        const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal
 
         // 1. บันทึกเลขมิเตอร์
         const meterRes = await saveMeterRecord(
@@ -993,7 +1022,8 @@ export default function UnifiedBillingPage() {
           item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
           billingCycle,
           eUnits,
-          wUnits
+          wUnits,
+          otherServiceVal
         )
         if (!billRes.success) {
           alert(`เกิดข้อผิดพลาดในการสร้างบิลห้อง ${item.roomNumber}: ${billRes.error}`)
@@ -1252,7 +1282,8 @@ export default function UnifiedBillingPage() {
       "unpaid",
       billingCycle,
       elecUnitsManual,
-      waterUnitsManual
+      waterUnitsManual,
+      otherServiceAmountManual
     )
     if (res.success) {
       showToast(`สร้างบิลแบบกำหนดเองห้อง ${newRoomNumber} สำเร็จ!`)
@@ -1333,7 +1364,10 @@ export default function UnifiedBillingPage() {
 
           {/* ปุ่มบิลกำหนดเอง (สำหรับแอดมินหรือกรณีฉุกเฉิน) */}
           <button
-            onClick={() => setCreateBillModalOpen(true)}
+            onClick={() => {
+              setOtherServiceAmountManual(0)
+              setCreateBillModalOpen(true)
+            }}
             className={`w-full md:w-auto h-12 md:h-9 px-3.5 rounded-xl flex items-center justify-center md:justify-start gap-1.5 text-sm md:text-xs font-semibold transition-all cursor-pointer shadow-sm ${
               isDark
                 ? "bg-slate-900 hover:bg-slate-850 border-slate-800 hover:border-slate-700 text-slate-300"
@@ -1387,6 +1421,7 @@ export default function UnifiedBillingPage() {
         handleLateDaysChange={handleLateDaysChange}
         handleSaveLateDays={handleSaveLateDays}
         latePenaltyRate={latePenaltyRate}
+        handleOtherServiceChange={handleOtherServiceChange}
       />
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}
@@ -1415,6 +1450,8 @@ export default function UnifiedBillingPage() {
         setElecUnitsManual={setElecUnitsManual}
         waterUnitsManual={waterUnitsManual}
         setWaterUnitsManual={setWaterUnitsManual}
+        otherServiceAmountManual={otherServiceAmountManual}
+        setOtherServiceAmountManual={setOtherServiceAmountManual}
         rentPrice={rentPrice}
         commonFee={commonFee}
         elecRate={elecRate}

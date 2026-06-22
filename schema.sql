@@ -78,6 +78,7 @@ create table public.bills (
   water_units numeric not null default 0,
   penalty_amount numeric not null default 0,
   late_days integer not null default 0,
+  other_service_amount numeric not null default 0,
   created_at timestamptz not null default now()
 );
 
