@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
 import { calculateLateDays } from "@/features/billing/utils"
 
@@ -690,7 +691,34 @@ export async function saveCancelledContract(workspaceId: string, contract: {
 
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Unauthorized - กรุณาเข้าสู่ระบบก่อนดำเนินการ" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, workspace_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile) {
+      return { success: false, error: "ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน" }
+    }
+
+    const isSuperAdmin = profile.role === "super_admin"
+    const isWorkspaceMember = profile.workspace_id === workspaceId && (profile.role === "admin" || profile.role === "staff")
+
+    if (!isSuperAdmin && !isWorkspaceMember) {
+      return { success: false, error: "คุณไม่มีสิทธิ์ในการบันทึกประวัติสำหรับหอพักนี้" }
+    }
+
+    const adminSupabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data, error } = await adminSupabase
       .from("cancelled_contracts")
       .insert([{
         id: contract.id || undefined,
@@ -725,7 +753,44 @@ export async function deleteCancelledContract(id: string) {
 
   try {
     const supabase = await createClient()
-    const { error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Unauthorized - กรุณาเข้าสู่ระบบก่อนดำเนินการ" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, workspace_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile) {
+      return { success: false, error: "ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน" }
+    }
+
+    const adminSupabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data: contract } = await adminSupabase
+      .from("cancelled_contracts")
+      .select("workspace_id")
+      .eq("id", id)
+      .single()
+
+    if (!contract) {
+      return { success: false, error: "ไม่พบข้อมูลประวัติการยกเลิกสัญญา" }
+    }
+
+    const isSuperAdmin = profile.role === "super_admin"
+    const isWorkspaceMember = profile.workspace_id === contract.workspace_id && (profile.role === "admin" || profile.role === "staff")
+
+    if (!isSuperAdmin && !isWorkspaceMember) {
+      return { success: false, error: "คุณไม่มีสิทธิ์ในการลบประวัติสำหรับหอพักนี้" }
+    }
+
+    const { error } = await adminSupabase
       .from("cancelled_contracts")
       .delete()
       .eq("id", id)
@@ -749,6 +814,32 @@ export async function migrateLocalStorageCancelledContracts(workspaceId: string,
 
   try {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Unauthorized - กรุณาเข้าสู่ระบบก่อนดำเนินการ" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, workspace_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile) {
+      return { success: false, error: "ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน" }
+    }
+
+    const isSuperAdmin = profile.role === "super_admin"
+    const isWorkspaceMember = profile.workspace_id === workspaceId && (profile.role === "admin" || profile.role === "staff")
+
+    if (!isSuperAdmin && !isWorkspaceMember) {
+      return { success: false, error: "คุณไม่มีสิทธิ์ในการย้ายข้อมูลสำหรับหอพักนี้" }
+    }
+
+    const adminSupabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     
     const toInsert = contracts.map(contract => ({
       id: contract.id || undefined,
@@ -764,7 +855,7 @@ export async function migrateLocalStorageCancelledContracts(workspaceId: string,
     }))
 
     if (toInsert.length > 0) {
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from("cancelled_contracts")
         .insert(toInsert)
       

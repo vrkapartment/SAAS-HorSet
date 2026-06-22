@@ -741,7 +741,12 @@ export default function RoomsPage() {
         forfeitedAmount: Math.max(0, Number(checkoutDeposit) - Number(checkoutRefund))
       }
 
-      await saveCancelledContract(wsId, newCancellation)
+      const saveRes = await saveCancelledContract(wsId, newCancellation)
+      if (!saveRes.success) {
+        setCheckoutError(saveRes.error || "เกิดข้อผิดพลาดในการบันทึกประวัติการยกเลิกสัญญา")
+        setCheckoutSubmitting(false)
+        return
+      }
 
       // 2. ย้ายออกผู้เช่าออกจากห้องพักใน Supabase
       const res = await deleteTenant(selectedRoom.tenantId, selectedRoom.roomNumber)
