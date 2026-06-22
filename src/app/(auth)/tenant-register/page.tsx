@@ -149,14 +149,6 @@ function TenantRegisterContent() {
 
       setSuccess(true)
 
-      // ทำการปิดหน้าต่าง LINE ทันทีในแอปพลิเคชันหลังสำเร็จ 3 วินาที
-      setTimeout(() => {
-        const liff = (window as any).liff
-        if (liff) {
-          liff.closeWindow()
-        }
-      }, 3000)
-
     } catch (err: any) {
       setError(err.message || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์หลักได้ กรุณาลองใหม่อีกครั้ง")
     } finally {
@@ -184,7 +176,7 @@ function TenantRegisterContent() {
             
             {/* โชว์ความสำเร็จเมื่อสำเร็จ */}
             {success ? (
-              <div className="text-center py-10 space-y-5 animate-in fade-in zoom-in-95 duration-300">
+              <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
                 <div className="inline-flex items-center justify-center p-4 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
                   <CheckCircle2 className="w-14 h-14" />
                 </div>
@@ -193,11 +185,43 @@ function TenantRegisterContent() {
                   <p className="text-slate-400 text-sm font-medium">
                     ยินดีต้อนรับคุณ <strong className="text-emerald-400">{tenantName}</strong> เข้าสู่ระบบ
                   </p>
-                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-                    ระบบผูกข้อมูลห้องพักของคุณเข้ากับบัญชีไลน์นี้เรียบร้อยแล้ว<br />
-                    คุณสามารถรับแจ้งบิลรายเดือนและชำระค่าบริการผ่านไลน์ได้ทันที<br />
-                    <span className="inline-block mt-3 text-emerald-500/70 font-bold">ระบบกำลังพากลับหน้าแชทหลักโดยอัตโนมัติ...</span>
-                  </p>
+                </div>
+
+                <div className="bg-slate-950/50 border border-slate-900/80 rounded-2xl p-5 text-left space-y-4">
+                  <div className="flex gap-2.5 items-start">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold mt-0.5 shrink-0">1</span>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      กดปุ่ม <strong className="text-emerald-400">"เพิ่มเพื่อน LINE OA"</strong> ด้านล่างเพื่อเชื่อมต่อช่องทางรับแจ้งบิล ค่าน้ำ-ค่าไฟ และใบเสร็จรับเงิน (LINE ID: <strong className="text-emerald-400">@423xmlwo</strong>)
+                    </p>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold mt-0.5 shrink-0">2</span>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      หลังจากแอดไลน์เรียบร้อยแล้ว ท่านสามารถกดปุ่ม <strong className="text-slate-500">"เสร็จสิ้นและปิดหน้านี้"</strong> เพื่อทำรายการอื่น ๆ ต่อได้ทันที
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <a
+                    href="https://line.me/R/ti/p/%40423xmlwo"
+                    className="w-full py-3.5 px-6 bg-[#06C755] hover:bg-[#05b04c] text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm transition-all transform active:scale-95 shadow-lg shadow-[#06C755]/15"
+                  >
+                    <MessageSquare className="w-4 h-4 fill-current" />
+                    เพิ่มเพื่อน LINE OA (@423xmlwo)
+                  </a>
+
+                  <button
+                    onClick={() => {
+                      const liff = (window as any).liff
+                      if (liff) {
+                        liff.closeWindow()
+                      }
+                    }}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 font-semibold rounded-2xl flex items-center justify-center gap-1.5 text-xs transition-colors"
+                  >
+                    เสร็จสิ้นและปิดหน้านี้
+                  </button>
                 </div>
               </div>
             ) : (
