@@ -149,6 +149,13 @@ function TenantRegisterContent() {
 
       setSuccess(true)
 
+      // พาลูกค้าเปิดหน้าแอดไลน์แชทบิลอัตโนมัติทันทีหลังจากลงทะเบียนเสร็จ 1.5 วินาที ป้องกันการไม่แอดเพื่อน
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          window.location.href = "https://line.me/R/ti/p/%40423xmlwo"
+        }
+      }, 1500)
+
     } catch (err: any) {
       setError(err.message || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์หลักได้ กรุณาลองใหม่อีกครั้ง")
     } finally {
