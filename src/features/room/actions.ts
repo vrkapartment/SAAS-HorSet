@@ -218,3 +218,19 @@ export async function updateRoomTypeDeposit(id: string, depositAmount: number) {
     return { success: false, error: errorMessage }
   }
 }
+
+export async function migrateRoomTypeDeposits(workspaceId: string, depositsMap: { [key: string]: number }) {
+  try {
+    const supabase = await createClient()
+    for (const [id, amount] of Object.entries(depositsMap)) {
+      await supabase
+        .from("room_types")
+        .update({ deposit_amount: Number(amount) })
+        .eq("id", id)
+    }
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดในการย้ายข้อมูลเงินประกันประเภทห้องพัก" }
+  }
+}
+

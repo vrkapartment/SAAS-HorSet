@@ -36,12 +36,17 @@ import {
   getRoomTypes,
   createRoomType,
   updateRoomType,
-  deleteRoomType
+  deleteRoomType,
+  migrateRoomTypeDeposits
 } from "@/features/room/actions"
 import { 
   createTenant, 
   deleteTenant, 
-  updateTenant 
+  updateTenant,
+  getCancelledContracts,
+  saveCancelledContract,
+  deleteCancelledContract,
+  migrateLocalStorageCancelledContracts
 } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
@@ -165,16 +170,45 @@ export default function RoomsPage() {
     try {
       const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
       
-      // โหลดข้อมูลประวัติยกเลิกสัญญาจาก localStorage
-      const savedCancellations = localStorage.getItem(`cancelled_contracts_${wsId}`)
-      if (savedCancellations) {
+      // โหลดข้อมูลประวัติยกเลิกสัญญาจาก Supabase และย้ายข้อมูลจาก localStorage หากมีอยู่
+      let tempCancellations: any[] = []
+      let hasLocalCancellations = false
+      if (typeof window !== "undefined") {
         try {
-          setCancelledContracts(JSON.parse(savedCancellations))
+          const savedCancellations = localStorage.getItem(`cancelled_contracts_${wsId}`)
+          if (savedCancellations) {
+            tempCancellations = JSON.parse(savedCancellations)
+            hasLocalCancellations = true
+          }
         } catch (e) {
-          console.error("Failed to parse saved cancellations", e)
+          console.error("Failed to parse saved cancellations from localStorage", e)
         }
+      }
+
+      if (hasLocalCancellations && tempCancellations.length > 0) {
+        // ย้ายข้อมูลไปยัง Supabase
+        migrateLocalStorageCancelledContracts(wsId, tempCancellations).then(async (migrated) => {
+          if (migrated.success) {
+            localStorage.removeItem(`cancelled_contracts_${wsId}`)
+            console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
+            const res = await getCancelledContracts(wsId)
+            if (res.success && res.data) {
+              setCancelledContracts(res.data)
+            }
+          } else if (migrated.error === "table_not_found") {
+            setCancelledContracts(tempCancellations)
+            console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
+          }
+        })
       } else {
-        setCancelledContracts([])
+        getCancelledContracts(wsId).then(res => {
+          if (res.success && res.data) {
+            setCancelledContracts(res.data)
+          } else if (res.error === "table_not_found") {
+            console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
+            setCancelledContracts([])
+          }
+        })
       }
 
       // ดึงข้อมูลตั้งค่าการเงินและบัญชีรับเงิน (เพื่อใช้แสดงค่ามัดจำ/ค่าเช่าล่วงหน้าในโมดอลลิงก์)
@@ -225,32 +259,44 @@ export default function RoomsPage() {
     loadData()
   }, [])
 
-  // ซิงค์ค่ามัดจำ/เงินประกันแยกตามประเภทห้องจาก Local Storage หรือ Database
+  // ซิงค์ค่ามัดจำ/เงินประกันแยกตามประเภทห้องจาก Database และย้ายข้อมูลหากยังมีใน Local Storage
   useEffect(() => {
     const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
     let localRtDeposits: { [key: string]: number } = {}
+    let hasLocalSaved = false
     if (typeof window !== "undefined") {
       try {
         const localSaved = localStorage.getItem(`room_type_deposits_${wsId}`)
         if (localSaved) {
           localRtDeposits = JSON.parse(localSaved)
+          hasLocalSaved = true
         }
       } catch (e) {
         console.error("Failed to parse local room type deposits", e)
       }
     }
     
-    // Merge กับค่าจาก DB (deposit_amount บน room_types) หากมีและยังไม่มีใน localStorage
+    if (hasLocalSaved && Object.keys(localRtDeposits).length > 0) {
+      migrateRoomTypeDeposits(wsId, localRtDeposits).then(migrated => {
+        if (migrated.success) {
+          localStorage.removeItem(`room_type_deposits_${wsId}`)
+          console.log("Successfully migrated room type deposits to Supabase and deleted local storage cache")
+        }
+      })
+    }
+
+    // สร้างข้อมูลเงินประกันจาก DB เท่านั้น
+    const dbDeposits: { [key: string]: number } = {}
     roomTypes.forEach((rt: any) => {
       if (rt.deposit_amount !== undefined && rt.deposit_amount !== null) {
-        if (localRtDeposits[rt.id] === undefined) {
-          localRtDeposits[rt.id] = rt.deposit_amount
-        }
+        dbDeposits[rt.id] = rt.deposit_amount
+      } else {
+        dbDeposits[rt.id] = localRtDeposits[rt.id] || (financeSettings?.deposit_amount || 5000)
       }
     })
     
-    setRoomTypeDeposits(localRtDeposits)
-  }, [roomTypes])
+    setRoomTypeDeposits(dbDeposits)
+  }, [roomTypes, financeSettings])
 
   // สลับประเภทห้องในหน้าจอฟอร์มห้องพัก -> ดึงราคาอัตโนมัติ
   const handleRoomTypeChange = (typeId: string) => {
@@ -683,12 +729,11 @@ export default function RoomsPage() {
     try {
       const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
       
-      // 1. บันทึกประวัติการยกเลิกสัญญาเพื่อใช้คำนวณภาษีเงินได้ประเภท 40(8) ที่ริบไว้
+      // 1. บันทึกประวัติการยกเลิกสัญญาเพื่อใช้คำนวณภาษีเงินได้ประเภท 40(8) ที่ริบไว้ใน Supabase
       const newCancellation = {
-        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
         tenantId: selectedRoom.tenantId,
         roomNumber: selectedRoom.roomNumber,
-        tenantName: selectedRoom.tenantName,
+        tenantName: selectedRoom.tenantName || "",
         cancellationDate: checkoutDate,
         depositAmount: Number(checkoutDeposit),
         refundedAmount: Number(checkoutRefund),
@@ -696,18 +741,7 @@ export default function RoomsPage() {
         forfeitedAmount: Math.max(0, Number(checkoutDeposit) - Number(checkoutRefund))
       }
 
-      let savedCancellations: any[] = []
-      const localData = localStorage.getItem(`cancelled_contracts_${wsId}`)
-      if (localData) {
-        try {
-          savedCancellations = JSON.parse(localData)
-        } catch (e) {
-          console.error("Failed to parse saved cancellations from localStorage", e)
-        }
-      }
-
-      savedCancellations = [newCancellation, ...savedCancellations]
-      localStorage.setItem(`cancelled_contracts_${wsId}`, JSON.stringify(savedCancellations))
+      await saveCancelledContract(wsId, newCancellation)
 
       // 2. ย้ายออกผู้เช่าออกจากห้องพักใน Supabase
       const res = await deleteTenant(selectedRoom.tenantId, selectedRoom.roomNumber)
@@ -728,13 +762,17 @@ export default function RoomsPage() {
 
 
   // ลบประวัติการยกเลิกสัญญา มาตรา 40(8)
-  const handleDeleteCancellation = (id: string) => {
+  const handleDeleteCancellation = async (id: string) => {
     if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการยกเลิกสัญญานี้? สำหรับยอดภาษีจะคำนวณใหม่โดยอัตโนมัติ")) return
     const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
-    const updated = cancelledContracts.filter(c => c.id !== id)
-    setCancelledContracts(updated)
-    localStorage.setItem(`cancelled_contracts_${wsId}`, JSON.stringify(updated))
-    showToast("✓ ลบประวัติการยกเลิกสัญญาเรียบร้อยแล้ว", "success")
+    const res = await deleteCancelledContract(id)
+    if (res.success || res.error === "table_not_found") {
+      const updated = cancelledContracts.filter(c => c.id !== id)
+      setCancelledContracts(updated)
+      showToast("✓ ลบประวัติการยกเลิกสัญญาเรียบร้อยแล้ว", "success")
+    } else {
+      showToast(`✗ ไม่สามารถลบข้อมูลได้: ${res.error}`, "error")
+    }
   }
 
   // คำนวณสถานะสัญญาเช่าผู้เช่า (สัญญาปกติ / เหลืออายุสัญญา X เดือน / สัญญาหมดอายุ / อยู่ครบสัญญา)

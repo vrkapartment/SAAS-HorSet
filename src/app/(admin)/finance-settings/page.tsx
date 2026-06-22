@@ -6,7 +6,7 @@ import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/feat
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
-import { getRoomTypes, updateRoomTypeDeposit } from "@/features/room/actions"
+import { getRoomTypes, updateRoomTypeDeposit, migrateRoomTypeDeposits } from "@/features/room/actions"
 
 function setCookie(name: string, value: string, days = 7) {
   if (typeof document === "undefined") return
@@ -324,23 +324,34 @@ export default function FinanceSettingsPage() {
             }
           }
 
-          // Build roomTypeDeposits map from local storage and DB fields
+          // Build roomTypeDeposits map from DB fields and migrate from localStorage if present
           let rtDeposits: { [key: string]: number } = {}
+          let hasLocalSaved = false
           if (typeof window !== "undefined") {
             try {
               const localSaved = localStorage.getItem(`room_type_deposits_${currentWsId}`)
               if (localSaved) {
                 rtDeposits = JSON.parse(localSaved)
+                hasLocalSaved = true
               }
             } catch (err) {
               console.error("Failed to parse local room type deposits", err)
             }
           }
+
+          if (hasLocalSaved && Object.keys(rtDeposits).length > 0) {
+            // Migrate to database
+            migrateRoomTypeDeposits(currentWsId, rtDeposits).then(migrated => {
+              if (migrated.success) {
+                localStorage.removeItem(`room_type_deposits_${currentWsId}`)
+                console.log("Successfully migrated room type deposits to Supabase and deleted local storage cache")
+              }
+            })
+          }
+
           fetchedRoomTypes.forEach((rt: any) => {
             if (rt.deposit_amount !== undefined && rt.deposit_amount !== null) {
-              if (rtDeposits[rt.id] === undefined) {
-                rtDeposits[rt.id] = rt.deposit_amount
-              }
+              rtDeposits[rt.id] = rt.deposit_amount
             } else {
               if (rtDeposits[rt.id] === undefined) {
                 rtDeposits[rt.id] = currentDepositType === "fixed" ? currentDepositAmount : 5000
@@ -413,9 +424,6 @@ export default function FinanceSettingsPage() {
       if (res.success) {
         // บันทึกเงินประกันแยกตามประเภทห้องพัก
         if (roomTypes.length > 0) {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(`room_type_deposits_${workspaceId}`, JSON.stringify(roomTypeDeposits))
-          }
           for (const rt of roomTypes) {
             const amt = roomTypeDeposits[rt.id] !== undefined ? roomTypeDeposits[rt.id] : depositAmount
             try {

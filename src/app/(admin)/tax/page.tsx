@@ -40,7 +40,7 @@ import { getFinanceSettings } from "@/features/finance/actions"
 import { getRooms } from "@/features/room/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getBills } from "@/features/billing/actions"
-import { getTenants } from "@/features/tenant/actions"
+import { getTenants, getCancelledContracts, migrateLocalStorageCancelledContracts } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 interface BillItem {
@@ -146,14 +146,45 @@ export default function TaxPage() {
         if (currentWsId) {
           setWorkspaceId(currentWsId)
 
-          // โหลดข้อมูลประวัติยกเลิกสัญญาจาก localStorage
-          const savedCancellations = localStorage.getItem(`cancelled_contracts_${currentWsId}`)
-          if (savedCancellations) {
+          // โหลดข้อมูลประวัติยกเลิกสัญญาจาก Supabase และย้ายข้อมูลหากยังมีใน Local Storage
+          let tempCancellations: any[] = []
+          let hasLocalCancellations = false
+          if (typeof window !== "undefined") {
             try {
-              setCancelledContracts(JSON.parse(savedCancellations))
+              const savedCancellations = localStorage.getItem(`cancelled_contracts_${currentWsId}`)
+              if (savedCancellations) {
+                tempCancellations = JSON.parse(savedCancellations)
+                hasLocalCancellations = true
+              }
             } catch (e) {
-              console.error("Failed to parse saved cancellations", e)
+              console.error("Failed to parse saved cancellations from localStorage", e)
             }
+          }
+
+          if (hasLocalCancellations && tempCancellations.length > 0) {
+            // ย้ายข้อมูลไปยัง Supabase
+            migrateLocalStorageCancelledContracts(currentWsId, tempCancellations).then(async (migrated) => {
+              if (migrated.success) {
+                localStorage.removeItem(`cancelled_contracts_${currentWsId}`)
+                console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
+                const res = await getCancelledContracts(currentWsId!)
+                if (res.success && res.data) {
+                  setCancelledContracts(res.data)
+                }
+              } else if (migrated.error === "table_not_found") {
+                setCancelledContracts(tempCancellations)
+                console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
+              }
+            })
+          } else {
+            getCancelledContracts(currentWsId).then(res => {
+              if (res.success && res.data) {
+                setCancelledContracts(res.data)
+              } else if (res.error === "table_not_found") {
+                console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
+                setCancelledContracts([])
+              }
+            })
           }
 
           // 1. โหลดข้อมูลผู้เสียภาษีและการเงิน

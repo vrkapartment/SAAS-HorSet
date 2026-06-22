@@ -558,4 +558,154 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
   }
 }
 
+export async function getCancelledContracts(workspaceId: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true, data: [] }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("cancelled_contracts")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      if (error.code === "42P01") {
+        console.warn("Table cancelled_contracts does not exist. Please run the SQL patch.")
+        return { success: false, error: "table_not_found", data: [] }
+      }
+      throw error
+    }
+
+    const formatted = data.map((item: any) => ({
+      id: item.id,
+      tenantId: item.tenant_id,
+      roomNumber: item.room_number,
+      tenantName: item.tenant_name,
+      cancellationDate: item.cancellation_date,
+      depositAmount: Number(item.deposit_amount || 0),
+      refundedAmount: Number(item.refunded_amount || 0),
+      actualRefund: Number(item.actual_refund !== null && item.actual_refund !== undefined ? item.actual_refund : (item.refunded_amount || 0)),
+      forfeitedAmount: Number(item.forfeited_amount || 0)
+    }))
+
+    return { success: true, data: formatted }
+  } catch (error: any) {
+    const errorMessage = error?.message || "เกิดข้อผิดพลาดในการดึงประวัติการยกเลิกสัญญา"
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function saveCancelledContract(workspaceId: string, contract: {
+  id?: string
+  tenantId: string | null
+  roomNumber: string
+  tenantName: string
+  cancellationDate: string
+  depositAmount: number
+  refundedAmount: number
+  actualRefund?: number
+  forfeitedAmount: number
+}) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("cancelled_contracts")
+      .insert([{
+        id: contract.id || undefined,
+        workspace_id: workspaceId,
+        tenant_id: contract.tenantId || null,
+        room_number: contract.roomNumber,
+        tenant_name: contract.tenantName,
+        cancellation_date: contract.cancellationDate,
+        deposit_amount: contract.depositAmount,
+        refunded_amount: contract.refundedAmount,
+        actual_refund: contract.actualRefund !== undefined ? contract.actualRefund : contract.refundedAmount,
+        forfeited_amount: contract.forfeitedAmount
+      }])
+      .select()
+
+    if (error) {
+      if (error.code === "42P01") {
+        return { success: false, error: "table_not_found" }
+      }
+      throw error
+    }
+    return { success: true, data: data[0] }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดในการบันทึกประวัติการยกเลิกสัญญา" }
+  }
+}
+
+export async function deleteCancelledContract(id: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from("cancelled_contracts")
+      .delete()
+      .eq("id", id)
+
+    if (error) {
+      if (error.code === "42P01") {
+        return { success: false, error: "table_not_found" }
+      }
+      throw error
+    }
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดในการลบประวัติการยกเลิกสัญญา" }
+  }
+}
+
+export async function migrateLocalStorageCancelledContracts(workspaceId: string, contracts: any[]) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    
+    const toInsert = contracts.map(contract => ({
+      id: contract.id || undefined,
+      workspace_id: workspaceId,
+      tenant_id: contract.tenantId || null,
+      room_number: contract.roomNumber || "",
+      tenant_name: contract.tenantName || "",
+      cancellation_date: contract.cancellationDate || "",
+      deposit_amount: Number(contract.depositAmount || 0),
+      refunded_amount: Number(contract.refundedAmount || 0),
+      actual_refund: Number(contract.actualRefund !== undefined ? contract.actualRefund : (contract.refundedAmount || 0)),
+      forfeited_amount: Number(contract.forfeitedAmount || 0)
+    }))
+
+    if (toInsert.length > 0) {
+      const { error } = await supabase
+        .from("cancelled_contracts")
+        .insert(toInsert)
+      
+      if (error) {
+        if (error.code === "42P01") {
+          return { success: false, error: "table_not_found" }
+        }
+        throw error
+      }
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดในการย้ายข้อมูลประวัติการยกเลิกสัญญา" }
+  }
+}
+
+
 
