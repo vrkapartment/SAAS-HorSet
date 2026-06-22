@@ -42,10 +42,11 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (tenantPaths.includes(path) && mockRole !== "tenant") {
-    // อนุญาตให้ผู้เช่าเข้าหน้า /portal ได้โดยไม่ต้อง Login หากเข้าผ่านลิงก์ตรงจากไลน์ (มี workspace_id และ room_number)
+    // อนุญาตให้ผู้เช่าเข้าหน้า /portal ได้โดยไม่ต้อง Login หากเข้าผ่านลิงก์ตรงจากไลน์ (มี workspace_id, room_number และ token ที่มีความปลอดภัย)
     const workspaceId = request.nextUrl.searchParams.get("workspace_id")
     const roomNumber = request.nextUrl.searchParams.get("room_number")
-    const isLoginFreePortal = workspaceId && roomNumber
+    const token = request.nextUrl.searchParams.get("token")
+    const isLoginFreePortal = workspaceId && roomNumber && token
 
     if (!isLoginFreePortal) {
       const url = request.nextUrl.clone()

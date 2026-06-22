@@ -78,6 +78,27 @@ create table if not exists public.support_access_grants (
   updated_at timestamptz
 );
 
+-- 4.1 Create Cancelled Contracts Table for lease termination deposit forfeiture tax history
+create table if not exists public.cancelled_contracts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references public.workspaces(id) on delete cascade,
+  tenant_id uuid,
+  room_number varchar(50),
+  tenant_name varchar(255),
+  cancellation_date varchar(50),
+  deposit_amount numeric default 0,
+  refunded_amount numeric default 0,
+  actual_refund numeric default 0,
+  forfeited_amount numeric default 0,
+  created_at timestamptz default now()
+);
+
+-- Index for fast queries by workspace_id
+create index if not exists cancelled_contracts_workspace_id_idx on public.cancelled_contracts(workspace_id);
+
+comment on table public.cancelled_contracts is 'Stores historical lease termination and forfeited/refunded deposit tax records';
+
+
 -- =========================================================================
 -- 5. Trigger to Automatically Populate workspace_id on New Inserts
 -- =========================================================================
@@ -123,6 +144,11 @@ create trigger trg_expenses_workspace
   before insert on public.expenses
   for each row execute procedure public.populate_workspace_id();
 
+drop trigger if exists trg_cancelled_contracts_workspace on public.cancelled_contracts;
+create trigger trg_cancelled_contracts_workspace
+  before insert on public.cancelled_contracts
+  for each row execute procedure public.populate_workspace_id();
+
 
 -- =========================================================================
 -- 6. Set up Row Level Security (RLS) & Policies
@@ -131,6 +157,7 @@ create trigger trg_expenses_workspace
 -- Enable RLS on new tables
 alter table public.workspaces enable row level security;
 alter table public.support_access_grants enable row level security;
+alter table public.cancelled_contracts enable row level security;
 
 -- Drop all old policies to avoid duplicate name conflicts
 drop policy if exists "Admin has full access on room_types" on public.room_types;
@@ -172,6 +199,8 @@ drop policy if exists "Read bills in workspace or support approved" on public.bi
 drop policy if exists "Manage bills in workspace or support approved" on public.bills;
 drop policy if exists "Read expenses in workspace or support approved" on public.expenses;
 drop policy if exists "Manage expenses in workspace or support approved" on public.expenses;
+drop policy if exists "Read cancelled_contracts in workspace or support approved" on public.cancelled_contracts;
+drop policy if exists "Manage cancelled_contracts in workspace or support approved" on public.cancelled_contracts;
 
 
 -- ==================== SECURITY DEFINER HELPERS ====================
@@ -402,6 +431,29 @@ using (
   )
 );
 
+
+-- ==================== CANCELLED CONTRACTS POLICIES ====================
+create policy "Read cancelled_contracts in workspace or support approved" 
+on public.cancelled_contracts for select 
+using (
+  workspace_id = public.get_current_user_workspace_id()
+  or (
+    public.get_current_user_role() = 'super_admin'
+    and exists (select 1 from public.support_access_grants where workspace_id = cancelled_contracts.workspace_id and status = 'approved')
+  )
+);
+
+create policy "Manage cancelled_contracts in workspace or support approved" 
+on public.cancelled_contracts for all 
+using (
+  (workspace_id = public.get_current_user_workspace_id() and public.get_current_user_role() in ('admin', 'staff'))
+  or (
+    public.get_current_user_role() = 'super_admin'
+    and exists (select 1 from public.support_access_grants where workspace_id = cancelled_contracts.workspace_id and status = 'approved')
+  )
+);
+
+
 -- =========================================================================
 -- 7. Trigger for profiles: sync workspace_id during new user sign up
 -- =========================================================================
@@ -503,6 +555,7 @@ create index if not exists idx_tenants_workspace_id on public.tenants (workspace
 create index if not exists idx_meter_records_workspace_id on public.meter_records (workspace_id);
 create index if not exists idx_bills_workspace_id on public.bills (workspace_id);
 create index if not exists idx_expenses_workspace_id on public.expenses (workspace_id);
+create index if not exists idx_cancelled_contracts_workspace_id on public.cancelled_contracts (workspace_id);
 
 -- Indexes for join relationships and lookups
 create index if not exists idx_tenants_room_id on public.tenants (room_id);

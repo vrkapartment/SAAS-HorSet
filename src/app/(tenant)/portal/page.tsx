@@ -95,18 +95,20 @@ export default function TenantPortal() {
     }
     let wsId = ""
     let rNum = ""
+    let token = ""
     
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search)
       wsId = searchParams.get("workspace_id") || ""
       rNum = searchParams.get("room_number") || ""
+      token = searchParams.get("token") || ""
     }
 
     try {
       let res
       if (wsId && rNum) {
         setIsLoginFree(true)
-        res = await getTenantPortalDataNoLoginAction(wsId, rNum)
+        res = await getTenantPortalDataNoLoginAction(wsId, rNum, token)
       } else {
         setIsLoginFree(false)
         res = await getTenantPortalData()

@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
+import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
 
 interface MeterReadingTableProps {
   isDark: boolean
@@ -120,7 +121,7 @@ export default function MeterReadingTable({
   }
 
   // ฟังก์ชันสำหรับคัดลอกข้อมูลใบแจ้งหนี้แบบสรุป เพื่ออำนวยความสะดวกในห้องที่ไม่ได้ผูก LINE UID
-  const handleCopySummary = (item: any) => {
+  const handleCopySummary = async (item: any) => {
     if (!permissions.billing_copy_summary) {
       alert("คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
       return
@@ -131,10 +132,19 @@ export default function MeterReadingTable({
     const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
     const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
 
-    const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
-    const portalLink = currentWorkspaceId
-      ? `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_number=${encodeURIComponent(item.roomNumber)}`
-      : `${safeAppUrl}/portal`
+    let portalLink = ""
+    if (currentWorkspaceId) {
+      const res = await generateSecurePortalLinkAction(currentWorkspaceId, item.roomNumber)
+      if (res.success && res.link) {
+        portalLink = res.link
+      } else {
+        const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
+        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_number=${encodeURIComponent(item.roomNumber)}`
+      }
+    } else {
+      const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
+      portalLink = `${safeAppUrl}/portal`
+    }
 
     const thaiCycle = formatBillingCycleThaiLocal(billingCycle)
     const otherServiceAmt = Number(item.otherServiceAmount || 0)

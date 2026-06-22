@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { generatePortalToken } from "@/features/tenant/actions"
 
 /**
  * ฟังก์ชันจำลองสำหรับระบบส่งข้อความแจ้งเตือนผ่าน LINE Messaging API (เก็บไว้เพื่อความเสถียรของระบบเก่า)
@@ -92,9 +93,10 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
     const safeCommonFee = typeof commonFee === "number" && !isNaN(commonFee) ? commonFee : 0
     const safeTotalAmount = typeof totalAmount === "number" && !isNaN(totalAmount) ? totalAmount : 0
 
-    // สร้างลิงก์เข้าดูบิลตรงแบบไม่ต้องล็อกอิน (โดยระบุ workspace_id และ room_number)
+    // สร้างลิงก์เข้าดูบิลตรงแบบไม่ต้องล็อกอิน (โดยระบุ workspace_id, room_number และ token ที่มีความปลอดภัยป้องกัน IDOR)
+    const token = workspaceId ? await generatePortalToken(workspaceId, safeRoomNumber) : ""
     const portalLink = workspaceId
-      ? `${safeAppUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(safeRoomNumber)}`
+      ? `${safeAppUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(safeRoomNumber)}&token=${token}`
       : `${safeAppUrl}/portal`
 
     // สร้างข้อความสำรองสำหรับหน้าจอแจ้งเตือน (Notification / Lock Screen)

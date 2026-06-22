@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import crypto from "crypto"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -403,10 +404,55 @@ export async function getTenantPortalData() {
 }
 
 /**
- * ดึงข้อมูลบิลและค่าใช้จ่ายแบบไม่ต้อง Login โดยอาศัยรหัสความปลอดภัยร่วมกัน (workspaceId + roomNumber)
+ * ฟังก์ชันช่วยสร้างและตรวจสอบ Token ลิงก์ดูบิลแบบไม่ล็อกอิน (เพื่อป้องกัน IDOR)
  */
-export async function getTenantPortalDataNoLoginAction(workspaceId: string, roomNumber: string) {
+function getSignatureSecret() {
+  return process.env.PORTAL_SIGNATURE_SECRET || process.env.LINE_CHANNEL_SECRET || "horset-portal-signature-secret-key-fallback"
+}
+
+export async function generatePortalToken(workspaceId: string, roomNumber: string): Promise<string> {
+  const secret = getSignatureSecret()
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`${workspaceId}:${roomNumber}`)
+    .digest("hex")
+}
+
+export async function verifyPortalToken(workspaceId: string, roomNumber: string, token: string): Promise<boolean> {
+  if (!token) return false
+  const expectedToken = await generatePortalToken(workspaceId, roomNumber)
   try {
+    return crypto.timingSafeEqual(Buffer.from(token, "utf-8"), Buffer.from(expectedToken, "utf-8"))
+  } catch {
+    return token === expectedToken
+  }
+}
+
+export async function generateSecurePortalLinkAction(workspaceId: string, roomNumber: string) {
+  try {
+    const token = await generatePortalToken(workspaceId, roomNumber)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || ""
+    const link = `${appUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(roomNumber)}&token=${token}`
+    return { success: true, link }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * ดึงข้อมูลบิลและค่าใช้จ่ายแบบไม่ต้อง Login โดยอาศัยรหัสความปลอดภัยร่วมกัน (workspaceId + roomNumber + token เพื่อความปลอดภัย)
+ */
+export async function getTenantPortalDataNoLoginAction(workspaceId: string, roomNumber: string, token?: string) {
+  try {
+    if (!token) {
+      return { success: false, error: "กรุณาระบุรหัสความปลอดภัยในการเข้าถึงข้อมูล (Missing signature token)" }
+    }
+
+    const isValid = await verifyPortalToken(workspaceId, roomNumber, token)
+    if (!isValid) {
+      return { success: false, error: "ลิงก์ดูข้อมูลบิลไม่ถูกต้องหรือไม่ได้รับอนุญาต (Invalid signature token)" }
+    }
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
