@@ -2,9 +2,11 @@
 -- Security Patch: Secure Registration Codes & Prevent Data Leak (High 🟠)
 -- =========================================================================
 
--- 1. Create or replace the verification function as SECURITY DEFINER
+-- 1. Drop existing function first to avoid 42P13 return type change error, then create as SECURITY DEFINER
 -- This allows unauthenticated users to verify a specific code securely through RPC
 -- without needing direct SELECT access to the entire registration_codes table.
+drop function if exists public.verify_registration_code(text);
+
 create or replace function public.verify_registration_code(input_code text)
 returns table (
   code text,
