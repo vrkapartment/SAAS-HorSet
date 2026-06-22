@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare } from "lucide-react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare, Edit3, Lock } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
 
@@ -89,6 +89,7 @@ export default function MeterReadingTable({
   const [bulkSendingProgress, setBulkSendingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
   const [bulkSendResults, setBulkSendResults] = useState<{ [room: string]: { success: boolean; error?: string } }>({})
   const [copiedRooms, setCopiedRooms] = useState<{ [room: string]: boolean }>({})
+  const [unlockedPaidRooms, setUnlockedPaidRooms] = useState<Record<string, boolean>>({})
 
   // กรองห้องที่มีผู้เช่าและออกบิลประจำรอบนั้นแล้ว (ไม่รวมห้องว่าง หรือยังไม่ออกบิล)
   const activeRooms = unifiedItems.filter(item => item.tenantName && item.billStatus !== "not_created")
@@ -428,7 +429,8 @@ export default function MeterReadingTable({
                                 <input
                                   type="text"
                                   inputMode="numeric"
-                                  className={`w-24 text-right pr-1.5 py-0.5 border rounded font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-bold ${
+                                  disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                  className={`w-24 text-right pr-1.5 py-0.5 border rounded font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-bold disabled:opacity-60 disabled:cursor-not-allowed ${
                                     isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                   }`}
                                   value={item.billAmount !== undefined ? item.billAmount : 0}
@@ -531,7 +533,8 @@ export default function MeterReadingTable({
                               type="text"
                               inputMode="numeric"
                               placeholder="0"
-                              className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold ${
+                              disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                              className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                 isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                               }`}
                               value={item.lateDays !== undefined ? item.lateDays : 0}
@@ -560,7 +563,8 @@ export default function MeterReadingTable({
                               type="text"
                               inputMode="numeric"
                               placeholder="0"
-                              className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                              disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                              className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                 isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                               }`}
                               value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
@@ -611,7 +615,8 @@ export default function MeterReadingTable({
                             type="text"
                             inputMode="decimal"
                             placeholder="จดเลขมิเตอร์ไฟฟ้า..."
-                            className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 ${
+                            disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                            className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
                               isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
                             }`}
                             value={item.elecCurr}
@@ -639,7 +644,12 @@ export default function MeterReadingTable({
                       </div>
 
                       <button
-                        onClick={() => handleSaveRow(item.roomNumber, "electric")}
+                        onClick={async () => {
+                          await handleSaveRow(item.roomNumber, "electric");
+                          if (item.billStatus === "paid") {
+                            setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                          }
+                        }}
                         disabled={isSaveDisabled}
                         className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                           isSaveDisabled
@@ -684,7 +694,8 @@ export default function MeterReadingTable({
                             type="text"
                             inputMode="decimal"
                             placeholder="จดเลขมิเตอร์น้ำประปา..."
-                            className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                            disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                            className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
                             value={item.waterCurr}
                             onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
                           />
@@ -710,7 +721,12 @@ export default function MeterReadingTable({
                       </div>
 
                       <button
-                        onClick={() => handleSaveRow(item.roomNumber, "water")}
+                        onClick={async () => {
+                          await handleSaveRow(item.roomNumber, "water");
+                          if (item.billStatus === "paid") {
+                            setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                          }
+                        }}
                         disabled={isSaveDisabled}
                         className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                           isSaveDisabled
@@ -728,7 +744,12 @@ export default function MeterReadingTable({
                     <div className="pt-2 space-y-2">
                       {item.isEdited ? (
                         <button
-                          onClick={() => handleSaveLateDays?.(item.roomNumber)}
+                          onClick={async () => {
+                            await handleSaveLateDays?.(item.roomNumber);
+                            if (item.billStatus === "paid") {
+                              setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                            }
+                          }}
                           className="w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/30 text-white shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
                         >
                           <Save className="w-4 h-4" /> บันทึกบิล
@@ -759,6 +780,36 @@ export default function MeterReadingTable({
                             >
                               <CheckCircle className={`w-4 h-4 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
                               <span>รับเงินสด / บันทึกชำระเงินตรง</span>
+                            </button>
+                          )}
+
+                          {/* ปุ่มแก้ไขบิลสำหรับบิลที่ชำระเงินแล้ว */}
+                          {item.billStatus === "paid" && (
+                            <button
+                              onClick={() => {
+                                const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomNumber];
+                                setUnlockedPaidRooms(prev => ({
+                                  ...prev,
+                                  [item.roomNumber]: !isCurrentlyUnlocked
+                                }));
+                              }}
+                              className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                unlockedPaidRooms[item.roomNumber]
+                                  ? "bg-rose-600 hover:bg-rose-500 border border-rose-500/30 text-white shadow-lg shadow-rose-600/10 active:scale-[0.98]"
+                                  : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
+                              }`}
+                            >
+                              {unlockedPaidRooms[item.roomNumber] ? (
+                                <>
+                                  <X className="w-4 h-4" />
+                                  <span>ยกเลิกแก้ไข</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Edit3 className="w-4 h-4" />
+                                  <span>แก้ไขบิล</span>
+                                </>
+                              )}
                             </button>
                           )}
                         </div>
@@ -937,7 +988,8 @@ export default function MeterReadingTable({
                                   type="text"
                                   inputMode="numeric"
                                   placeholder="0"
-                                  className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                                  disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                  className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                     isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                   }`}
                                   value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
@@ -959,7 +1011,8 @@ export default function MeterReadingTable({
                                     type="text"
                                     inputMode="numeric"
                                     placeholder="0"
-                                    className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold ${
+                                    disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                    className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                       isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                     }`}
                                     value={item.lateDays !== undefined ? item.lateDays : 0}
@@ -987,7 +1040,8 @@ export default function MeterReadingTable({
                                     <input
                                       type="text"
                                       inputMode="numeric"
-                                      className={`w-28 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-black ${
+                                      disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                      className={`w-28 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-black disabled:opacity-60 disabled:cursor-not-allowed ${
                                         isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                       }`}
                                       value={item.billAmount !== undefined ? item.billAmount : 0}
@@ -1043,7 +1097,12 @@ export default function MeterReadingTable({
                             <div className="flex items-center justify-center gap-1.5">
                               {item.isEdited ? (
                                 <button
-                                  onClick={() => handleSaveLateDays?.(item.roomNumber)}
+                                  onClick={async () => {
+                                    await handleSaveLateDays?.(item.roomNumber);
+                                    if (item.billStatus === "paid") {
+                                      setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                                    }
+                                  }}
                                   className={`p-1.5 rounded-xl border transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer ${
                                     isDark
                                       ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 hover:text-white"
@@ -1093,6 +1152,41 @@ export default function MeterReadingTable({
                                       </span>
                                     </button>
                                   )}
+
+                                  {/* ปุ่มแก้ไขบิลสำหรับบิลที่ชำระเงินแล้ว */}
+                                  {item.billStatus === "paid" && (
+                                    <button
+                                      onClick={() => {
+                                        const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomNumber];
+                                        setUnlockedPaidRooms(prev => ({
+                                          ...prev,
+                                          [item.roomNumber]: !isCurrentlyUnlocked
+                                        }));
+                                      }}
+                                      className={`p-1.5 rounded-xl border transition-all font-semibold text-xs flex items-center gap-1 hover:scale-105 cursor-pointer ${
+                                        unlockedPaidRooms[item.roomNumber]
+                                          ? isDark
+                                            ? "bg-rose-500/20 text-rose-400 border-rose-500/30 hover:bg-rose-500 hover:text-white"
+                                            : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-500 hover:text-white"
+                                          : isDark
+                                            ? "bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500 hover:text-white"
+                                            : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-500 hover:text-white"
+                                      }`}
+                                      title={unlockedPaidRooms[item.roomNumber] ? "ล็อกการแก้ไขบิล" : "ปลดล็อกเพื่อแก้ไขรายละเอียดบิล"}
+                                    >
+                                      {unlockedPaidRooms[item.roomNumber] ? (
+                                        <>
+                                          <X className="w-3.5 h-3.5" />
+                                          <span className="text-[10px] font-bold">ยกเลิกแก้ไข</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Edit3 className="w-3.5 h-3.5" />
+                                          <span className="text-[10px] font-bold">แก้ไขบิล</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
                                 </>
                               ) : (
                                 <span className="text-[10px] text-slate-400 italic">ยังไม่ออกบิล</span>
@@ -1133,7 +1227,8 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 placeholder="กรอกเลข"
-                                className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold ${
+                                disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                 }`}
                                 value={item.elecCurr}
@@ -1162,7 +1257,12 @@ export default function MeterReadingTable({
                           {/* บันทึก */}
                           <td className="py-4 text-center pr-2">
                             <button
-                              onClick={() => handleSaveRow(item.roomNumber, "electric")}
+                              onClick={async () => {
+                                await handleSaveRow(item.roomNumber, "electric");
+                                if (item.billStatus === "paid") {
+                                  setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                                }
+                              }}
                               disabled={isSaveDisabled}
                               className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
                                 isSaveDisabled
@@ -1208,7 +1308,8 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 placeholder="กรอกเลข"
-                                className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold ${
+                                disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                 }`}
                                 value={item.waterCurr}
@@ -1237,7 +1338,12 @@ export default function MeterReadingTable({
                           {/* บันทึก */}
                           <td className="py-4 text-center pr-2">
                             <button
-                              onClick={() => handleSaveRow(item.roomNumber, "water")}
+                              onClick={async () => {
+                                await handleSaveRow(item.roomNumber, "water");
+                                if (item.billStatus === "paid") {
+                                  setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                                }
+                              }}
                               disabled={isSaveDisabled}
                               className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
                                 isSaveDisabled
@@ -1269,7 +1375,10 @@ export default function MeterReadingTable({
         {!loading && unifiedItems.length > 0 && activeTab !== "all" && (
           <div className="mt-8 flex justify-center px-4 md:px-0 pb-4">
             <button
-              onClick={() => handleSaveAll(activeTab as "electric" | "water")}
+              onClick={async () => {
+                await handleSaveAll(activeTab as "electric" | "water");
+                setUnlockedPaidRooms({});
+              }}
               className={`w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg transition-all cursor-pointer active:scale-[0.98] border animate-pulse hover:animate-none ${
                 activeTab === "electric"
                   ? "from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-600/20 hover:shadow-blue-500/30 border-blue-500/30"
