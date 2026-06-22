@@ -83,10 +83,10 @@ export default function PermissionsPage() {
   const sqlScript = `-- Database Patch: Add staff permissions to profiles table
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS permissions JSONB 
-DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_property_settings": false, "manage_staff_permissions": false, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb;
+DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_property_settings": false, "manage_staff_permissions": false, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb;
 
 UPDATE public.profiles
-SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_property_settings": true, "manage_staff_permissions": true, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb
+SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_property_settings": true, "manage_staff_permissions": true, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb
 WHERE role IN ('admin', 'super_admin');`;
 
   // Check demo mode
@@ -368,7 +368,8 @@ WHERE role IN ('admin', 'super_admin');`;
                       const items = [
                         { key: "view_dashboard_stats", label: "ดูสถิติภาพรวม" },
                         { key: "manage_rooms_tenants", label: "จัดการห้องพัก & ผู้เช่า" },
-                        { key: "manage_meters_bills", label: "จดมิเตอร์ & ออกบิล" },
+                        { key: "manage_meters_bills", label: "จดมิเตอร์ & สรุปบิล" },
+                        { key: "manage_bills", label: "จัดการบิล" },
                         { key: "manage_finance_expenses", label: "จัดการการเงิน & รายจ่าย" },
                         { key: "access_tax", label: "จัดการข้อมูลภาษี" },
                         { key: "manage_finance_settings", label: "ตั้งค่าระบบบัญชี/การเงิน" },
@@ -603,10 +604,27 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>จดเลขมิเตอร์ & จัดการบิล</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และออกใบแจ้งหนี้รายเดือน</span>
+                    <span>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และสรุปยอดบิล</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_meters_bills ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_bills */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("add", "manage_bills")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    addPermissions.manage_bills
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>จัดการบิล</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการบิลค่าเช่าทั้งหมด</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_bills ? "opacity-100" : "opacity-0"}`} />
                 </button>
 
                 {/* manage_finance_expenses */}
@@ -876,10 +894,27 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>จดเลขมิเตอร์ & จัดการบิล</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และออกบิลค่าเช่า</span>
+                    <span>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และดูสรุปยอดบิล</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_meters_bills ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
+                {/* manage_bills */}
+                <button
+                  type="button"
+                  onClick={() => handlePermissionToggle("edit", "manage_bills")}
+                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    editPermissions.manage_bills
+                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span>จัดการบิล</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการบิลค่าเช่าทั้งหมด</span>
+                  </div>
+                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_bills ? "opacity-100" : "opacity-0"}`} />
                 </button>
 
                 {/* manage_finance_expenses */}

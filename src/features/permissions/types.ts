@@ -5,6 +5,7 @@ export interface StaffPermissions {
   view_dashboard_stats: boolean       // ดูแดชบอร์ดภาพรวมสถิติ (/dashboard)
   manage_rooms_tenants: boolean       // จัดการห้องพักและผู้เช่า (/rooms, /tenants)
   manage_meters_bills: boolean        // จดมิเตอร์ & จัดการบิล (/billing, /meter)
+  manage_bills: boolean               // จัดการบิล (/manage-bills)
   manage_finance_expenses: boolean    // จัดการบิลรายจ่ายรายวัน (/daily-bills)
   access_tax: boolean                 // จัดการภาษี ภ.ง.ด. (/tax)
   manage_finance_settings: boolean    // ตั้งค่าการเงิน (/finance-settings)
@@ -19,6 +20,7 @@ export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
   view_dashboard_stats: false,
   manage_rooms_tenants: true,
   manage_meters_bills: true,
+  manage_bills: true,
   manage_finance_expenses: false,
   access_tax: false,
   manage_finance_settings: false,
@@ -33,6 +35,7 @@ export const ADMIN_DEFAULT_PERMISSIONS: StaffPermissions = {
   view_dashboard_stats: true,
   manage_rooms_tenants: true,
   manage_meters_bills: true,
+  manage_bills: true,
   manage_finance_expenses: true,
   access_tax: true,
   manage_finance_settings: true,

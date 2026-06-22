@@ -645,8 +645,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     if (path === "/rooms" || path === "/tenants") {
       return !!userPermissions.manage_rooms_tenants
     }
-    if (path === "/billing" || path === "/meter" || path === "/manage-bills") {
+    if (path === "/billing" || path === "/meter") {
       return !!userPermissions.manage_meters_bills
+    }
+    if (path === "/manage-bills") {
+      return !!userPermissions.manage_bills
     }
     if (path === "/daily-bills") {
       return !!userPermissions.manage_finance_expenses
