@@ -718,20 +718,25 @@ export async function saveCancelledContract(workspaceId: string, contract: {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    const insertData: any = {
+      workspace_id: workspaceId,
+      tenant_id: contract.tenantId || null,
+      room_number: contract.roomNumber,
+      tenant_name: contract.tenantName,
+      cancellation_date: contract.cancellationDate,
+      deposit_amount: contract.depositAmount,
+      refunded_amount: contract.refundedAmount,
+      actual_refund: contract.actualRefund !== undefined && contract.actualRefund !== null ? contract.actualRefund : contract.refundedAmount,
+      forfeited_amount: contract.forfeitedAmount
+    }
+
+    if (contract.id) {
+      insertData.id = contract.id
+    }
+
     const { data, error } = await adminSupabase
       .from("cancelled_contracts")
-      .insert([{
-        id: contract.id || undefined,
-        workspace_id: workspaceId,
-        tenant_id: contract.tenantId || null,
-        room_number: contract.roomNumber,
-        tenant_name: contract.tenantName,
-        cancellation_date: contract.cancellationDate,
-        deposit_amount: contract.depositAmount,
-        refunded_amount: contract.refundedAmount,
-        actual_refund: contract.actualRefund !== undefined ? contract.actualRefund : contract.refundedAmount,
-        forfeited_amount: contract.forfeitedAmount
-      }])
+      .insert([insertData])
       .select()
 
     if (error) {
@@ -841,18 +846,23 @@ export async function migrateLocalStorageCancelledContracts(workspaceId: string,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
     
-    const toInsert = contracts.map(contract => ({
-      id: contract.id || undefined,
-      workspace_id: workspaceId,
-      tenant_id: contract.tenantId || null,
-      room_number: contract.roomNumber || "",
-      tenant_name: contract.tenantName || "",
-      cancellation_date: contract.cancellationDate || "",
-      deposit_amount: Number(contract.depositAmount || 0),
-      refunded_amount: Number(contract.refundedAmount || 0),
-      actual_refund: Number(contract.actualRefund !== undefined ? contract.actualRefund : (contract.refundedAmount || 0)),
-      forfeited_amount: Number(contract.forfeitedAmount || 0)
-    }))
+    const toInsert = contracts.map(contract => {
+      const row: any = {
+        workspace_id: workspaceId,
+        tenant_id: contract.tenantId || null,
+        room_number: contract.roomNumber || "",
+        tenant_name: contract.tenantName || "",
+        cancellation_date: contract.cancellationDate || "",
+        deposit_amount: Number(contract.depositAmount || 0),
+        refunded_amount: Number(contract.refundedAmount || 0),
+        actual_refund: Number(contract.actualRefund !== undefined && contract.actualRefund !== null ? contract.actualRefund : (contract.refundedAmount || 0)),
+        forfeited_amount: Number(contract.forfeitedAmount || 0)
+      }
+      if (contract.id) {
+        row.id = contract.id
+      }
+      return row
+    })
 
     if (toInsert.length > 0) {
       const { error } = await adminSupabase
