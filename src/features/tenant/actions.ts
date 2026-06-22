@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import crypto from "crypto"
-import { calculateLateDays } from "@/features/billing/actions"
+import { calculateLateDays } from "@/features/billing/utils"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
