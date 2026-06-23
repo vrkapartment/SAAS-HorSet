@@ -205,37 +205,51 @@ export default function AdminDashboard() {
         clearWorkspaceCache(wsId)
       }
 
-      // 1. ดึงข้อมูลห้องพักทั้งหมด
+      // โหลดข้อมูลแบบคู่ขนาน (Parallel Fetching) เพื่อประสิทธิภาพสูงสุด
+      const fetchPromises = [];
+
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
-      if (!rooms || forceRefresh) {
-        const roomsRes = await getRooms()
-        if (roomsRes && roomsRes.success === false) {
-          throw new Error(roomsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลห้องพักได้")
-        }
-        rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
-        if (wsId) setCachedData(wsId, "rooms", rooms)
-      }
-
-      // 2. ดึงข้อมูลผู้เช่าทั้งหมด
       let tenants = wsId ? getCachedData(wsId, "tenants") : null
-      if (!tenants || forceRefresh) {
-        const tenantsRes = await getTenants()
-        if (tenantsRes && tenantsRes.success === false) {
-          throw new Error(tenantsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลผู้เช่าได้")
-        }
-        tenants = tenantsRes.success && tenantsRes.data ? tenantsRes.data : []
-        if (wsId) setCachedData(wsId, "tenants", tenants)
+      let bills = wsId ? getCachedData(wsId, "bills_all") : null
+
+      if (!rooms || forceRefresh) {
+        fetchPromises.push(
+          getRooms().then(roomsRes => {
+            if (roomsRes && roomsRes.success === false) {
+              throw new Error(roomsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลห้องพักได้")
+            }
+            rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
+            if (wsId) setCachedData(wsId, "rooms", rooms)
+          })
+        );
       }
 
-      // 3. ดึงข้อมูลบิลทั้งหมด (แบบไม่ระบุรอบ เพื่อแสดงสถิติประวัติและกราฟภาพรวมในแดชบอร์ด)
-      let bills = wsId ? getCachedData(wsId, "bills_all") : null
+      if (!tenants || forceRefresh) {
+        fetchPromises.push(
+          getTenants().then(tenantsRes => {
+            if (tenantsRes && tenantsRes.success === false) {
+              throw new Error(tenantsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลผู้เช่าได้")
+            }
+            tenants = tenantsRes.success && tenantsRes.data ? tenantsRes.data : []
+            if (wsId) setCachedData(wsId, "tenants", tenants)
+          })
+        );
+      }
+
       if (!bills || forceRefresh) {
-        const billsRes = await getBills()
-        if (billsRes && billsRes.success === false) {
-          throw new Error(billsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลบิลได้")
-        }
-        bills = billsRes.success && billsRes.data ? billsRes.data : []
-        if (wsId) setCachedData(wsId, "bills_all", bills)
+        fetchPromises.push(
+          getBills().then(billsRes => {
+            if (billsRes && billsRes.success === false) {
+              throw new Error(billsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลบิลได้")
+            }
+            bills = billsRes.success && billsRes.data ? billsRes.data : []
+            if (wsId) setCachedData(wsId, "bills_all", bills)
+          })
+        );
+      }
+
+      if (fetchPromises.length > 0) {
+        await Promise.all(fetchPromises)
       }
 
       const isRealSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")

@@ -195,6 +195,9 @@ export default function TaxPage() {
             })
           }
 
+          // เริ่มโหลดข้อมูลแบบคู่ขนาน (Parallel Fetching) เพื่อประสิทธิภาพสูงสุดและปลอดภัยตามเดิม
+          const fetchPromises = [];
+
           // 1. โหลดข้อมูลผู้เสียภาษีและการเงิน
           const financeCacheKey = "finance_settings"
           const cachedFinance = getCachedData<any>(currentWsId, financeCacheKey)
@@ -211,21 +214,24 @@ export default function TaxPage() {
             setDefaultDepositAmount(Number(cachedFinance.deposit_amount !== null && cachedFinance.deposit_amount !== undefined ? cachedFinance.deposit_amount : 0))
             setDefaultAdvanceRent(Number(cachedFinance.advance_rent !== null && cachedFinance.advance_rent !== undefined ? cachedFinance.advance_rent : 0))
           } else {
-            const res = await getFinanceSettings(currentWsId)
-            if (res.success && res.data) {
-              setFirstName(res.data.tax_firstname || "")
-              setLastName(res.data.tax_lastname || "")
-              setTaxId(res.data.tax_id || "")
-              setAddress(res.data.tax_address || "")
-              setPhone(res.data.tax_phone || "")
-              setElectricRate(res.data.electric_rate)
-              setWaterRate(res.data.water_rate)
-              setCommonFee(res.data.common_fee)
-              setLatePenaltyRate(res.data.late_penalty_rate)
-              setDefaultDepositAmount(res.data.deposit_amount !== undefined ? Number(res.data.deposit_amount) : 0)
-              setDefaultAdvanceRent(res.data.advance_rent !== undefined ? Number(res.data.advance_rent) : 0)
-              setCachedData(currentWsId, financeCacheKey, res.data)
-            }
+            fetchPromises.push(
+              getFinanceSettings(currentWsId).then(res => {
+                if (res.success && res.data) {
+                  setFirstName(res.data.tax_firstname || "")
+                  setLastName(res.data.tax_lastname || "")
+                  setTaxId(res.data.tax_id || "")
+                  setAddress(res.data.tax_address || "")
+                  setPhone(res.data.tax_phone || "")
+                  setElectricRate(res.data.electric_rate)
+                  setWaterRate(res.data.water_rate)
+                  setCommonFee(res.data.common_fee)
+                  setLatePenaltyRate(res.data.late_penalty_rate)
+                  setDefaultDepositAmount(res.data.deposit_amount !== undefined ? Number(res.data.deposit_amount) : 0)
+                  setDefaultAdvanceRent(res.data.advance_rent !== undefined ? Number(res.data.advance_rent) : 0)
+                  setCachedData(currentWsId, financeCacheKey, res.data)
+                }
+              })
+            );
           }
 
           // 1.2 โหลดข้อมูลผู้เช่า
@@ -234,11 +240,14 @@ export default function TaxPage() {
           if (cachedTenants) {
             setTenants(cachedTenants)
           } else {
-            const tenantsRes = await getTenants()
-            if (tenantsRes.success && tenantsRes.data) {
-              setTenants(tenantsRes.data)
-              setCachedData(currentWsId, tenantsCacheKey, tenantsRes.data)
-            }
+            fetchPromises.push(
+              getTenants().then(tenantsRes => {
+                if (tenantsRes.success && tenantsRes.data) {
+                  setTenants(tenantsRes.data)
+                  setCachedData(currentWsId, tenantsCacheKey, tenantsRes.data)
+                }
+              })
+            );
           }
 
           // 1.5 โหลดข้อมูลห้องเพื่อรู้ค่าเช่าห้องพักหลัก (baseRent)
@@ -247,15 +256,18 @@ export default function TaxPage() {
           if (cachedRooms) {
             setRooms(cachedRooms)
           } else {
-            const roomsRes = await getRooms()
-            if (roomsRes.success && roomsRes.data) {
-              const mappedRooms = roomsRes.data.map((r: any) => ({
-                roomNumber: r.roomNumber,
-                baseRent: Number(r.baseRent)
-              }))
-              setRooms(mappedRooms)
-              setCachedData(currentWsId, roomsCacheKey, mappedRooms)
-            }
+            fetchPromises.push(
+              getRooms().then(roomsRes => {
+                if (roomsRes.success && roomsRes.data) {
+                  const mappedRooms = roomsRes.data.map((r: any) => ({
+                    roomNumber: r.roomNumber,
+                    baseRent: Number(r.baseRent)
+                  }))
+                  setRooms(mappedRooms)
+                  setCachedData(currentWsId, roomsCacheKey, mappedRooms)
+                }
+              })
+            );
           }
 
           // 2. โหลดบิลจากระบบ
@@ -275,26 +287,34 @@ export default function TaxPage() {
             }))
             setBills(mappedBills)
           } else {
-            const billsRes = await getBills()
-            if (billsRes.success && billsRes.data) {
-              const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
-                id: b.id,
-                roomNumber: b.roomNumber,
-                tenantName: b.tenantName || "ผู้เช่า",
-                amount: Number(b.amount),
-                status: b.status as "unpaid" | "pending" | "paid",
-                billingCycle: b.billingCycle,
-                slipUrl: b.slipUrl || null,
-                electricUnits: Number(b.electricUnits || 0),
-                waterUnits: Number(b.waterUnits || 0)
-              }))
-              setBills(mappedBills)
-              setCachedData(currentWsId, billsCacheKey, billsRes.data)
-            }
+            fetchPromises.push(
+              getBills().then(billsRes => {
+                if (billsRes.success && billsRes.data) {
+                  const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
+                    id: b.id,
+                    roomNumber: b.roomNumber,
+                    tenantName: b.tenantName || "ผู้เช่า",
+                    amount: Number(b.amount),
+                    status: b.status as "unpaid" | "pending" | "paid",
+                    billingCycle: b.billingCycle,
+                    slipUrl: b.slipUrl || null,
+                    electricUnits: Number(b.electricUnits || 0),
+                    waterUnits: Number(b.waterUnits || 0)
+                  }))
+                  setBills(mappedBills)
+                  setCachedData(currentWsId, billsCacheKey, billsRes.data)
+                }
+              })
+            );
           }
 
           // 3. โหลดค่าใช้จ่าย
-          await loadExpensesData(taxYear, currentWsId)
+          fetchPromises.push(loadExpensesData(taxYear, currentWsId))
+
+          // รอให้ทุกสัญญาทำงานเสร็จสิ้นพร้อมกัน
+          if (fetchPromises.length > 0) {
+            await Promise.all(fetchPromises)
+          }
         }
       } catch (err) {
         console.error("Failed to load initial data in tax page:", err)
