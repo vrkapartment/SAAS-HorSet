@@ -91,6 +91,95 @@ export default function MeterReadingTable({
   const [copiedRooms, setCopiedRooms] = useState<{ [room: string]: boolean }>({})
   const [unlockedPaidRooms, setUnlockedPaidRooms] = useState<Record<string, boolean>>({})
 
+  // --- มิเตอร์หมุนเวียนครบรอบ (Meter Rollover) Helpers ---
+  const getUnitsUsedWithRollover = (curr: string | number | null | undefined, prev: string | number | null | undefined): number => {
+    if (curr === "" || curr === null || curr === undefined) return 0;
+    const currNum = Number(curr);
+    const prevNum = Number(prev || 0);
+    if (isNaN(currNum) || isNaN(prevNum)) return 0;
+    if (currNum >= prevNum) return currNum - prevNum;
+    return (10000 - prevNum) + currNum;
+  };
+
+  const isMeterRollover = (curr: string | number | null | undefined, prev: string | number | null | undefined): boolean => {
+    if (curr === "" || curr === null || curr === undefined) return false;
+    const currNum = Number(curr);
+    const prevNum = Number(prev || 0);
+    if (isNaN(currNum) || isNaN(prevNum)) return false;
+    return currNum < prevNum;
+  };
+
+  const [rolloverConfirm, setRolloverConfirm] = useState<{
+    isOpen: boolean
+    roomNumber: string
+    type: "electric" | "water" | "all"
+    isBulk: boolean
+    onConfirm: () => void
+  } | null>(null)
+
+  const onSaveRowWithRolloverCheck = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
+    const item = unifiedItems.find(i => i.roomNumber === roomNumber)
+    if (!item) return
+
+    const hasElecRolloverVal = type !== "water" && isMeterRollover(item.elecCurr, item.elecPrev)
+    const hasWaterRolloverVal = type !== "electric" && isMeterRollover(item.waterCurr, item.waterPrev)
+
+    if (hasElecRolloverVal || hasWaterRolloverVal) {
+      setRolloverConfirm({
+        isOpen: true,
+        roomNumber,
+        type,
+        isBulk: false,
+        onConfirm: async () => {
+          await handleSaveRow(roomNumber, type)
+          if (item.billStatus === "paid") {
+            setUnlockedPaidRooms(prev => ({ ...prev, [roomNumber]: false }))
+          }
+        }
+      })
+    } else {
+      await handleSaveRow(roomNumber, type)
+      if (item.billStatus === "paid") {
+        setUnlockedPaidRooms(prev => ({ ...prev, [roomNumber]: false }))
+      }
+    }
+  }
+
+  const onSaveAllWithRolloverCheck = async (type: "electric" | "water") => {
+    const itemsToSave = unifiedItems.filter(item => {
+      if (type === "electric") {
+        return item.elecCurr !== "" && !item.isMeterSaved;
+      } else {
+        return item.waterCurr !== "" && !item.isMeterSaved;
+      }
+    });
+
+    const anyRollover = itemsToSave.some(item => {
+      if (type === "electric") {
+        return isMeterRollover(item.elecCurr, item.elecPrev);
+      } else {
+        return isMeterRollover(item.waterCurr, item.waterPrev);
+      }
+    });
+
+    if (anyRollover) {
+      setRolloverConfirm({
+        isOpen: true,
+        roomNumber: "ทุกห้องที่เลือก",
+        type,
+        isBulk: true,
+        onConfirm: async () => {
+          await handleSaveAll(type)
+          setUnlockedPaidRooms({})
+        }
+      })
+    } else {
+      await handleSaveAll(type)
+      setUnlockedPaidRooms({})
+    }
+  }
+
+
   // กรองห้องที่มีผู้เช่าและออกบิลประจำรอบนั้นแล้ว (ไม่รวมห้องว่าง หรือยังไม่ออกบิล)
   const activeRooms = unifiedItems.filter(item => item.tenantName && item.billStatus !== "not_created")
 
@@ -127,8 +216,8 @@ export default function MeterReadingTable({
       alert("คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
       return
     }
-    const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
-    const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+    const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
+    const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
 
     const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
     const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
@@ -204,8 +293,8 @@ export default function MeterReadingTable({
         }
 
         try {
-          const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
-          const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+          const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
+          const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
 
           const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
           const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
@@ -350,13 +439,13 @@ export default function MeterReadingTable({
           ) : unifiedItems.length > 0 ? (
             unifiedItems.map((item) => {
               const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-              const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+              const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
               const elecCost = hasElecCurr && elecUnitsUsed >= 0
                 ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                 : 0
 
               const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-              const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+              const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
               const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                 ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
@@ -364,9 +453,12 @@ export default function MeterReadingTable({
               const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0)
               const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
               const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
-              const isSaveDisabled = item.tenantName
+              
+              const isElectricInvalid = hasElecCurr && elecUnitsUsed > 3000
+              const isWaterInvalid = hasWaterCurr && waterUnitsUsed > 3000
+              const isSaveDisabled = (item.tenantName
                 ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
-                : item.isMeterSaved
+                : item.isMeterSaved) || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
 
               return (
                 <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
@@ -627,16 +719,36 @@ export default function MeterReadingTable({
                           </span>
                         </div>
 
+                        {item.elecCurr !== "" && (() => {
+                          const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev);
+                          const isRollover = isMeterRollover(item.elecCurr, item.elecPrev);
+                          if (units > 3000) {
+                            return (
+                              <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>ข้อมูลผิดพลาด เกิน 3,000 หน่วย (ล็อกบันทึก)</span>
+                              </div>
+                            );
+                          } else if (isRollover) {
+                            return (
+                              <div className="text-[10px] text-amber-500 font-extrabold flex items-center gap-1 animate-pulse">
+                                <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+
                         <div className="flex justify-between text-xs font-mono">
                           <span className="text-slate-500 dark:text-slate-400">หน่วยไฟที่ใช้:</span>
-                          <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
-                            {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                          <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
+                            {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                           </span>
                         </div>
                         <div className="flex justify-between text-xs font-mono">
                           <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
                           <span className="font-bold text-slate-700 dark:text-slate-300">
-                            {hasElecCurr && elecUnitsUsed >= 0 
+                            {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
                               ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                               : "-"}
                           </span>
@@ -645,10 +757,7 @@ export default function MeterReadingTable({
 
                       <button
                         onClick={async () => {
-                          await handleSaveRow(item.roomNumber, "electric");
-                          if (item.billStatus === "paid") {
-                            setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
-                          }
+                          await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
                         }}
                         disabled={isSaveDisabled}
                         className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -704,16 +813,36 @@ export default function MeterReadingTable({
                           </span>
                         </div>
 
+                        {item.waterCurr !== "" && (() => {
+                          const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev);
+                          const isRollover = isMeterRollover(item.waterCurr, item.waterPrev);
+                          if (units > 3000) {
+                            return (
+                              <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>ข้อมูลผิดพลาด เกิน 3,000 หน่วย (ล็อกบันทึก)</span>
+                              </div>
+                            );
+                          } else if (isRollover) {
+                            return (
+                              <div className="text-[10px] text-amber-500 font-extrabold flex items-center gap-1 animate-pulse">
+                                <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+
                         <div className="flex justify-between text-xs font-mono">
                           <span className="text-slate-500 dark:text-slate-400">หน่วยน้ำที่ใช้:</span>
-                          <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
-                            {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                          <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
+                            {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                           </span>
                         </div>
                         <div className="flex justify-between text-xs font-mono">
                           <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
                           <span className="font-bold text-slate-700 dark:text-slate-300">
-                            {hasWaterCurr && waterUnitsUsed >= 0 
+                            {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000
                               ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
                               : "-"}
                           </span>
@@ -722,10 +851,7 @@ export default function MeterReadingTable({
 
                       <button
                         onClick={async () => {
-                          await handleSaveRow(item.roomNumber, "water");
-                          if (item.billStatus === "paid") {
-                            setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
-                          }
+                          await onSaveRowWithRolloverCheck(item.roomNumber, "water");
                         }}
                         disabled={isSaveDisabled}
                         className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -885,13 +1011,13 @@ export default function MeterReadingTable({
               ) : unifiedItems.length > 0 ? (
                 unifiedItems.map((item) => {
                   const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                  const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+                  const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
                   const elecCost = hasElecCurr && elecUnitsUsed >= 0
                     ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                     : 0
 
                   const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                  const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+                  const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
                   const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                     ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
@@ -900,9 +1026,12 @@ export default function MeterReadingTable({
                   const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
 
                   const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
-                  const isSaveDisabled = item.tenantName
+                  
+                  const isElectricInvalid = hasElecCurr && elecUnitsUsed > 3000
+                  const isWaterInvalid = hasWaterCurr && waterUnitsUsed > 3000
+                  const isSaveDisabled = (item.tenantName
                     ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
-                    : item.isMeterSaved
+                    : item.isMeterSaved) || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
 
                   return (
                     <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
@@ -1240,15 +1369,33 @@ export default function MeterReadingTable({
                                 kWh
                               </span>
                             </div>
+                            {item.elecCurr !== "" && (() => {
+                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev);
+                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev);
+                              if (units > 3000) {
+                                return (
+                                  <div className="text-[10px] text-red-500 font-extrabold flex items-center justify-center gap-1 mt-1">
+                                    <span>⚠️ เกิน 3,000 หน่วย</span>
+                                  </div>
+                                );
+                              } else if (isRollover) {
+                                return (
+                                  <div className="text-[10px] text-amber-500 font-extrabold flex items-center justify-center gap-1 mt-1 animate-pulse">
+                                    <span>🔄 หมุนครบรอบ (+{units})</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
 
                           {/* หน่วย / ยอดไฟ */}
                           <td className="py-4 text-center bg-blue-50/20 dark:bg-blue-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
-                            <div className={`font-black text-xs ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
-                              {hasElecCurr ? (elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                            <div className={`font-black text-xs ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
+                              {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                             </div>
                             <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                              {hasElecCurr && elecUnitsUsed >= 0 
+                              {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
                                 ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                                 : "-"}
                             </div>
@@ -1258,10 +1405,7 @@ export default function MeterReadingTable({
                           <td className="py-4 text-center pr-2">
                             <button
                               onClick={async () => {
-                                await handleSaveRow(item.roomNumber, "electric");
-                                if (item.billStatus === "paid") {
-                                  setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
-                                }
+                                await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
                               }}
                               disabled={isSaveDisabled}
                               className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
@@ -1321,15 +1465,33 @@ export default function MeterReadingTable({
                                 m³
                               </span>
                             </div>
+                            {item.waterCurr !== "" && (() => {
+                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev);
+                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev);
+                              if (units > 3000) {
+                                return (
+                                  <div className="text-[10px] text-red-500 font-extrabold flex items-center justify-center gap-1 mt-1">
+                                    <span>⚠️ เกิน 3,000 หน่วย</span>
+                                  </div>
+                                );
+                              } else if (isRollover) {
+                                return (
+                                  <div className="text-[10px] text-amber-500 font-extrabold flex items-center justify-center gap-1 mt-1 animate-pulse">
+                                    <span>🔄 หมุนครบรอบ (+{units})</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
 
                           {/* หน่วย / ยอดน้ำ */}
                           <td className="py-4 text-center bg-teal-50/20 dark:bg-teal-500/5 border-r border-slate-200 dark:border-slate-800/40 font-mono">
-                            <div className={`font-black text-xs ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
-                              {hasWaterCurr ? (waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                            <div className={`font-black text-xs ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-red-500 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
+                              {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                             </div>
                             <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                              {hasWaterCurr && waterUnitsUsed >= 0 
+                              {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000
                                 ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
                                 : "-"}
                             </div>
@@ -1339,10 +1501,7 @@ export default function MeterReadingTable({
                           <td className="py-4 text-center pr-2">
                             <button
                               onClick={async () => {
-                                await handleSaveRow(item.roomNumber, "water");
-                                if (item.billStatus === "paid") {
-                                  setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
-                                }
+                                await onSaveRowWithRolloverCheck(item.roomNumber, "water");
                               }}
                               disabled={isSaveDisabled}
                               className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all mx-auto cursor-pointer ${
@@ -1376,8 +1535,7 @@ export default function MeterReadingTable({
           <div className="mt-8 flex justify-center px-4 md:px-0 pb-4">
             <button
               onClick={async () => {
-                await handleSaveAll(activeTab as "electric" | "water");
-                setUnlockedPaidRooms({});
+                await onSaveAllWithRolloverCheck(activeTab as "electric" | "water");
               }}
               className={`w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg transition-all cursor-pointer active:scale-[0.98] border animate-pulse hover:animate-none ${
                 activeTab === "electric"
@@ -1727,6 +1885,81 @@ export default function MeterReadingTable({
                   <span>เริ่มส่งเข้า LINE OA ({connectedRooms.length} ห้อง)</span>
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Pop-up ยืนยันการหมุนเวียนครบรอบ (Rollover Confirmation Modal) */}
+      {rolloverConfirm && rolloverConfirm.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-all"
+            onClick={() => setRolloverConfirm(null)}
+          />
+          {/* Modal Container */}
+          <div className={`relative w-full max-w-md p-6 rounded-2xl border shadow-2xl transform scale-100 transition-all ${
+            isDark 
+              ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-slate-950/50" 
+              : "bg-white/95 border-slate-200 text-slate-800 shadow-slate-200/50"
+          }`}>
+            <button
+              onClick={() => setRolloverConfirm(null)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="p-3 bg-amber-500/10 dark:bg-amber-500/20 text-amber-500 rounded-full animate-bounce">
+                <RefreshCw className="w-8 h-8" />
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-lg font-black tracking-tight">
+                  🔄 ยืนยันมิเตอร์หมุนครบรอบ
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 px-2 leading-relaxed">
+                  คุณกำลังบันทึกเลขมิเตอร์ที่มีค่าน้อยกว่าเลขครั้งก่อนหน้า สำหรับ{" "}
+                  <strong className="text-amber-500 font-extrabold">{rolloverConfirm.isBulk ? "ทุกห้องที่มีการหมุนครบรอบ" : `ห้อง ${rolloverConfirm.roomNumber}`}</strong>
+                </p>
+              </div>
+
+              <div className={`w-full p-4 rounded-xl border text-left space-y-2 text-xs leading-relaxed ${
+                isDark ? "bg-slate-950/40 border-slate-850" : "bg-amber-50/30 border-amber-100 text-amber-800"
+              }`}>
+                <p className="font-bold flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  โปรดตรวจสอบข้อมูลเพื่อความถูกต้อง:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-650 dark:text-slate-300">
+                  <li>ระบบจะคิดสูตร: (10000 - เลขเก่า) + เลขใหม่</li>
+                  <li>ยอดหน่วยที่คำนวณได้จริงต้องมีค่าไม่เกิน 3,000 หน่วย</li>
+                  <li>กดยืนยันหากตรวจสอบแล้วว่ามิเตอร์มีการหมุนครบรอบจริง</li>
+                </ul>
+              </div>
+
+              <div className="flex w-full gap-3 pt-2">
+                <button
+                  onClick={() => setRolloverConfirm(null)}
+                  className={`flex-1 h-11 text-xs font-bold rounded-xl border transition-all ${
+                    isDark 
+                      ? "bg-slate-950 border-slate-850 text-slate-400 hover:text-white" 
+                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={() => {
+                    rolloverConfirm.onConfirm();
+                    setRolloverConfirm(null);
+                  }}
+                  className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all"
+                >
+                  ยืนยันหมุนครบรอบ
+                </button>
+              </div>
             </div>
           </div>
         </div>

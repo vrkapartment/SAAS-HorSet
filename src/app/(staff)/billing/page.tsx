@@ -847,8 +847,12 @@ export default function UnifiedBillingPage() {
         alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
         return
       }
-      if ((elecVal as number) < elecPrevVal) {
-        alert("⚠️ ตัวเลขมิเตอร์ไฟฟ้าปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
+      const eUnits = (elecVal as number) >= elecPrevVal 
+        ? (elecVal as number) - elecPrevVal 
+        : (10000 - elecPrevVal) + (elecVal as number)
+      
+      if (eUnits > 3000) {
+        alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง")
         return
       }
     } else if (type === "water") {
@@ -860,8 +864,12 @@ export default function UnifiedBillingPage() {
         alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
         return
       }
-      if ((waterVal as number) < waterPrevVal) {
-        alert("⚠️ ตัวเลขมิเตอร์น้ำประปาปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
+      const wUnits = (waterVal as number) >= waterPrevVal 
+        ? (waterVal as number) - waterPrevVal 
+        : (10000 - waterPrevVal) + (waterVal as number)
+      
+      if (wUnits > 3000) {
+        alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง")
         return
       }
     } else {
@@ -874,14 +882,21 @@ export default function UnifiedBillingPage() {
         alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
         return
       }
-      if ((elecVal as number) < elecPrevVal || (waterVal as number) < waterPrevVal) {
-        alert("⚠️ ตัวเลขมิเตอร์ปัจจุบันต้องไม่น้อยกว่ามิเตอร์ครั้งก่อนหน้า")
+      const eUnits = (elecVal as number) >= elecPrevVal 
+        ? (elecVal as number) - elecPrevVal 
+        : (10000 - elecPrevVal) + (elecVal as number)
+      const wUnits = (waterVal as number) >= waterPrevVal 
+        ? (waterVal as number) - waterPrevVal 
+        : (10000 - waterPrevVal) + (waterVal as number)
+
+      if (eUnits > 3000 || wUnits > 3000) {
+        alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง")
         return
       }
     }
 
-    const eUnits = elecVal === "" ? 0 : (elecVal as number) - elecPrevVal
-    const wUnits = waterVal === "" ? 0 : (waterVal as number) - waterPrevVal
+    const eUnits = elecVal === "" ? 0 : ((elecVal as number) >= elecPrevVal ? (elecVal as number) - elecPrevVal : (10000 - elecPrevVal) + (elecVal as number))
+    const wUnits = waterVal === "" ? 0 : ((waterVal as number) >= waterPrevVal ? (waterVal as number) - waterPrevVal : (10000 - waterPrevVal) + (waterVal as number))
     
     const elecCost = elecVal === "" 
       ? 0 
@@ -961,25 +976,27 @@ export default function UnifiedBillingPage() {
       const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
       
       if (type === "electric") {
-        return (
-          elecVal === "" ||
-          isNaN(elecVal as number) ||
-          isNaN(elecPrevVal) ||
-          (elecVal as number) < elecPrevVal
-        )
+        if (elecVal === "" || isNaN(elecVal as number) || isNaN(elecPrevVal)) {
+          return true;
+        }
+        const eUnits = (elecVal as number) >= elecPrevVal 
+          ? (elecVal as number) - elecPrevVal 
+          : (10000 - elecPrevVal) + (elecVal as number);
+        return eUnits > 3000;
       } else {
-        return (
-          waterVal === "" ||
-          isNaN(waterVal as number) ||
-          isNaN(waterPrevVal) ||
-          (waterVal as number) < waterPrevVal
-        )
+        if (waterVal === "" || isNaN(waterVal as number) || isNaN(waterPrevVal)) {
+          return true;
+        }
+        const wUnits = (waterVal as number) >= waterPrevVal 
+          ? (waterVal as number) - waterPrevVal 
+          : (10000 - waterPrevVal) + (waterVal as number);
+        return wUnits > 3000;
       }
     })
 
     if (invalidItems.length > 0) {
       const typeText = type === "electric" ? "ไฟฟ้า" : "น้ำประปา"
-      alert(`ไม่สามารถประมวลผลทั้งหมดได้ เนื่องจากมี ${invalidItems.length} ห้องพักที่ข้อมูลเลขมิเตอร์${typeText}ไม่ครบถ้วน หรือค่าปัจจุบันน้อยกว่าครั้งก่อนหน้า`)
+      alert(`ไม่สามารถประมวลผลทั้งหมดได้ เนื่องจากมี ${invalidItems.length} ห้องพักที่ข้อมูลเลขมิเตอร์${typeText}ไม่ครบถ้วน หรือคำนวณแล้วมีปริมาณหน่วยเกิน 3,000 หน่วย`)
       return
     }
 
@@ -998,8 +1015,8 @@ export default function UnifiedBillingPage() {
         const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
         const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-        const eUnits = elecVal === "" ? 0 : (elecVal as number) - elecPrevVal
-        const wUnits = waterVal === "" ? 0 : (waterVal as number) - waterPrevVal
+        const eUnits = elecVal === "" ? 0 : ((elecVal as number) >= elecPrevVal ? (elecVal as number) - elecPrevVal : (10000 - elecPrevVal) + (elecVal as number))
+        const wUnits = waterVal === "" ? 0 : ((waterVal as number) >= waterPrevVal ? (waterVal as number) - waterPrevVal : (10000 - waterPrevVal) + (waterVal as number))
         
         const elecCost = elecVal === "" 
           ? 0 
@@ -1093,8 +1110,8 @@ export default function UnifiedBillingPage() {
     }
 
     try {
-      const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
-      const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+      const elecUnitsUsed = item.elecCurr !== "" ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
+      const waterUnitsUsed = item.waterCurr !== "" ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
 
       const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
       const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
@@ -1136,8 +1153,8 @@ export default function UnifiedBillingPage() {
     setDownloadingPdfId(item.roomNumber)
     try {
       const { generateBillPdf } = await import("@/lib/pdfHelper")
-      const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
-      const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+      const elecUnitsUsed = item.elecCurr !== "" ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
+      const waterUnitsUsed = item.waterCurr !== "" ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
 
       const blob = await generateBillPdf({
         roomNumber: item.roomNumber,
@@ -1208,8 +1225,8 @@ export default function UnifiedBillingPage() {
         // เฉพาะห้องที่มีผู้เช่าและข้อมูลครบถ้วนสำหรับการทำบิล
         if (!item.tenantName) continue
 
-        const elecUnitsUsed = item.elecCurr !== "" ? Number(item.elecCurr) - Number(item.elecPrev) : 0
-        const waterUnitsUsed = item.waterCurr !== "" ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+        const elecUnitsUsed = item.elecCurr !== "" ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
+        const waterUnitsUsed = item.waterCurr !== "" ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
 
         const blob = await generateBillPdf({
           roomNumber: item.roomNumber,
@@ -1458,13 +1475,13 @@ export default function UnifiedBillingPage() {
                 ) : unifiedItems.length > 0 ? (
                   unifiedItems.map((item) => {
                     const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                    const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+                    const elecUnitsUsed = hasElecCurr ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
                     const elecCost = hasElecCurr && elecUnitsUsed >= 0
                       ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                       : 0
 
                     const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                    const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+                    const waterUnitsUsed = hasWaterCurr ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
                     const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                       ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                       : 0
@@ -1573,13 +1590,13 @@ export default function UnifiedBillingPage() {
             ) : unifiedItems.length > 0 ? (
               unifiedItems.map((item) => {
                 const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                const elecUnitsUsed = hasElecCurr ? Number(item.elecCurr) - Number(item.elecPrev) : 0
+                const elecUnitsUsed = hasElecCurr ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
                 const elecCost = hasElecCurr && elecUnitsUsed >= 0
                   ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                   : 0
 
                 const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                const waterUnitsUsed = hasWaterCurr ? Number(item.waterCurr) - Number(item.waterPrev) : 0
+                const waterUnitsUsed = hasWaterCurr ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
                 const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                   ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                   : 0
