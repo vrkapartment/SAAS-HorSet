@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Building, Save, ShieldCheck, Check, AlertTriangle, Loader2, Droplet, Zap, Sliders, Clock, FileText } from "lucide-react"
-import { getFinanceSettings, saveFinanceSettings, FinanceSettings } from "@/features/finance/actions"
+import { getFinanceSettings, saveFinanceSettings, FinanceSettings, cleanupExpiredSlipsAction } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
@@ -59,6 +59,10 @@ export default function PropertySettingsPage() {
   // ตั้งค่าระยะเวลาสัญญาเช่าเริ่มต้นและประเภทสัญญา
   const [leaseDuration, setLeaseDuration] = useState<number>(6)
   const [leaseExpiryAction, setLeaseExpiryAction] = useState<"renew" | "original">("renew")
+
+  // ตั้งค่าระยะเวลาการเก็บไฟล์สลิปโอนเงิน (เดือน) -> 0 หมายถึง ไม่จำกัด / ตลอดไป
+  const [slipRetentionMonths, setSlipRetentionMonths] = useState<number>(0)
+  const [isCleaning, setIsCleaning] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -143,6 +147,7 @@ export default function PropertySettingsPage() {
             setElectricMinUnit(cached.electric_min_unit !== undefined ? cached.electric_min_unit : 10)
             setLeaseDuration(cached.lease_duration !== undefined ? cached.lease_duration : 6)
             setLeaseExpiryAction(cached.lease_expiry_action || "renew")
+            setSlipRetentionMonths(cached.slip_retention_months !== undefined ? cached.slip_retention_months : 0)
             setIsDatabaseBacked(true)
           } else {
             const res = await getFinanceSettings(currentWsId)
@@ -172,6 +177,7 @@ export default function PropertySettingsPage() {
               setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
               setLeaseDuration(res.data.lease_duration !== undefined ? res.data.lease_duration : 6)
               setLeaseExpiryAction(res.data.lease_expiry_action || "renew")
+              setSlipRetentionMonths(res.data.slip_retention_months !== undefined ? res.data.slip_retention_months : 0)
               setIsDatabaseBacked(true)
               setCachedData(currentWsId, cacheKey, res.data)
             } else if (res.error) {
@@ -228,6 +234,36 @@ export default function PropertySettingsPage() {
     loadData()
   }, [])
 
+  const handleManualCleanup = async () => {
+    if (!workspaceId) {
+      alert("ไม่สามารถดำเนินการได้เนื่องจากไม่พบรหัสหอพัก")
+      return
+    }
+    if (slipRetentionMonths <= 0) {
+      alert("กรุณาเลือกตั้งค่าเก็บไฟล์สลิปเป็นแบบจำกัดเวลา (เช่น 1, 3, 6, 12 เดือน) ก่อนสั่งทำความสะอาด")
+      return
+    }
+    
+    if (!confirm("คุณแน่ใจหรือไม่ที่จะทำการลบรูปภาพสลิปโอนเงินที่หมดอายุทั้งหมดในขณะนี้? (การลบนี้จะลบไฟล์รูปอย่างถาวรออกจาก Supabase Storage และลบ URL สลิปออกจากตารางบิลเพื่อประหยัดพื้นที่)")) {
+      return
+    }
+
+    setIsCleaning(true)
+    try {
+      const res = await cleanupExpiredSlipsAction(workspaceId)
+      if (res.success) {
+        alert(res.message || "ล้างข้อมูลรูปสลิปหมดอายุสำเร็จ!")
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการล้างสลิป")
+      }
+    } catch (err: any) {
+      console.error(err)
+      alert(err?.message || "เกิดข้อผิดพลาดในการส่งคำขอระบบทำความสะอาด")
+    } finally {
+      setIsCleaning(false)
+    }
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -255,7 +291,8 @@ export default function PropertySettingsPage() {
         deposit_type: depositType,
         advance_rent: advanceRent,
         lease_duration: leaseDuration,
-        lease_expiry_action: leaseExpiryAction
+        lease_expiry_action: leaseExpiryAction,
+        slip_retention_months: slipRetentionMonths
       }
 
       const res = await saveFinanceSettings(workspaceId, payload)
@@ -734,19 +771,87 @@ export default function PropertySettingsPage() {
                     {leaseExpiryAction === "renew" ? (
                       <>
                         <li className="text-amber-500 font-medium dark:text-amber-400">
-                          ช่วง 2 เดือนสุดท้ายก่อนหมดสัญญา: แสดงสถานะ <strong className="font-semibold">"เหลืออายุสัญญาอีก X เดือน"</strong>
+                          ช่วง 2 เดือนสุดท้ายก่อนหมดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;เหลืออายุสัญญาอีก X เดือน&quot;</strong>
                         </li>
                         <li className="text-red-500 font-medium dark:text-red-400">
-                          เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">"สัญญาหมดอายุ"</strong>
+                          เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;สัญญาหมดอายุ&quot;</strong>
                         </li>
                       </>
                     ) : (
                       <li className="text-emerald-500 font-medium dark:text-emerald-400">
-                        เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">"อยู่ครบสัญญา"</strong>
+                        เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;อยู่ครบสัญญา&quot;</strong>
                       </li>
                     )}
                   </ul>
                 </div>
+              </div>
+            </div>
+
+            {/* กล่อง 5: ตั้งค่าระยะเวลาการเก็บไฟล์สลิปโอนเงิน (Slip Retention Settings) */}
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <Clock className="w-4 h-4 text-rose-500" /> ระยะเวลาการเก็บไฟล์สลิปโอนเงิน (Slip)
+              </h3>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-400 font-medium block">
+                    ระยะเวลาเก็บไฟล์สลิป (สลิปโอนเงินในตารางบิล)
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-rose-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    value={slipRetentionMonths}
+                    onChange={(e) => setSlipRetentionMonths(Number(e.target.value))}
+                  >
+                    <option value={0}>เก็บไว้ตลอดไป (ไม่ลบอัตโนมัติ)</option>
+                    <option value={1}>เก็บไว้ 1 เดือน (ลบไฟล์สลิปที่อายุเกิน 1 เดือน)</option>
+                    <option value={3}>เก็บไว้ 3 เดือน (ลบไฟล์สลิปที่อายุเกิน 3 เดือน)</option>
+                    <option value={6}>เก็บไว้ 6 เดือน (ลบไฟล์สลิปที่อายุเกิน 6 เดือน)</option>
+                    <option value={12}>เก็บไว้ 12 เดือน / 1 ปี (ลบไฟล์สลิปที่อายุเกิน 1 ปี)</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                    ระบบจะลบรูปภาพสลิปที่อายุเกินระยะเวลาที่กำหนดออกจาก Supabase Storage และลบที่อยู่ไฟล์ (URL) ออกจากตารางบิลโดยอัตโนมัติทุกๆ สิ้นเดือนเพื่อช่วยประหยัดพื้นที่จัดเก็บข้อมูล แต่ยังคงเก็บข้อมูลบิลและยอดเงินเดิมไว้ทั้งหมดเพื่อความโปร่งใสและการบัญชี
+                  </p>
+                </div>
+
+                {slipRetentionMonths > 0 && (
+                  <div className="p-3 bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/10 rounded-xl space-y-3 animate-fade-in">
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                      <span className="text-[11px] text-rose-700 dark:text-rose-400 font-bold">
+                        ระบบทำความสะอาดไฟล์สลิป:
+                      </span>
+                    </div>
+                    <ul className="list-disc list-inside text-[10px] text-slate-500 space-y-1 leading-normal">
+                      <li>
+                        ภาพสลิปที่มีอายุเกินกว่า <strong className="font-semibold text-rose-500">{slipRetentionMonths} เดือน</strong> จะถูกเคลียร์อัตโนมัติเพื่อประหยัดพื้นที่คลาวด์
+                      </li>
+                      <li>
+                        ข้อมูลรายการเดินบัญชีและสถิติยอดเงินทั้งหมดจะไม่ถูกกระทบกระเทือน
+                      </li>
+                    </ul>
+
+                    {/* ปุ่มสั่งงานแบบแมนนวล */}
+                    <button
+                      type="button"
+                      disabled={isCleaning}
+                      onClick={handleManualCleanup}
+                      className="w-full text-xs font-bold text-center py-2 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white rounded-lg shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {isCleaning ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          กำลังเคลียร์สลิปหมดอายุ...
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="w-3.5 h-3.5" />
+                          ล้างไฟล์สลิปหมดอายุทันที (Manual Run)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

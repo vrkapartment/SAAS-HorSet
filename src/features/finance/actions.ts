@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js"
 
 export interface FinanceSettings {
   name?: string
@@ -25,6 +26,7 @@ export interface FinanceSettings {
   deposit_type?: "months" | "fixed"
   lease_duration?: number
   lease_expiry_action?: "renew" | "original"
+  slip_retention_months?: number
 }
 
 /**
@@ -127,6 +129,21 @@ export async function getFinanceSettings(workspaceId: string) {
       console.warn("Columns lease_duration or lease_expiry_action not available in workspaces. Defaulting.")
     }
 
+    // 6. ดึงข้อมูลระยะเวลาเก็บสลิปโอนเงิน (แยกดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ติดตั้ง)
+    let slipRetentionMonths = 0
+    try {
+      const { data: slipData, error: slipError } = await supabase
+        .from("workspaces")
+        .select("slip_retention_months")
+        .eq("id", workspaceId)
+        .single()
+      if (!slipError && slipData) {
+        slipRetentionMonths = Number(slipData.slip_retention_months || 0)
+      }
+    } catch (e) {
+      console.warn("Column slip_retention_months not available in workspaces. Defaulting to 0.")
+    }
+
     const merged = {
       ...coreData,
       ...(utilityData || {
@@ -142,7 +159,8 @@ export async function getFinanceSettings(workspaceId: string) {
       advance_rent: advanceRent,
       deposit_type: depositType,
       lease_duration: leaseDuration,
-      lease_expiry_action: leaseExpiryAction
+      lease_expiry_action: leaseExpiryAction,
+      slip_retention_months: slipRetentionMonths
     }
 
     return { 
@@ -169,7 +187,8 @@ export async function getFinanceSettings(workspaceId: string) {
         advance_rent: Number(merged.advance_rent !== null && merged.advance_rent !== undefined ? merged.advance_rent : 0),
         deposit_type: merged.deposit_type as "months" | "fixed",
         lease_duration: Number(merged.lease_duration !== null && merged.lease_duration !== undefined ? merged.lease_duration : 6),
-        lease_expiry_action: (merged.lease_expiry_action as "renew" | "original") || "renew"
+        lease_expiry_action: (merged.lease_expiry_action as "renew" | "original") || "renew",
+        slip_retention_months: Number(merged.slip_retention_months !== null && merged.slip_retention_months !== undefined ? merged.slip_retention_months : 0)
       } as FinanceSettings 
     }
   } catch (error) {
@@ -232,7 +251,8 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         advance_rent: Number(settings.advance_rent || 0),
         deposit_type: settings.deposit_type || "months",
         lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
-        lease_expiry_action: settings.lease_expiry_action || "renew"
+        lease_expiry_action: settings.lease_expiry_action || "renew",
+        slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0)
       })
       .eq("id", workspaceId)
 
@@ -306,3 +326,116 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
     return { success: false, error: errorMessage }
   }
 }
+
+/**
+ * ดำเนินการลบรูปภาพสลิปที่หมดอายุสำหรับ Workspace ที่กำหนด
+ */
+export async function cleanupExpiredSlipsAction(workspaceId: string) {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceKey || serviceKey.includes("placeholder")) {
+      return { success: false, error: "ระบบฐานข้อมูลหรือคีย์เชื่อมต่อเซิร์ฟเวอร์ไม่พร้อมใช้งาน" }
+    }
+
+    // สร้าง Admin Client ด้วย Service Role Key เพื่อลบรูปใน Storage และอัปเดตบิลได้โดยตรง
+    const supabaseAdmin = createSupabaseServiceClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+
+    // 1. ดึงค่า slip_retention_months ของ Workspace นี้
+    const { data: wsData, error: wsError } = await supabaseAdmin
+      .from("workspaces")
+      .select("slip_retention_months")
+      .eq("id", workspaceId)
+      .single()
+
+    if (wsError || !wsData) {
+      return { success: false, error: "ไม่พบข้อมูลการตั้งค่าอพาร์ทเมนท์" }
+    }
+
+    const retentionMonths = Number(wsData.slip_retention_months || 0)
+    if (retentionMonths <= 0) {
+      return { success: true, count: 0, message: "ไม่ได้เปิดใช้งานการลบรูปสลิปอัตโนมัติ (ตั้งค่าเป็นเก็บไว้ตลอดไป)" }
+    }
+
+    // 2. ค้นหารายการบิลที่มี slip_url และอายุเกินกว่าระยะเวลาที่กำหนด
+    const cutoffDate = new Date()
+    cutoffDate.setMonth(cutoffDate.getMonth() - retentionMonths)
+    const cutoffIso = cutoffDate.toISOString()
+
+    const { data: expiredBills, error: billsError } = await supabaseAdmin
+      .from("bills")
+      .select("id, slip_url")
+      .eq("workspace_id", workspaceId)
+      .not("slip_url", "is", null)
+      .lt("created_at", cutoffIso)
+
+    if (billsError) {
+      throw billsError
+    }
+
+    if (!expiredBills || expiredBills.length === 0) {
+      return { success: true, count: 0, message: "ไม่มีรูปภาพสลิปที่หมดอายุให้ต้องทำความสะอาดในขณะนี้" }
+    }
+
+    // 3. กรองและสกัด Storage Paths ของสลิปทั้งหมด
+    const pathsToDelete: string[] = []
+    const billIdsToUpdate: string[] = []
+
+    for (const bill of expiredBills) {
+      if (bill.slip_url) {
+        const marker = "/payment-slips/";
+        const idx = bill.slip_url.indexOf(marker);
+        if (idx !== -1) {
+          const path = bill.slip_url.substring(idx + marker.length);
+          if (path) {
+            pathsToDelete.push(path)
+            billIdsToUpdate.push(bill.id)
+          }
+        }
+      }
+    }
+
+    let deletedCount = 0
+
+    // 4. สั่งลบไฟล์จาก Supabase Storage (ลบเป็นแบบ Batch)
+    if (pathsToDelete.length > 0) {
+      const { data: deleteData, error: deleteStorageError } = await supabaseAdmin
+        .storage
+        .from("payment-slips")
+        .remove(pathsToDelete)
+
+      if (deleteStorageError) {
+        console.error("Error deleting slips from storage:", deleteStorageError)
+      } else if (deleteData) {
+        deletedCount = deleteData.length
+      }
+
+      // 5. สั่งอัปเดตลบ slip_url ออกจากฐานข้อมูลตาราง bills
+      const { error: dbUpdateError } = await supabaseAdmin
+        .from("bills")
+        .update({ slip_url: null })
+        .in("id", billIdsToUpdate)
+
+      if (dbUpdateError) {
+        throw dbUpdateError
+      }
+    }
+
+    return { 
+      success: true, 
+      count: deletedCount, 
+      message: `ทำความสะอาดสลิปที่หมดอายุเรียบร้อย! ลบรูปภาพสำเร็จ ${deletedCount} รูปภาพ ช่วยเพิ่มพื้นที่จัดเก็บข้อมูล` 
+    }
+  } catch (err: unknown) {
+    console.error("Cleanup expired slips error:", err)
+    const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการล้างไฟล์สลิป"
+    return { success: false, error: errMsg }
+  }
+}
+

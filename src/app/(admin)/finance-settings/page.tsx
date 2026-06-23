@@ -195,6 +195,9 @@ export default function FinanceSettingsPage() {
   const [electricMinChecked, setElectricMinChecked] = useState<boolean>(true)
   const [electricMinUnit, setElectricMinUnit] = useState<number>(10)
 
+  // ป้องกันการทับซ้อนคอลัมน์เก็บไฟล์สลิปของหน้านี้
+  const [slipRetentionMonths, setSlipRetentionMonths] = useState<number>(0)
+
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -282,10 +285,9 @@ export default function FinanceSettingsPage() {
             setAdvanceRent(cached.advance_rent !== undefined ? cached.advance_rent : 0)
             setWaterRate(cached.water_rate !== undefined ? cached.water_rate : 18)
             setElectricRate(cached.electric_rate !== undefined ? cached.electric_rate : 7)
-            setWaterMinChecked(cached.water_min_checked !== undefined ? cached.water_min_checked : true)
-            setWaterMinUnit(cached.water_min_unit !== undefined ? cached.water_min_unit : 3)
             setElectricMinChecked(cached.electric_min_checked !== undefined ? cached.electric_min_checked : true)
             setElectricMinUnit(cached.electric_min_unit !== undefined ? cached.electric_min_unit : 10)
+            setSlipRetentionMonths(cached.slip_retention_months !== undefined ? cached.slip_retention_months : 0)
             setIsDatabaseBacked(true)
           } else {
             const res = await getFinanceSettings(currentWsId)
@@ -317,6 +319,7 @@ export default function FinanceSettingsPage() {
               setWaterMinUnit(res.data.water_min_unit !== undefined ? res.data.water_min_unit : 3)
               setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
               setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
+              setSlipRetentionMonths(res.data.slip_retention_months !== undefined ? res.data.slip_retention_months : 0)
               setIsDatabaseBacked(true)
               setCachedData(currentWsId, cacheKey, res.data)
             } else if (res.error) {
@@ -416,7 +419,8 @@ export default function FinanceSettingsPage() {
         electric_min_unit: electricMinUnit,
         deposit_amount: depositAmount,
         deposit_type: depositType,
-        advance_rent: advanceRent
+        advance_rent: advanceRent,
+        slip_retention_months: slipRetentionMonths
       }
 
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
