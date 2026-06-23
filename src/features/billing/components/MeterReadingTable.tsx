@@ -408,12 +408,42 @@ export default function MeterReadingTable({
 
 ขอบคุณค่ะ/ครับ 🙏`
 
-    navigator.clipboard.writeText(text)
-    setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: true }))
-    
-    setTimeout(() => {
-      setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: false }))
-    }, 3500)
+    let copied = false
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text)
+        copied = true
+      } catch (err) {
+        console.warn("Navigator clipboard failed, trying fallback:", err)
+      }
+    }
+
+    if (!copied) {
+      try {
+        const textArea = document.createElement("textarea")
+        textArea.value = text
+        textArea.style.position = "fixed"
+        textArea.style.top = "0"
+        textArea.style.left = "0"
+        textArea.style.opacity = "0"
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        copied = document.execCommand("copy")
+        document.body.removeChild(textArea)
+      } catch (err) {
+        console.error("Fallback clipboard copy failed:", err)
+      }
+    }
+
+    if (copied) {
+      setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: true }))
+      setTimeout(() => {
+        setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: false }))
+      }, 3500)
+    } else {
+      alert("เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง")
+    }
   }
 
   // ฟังก์ชันเริ่มส่ง LINE OA แบบกลุ่มทีละห้อง
