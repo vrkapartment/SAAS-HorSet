@@ -718,6 +718,95 @@ export default function UnifiedBillingPage() {
     )
   }
 
+  // ตัวแปรและฟังก์ชันช่วยจัดรูปแบบข้อมูลและอัปเดตแคชเพื่อความเร็วสูงสุดแบบไม่ต้องโหลดข้อมูลใหม่ (Option 1 - Optimistic / Local State Update)
+  const formatDbBillToCamelCase = (b: any) => ({
+    id: b.id,
+    roomNumber: b.room_number,
+    tenantName: b.tenant_name,
+    amount: Number(b.amount),
+    status: b.status,
+    billingCycle: b.billing_cycle,
+    slipUrl: b.slip_url,
+    electricUnits: Number(b.electric_units),
+    waterUnits: Number(b.water_units),
+    penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
+    lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
+    otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
+  })
+
+  const formatDbMeterToCamelCase = (m: any) => ({
+    id: m.id,
+    roomNumber: m.room_number,
+    billingCycle: m.billing_cycle,
+    elecPrev: Number(m.elec_prev),
+    elecCurr: m.elec_curr === null || m.elec_curr === undefined ? "" : Number(m.elec_curr),
+    waterPrev: Number(m.water_prev),
+    waterCurr: m.water_curr === null || m.water_curr === undefined ? "" : Number(m.water_curr)
+  })
+
+  const updateLocalStateAndCache = (
+    roomNumber: string,
+    formattedMeter?: any,
+    formattedBill?: any
+  ) => {
+    // 1. อัปเดต React State ทันทีเพื่อความลื่นไหลแบบ 0ms
+    setUnifiedItems(prev => prev.map(i => {
+      if (i.roomNumber === roomNumber) {
+        return {
+          ...i,
+          ...(formattedMeter ? {
+            meterRecordId: formattedMeter.id,
+            elecPrev: formattedMeter.elecPrev,
+            elecCurr: formattedMeter.elecCurr,
+            waterPrev: formattedMeter.waterPrev,
+            waterCurr: formattedMeter.waterCurr,
+            isMeterSaved: true,
+            isEdited: false
+          } : {}),
+          ...(formattedBill ? {
+            billId: formattedBill.id,
+            billAmount: formattedBill.amount,
+            billStatus: formattedBill.status,
+            slipUrl: formattedBill.slipUrl,
+            electricUnits: formattedBill.electricUnits,
+            waterUnits: formattedBill.waterUnits,
+            penaltyAmount: formattedBill.penaltyAmount || 0,
+            lateDays: formattedBill.lateDays || 0,
+            otherServiceAmount: formattedBill.otherServiceAmount
+          } : {})
+        }
+      }
+      return i
+    }))
+
+    // 2. อัปเดตข้อมูลแคชของ Workspace เพื่อป้องกันปัญหาดึงแคชตัวเก่าเมื่อสลับหน้าไปมา
+    if (currentWorkspaceId) {
+      if (formattedMeter) {
+        const cachedMeters = getCachedData(currentWorkspaceId, `meters_${billingCycle}`) || []
+        const existingMeterIdx = cachedMeters.findIndex((m: any) => m.roomNumber === roomNumber)
+        let updatedMeters = [...cachedMeters]
+        if (existingMeterIdx >= 0) {
+          updatedMeters[existingMeterIdx] = { ...updatedMeters[existingMeterIdx], ...formattedMeter }
+        } else {
+          updatedMeters.push(formattedMeter)
+        }
+        setCachedData(currentWorkspaceId, `meters_${billingCycle}`, updatedMeters)
+      }
+
+      if (formattedBill) {
+        const cachedBills = getCachedData(currentWorkspaceId, `bills_${billingCycle}`) || []
+        const existingBillIdx = cachedBills.findIndex((b: any) => b.roomNumber === roomNumber)
+        let updatedBills = [...cachedBills]
+        if (existingBillIdx >= 0) {
+          updatedBills[existingBillIdx] = { ...updatedBills[existingBillIdx], ...formattedBill }
+        } else {
+          updatedBills.push(formattedBill)
+        }
+        setCachedData(currentWorkspaceId, `bills_${billingCycle}`, updatedBills)
+      }
+    }
+  }
+
   // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
   const handleSaveLateDays = async (roomNumber: string) => {
     console.log("🚀 [Client] handleSaveLateDays started for room:", roomNumber)
@@ -764,12 +853,12 @@ export default function UnifiedBillingPage() {
       
       if (res.success) {
         showToast(`บันทึกจำนวนวันปรับล่าช้าห้อง ${roomNumber} สำเร็จ!`)
+        const formatted = formatDbBillToCamelCase(res.data)
+        updateLocalStateAndCache(roomNumber, undefined, formatted)
         setUnifiedItems(prev =>
           prev.map(i => i.roomNumber === roomNumber ? { ...i, isEdited: false } : i)
         )
-        console.log("👉 [Client] Refreshing page data via loadData...")
-        await loadData(billingCycle, true)
-        console.log("👉 [Client] loadData completed after update")
+        console.log("👉 [Client] Local state & cache updated successfully")
       } else {
         console.error("❌ [Client] Server Action returned success=false:", res.error)
         alert(`❌ บันทึกไม่สำเร็จ: ${res.error || "เกิดข้อผิดพลาดในการบันทึกค่าปรับ"}`)
@@ -792,7 +881,8 @@ export default function UnifiedBillingPage() {
     const res = await updateBillStatus(id, "paid")
     if (res.success) {
       showToast("อนุมัติรายการชำระเงินเรียบร้อยแล้ว!")
-      await loadData(billingCycle, true)
+      const formatted = formatDbBillToCamelCase(res.data)
+      updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
     } else {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
@@ -810,7 +900,8 @@ export default function UnifiedBillingPage() {
     const res = await updateBillStatus(id, "unpaid", null)
     if (res.success) {
       showToast("ปฏิเสธสลิปแล้ว บิลจะกลับเป็นสถานะค้างชำระ")
-      await loadData(billingCycle, true)
+      const formatted = formatDbBillToCamelCase(res.data)
+      updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
     } else {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
@@ -830,7 +921,8 @@ export default function UnifiedBillingPage() {
     const res = await updateBillStatus(billId, "paid")
     if (res.success) {
       showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
-      await loadData(billingCycle, true)
+      const formatted = formatDbBillToCamelCase(res.data)
+      updateLocalStateAndCache(roomNumber, undefined, formatted)
     } else {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
     }
@@ -950,7 +1042,8 @@ export default function UnifiedBillingPage() {
       // 2. สร้าง/อัปเดตบิลใน DB (เฉพาะกรณีมีผู้เช่าเท่านั้น)
       if (!item.tenantName) {
         showToast(`บันทึกข้อมูลมิเตอร์ห้อง ${roomNumber} สำเร็จ! (ไม่มีผู้เช่า จึงไม่ได้ออกบิล)`)
-        await loadData(billingCycle, true)
+        const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
+        updateLocalStateAndCache(roomNumber, formattedMeter, undefined)
         setSavingAll(false)
         return
       }
@@ -972,7 +1065,9 @@ export default function UnifiedBillingPage() {
       }
 
       showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
-      await loadData(billingCycle, true)
+      const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
+      const formattedBill = formatDbBillToCamelCase(billRes.data)
+      updateLocalStateAndCache(roomNumber, formattedMeter, formattedBill)
     } catch (err) {
       console.error(err)
       alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
@@ -1038,6 +1133,10 @@ export default function UnifiedBillingPage() {
 
     try {
       let currentIdx = 0
+      const updatedMetersList: any[] = []
+      const updatedBillsList: any[] = []
+      const stateUpdates: { [roomNumber: string]: { formattedMeter: any; formattedBill?: any } } = {}
+
       // โหมด Supabase
       for (const item of unifiedItems) {
         currentIdx++
@@ -1103,6 +1202,10 @@ export default function UnifiedBillingPage() {
           return
         }
 
+        const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
+        updatedMetersList.push(formattedMeter)
+        stateUpdates[item.roomNumber] = { formattedMeter }
+
         // 2. บันทึกและออกบิล (เฉพาะกรณีมีผู้เช่าเท่านั้น)
         if (!item.tenantName) {
           continue
@@ -1123,11 +1226,72 @@ export default function UnifiedBillingPage() {
           setSavingAll(false)
           return
         }
+
+        const formattedBill = formatDbBillToCamelCase(billRes.data)
+        updatedBillsList.push(formattedBill)
+        stateUpdates[item.roomNumber].formattedBill = formattedBill
+      }
+
+      // ปลุกพลัง Optimistic UI: อัปเดต React State ทันทีแบบไม่ต้องพึ่งการโหลดเน็ตเวิร์ก
+      setUnifiedItems(prev => prev.map(i => {
+        const update = stateUpdates[i.roomNumber]
+        if (update) {
+          return {
+            ...i,
+            meterRecordId: update.formattedMeter.id,
+            elecPrev: update.formattedMeter.elecPrev,
+            elecCurr: update.formattedMeter.elecCurr,
+            waterPrev: update.formattedMeter.waterPrev,
+            waterCurr: update.formattedMeter.waterCurr,
+            isMeterSaved: true,
+            isEdited: false,
+            ...(update.formattedBill ? {
+              billId: update.formattedBill.id,
+              billAmount: update.formattedBill.amount,
+              billStatus: update.formattedBill.status,
+              slipUrl: update.formattedBill.slipUrl,
+              electricUnits: update.formattedBill.electricUnits,
+              waterUnits: update.formattedBill.waterUnits,
+              penaltyAmount: update.formattedBill.penaltyAmount || 0,
+              lateDays: update.formattedBill.lateDays || 0,
+              otherServiceAmount: update.formattedBill.otherServiceAmount
+            } : {})
+          }
+        }
+        return i
+      }))
+
+      // อัปเดตข้อมูลแคชของ Workspace เพื่อให้สลับหน้าไปมาไม่เจอบั๊กข้อมูลค้าง
+      if (currentWorkspaceId) {
+        // จัดการมิเตอร์
+        const cachedMeters = getCachedData(currentWorkspaceId, `meters_${billingCycle}`) || []
+        let updatedMeters = [...cachedMeters]
+        updatedMetersList.forEach(formattedMeter => {
+          const idx = updatedMeters.findIndex((m: any) => m.roomNumber === formattedMeter.roomNumber)
+          if (idx >= 0) {
+            updatedMeters[idx] = { ...updatedMeters[idx], ...formattedMeter }
+          } else {
+            updatedMeters.push(formattedMeter)
+          }
+        })
+        setCachedData(currentWorkspaceId, `meters_${billingCycle}`, updatedMeters)
+
+        // จัดการบิล
+        const cachedBills = getCachedData(currentWorkspaceId, `bills_${billingCycle}`) || []
+        let updatedBills = [...cachedBills]
+        updatedBillsList.forEach(formattedBill => {
+          const idx = updatedBills.findIndex((b: any) => b.roomNumber === formattedBill.roomNumber)
+          if (idx >= 0) {
+            updatedBills[idx] = { ...updatedBills[idx], ...formattedBill }
+          } else {
+            updatedBills.push(formattedBill)
+          }
+        })
+        setCachedData(currentWorkspaceId, `bills_${billingCycle}`, updatedBills)
       }
 
       const successText = type === "electric" ? "มิเตอร์ไฟ" : "มิเตอร์น้ำ"
       showToast(`บันทึกข้อมูล${successText}และคำนวณบิลสำเร็จเรียบร้อย!`)
-      await loadData(billingCycle, true)
     } catch (err) {
       console.error(err)
       alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
@@ -1380,7 +1544,8 @@ export default function UnifiedBillingPage() {
     )
     if (res.success) {
       showToast(`สร้างบิลแบบกำหนดเองห้อง ${newRoomNumber} สำเร็จ!`)
-      await loadData(billingCycle, true)
+      const formatted = formatDbBillToCamelCase(res.data)
+      updateLocalStateAndCache(newRoomNumber, undefined, formatted)
     } else {
       alert(res.error || "ออกใบแจ้งยอดไม่สำเร็จ")
       return
