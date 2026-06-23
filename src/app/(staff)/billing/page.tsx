@@ -25,7 +25,7 @@ import {
   Home,
   ShieldAlert
 } from "lucide-react"
-import { getBills, createBill, updateBillStatus } from "@/features/billing/actions"
+import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
@@ -334,58 +334,57 @@ export default function UnifiedBillingPage() {
         clearWorkspaceCache(wsId)
       }
 
-      // 1. ดึงข้อมูลห้องพักทั้งหมด
+      // ดึงข้อมูลทั้งหมดในคราวเดียวผ่าน Server Action แบบขนาน (หรือใช้ Cache ท้องถิ่นถ้ามีครบและไม่ใช่การ Force Refresh)
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
-      if (!rooms || forceRefresh) {
-        const roomsRes = await getRooms()
-        rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
-        if (wsId) setCachedData(wsId, "rooms", rooms)
-      }
-      setRoomsList(rooms)
-      
-      // 2. ดึงข้อมูลบิลทั้งหมดประจำรอบบิลนี้
-      let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
-      if (!dbBills || forceRefresh) {
-        const billsRes = await getBills(cycle)
-        dbBills = billsRes.success && billsRes.data ? billsRes.data : []
-        if (wsId) setCachedData(wsId, `bills_${cycle}`, dbBills)
-      }
-      
-      // 3. ดึงข้อมูลมิเตอร์น้ำไฟรอบนี้
-      let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
-      if (!dbMeters || forceRefresh) {
-        const meterRes = await getMeterRecords(cycle)
-        dbMeters = meterRes.success && meterRes.data ? meterRes.data : []
-        if (wsId) setCachedData(wsId, `meters_${cycle}`, dbMeters)
-      }
-      
-      // 3.1 ดึงข้อมูลเปลี่ยนมิเตอร์กลางเดือนรอบนี้
-      let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
-      if (!dbReplacements || forceRefresh) {
-        const repRes = await getMeterReplacements(cycle)
-        dbReplacements = repRes.success && repRes.data ? repRes.data : []
-        if (wsId) setCachedData(wsId, `replacements_${cycle}`, dbReplacements)
-      }
-      setMeterReplacements(dbReplacements)
-      
-      // 4. ดึงข้อมูลมิเตอร์น้ำไฟรอบก่อน เพื่อใช้อ้างอิงเป็นเลขมิเตอร์ครั้งก่อนหน้า
       const prevCycle = getPreviousCycle(cycle)
+      let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
+      let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
+      let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
       let dbPrevMeters = wsId ? getCachedData(wsId, `meters_${prevCycle}`) : null
-      if (!dbPrevMeters || forceRefresh) {
-        const prevMeterRes = await getMeterRecords(prevCycle)
-        dbPrevMeters = prevMeterRes.success && prevMeterRes.data ? prevMeterRes.data : []
-        if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
-      }
-      
-      // 5. ดึงข้อมูลการเงินเพื่อใช้หาอัตราค่าปรับจ่ายล่าช้าแบบไดนามิก
       let financeData = wsId ? getCachedData(wsId, "finance_settings") : null
-      if (wsId && (!financeData || forceRefresh)) {
-        const financeRes = await getFinanceSettings(wsId)
-        if (financeRes.success && financeRes.data) {
-          financeData = financeRes.data
-          setCachedData(wsId, "finance_settings", financeData)
+
+      const needsFetch = forceRefresh || !rooms || !dbBills || !dbMeters || !dbReplacements || !dbPrevMeters || !financeData
+
+      if (needsFetch) {
+        const unifiedRes = await getBillingPageData(cycle, prevCycle, wsId || "")
+        if (unifiedRes.success && unifiedRes.data) {
+          const fetched = unifiedRes.data
+          
+          if (!rooms || forceRefresh) {
+            rooms = fetched.rooms
+            if (wsId) setCachedData(wsId, "rooms", rooms)
+          }
+          if (!dbBills || forceRefresh) {
+            dbBills = fetched.bills
+            if (wsId) setCachedData(wsId, `bills_${cycle}`, dbBills)
+          }
+          if (!dbMeters || forceRefresh) {
+            dbMeters = fetched.meters
+            if (wsId) setCachedData(wsId, `meters_${cycle}`, dbMeters)
+          }
+          if (!dbReplacements || forceRefresh) {
+            dbReplacements = fetched.replacements
+            if (wsId) setCachedData(wsId, `replacements_${cycle}`, dbReplacements)
+          }
+          if (!dbPrevMeters || forceRefresh) {
+            dbPrevMeters = fetched.prevMeters
+            if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
+          }
+          if (!financeData || forceRefresh) {
+            financeData = fetched.financeSettings
+            if (wsId && financeData) setCachedData(wsId, "finance_settings", financeData)
+          }
+        } else {
+          rooms = rooms || []
+          dbBills = dbBills || []
+          dbMeters = dbMeters || []
+          dbReplacements = dbReplacements || []
+          dbPrevMeters = dbPrevMeters || []
         }
       }
+
+      setRoomsList(rooms)
+      setMeterReplacements(dbReplacements)
       const currentPenaltyRate = financeData ? Number(financeData.late_penalty_rate || 0) : 0
 
       // โหมด Supabase ดั้งเดิมและถาวร (รวมทุกห้องแม้ไม่มีผู้เช่า)

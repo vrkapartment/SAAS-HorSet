@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { calculateLateDays } from "./utils"
+import { getRooms } from "@/features/room/actions"
+import { getMeterRecords, getMeterReplacements } from "@/features/meter/actions"
+import { getFinanceSettings } from "@/features/finance/actions"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -432,3 +435,43 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
     return { success: false, error: errorMessage }
   }
 }
+
+export async function getBillingPageData(cycle: string, prevCycle: string, workspaceId: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const [
+      roomsRes,
+      billsRes,
+      metersRes,
+      replacementsRes,
+      prevMetersRes,
+      financeRes
+    ] = await Promise.all([
+      getRooms(),
+      getBills(cycle),
+      getMeterRecords(cycle),
+      getMeterReplacements(cycle),
+      getMeterRecords(prevCycle),
+      workspaceId ? getFinanceSettings(workspaceId) : Promise.resolve({ success: true, data: null })
+    ])
+
+    return {
+      success: true,
+      data: {
+        rooms: roomsRes.success && roomsRes.data ? roomsRes.data : [],
+        bills: billsRes.success && billsRes.data ? billsRes.data : [],
+        meters: metersRes.success && metersRes.data ? metersRes.data : [],
+        replacements: replacementsRes.success && replacementsRes.data ? replacementsRes.data : [],
+        prevMeters: prevMetersRes.success && prevMetersRes.data ? prevMetersRes.data : [],
+        financeSettings: financeRes.success && financeRes.data ? financeRes.data : null
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการโหลดข้อมูลตั้งต้น"
+    return { success: false, error: errorMessage }
+  }
+}
+

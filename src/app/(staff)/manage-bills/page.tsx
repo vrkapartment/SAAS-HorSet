@@ -23,7 +23,7 @@ import {
   Zap,
   Droplet
 } from "lucide-react"
-import { getBills, createBill, updateBillStatus } from "@/features/billing/actions"
+import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
@@ -326,53 +326,57 @@ export default function ManageBillsPage() {
         clearWorkspaceCache(wsId)
       }
 
+      // ดึงข้อมูลทั้งหมดในคราวเดียวผ่าน Server Action แบบขนาน (หรือใช้ Cache ท้องถิ่นถ้ามีครบและไม่ใช่การ Force Refresh)
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
-      if (!rooms || forceRefresh) {
-        const roomsRes = await getRooms()
-        rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
-        if (wsId) setCachedData(wsId, "rooms", rooms)
-      }
-      setRoomsList(rooms)
-      
-      let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
-      if (!dbBills || forceRefresh) {
-        const billsRes = await getBills(cycle)
-        dbBills = billsRes.success && billsRes.data ? billsRes.data : []
-        if (wsId) setCachedData(wsId, `bills_${cycle}`, dbBills)
-      }
-      
-      let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
-      if (!dbMeters || forceRefresh) {
-        const meterRes = await getMeterRecords(cycle)
-        dbMeters = meterRes.success && meterRes.data ? meterRes.data : []
-        if (wsId) setCachedData(wsId, `meters_${cycle}`, dbMeters)
-      }
-      
-      // 3.1 ดึงข้อมูลเปลี่ยนมิเตอร์กลางเดือนรอบนี้
-      let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
-      if (!dbReplacements || forceRefresh) {
-        const repRes = await getMeterReplacements(cycle)
-        dbReplacements = repRes.success && repRes.data ? repRes.data : []
-        if (wsId) setCachedData(wsId, `replacements_${cycle}`, dbReplacements)
-      }
-      setMeterReplacements(dbReplacements)
-      
       const prevCycle = getPreviousCycle(cycle)
+      let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
+      let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
+      let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
       let dbPrevMeters = wsId ? getCachedData(wsId, `meters_${prevCycle}`) : null
-      if (!dbPrevMeters || forceRefresh) {
-        const prevMeterRes = await getMeterRecords(prevCycle)
-        dbPrevMeters = prevMeterRes.success && prevMeterRes.data ? prevMeterRes.data : []
-        if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
-      }
-      
       let financeData = wsId ? getCachedData(wsId, "finance_settings") : null
-      if (wsId && (!financeData || forceRefresh)) {
-        const financeRes = await getFinanceSettings(wsId)
-        if (financeRes.success && financeRes.data) {
-          financeData = financeRes.data
-          setCachedData(wsId, "finance_settings", financeData)
+
+      const needsFetch = forceRefresh || !rooms || !dbBills || !dbMeters || !dbReplacements || !dbPrevMeters || !financeData
+
+      if (needsFetch) {
+        const unifiedRes = await getBillingPageData(cycle, prevCycle, wsId || "")
+        if (unifiedRes.success && unifiedRes.data) {
+          const fetched = unifiedRes.data
+          
+          if (!rooms || forceRefresh) {
+            rooms = fetched.rooms
+            if (wsId) setCachedData(wsId, "rooms", rooms)
+          }
+          if (!dbBills || forceRefresh) {
+            dbBills = fetched.bills
+            if (wsId) setCachedData(wsId, `bills_${cycle}`, dbBills)
+          }
+          if (!dbMeters || forceRefresh) {
+            dbMeters = fetched.meters
+            if (wsId) setCachedData(wsId, `meters_${cycle}`, dbMeters)
+          }
+          if (!dbReplacements || forceRefresh) {
+            dbReplacements = fetched.replacements
+            if (wsId) setCachedData(wsId, `replacements_${cycle}`, dbReplacements)
+          }
+          if (!dbPrevMeters || forceRefresh) {
+            dbPrevMeters = fetched.prevMeters
+            if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
+          }
+          if (!financeData || forceRefresh) {
+            financeData = fetched.financeSettings
+            if (wsId && financeData) setCachedData(wsId, "finance_settings", financeData)
+          }
+        } else {
+          rooms = rooms || []
+          dbBills = dbBills || []
+          dbMeters = dbMeters || []
+          dbReplacements = dbReplacements || []
+          dbPrevMeters = dbPrevMeters || []
         }
       }
+
+      setRoomsList(rooms)
+      setMeterReplacements(dbReplacements)
       const currentPenaltyRate = financeData ? Number(financeData.late_penalty_rate || 0) : 0
 
       const activeRooms = rooms
