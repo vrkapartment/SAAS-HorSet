@@ -335,9 +335,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         }
         break
       case "/billing":
-        if (!getCachedData(wsId, "bills_all")) {
-          getBills().then(res => {
-            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+        if (!getCachedData(wsId, "bills_year_2026")) {
+          getBills(undefined, "2026").then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }
         break
@@ -359,9 +359,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             if (res.success && res.data) setCachedData(wsId, "finance_settings", res.data)
           }).catch(() => {})
         }
-        if (!getCachedData(wsId, "bills_all")) {
-          getBills().then(res => {
-            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+        if (!getCachedData(wsId, "bills_year_2026")) {
+          getBills(undefined, "2026").then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }
         break
@@ -384,9 +384,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             if (res.success && res.data) setCachedData(wsId, "tenants", res.data)
           }).catch(() => {})
         }
-        if (!getCachedData(wsId, "bills_all")) {
-          getBills().then(res => {
-            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+        if (!getCachedData(wsId, "bills_year_2026")) {
+          getBills(undefined, "2026").then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }
         break
@@ -430,9 +430,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         }
 
         // 4. โหลดข้อมูลบิลทั้งหมดล่วงหน้า
-        if (!getCachedData(wsId, "bills_all")) {
-          getBills().then(res => {
-            if (res.success && res.data) setCachedData(wsId, "bills_all", res.data)
+        if (!getCachedData(wsId, "bills_year_2026")) {
+          getBills(undefined, "2026").then(res => {
+            if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }
 

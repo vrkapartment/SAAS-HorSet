@@ -271,7 +271,7 @@ export default function TaxPage() {
           }
 
           // 2. โหลดบิลจากระบบ
-          const billsCacheKey = "bills_all"
+          const billsCacheKey = `bills_year_${taxYear}`
           const cachedBills = getCachedData<any[]>(currentWsId, billsCacheKey)
           if (cachedBills) {
             const mappedBills: BillItem[] = cachedBills.map((b: any) => ({
@@ -288,7 +288,7 @@ export default function TaxPage() {
             setBills(mappedBills)
           } else {
             fetchPromises.push(
-              getBills().then(billsRes => {
+              getBills(undefined, taxYear).then(billsRes => {
                 if (billsRes.success && billsRes.data) {
                   const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
                     id: b.id,

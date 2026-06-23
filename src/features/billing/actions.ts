@@ -9,7 +9,7 @@ const isSupabaseConfigured =
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
   process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
 
-export async function getBills(billingCycle?: string) {
+export async function getBills(billingCycle?: string, year?: string) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
@@ -19,6 +19,8 @@ export async function getBills(billingCycle?: string) {
     let query = supabase.from("bills").select("*")
     if (billingCycle) {
       query = query.eq("billing_cycle", billingCycle)
+    } else if (year) {
+      query = query.like("billing_cycle", `${year}-%`)
     }
     const { data, error } = await query.order("room_number", { ascending: true })
     if (error) throw error

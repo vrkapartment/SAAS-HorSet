@@ -208,9 +208,10 @@ export default function AdminDashboard() {
       // โหลดข้อมูลแบบคู่ขนาน (Parallel Fetching) เพื่อประสิทธิภาพสูงสุด
       const fetchPromises = [];
 
+      const currentYear = selectedCycle.split("-")[0] || "2026"
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
       let tenants = wsId ? getCachedData(wsId, "tenants") : null
-      let bills = wsId ? getCachedData(wsId, "bills_all") : null
+      let bills = wsId ? getCachedData(wsId, `bills_year_${currentYear}`) : null
 
       if (!rooms || forceRefresh) {
         fetchPromises.push(
@@ -238,12 +239,12 @@ export default function AdminDashboard() {
 
       if (!bills || forceRefresh) {
         fetchPromises.push(
-          getBills().then(billsRes => {
+          getBills(undefined, currentYear).then(billsRes => {
             if (billsRes && billsRes.success === false) {
               throw new Error(billsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลบิลได้")
             }
             bills = billsRes.success && billsRes.data ? billsRes.data : []
-            if (wsId) setCachedData(wsId, "bills_all", bills)
+            if (wsId) setCachedData(wsId, `bills_year_${currentYear}`, bills)
           })
         );
       }
