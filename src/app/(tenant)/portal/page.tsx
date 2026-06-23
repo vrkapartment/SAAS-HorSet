@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 
 function getCookie(name: string): string | undefined {
@@ -36,6 +36,7 @@ import {
 import { generatePromptPayPayload } from "@/lib/promptpay"
 import { getTenantPortalData, getTenantPortalDataNoLoginAction } from "@/features/tenant/actions"
 import { updateBillStatus } from "@/features/billing/actions"
+import { createClient } from "@/lib/supabase/client"
 
 interface BillHistoryItem {
   cycle: string
@@ -43,8 +44,61 @@ interface BillHistoryItem {
   status: "paid" | "unpaid"
 }
 
+const optimizeImage = (file: File): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // Resize logic: Max width 1200px (retaining aspect ratio)
+        const maxWidth = 1200;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Failed to get 2D context for image compression"));
+          return;
+        }
+
+        // Draw image on canvas
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to WebP if browser supports it, otherwise fallback to JPEG
+        // We compress at 75% quality as requested
+        const targetType = "image/jpeg";
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Image compression failed"));
+            }
+          },
+          targetType,
+          0.75
+        );
+      };
+      img.onerror = (err) => reject(err);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function TenantPortal() {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   
   const [isDemo, setIsDemo] = useState(false)
   const [roomNumber, setRoomNumber] = useState("")
@@ -318,14 +372,26 @@ export default function TenantPortal() {
     }
   }
 
-  const handleUploadSlip = async () => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
     setUploading(true)
-    const mockSlipUrl = "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=300"
-    
-    if (isDemo) {
-      setTimeout(() => {
+    try {
+      // 1. Client-Side Image Optimization (Resize & Compress)
+      const optimizedBlob = await optimizeImage(file)
+      
+      // Safety Check: Ensure size is under 1MB
+      if (optimizedBlob.size > 1024 * 1024) {
+        alert("ไฟล์รูปภาพมีขนาดใหญ่เกินไป (เกิน 1MB) แม้จะทำการบีบอัดแล้ว กรุณาลองใหม่อีกครั้ง")
         setUploading(false)
-        setUploadedSlip(mockSlipUrl)
+        return
+      }
+
+      if (isDemo) {
+        // In demo mode, convert optimized blob to local URL for live preview
+        const localUrl = URL.createObjectURL(optimizedBlob)
+        setUploadedSlip(localUrl)
         setBillStatus("pending")
 
         const savedBills = getCookie("horset_bills")
@@ -334,34 +400,63 @@ export default function TenantPortal() {
             const bills = JSON.parse(decodeURIComponent(savedBills))
             const updatedBills = bills.map((b: any) => {
               if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
-                return { ...b, status: "pending", slipUrl: mockSlipUrl, amount: totalAmount }
+                return { ...b, status: "pending", slipUrl: localUrl, amount: totalAmount }
               }
               return b
             })
             setCookie("horset_bills", encodeURIComponent(JSON.stringify(updatedBills)))
-          } catch (e) {
-            console.error(e)
+          } catch (err) {
+            console.error(err)
           }
         }
-        alert("อัปโหลดสลิปของคุณเรียบร้อยแล้ว! ระบบกำลังส่งข้อมูลไปยังผู้ดูแลเพื่อตรวจสอบและปรับสถานะบิลของคุณ")
-      }, 1500)
-    } else {
-      if (!bill) {
         setUploading(false)
-        alert("ไม่พบบิลของท่านในเดือนนี้")
-        return
-      }
-      
-      const res = await updateBillStatus(bill.id, "pending", mockSlipUrl, totalAmount)
-      setUploading(false)
-      if (res.success) {
-        setUploadedSlip(mockSlipUrl)
-        setBillStatus("pending")
-        alert("อัปโหลดสลิปของคุณเรียบร้อยแล้ว! ระบบกำลังส่งข้อมูลไปยังผู้ดูแลเพื่อตรวจสอบและปรับสถานะบิลของคุณ")
-        loadPortalData()
+        alert("อัปโหลดสลิปสำเร็จ (โหมดสาธิต)! ระบบจำลองการแนบสลิปของคุณเพื่อรอการตรวจสอบแล้ว")
       } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการส่งสลิป")
+        if (!bill) {
+          setUploading(false)
+          alert("ไม่พบบิลของท่านในเดือนนี้")
+          return
+        }
+
+        const supabase = createClient()
+        const fileExt = "jpeg"
+        const fileName = `slips/bill_${bill.id}_${Date.now()}.${fileExt}`
+
+        // 2. Upload optimized blob to Supabase Storage
+        const { data, error: uploadError } = await supabase.storage
+          .from("payment-slips")
+          .upload(fileName, optimizedBlob, {
+            contentType: "image/jpeg",
+            cacheControl: "3600",
+            upsert: true,
+          })
+
+        if (uploadError) {
+          throw uploadError
+        }
+
+        // 3. Get Public URL of the uploaded image
+        const { data: { publicUrl } } = supabase.storage
+          .from("payment-slips")
+          .getPublicUrl(fileName)
+
+        // 4. Update Database Bill Status
+        const res = await updateBillStatus(bill.id, "pending", publicUrl, totalAmount)
+        setUploading(false)
+
+        if (res.success) {
+          setUploadedSlip(publicUrl)
+          setBillStatus("pending")
+          alert("อัปโหลดสลิปของคุณเรียบร้อยแล้ว! ระบบกำลังส่งข้อมูลไปยังผู้ดูแลเพื่อตรวจสอบและปรับสถานะบิลของคุณ")
+          loadPortalData()
+        } else {
+          alert(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปลงฐานข้อมูล")
+        }
       }
+    } catch (err: any) {
+      console.error("Error optimizing/uploading image:", err)
+      alert(err?.message || "เกิดข้อผิดพลาดในการอัปโหลดภาพสลิป กรุณาลองใหม่อีกครั้ง")
+      setUploading(false)
     }
   }
 
@@ -584,8 +679,16 @@ export default function TenantPortal() {
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-slate-400">อัปโหลดภาพใบสลิปโอนเงิน</h4>
                 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                />
+
                 <button
-                  onClick={handleUploadSlip}
+                  onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                   className="w-full py-6 bg-slate-900/40 border border-dashed border-slate-800 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-all"
                 >
@@ -595,7 +698,7 @@ export default function TenantPortal() {
                     <>
                       <Upload className="w-6 h-6 text-blue-400" />
                       <span>กดเลือกไฟล์สลิป หรือลากไฟล์มาวางที่นี่</span>
-                      <span className="text-[9px] text-slate-600">(จำลองการทดสอบ: กดปุ่มเพื่อแนบสลิปทดลอง)</span>
+                      <span className="text-[9px] text-slate-500 font-medium">รองรับเฉพาะ .jpg, .png, .webp (บีบอัดและย่อรูปภาพให้อัตโนมัติ)</span>
                     </>
                   )}
                 </button>
