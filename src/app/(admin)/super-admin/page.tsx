@@ -37,6 +37,7 @@ interface Workspace {
   id: string
   name: string
   created_at: string
+  slip_retention_months?: number
 }
 
 interface ProfileItem {
@@ -282,7 +283,8 @@ export default function SuperAdminPage() {
     const newWs: Workspace = {
       id: newId,
       name: newWorkspaceName.trim(),
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      slip_retention_months: 1
     }
 
     if (!isDemo) {
