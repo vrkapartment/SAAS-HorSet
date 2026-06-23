@@ -1,7 +1,8 @@
 import React, { useState } from "react"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare, Edit3, Lock } from "lucide-react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare, Edit3, Lock, Wrench } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
+import { saveMeterReplacement, deleteMeterReplacement } from "@/features/meter/actions"
 
 interface MeterReadingTableProps {
   isDark: boolean
@@ -39,6 +40,8 @@ interface MeterReadingTableProps {
   handleOtherServiceChange?: (roomNumber: string, value: string) => void
   handleBillAmountChange?: (roomNumber: string, value: string) => void
   mode?: "meters" | "billing"
+  meterReplacements?: any[]
+  onMeterReplacementsChange?: () => void | Promise<void>
 }
 
 export default function MeterReadingTable({
@@ -75,7 +78,9 @@ export default function MeterReadingTable({
   latePenaltyRate = 0,
   handleOtherServiceChange,
   handleBillAmountChange,
-  mode = "billing"
+  mode = "billing",
+  meterReplacements = [],
+  onMeterReplacementsChange
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">(
@@ -91,22 +96,168 @@ export default function MeterReadingTable({
   const [copiedRooms, setCopiedRooms] = useState<{ [room: string]: boolean }>({})
   const [unlockedPaidRooms, setUnlockedPaidRooms] = useState<Record<string, boolean>>({})
 
-  // --- มิเตอร์หมุนเวียนครบรอบ (Meter Rollover) Helpers ---
-  const getUnitsUsedWithRollover = (curr: string | number | null | undefined, prev: string | number | null | undefined): number => {
+  // --- มิเตอร์หมุนเวียนครบรอบ (Meter Rollover) & เปลี่ยนมิเตอร์ (Meter Replacement) Helpers ---
+  const [replacementModal, setReplacementModal] = useState<{
+    isOpen: boolean;
+    roomNumber: string;
+    meterType: "electric" | "water";
+    oldFinalReading: string;
+    newStartReading: string;
+    isEdit: boolean;
+    loading: boolean;
+  } | null>(null);
+
+  const getReplacement = (roomNumber: string, type: "electric" | "water") => {
+    return meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === type);
+  };
+
+  const getUnitsUsedWithRollover = (
+    curr: string | number | null | undefined,
+    prev: string | number | null | undefined,
+    roomNumber?: string,
+    meterType?: "electric" | "water"
+  ): number => {
     if (curr === "" || curr === null || curr === undefined) return 0;
     const currNum = Number(curr);
     const prevNum = Number(prev || 0);
     if (isNaN(currNum) || isNaN(prevNum)) return 0;
+
+    const getUnits = (c: number, p: number) => {
+      if (c >= p) return c - p;
+      return (10000 - p) + c;
+    };
+
+    const replacement = roomNumber && meterType ? getReplacement(roomNumber, meterType) : undefined;
+
+    if (replacement) {
+      const oldFinal = Number(replacement.oldFinalReading ?? 0);
+      const newStart = Number(replacement.newStartReading ?? 0);
+      const oldUnits = getUnits(oldFinal, prevNum);
+      const newUnits = getUnits(currNum, newStart);
+      return oldUnits + newUnits;
+    }
+
     if (currNum >= prevNum) return currNum - prevNum;
     return (10000 - prevNum) + currNum;
   };
 
-  const isMeterRollover = (curr: string | number | null | undefined, prev: string | number | null | undefined): boolean => {
+  const isMeterRollover = (
+    curr: string | number | null | undefined,
+    prev: string | number | null | undefined,
+    roomNumber?: string,
+    meterType?: "electric" | "water"
+  ): boolean => {
     if (curr === "" || curr === null || curr === undefined) return false;
     const currNum = Number(curr);
     const prevNum = Number(prev || 0);
     if (isNaN(currNum) || isNaN(prevNum)) return false;
+
+    const replacement = roomNumber && meterType ? getReplacement(roomNumber, meterType) : undefined;
+
+    if (replacement) {
+      const oldFinal = Number(replacement.oldFinalReading ?? 0);
+      const newStart = Number(replacement.newStartReading ?? 0);
+      const oldRollover = oldFinal < prevNum;
+      const newRollover = currNum < newStart;
+      return oldRollover || newRollover;
+    }
+
     return currNum < prevNum;
+  };
+
+  const handleOpenReplacementModal = (roomNumber: string, meterType: "electric" | "water", existing?: any) => {
+    const item = unifiedItems.find(i => i.roomNumber === roomNumber);
+    if (!item) return;
+
+    if (!permissions.manage_meters_bills) {
+      alert("คุณไม่มีสิทธิ์ในการจัดการข้อมูลมิเตอร์ กรุณาติดต่อผู้ดูแลระบบ");
+      return;
+    }
+
+    if (item.billStatus === "paid" && !unlockedPaidRooms[roomNumber]) {
+      alert("ไม่สามารถบันทึกหรือเปลี่ยนมิเตอร์ได้ เนื่องจากบิลของห้องนี้ได้รับการชำระเงินเรียบร้อยแล้วและยังไม่ได้ปลดล็อกแก้ไข");
+      return;
+    }
+
+    setReplacementModal({
+      isOpen: true,
+      roomNumber,
+      meterType,
+      oldFinalReading: existing ? String(existing.oldFinalReading) : "",
+      newStartReading: existing ? String(existing.newStartReading) : "",
+      isEdit: !!existing,
+      loading: false
+    });
+  };
+
+  const handleSaveReplacement = async () => {
+    if (!replacementModal) return;
+    const { roomNumber, meterType, oldFinalReading, newStartReading } = replacementModal;
+
+    const oldNum = Number(oldFinalReading);
+    const newNum = Number(newStartReading);
+
+    if (oldFinalReading === "" || isNaN(oldNum)) {
+      alert("กรุณากรอกเลขมิเตอร์เครื่องเดิมครั้งสุดท้ายให้ถูกต้อง");
+      return;
+    }
+    if (newStartReading === "" || isNaN(newNum)) {
+      alert("กรุณากรอกเลขมิเตอร์เครื่องใหม่เริ่มต้นให้ถูกต้อง");
+      return;
+    }
+
+    setReplacementModal(prev => prev ? { ...prev, loading: true } : null);
+
+    try {
+      const res = await saveMeterReplacement(
+        currentWorkspaceId,
+        roomNumber,
+        billingCycle,
+        meterType,
+        oldNum,
+        newNum
+      );
+
+      if (res.success) {
+        if (onMeterReplacementsChange) {
+          await onMeterReplacementsChange();
+        }
+        setReplacementModal(null);
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+        setReplacementModal(prev => prev ? { ...prev, loading: false } : null);
+      }
+    } catch (e: any) {
+      alert(e?.message || "เกิดข้อผิดพลาดระบบ");
+      setReplacementModal(prev => prev ? { ...prev, loading: false } : null);
+    }
+  };
+
+  const handleDeleteReplacement = async () => {
+    if (!replacementModal) return;
+    const { roomNumber, meterType } = replacementModal;
+
+    if (!confirm("คุณต้องการลบข้อมูลการเปลี่ยนมิเตอร์กลางเดือนนี้ใช่หรือไม่? ระบบจะกลับไปคิดแบบปกติ")) {
+      return;
+    }
+
+    setReplacementModal(prev => prev ? { ...prev, loading: true } : null);
+
+    try {
+      const res = await deleteMeterReplacement(roomNumber, billingCycle, meterType);
+      if (res.success) {
+        if (onMeterReplacementsChange) {
+          await onMeterReplacementsChange();
+        }
+        setReplacementModal(null);
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการลบข้อมูล");
+        setReplacementModal(prev => prev ? { ...prev, loading: false } : null);
+      }
+    } catch (e: any) {
+      alert(e?.message || "เกิดข้อผิดพลาดระบบ");
+      setReplacementModal(prev => prev ? { ...prev, loading: false } : null);
+    }
   };
 
   const [rolloverConfirm, setRolloverConfirm] = useState<{
@@ -121,8 +272,8 @@ export default function MeterReadingTable({
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
     if (!item) return
 
-    const hasElecRolloverVal = type !== "water" && isMeterRollover(item.elecCurr, item.elecPrev)
-    const hasWaterRolloverVal = type !== "electric" && isMeterRollover(item.waterCurr, item.waterPrev)
+    const hasElecRolloverVal = type !== "water" && isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")
+    const hasWaterRolloverVal = type !== "electric" && isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water")
 
     if (hasElecRolloverVal || hasWaterRolloverVal) {
       setRolloverConfirm({
@@ -156,9 +307,9 @@ export default function MeterReadingTable({
 
     const anyRollover = itemsToSave.some(item => {
       if (type === "electric") {
-        return isMeterRollover(item.elecCurr, item.elecPrev);
+        return isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
       } else {
-        return isMeterRollover(item.waterCurr, item.waterPrev);
+        return isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
       }
     });
 
@@ -216,8 +367,8 @@ export default function MeterReadingTable({
       alert("คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
       return
     }
-    const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
-    const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
+    const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
+    const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
 
     const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
     const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
@@ -293,8 +444,8 @@ export default function MeterReadingTable({
         }
 
         try {
-          const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
-          const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
+          const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
+          const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
 
           const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
           const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
@@ -439,13 +590,13 @@ export default function MeterReadingTable({
           ) : unifiedItems.length > 0 ? (
             unifiedItems.map((item) => {
               const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-              const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
+              const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
               const elecCost = hasElecCurr && elecUnitsUsed >= 0
                 ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                 : 0
 
               const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-              const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
+              const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
               const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                 ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
@@ -578,6 +729,17 @@ export default function MeterReadingTable({
                           {hasElecCurr && (
                             <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
                               {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                              {(() => {
+                                const repl = getReplacement(item.roomNumber, "electric");
+                                if (repl) {
+                                  return (
+                                    <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
+                                      สูตร: ({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                           )}
                         </div>
@@ -597,6 +759,17 @@ export default function MeterReadingTable({
                           {hasWaterCurr && (
                             <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
                               {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                              {(() => {
+                                const repl = getReplacement(item.roomNumber, "water");
+                                if (repl) {
+                                  return (
+                                    <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
+                                      สูตร: ({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                           )}
                         </div>
@@ -719,9 +892,53 @@ export default function MeterReadingTable({
                           </span>
                         </div>
 
+                        {/* Replacement Trigger */}
+                        {(() => {
+                          const repl = getReplacement(item.roomNumber, "electric");
+                          const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                          if (repl) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
+                                disabled={isDisabled}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                                  isDark 
+                                    ? "bg-amber-950/20 border-amber-500/30 text-amber-400 hover:bg-amber-950/30" 
+                                    : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100/50"
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <Wrench className="w-3.5 h-3.5 animate-bounce" />
+                                  <span>เปลี่ยนมิเตอร์กลางเดือนแล้ว (คลิกเพื่อแก้ไข)</span>
+                                </span>
+                                <span className="font-mono text-[10px]">
+                                  {repl.oldFinalReading} ➔ {repl.newStartReading}
+                                </span>
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReplacementModal(item.roomNumber, "electric")}
+                                disabled={isDisabled}
+                                className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
+                                  isDark 
+                                    ? "border-slate-800 text-slate-400 hover:bg-slate-900/50 hover:text-slate-300" 
+                                    : "border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              >
+                                <Wrench className="w-3.5 h-3.5" />
+                                <span>บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)</span>
+                              </button>
+                            );
+                          }
+                        })()}
+
                         {item.elecCurr !== "" && (() => {
-                          const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev);
-                          const isRollover = isMeterRollover(item.elecCurr, item.elecPrev);
+                          const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
+                          const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
                           if (units > 3000) {
                             return (
                               <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
@@ -745,6 +962,18 @@ export default function MeterReadingTable({
                             {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                           </span>
                         </div>
+                        {(() => {
+                          const repl = getReplacement(item.roomNumber, "electric");
+                          if (repl && hasElecCurr) {
+                            return (
+                              <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
+                                <span>สูตรคำนวณ:</span>
+                                <span>({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         <div className="flex justify-between text-xs font-mono">
                           <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
                           <span className="font-bold text-slate-700 dark:text-slate-300">
@@ -813,9 +1042,53 @@ export default function MeterReadingTable({
                           </span>
                         </div>
 
+                        {/* Replacement Trigger */}
+                        {(() => {
+                          const repl = getReplacement(item.roomNumber, "water");
+                          const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                          if (repl) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReplacementModal(item.roomNumber, "water", repl)}
+                                disabled={isDisabled}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                                  isDark 
+                                    ? "bg-amber-950/20 border-amber-500/30 text-amber-400 hover:bg-amber-950/30" 
+                                    : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100/50"
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <Wrench className="w-3.5 h-3.5 animate-bounce" />
+                                  <span>เปลี่ยนมิเตอร์กลางเดือนแล้ว (คลิกเพื่อแก้ไข)</span>
+                                </span>
+                                <span className="font-mono text-[10px]">
+                                  {repl.oldFinalReading} ➔ {repl.newStartReading}
+                                </span>
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReplacementModal(item.roomNumber, "water")}
+                                disabled={isDisabled}
+                                className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
+                                  isDark 
+                                    ? "border-slate-800 text-slate-400 hover:bg-slate-900/50 hover:text-slate-300" 
+                                    : "border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              >
+                                <Wrench className="w-3.5 h-3.5" />
+                                <span>บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)</span>
+                              </button>
+                            );
+                          }
+                        })()}
+
                         {item.waterCurr !== "" && (() => {
-                          const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev);
-                          const isRollover = isMeterRollover(item.waterCurr, item.waterPrev);
+                          const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
+                          const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
                           if (units > 3000) {
                             return (
                               <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
@@ -839,6 +1112,18 @@ export default function MeterReadingTable({
                             {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                           </span>
                         </div>
+                        {(() => {
+                          const repl = getReplacement(item.roomNumber, "water");
+                          if (repl && hasWaterCurr) {
+                            return (
+                              <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
+                                <span>สูตรคำนวณ:</span>
+                                <span>({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         <div className="flex justify-between text-xs font-mono">
                           <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
                           <span className="font-bold text-slate-700 dark:text-slate-300">
@@ -1011,13 +1296,13 @@ export default function MeterReadingTable({
               ) : unifiedItems.length > 0 ? (
                 unifiedItems.map((item) => {
                   const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                  const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev) : 0
+                  const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
                   const elecCost = hasElecCurr && elecUnitsUsed >= 0
                     ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                     : 0
 
                   const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                  const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev) : 0
+                  const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
                   const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                     ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
@@ -1370,8 +1655,8 @@ export default function MeterReadingTable({
                               </span>
                             </div>
                             {item.elecCurr !== "" && (() => {
-                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev);
-                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev);
+                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
+                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
                               if (units > 3000) {
                                 return (
                                   <div className="text-[10px] text-red-500 font-extrabold flex items-center justify-center gap-1 mt-1">
@@ -1387,6 +1672,46 @@ export default function MeterReadingTable({
                               }
                               return null;
                             })()}
+                            <div className="block mt-1">
+                              {(() => {
+                                const repl = getReplacement(item.roomNumber, "electric");
+                                const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                                if (repl) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
+                                      disabled={isDisabled}
+                                      title={`เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-black transition-all ${
+                                        isDark 
+                                          ? "bg-amber-950/25 border-amber-500/30 text-amber-400 hover:bg-amber-950/40" 
+                                          : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                      <Wrench className="w-2.5 h-2.5" />
+                                      <span>เปลี่ยนแล้ว ({repl.oldFinalReading}➔{repl.newStartReading})</span>
+                                    </button>
+                                  );
+                                } else {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "electric")}
+                                      disabled={isDisabled}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-dashed text-[9px] font-black transition-all ${
+                                        isDark 
+                                          ? "border-slate-800 text-slate-500 hover:text-slate-400 hover:bg-slate-900/30" 
+                                          : "border-slate-300 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                      <Wrench className="w-2.5 h-2.5" />
+                                      <span>เปลี่ยนมิเตอร์</span>
+                                    </button>
+                                  );
+                                }
+                              })()}
+                            </div>
                           </td>
 
                           {/* หน่วย / ยอดไฟ */}
@@ -1399,6 +1724,22 @@ export default function MeterReadingTable({
                                 ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                                 : "-"}
                             </div>
+                            {(() => {
+                              const repl = getReplacement(item.roomNumber, "electric");
+                              if (repl && hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000) {
+                                return (
+                                  <div 
+                                    className={`mt-1 text-[8px] leading-tight px-1 py-0.5 rounded font-black max-w-[110px] mx-auto cursor-help ${
+                                      isDark ? "bg-blue-950/20 text-blue-300" : "bg-blue-50 text-blue-700"
+                                    }`}
+                                    title={`สูตรคำนวณมิเตอร์เสียกลางเดือน:\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.elecPrev}) + (จดรอบนี้: ${item.elecCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
+                                  >
+                                    ({repl.oldFinalReading}-{item.elecPrev}) + ({item.elecCurr || 0}-{repl.newStartReading})
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
 
                           {/* บันทึก */}
@@ -1466,8 +1807,8 @@ export default function MeterReadingTable({
                               </span>
                             </div>
                             {item.waterCurr !== "" && (() => {
-                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev);
-                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev);
+                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
+                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
                               if (units > 3000) {
                                 return (
                                   <div className="text-[10px] text-red-500 font-extrabold flex items-center justify-center gap-1 mt-1">
@@ -1483,6 +1824,46 @@ export default function MeterReadingTable({
                               }
                               return null;
                             })()}
+                            <div className="block mt-1">
+                              {(() => {
+                                const repl = getReplacement(item.roomNumber, "water");
+                                const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                                if (repl) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "water", repl)}
+                                      disabled={isDisabled}
+                                      title={`เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-black transition-all ${
+                                        isDark 
+                                          ? "bg-amber-950/25 border-amber-500/30 text-amber-400 hover:bg-amber-950/40" 
+                                          : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                      <Wrench className="w-2.5 h-2.5" />
+                                      <span>เปลี่ยนแล้ว ({repl.oldFinalReading}➔{repl.newStartReading})</span>
+                                    </button>
+                                  );
+                                } else {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "water")}
+                                      disabled={isDisabled}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-dashed text-[9px] font-black transition-all ${
+                                        isDark 
+                                          ? "border-slate-800 text-slate-500 hover:text-slate-400 hover:bg-slate-900/30" 
+                                          : "border-slate-300 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                      <Wrench className="w-2.5 h-2.5" />
+                                      <span>เปลี่ยนมิเตอร์</span>
+                                    </button>
+                                  );
+                                }
+                              })()}
+                            </div>
                           </td>
 
                           {/* หน่วย / ยอดน้ำ */}
@@ -1495,6 +1876,22 @@ export default function MeterReadingTable({
                                 ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
                                 : "-"}
                             </div>
+                            {(() => {
+                              const repl = getReplacement(item.roomNumber, "water");
+                              if (repl && hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000) {
+                                return (
+                                  <div 
+                                    className={`mt-1 text-[8px] leading-tight px-1 py-0.5 rounded font-black max-w-[110px] mx-auto cursor-help ${
+                                      isDark ? "bg-teal-950/20 text-teal-300" : "bg-teal-50 text-teal-700"
+                                    }`}
+                                    title={`สูตรคำนวณมิเตอร์เสียกลางเดือน:\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.waterPrev}) + (จดรอบนี้: ${item.waterCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
+                                  >
+                                    ({repl.oldFinalReading}-{item.waterPrev}) + ({item.waterCurr || 0}-{repl.newStartReading})
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
 
                           {/* บันทึก */}
@@ -1959,6 +2356,127 @@ export default function MeterReadingTable({
                 >
                   ยืนยันหมุนครบรอบ
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up บันทึกเปลี่ยนมิเตอร์ (กลางเดือน) */}
+      {replacementModal && replacementModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-all"
+            onClick={() => setReplacementModal(null)}
+          />
+          {/* Modal Container */}
+          <div className={`relative w-full max-w-md p-6 rounded-2xl border shadow-2xl transform scale-100 transition-all ${
+            isDark 
+              ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-slate-950/50" 
+              : "bg-white/95 border-slate-200 text-slate-800 shadow-slate-200/50"
+          }`}>
+            <button
+              onClick={() => setReplacementModal(null)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500/10 dark:bg-amber-500/20 text-amber-500 rounded-full">
+                  <Wrench className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight">
+                    {replacementModal.isEdit ? "🔧 แก้ไขบันทึกเปลี่ยนมิเตอร์" : "🔧 บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)"}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    ห้อง {replacementModal.roomNumber} ({replacementModal.meterType === "electric" ? "มิเตอร์ไฟฟ้า" : "มิเตอร์น้ำประปา"})
+                  </p>
+                </div>
+              </div>
+
+              <div className={`p-4 rounded-xl border space-y-2 text-xs leading-relaxed ${
+                isDark ? "bg-slate-950/40 border-slate-850" : "bg-blue-50/30 border-blue-100 text-blue-800"
+              }`}>
+                <p className="font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  สูตรคำนวณมิเตอร์เสียกลางเดือน:
+                </p>
+                <div className="font-mono bg-white dark:bg-slate-950 p-2 rounded border border-slate-200 dark:border-slate-800/80 text-center text-xs font-black text-amber-600 dark:text-amber-400">
+                  (มิเตอร์เก่า - ก่อนหน้า) + (จดรอบนี้ - มิเตอร์ใหม่)
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    เลขสุดท้ายของมิเตอร์เครื่องเดิม (ที่เสีย):
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="เช่น 1234"
+                    disabled={replacementModal.loading}
+                    className={`w-full h-11 px-3.5 rounded-xl border font-mono font-bold focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 transition-all ${
+                      isDark ? "bg-slate-950 border-slate-850 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                    }`}
+                    value={replacementModal.oldFinalReading}
+                    onChange={(e) => setReplacementModal(prev => prev ? { ...prev, oldFinalReading: e.target.value } : null)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    เลขเริ่มต้นของมิเตอร์เครื่องใหม่:
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="เช่น 0"
+                    disabled={replacementModal.loading}
+                    className={`w-full h-11 px-3.5 rounded-xl border font-mono font-bold focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 transition-all ${
+                      isDark ? "bg-slate-950 border-slate-850 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                    }`}
+                    value={replacementModal.newStartReading}
+                    onChange={(e) => setReplacementModal(prev => prev ? { ...prev, newStartReading: e.target.value } : null)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-4">
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setReplacementModal(null)}
+                    disabled={replacementModal.loading}
+                    className={`flex-1 h-11 text-xs font-bold rounded-xl border transition-all ${
+                      isDark 
+                        ? "bg-slate-950 border-slate-850 text-slate-400 hover:text-white" 
+                        : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={handleSaveReplacement}
+                    disabled={replacementModal.loading}
+                    className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {replacementModal.loading ? "กำลังบันทึก..." : "บันทึกเปลี่ยนมิเตอร์"}
+                  </button>
+                </div>
+
+                {replacementModal.isEdit && (
+                  <button
+                    onClick={handleDeleteReplacement}
+                    disabled={replacementModal.loading}
+                    className="w-full h-10 mt-1 text-xs font-bold rounded-xl border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 transition-all disabled:opacity-50"
+                  >
+                    {replacementModal.loading ? "กำลังลบ..." : "ลบบันทึกเปลี่ยนมิเตอร์ (กลับไปคิดแบบปกติ)"}
+                  </button>
+                )}
               </div>
             </div>
           </div>

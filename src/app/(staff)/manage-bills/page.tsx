@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import { getBills, createBill, updateBillStatus } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
-import { getMeterRecords, saveMeterRecord } from "@/features/meter/actions"
+import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 
@@ -186,6 +186,7 @@ export default function ManageBillsPage() {
   const [workspaceTaxId, setWorkspaceTaxId] = useState<string>("")
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>("")
   const [latePenaltyRate, setLatePenaltyRate] = useState<number>(0)
+  const [meterReplacements, setMeterReplacements] = useState<any[]>([])
   
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
@@ -346,6 +347,15 @@ export default function ManageBillsPage() {
         dbMeters = meterRes.success && meterRes.data ? meterRes.data : []
         if (wsId) setCachedData(wsId, `meters_${cycle}`, dbMeters)
       }
+      
+      // 3.1 ดึงข้อมูลเปลี่ยนมิเตอร์กลางเดือนรอบนี้
+      let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
+      if (!dbReplacements || forceRefresh) {
+        const repRes = await getMeterReplacements(cycle)
+        dbReplacements = repRes.success && repRes.data ? repRes.data : []
+        if (wsId) setCachedData(wsId, `replacements_${cycle}`, dbReplacements)
+      }
+      setMeterReplacements(dbReplacements)
       
       const prevCycle = getPreviousCycle(cycle)
       let dbPrevMeters = wsId ? getCachedData(wsId, `meters_${prevCycle}`) : null
@@ -782,60 +792,70 @@ export default function ManageBillsPage() {
     const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
     const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-    if (type === "electric") {
-      if (elecVal === "" || isNaN(elecVal as number)) {
-        alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าให้ครบถ้วน")
-        return
-      }
-      if (isNaN(elecPrevVal)) {
-        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
-        return
-      }
-      const eUnits = (elecVal as number) >= elecPrevVal 
-        ? (elecVal as number) - elecPrevVal 
-        : (10000 - elecPrevVal) + (elecVal as number)
-      
-      if (eUnits > 3000) {
-        alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง")
-        return
-      }
-    } else if (type === "water") {
-      if (waterVal === "" || isNaN(waterVal as number)) {
-        alert("กรุณากรอกตัวเลขมิเตอร์น้ำประปาให้ครบถ้วน")
-        return
-      }
-      if (isNaN(waterPrevVal)) {
-        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
-        return
-      }
-      const wUnits = (waterVal as number) >= waterPrevVal 
-        ? (waterVal as number) - waterPrevVal 
-        : (10000 - waterPrevVal) + (waterVal as number)
-      
-      if (wUnits > 3000) {
-        alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง")
-        return
-      }
-    } else {
-      if (elecVal === "" || waterVal === "" || isNaN(elecVal as number) || isNaN(waterVal as number)) {
-        alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
-        return
-      }
-      if (isNaN(elecPrevVal) || isNaN(waterPrevVal)) {
-        alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้ถูกต้อง")
-        return
-      }
-      const eUnits = (elecVal as number) >= elecPrevVal 
-        ? (elecVal as number) - elecPrevVal 
-        : (10000 - elecPrevVal) + (elecVal as number)
-      const wUnits = (waterVal as number) >= waterPrevVal 
-        ? (waterVal as number) - waterPrevVal 
-        : (10000 - waterPrevVal) + (waterVal as number)
+    const repElec = meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === "electric")
+    const repWater = meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === "water")
 
-      if (eUnits > 3000 || wUnits > 3000) {
-        alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง")
-        return
+    const getUnits = (curr: number, prev: number) => {
+      if (curr >= prev) return curr - prev
+      return (10000 - prev) + curr
+    }
+
+    let eUnits = 0
+    let wUnits = 0
+
+    if (type === "electric" || type === "all") {
+      if (elecVal === "" || isNaN(elecVal as number)) {
+        if (type === "electric") {
+          alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าให้ครบถ้วน")
+          return
+        }
+      } else {
+        if (isNaN(elecPrevVal)) {
+          alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+          return
+        }
+        if (repElec) {
+          const oldUnits = getUnits(repElec.oldFinalReading, elecPrevVal)
+          const newUnits = getUnits(Number(elecVal), repElec.newStartReading)
+          eUnits = oldUnits + newUnits
+        } else {
+          eUnits = getUnits(Number(elecVal), elecPrevVal)
+        }
+        if (eUnits > 3000) {
+          alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง (คำนวณแล้วเกิน 3,000 หน่วย)")
+          return
+        }
       }
+    }
+
+    if (type === "water" || type === "all") {
+      if (waterVal === "" || isNaN(waterVal as number)) {
+        if (type === "water") {
+          alert("กรุณากรอกตัวเลขมิเตอร์น้ำประปาให้ครบถ้วน")
+          return
+        }
+      } else {
+        if (isNaN(waterPrevVal)) {
+          alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+          return
+        }
+        if (repWater) {
+          const oldUnits = getUnits(repWater.oldFinalReading, waterPrevVal)
+          const newUnits = getUnits(Number(waterVal), repWater.newStartReading)
+          wUnits = oldUnits + newUnits
+        } else {
+          wUnits = getUnits(Number(waterVal), waterPrevVal)
+        }
+        if (wUnits > 3000) {
+          alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง (คำนวณแล้วเกิน 3,000 หน่วย)")
+          return
+        }
+      }
+    }
+
+    if (type === "all" && (elecVal === "" || waterVal === "")) {
+      alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
+      return
     }
 
     setSavingAll(true)
@@ -861,11 +881,8 @@ export default function ManageBillsPage() {
       }
 
       if (item.tenantName) {
-        const calculatedElecUnits = activeElecCurr >= activeElecPrev ? activeElecCurr - activeElecPrev : (10000 - activeElecPrev) + activeElecCurr
-        const calculatedWaterUnits = activeWaterCurr >= activeWaterPrev ? activeWaterCurr - activeWaterPrev : (10000 - activeWaterPrev) + activeWaterCurr
-
-        const finalElecUnits = electricMinChecked && calculatedElecUnits <= electricMinUnit ? electricMinUnit : calculatedElecUnits
-        const finalWaterUnits = waterMinChecked && calculatedWaterUnits <= waterMinUnit ? waterMinUnit : calculatedWaterUnits
+        const finalElecUnits = electricMinChecked && eUnits <= electricMinUnit ? electricMinUnit : eUnits
+        const finalWaterUnits = waterMinChecked && wUnits <= waterMinUnit ? waterMinUnit : wUnits
 
         const elecCost = finalElecUnits * elecRate
         const waterCost = finalWaterUnits * waterRate
@@ -878,8 +895,8 @@ export default function ManageBillsPage() {
           billTotalAmount,
           item.billStatus === "not_created" ? "unpaid" : item.billStatus,
           billingCycle,
-          calculatedElecUnits,
-          calculatedWaterUnits,
+          eUnits,
+          wUnits,
           item.otherServiceAmount || 0
         )
 
@@ -921,6 +938,11 @@ export default function ManageBillsPage() {
     setSavingAll(true)
     setSavingProgress({ current: 0, total: editedItems.length, currentRoom: "" })
 
+    const getUnits = (curr: number, prev: number) => {
+      if (curr >= prev) return curr - prev
+      return (10000 - prev) + curr
+    }
+
     try {
       for (let i = 0; i < editedItems.length; i++) {
         const item = editedItems[i]
@@ -931,27 +953,33 @@ export default function ManageBillsPage() {
         const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
         const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-        if (type === "electric") {
-          if (elecVal === "" || isNaN(elecVal as number) || isNaN(elecPrevVal)) continue
-          const eUnits = (elecVal as number) >= elecPrevVal 
-            ? (elecVal as number) - elecPrevVal 
-            : (10000 - elecPrevVal) + (elecVal as number)
-          if (eUnits > 3000) continue
-        } else if (type === "water") {
-          if (waterVal === "" || isNaN(waterVal as number) || isNaN(waterPrevVal)) continue
-          const wUnits = (waterVal as number) >= waterPrevVal 
-            ? (waterVal as number) - waterPrevVal 
-            : (10000 - waterPrevVal) + (waterVal as number)
-          if (wUnits > 3000) continue
-        } else {
-          if (elecVal === "" || waterVal === "" || isNaN(elecVal as number) || isNaN(waterVal as number) || isNaN(elecPrevVal) || isNaN(waterPrevVal)) continue
-          const eUnits = (elecVal as number) >= elecPrevVal 
-            ? (elecVal as number) - elecPrevVal 
-            : (10000 - elecPrevVal) + (elecVal as number)
-          const wUnits = (waterVal as number) >= waterPrevVal 
-            ? (waterVal as number) - waterPrevVal 
-            : (10000 - waterPrevVal) + (waterVal as number)
-          if (eUnits > 3000 || wUnits > 3000) continue
+        const repElec = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "electric")
+        const repWater = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "water")
+
+        let eUnits = 0
+        if (elecVal !== "") {
+          if (repElec) {
+            const oldUnits = getUnits(repElec.oldFinalReading, elecPrevVal)
+            const newUnits = getUnits(Number(elecVal), repElec.newStartReading)
+            eUnits = oldUnits + newUnits
+          } else {
+            eUnits = getUnits(Number(elecVal), elecPrevVal)
+          }
+        }
+
+        let wUnits = 0
+        if (waterVal !== "") {
+          if (repWater) {
+            const oldUnits = getUnits(repWater.oldFinalReading, waterPrevVal)
+            const newUnits = getUnits(Number(waterVal), repWater.newStartReading)
+            wUnits = oldUnits + newUnits
+          } else {
+            wUnits = getUnits(Number(waterVal), waterPrevVal)
+          }
+        }
+
+        if (eUnits > 3000 || wUnits > 3000) {
+          continue
         }
 
         const activeElecCurr = elecVal === "" ? 0 : Number(elecVal)
@@ -973,11 +1001,8 @@ export default function ManageBillsPage() {
         }
 
         if (item.tenantName) {
-          const calculatedElecUnits = activeElecCurr >= activeElecPrev ? activeElecCurr - activeElecPrev : (10000 - activeElecPrev) + activeElecCurr
-          const calculatedWaterUnits = activeWaterCurr >= activeWaterPrev ? activeWaterCurr - activeWaterPrev : (10000 - activeWaterPrev) + activeWaterCurr
-
-          const finalElecUnits = electricMinChecked && calculatedElecUnits <= electricMinUnit ? electricMinUnit : calculatedElecUnits
-          const finalWaterUnits = waterMinChecked && calculatedWaterUnits <= waterMinUnit ? waterMinUnit : calculatedWaterUnits
+          const finalElecUnits = electricMinChecked && eUnits <= electricMinUnit ? electricMinUnit : eUnits
+          const finalWaterUnits = waterMinChecked && wUnits <= waterMinUnit ? waterMinUnit : wUnits
 
           const elecCost = finalElecUnits * elecRate
           const waterCost = finalWaterUnits * waterRate
@@ -990,8 +1015,8 @@ export default function ManageBillsPage() {
             billTotalAmount,
             item.billStatus === "not_created" ? "unpaid" : item.billStatus,
             billingCycle,
-            calculatedElecUnits,
-            calculatedWaterUnits,
+            eUnits,
+            wUnits,
             item.otherServiceAmount || 0
           )
         }
@@ -1399,6 +1424,10 @@ export default function ManageBillsPage() {
         latePenaltyRate={latePenaltyRate}
         handleOtherServiceChange={handleOtherServiceChange}
         mode="billing"
+        meterReplacements={meterReplacements}
+        onMeterReplacementsChange={async () => {
+          await loadData(billingCycle, true)
+        }}
       />
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}

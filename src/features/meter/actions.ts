@@ -112,3 +112,119 @@ export async function saveMeterRecord(
     return { success: false, error: errorMessage }
   }
 }
+
+export async function saveMeterReplacement(
+  workspaceId: string,
+  roomNumber: string,
+  billingCycle: string,
+  meterType: "electric" | "water",
+  oldFinalReading: number,
+  newStartReading: number
+) {
+  if (!isSupabaseConfigured) {
+    return { success: true, mock: true }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    const { data: existing } = await supabase
+      .from("meter_replacements")
+      .select("id")
+      .eq("room_number", roomNumber)
+      .eq("billing_cycle", billingCycle)
+      .eq("meter_type", meterType)
+      .maybeSingle()
+
+    let result
+    if (existing) {
+      result = await supabase
+        .from("meter_replacements")
+        .update({
+          workspace_id: workspaceId,
+          old_final_reading: oldFinalReading,
+          new_start_reading: newStartReading,
+          is_active: true
+        })
+        .eq("id", existing.id)
+        .select()
+    } else {
+      result = await supabase
+        .from("meter_replacements")
+        .insert([{
+          workspace_id: workspaceId,
+          room_number: roomNumber,
+          billing_cycle: billingCycle,
+          meter_type: meterType,
+          old_final_reading: oldFinalReading,
+          new_start_reading: newStartReading,
+          is_active: true
+        }])
+        .select()
+    }
+
+    if (result.error) throw result.error
+    return { success: true, data: result.data[0] }
+  } catch (error: any) {
+    const errorMessage = error && error.message ? error.message : "เกิดข้อผิดพลาดในการบันทึกเปลี่ยนมิเตอร์"
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function getMeterReplacements(billingCycle: string) {
+  if (!isSupabaseConfigured) {
+    return { success: true, data: [] }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("meter_replacements")
+      .select("*")
+      .eq("billing_cycle", billingCycle)
+      .eq("is_active", true)
+
+    if (error) throw error
+
+    const formatted = data.map((m: any) => ({
+      id: m.id,
+      workspaceId: m.workspace_id,
+      roomNumber: m.room_number,
+      billingCycle: m.billing_cycle,
+      meterType: m.meter_type as "electric" | "water",
+      oldFinalReading: Number(m.old_final_reading),
+      newStartReading: Number(m.new_start_reading)
+    }))
+
+    return { success: true, data: formatted }
+  } catch (error: any) {
+    const errorMessage = error && error.message ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลการเปลี่ยนมิเตอร์"
+    return { success: false, error: errorMessage, data: [] }
+  }
+}
+
+export async function deleteMeterReplacement(
+  roomNumber: string,
+  billingCycle: string,
+  meterType: "electric" | "water"
+) {
+  if (!isSupabaseConfigured) {
+    return { success: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from("meter_replacements")
+      .delete()
+      .eq("room_number", roomNumber)
+      .eq("billing_cycle", billingCycle)
+      .eq("meter_type", meterType)
+
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    const errorMessage = error && error.message ? error.message : "เกิดข้อผิดพลาดในการลบข้อมูลการเปลี่ยนมิเตอร์"
+    return { success: false, error: errorMessage }
+  }
+}
