@@ -1268,51 +1268,113 @@ export default function TaxPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-900/40">
-              {monthsList.map(m => {
-                const cycleStr = `${taxYear}-${m.num}`
-                const paidBillsInMonth = bills.filter(b => b.status === "paid" && b.billingCycle === cycleStr)
-                
-                let monthlyRent = 0
-                let monthlyUtil = 0
-                
-                if (dataSource === "system" && hasPaidBills) {
-                  paidBillsInMonth.forEach(bill => {
-                    const elecVal = Number(bill.electricUnits || 0) * electricRate
-                    const waterVal = Number(bill.waterUnits || 0) * waterRate
-                    const utilVal = elecVal + waterVal
-                    const rentVal = Number(bill.amount || 0) - utilVal
+              {(() => {
+                let sumRent = 0
+                let sumUtil = 0
+                let sumTotal = 0
+                let sumBills = 0
+
+                const rows = monthsList.map(m => {
+                  const cycleStr = `${taxYear}-${m.num}`
+                  const paidBillsInMonth = bills.filter(b => b.status === "paid" && b.billingCycle === cycleStr)
+                  
+                  let monthlyRent = 0
+                  let monthlyUtil = 0
+                  
+                  if (dataSource === "system" && hasPaidBills) {
+                    paidBillsInMonth.forEach(bill => {
+                      const electricUnits = Number(bill.electricUnits || 0)
+                      const waterUnits = Number(bill.waterUnits || 0)
+                      
+                      const elecAmount = electricUnits * electricRate
+                      const waterAmount = waterUnits * waterRate
+                      
+                      // ค่าน้ำไฟ/บริการ 40(8) = ค่ายูนิตน้ำ + ค่ายูนิตไฟ + ค่าส่วนกลาง
+                      const utilitiesAmount = elecAmount + waterAmount + commonFee
+                      
+                      const billAmount = Number(bill.amount || 0)
+                      
+                      // ค้นหาค่าเช่าห้องพักหลัก (baseRent) จากข้อมูลห้อง หรือใช้ส่วนต่างบิลหักน้ำไฟส่วนกลางเป็นทางเลือกสุดท้าย
+                      const matchedRoom = rooms.find(r => r.roomNumber === bill.roomNumber)
+                      const baseRentVal = matchedRoom ? matchedRoom.baseRent : Math.max(0, billAmount - utilitiesAmount)
+                      
+                      // ค่าเช่า 40(5) = เฉพาะค่าเช่าห้องพักหลัก
+                      const rentAmount = Math.max(0, Math.min(baseRentVal, billAmount))
+                      
+                      // รายได้อื่นๆ 40(8) = ยอดชำระสุทธิ - ค่าเช่าห้อง - ค่าน้ำไฟ/บริการส่วนกลาง (เช่น เงินปรับล่าช้า / มัดจำ)
+                      const otherAmount = Math.max(0, billAmount - rentAmount - utilitiesAmount)
+
+                      monthlyRent += rentAmount
+                      monthlyUtil += (utilitiesAmount + otherAmount)
+                    })
                     
-                    monthlyRent += rentVal
-                    monthlyUtil += utilVal
-                  })
-                } else {
-                  // ข้อมูลจำลอง/ manual หาร 12
-                  monthlyRent = rent405Full / 12
-                  monthlyUtil = utilities408Full / 12
-                }
-                
-                const monthlyTotal = monthlyRent + monthlyUtil
-                const hasRealData = paidBillsInMonth.length > 0 && dataSource === "system"
-                
+                    // บวกค่าเช่าล่วงหน้าสะสมของเดือนนี้ (40(5))
+                    const advanceRentBillsInMonth = advanceRentBills.filter(t => t.contractStart && t.contractStart.startsWith(`${taxYear}-${m.num}`))
+                    const advanceRentAmountInMonth = advanceRentBillsInMonth.reduce((sum, t) => {
+                      const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
+                      const roomRent = matchedRoom ? matchedRoom.baseRent : 0
+                      return sum + (roomRent * defaultAdvanceRent)
+                    }, 0)
+                    
+                    // บวกเงินประกันริบสะสมของเดือนนี้ (40(8))
+                    const forfeitedBillsInMonth = cancelledInYear.filter(c => c.cancellationDate && c.cancellationDate.startsWith(`${taxYear}-${m.num}`))
+                    const forfeitedAmountInMonth = forfeitedBillsInMonth.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
+
+                    monthlyRent += advanceRentAmountInMonth
+                    monthlyUtil += forfeitedAmountInMonth
+                    sumBills += paidBillsInMonth.length
+                  } else {
+                    // ข้อมูลจำลอง/ manual หาร 12
+                    monthlyRent = rent405Full / 12
+                    monthlyUtil = (utilities408Full + other408Full) / 12
+                  }
+                  
+                  const monthlyTotal = monthlyRent + monthlyUtil
+                  const hasRealData = paidBillsInMonth.length > 0 && dataSource === "system"
+
+                  sumRent += monthlyRent
+                  sumUtil += monthlyUtil
+                  sumTotal += monthlyTotal
+
+                  return (
+                    <tr key={m.num} className="hover:bg-slate-50 dark:hover:bg-slate-900/10">
+                      <td className="py-3 pl-2 font-medium text-slate-800 dark:text-slate-200">{m.name}</td>
+                      <td className="py-3 text-center text-slate-500 dark:text-slate-400">
+                        {dataSource === "system" && hasPaidBills ? `${paidBillsInMonth.length} ห้อง` : "-"}
+                      </td>
+                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{Math.round(monthlyRent).toLocaleString()} บาท</td>
+                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{Math.round(monthlyUtil).toLocaleString()} บาท</td>
+                      <td className="py-3 text-right text-teal-600 dark:text-teal-400 font-bold font-mono">{Math.round(monthlyTotal).toLocaleString()} บาท</td>
+                      <td className="py-3 text-center">
+                        {hasRealData ? (
+                          <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-500/10">บิลจริง</span>
+                        ) : (
+                          <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">คำนวณจำลอง</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
+
                 return (
-                  <tr key={m.num} className="hover:bg-slate-50 dark:hover:bg-slate-900/10">
-                    <td className="py-3 pl-2 font-medium text-slate-800 dark:text-slate-200">{m.name}</td>
-                    <td className="py-3 text-center text-slate-500 dark:text-slate-400">
-                      {dataSource === "system" && hasPaidBills ? `${paidBillsInMonth.length} ห้อง` : "-"}
-                    </td>
-                    <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{Math.round(monthlyRent).toLocaleString()} บาท</td>
-                    <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{Math.round(monthlyUtil).toLocaleString()} บาท</td>
-                    <td className="py-3 text-right text-teal-600 dark:text-teal-400 font-bold font-mono">{Math.round(monthlyTotal).toLocaleString()} บาท</td>
-                    <td className="py-3 text-center">
-                      {hasRealData ? (
-                        <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-500/10">บิลจริง</span>
-                      ) : (
-                        <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">คำนวณจำลอง</span>
-                      )}
-                    </td>
-                  </tr>
+                  <>
+                    {rows}
+                    {/* แถวสรุปผลรวมสะสมที่ถูกต้องสมบูรณ์เพื่อไม่ให้เกิดเศษหรือข้อผิดพลาด */}
+                    <tr className="border-t-2 border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 font-semibold text-slate-800 dark:text-slate-200">
+                      <td className="py-3.5 pl-2">รวมสะสมทั้งปี</td>
+                      <td className="py-3.5 text-center text-slate-500 dark:text-slate-400">
+                        {dataSource === "system" && hasPaidBills ? `${sumBills} บิล` : "-"}
+                      </td>
+                      <td className="py-3.5 text-right text-blue-600 dark:text-blue-400 font-mono font-bold">{Math.round(sumRent).toLocaleString()} บาท</td>
+                      <td className="py-3.5 text-right text-teal-600 dark:text-teal-400 font-mono font-bold">{Math.round(sumUtil).toLocaleString()} บาท</td>
+                      <td className="py-3.5 text-right text-emerald-600 dark:text-emerald-400 font-mono font-extrabold">{Math.round(sumTotal).toLocaleString()} บาท</td>
+                      <td className="py-3.5 text-center">
+                        <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">ยอดรวม</span>
+                      </td>
+                    </tr>
+                  </>
                 )
-              })}
+              })()}
             </tbody>
           </table>
         </div>
