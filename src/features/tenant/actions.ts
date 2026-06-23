@@ -337,12 +337,13 @@ export async function getTenantPortalData() {
         .from("bills")
         .select("*")
         .eq("room_number", roomNumber)
+        .eq("workspace_id", tenant.workspace_id)
         .order("billing_cycle", { ascending: false })
 
       if (billsError) throw billsError
 
       if (bills) {
-        // ตรวจสอบว่ามีผู้เช่ารายใหม่เข้ามาอยู่ต่อหลังจากคนนี้หรือไม่
+        // ตรวจสอบว่ามีผู้เช่ารายใหม่เข้ามาอยู่ต่อหลังจากสัญญาเช่าของตนเองหรือไม่
         const { data: newer } = await supabase
           .from("tenants")
           .select("id")
@@ -355,6 +356,13 @@ export async function getTenantPortalData() {
         const leaseEndCycle = tenant.lease_end ? tenant.lease_end.substring(0, 7) : ""
 
         let filteredBills = bills
+        
+        // 1. กรองด้วยประวัติชื่อผู้เช่า (ต้องตรงกัน) ป้องกันไม่ให้เห็นบิลของผู้เช่ารายอื่น
+        if (tenant.tenant_name) {
+          filteredBills = filteredBills.filter((b: any) => b.tenant_name === tenant.tenant_name)
+        }
+
+        // 2. กรองตามเงื่อนไข lease_start และ lease_end ที่นำกลับมา
         if (leaseStartCycle) {
           filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
         }
@@ -570,6 +578,13 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       const leaseEndCycle = tenant?.lease_end ? tenant.lease_end.substring(0, 7) : ""
 
       let filteredBills = bills
+      
+      // 1. กรองด้วยประวัติชื่อผู้เช่า (ต้องตรงกัน) ป้องกันไม่ให้เห็นบิลของผู้เช่ารายอื่น
+      if (tenant?.tenant_name) {
+        filteredBills = filteredBills.filter((b: any) => b.tenant_name === tenant.tenant_name)
+      }
+
+      // 2. กรองตามเงื่อนไข lease_start และ lease_end ที่นำกลับมา
       if (leaseStartCycle) {
         filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
       }

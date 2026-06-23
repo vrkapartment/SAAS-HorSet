@@ -41,7 +41,7 @@ import { createClient } from "@/lib/supabase/client"
 interface BillHistoryItem {
   cycle: string
   amount: number
-  status: "paid" | "unpaid"
+  status: "paid" | "unpaid" | "pending"
 }
 
 const optimizeImage = (file: File): Promise<Blob> => {
@@ -218,7 +218,7 @@ export default function TenantPortal() {
           const hist: BillHistoryItem[] = activeBills.slice(1).map(b => ({
             cycle: formatCycle(b.billingCycle),
             amount: b.amount,
-            status: b.status === "paid" ? "paid" : "unpaid"
+            status: b.status === "paid" ? "paid" : b.status === "pending" ? "pending" : "unpaid"
           }))
           setHistory(hist)
         } else {
@@ -779,8 +779,12 @@ export default function TenantPortal() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-slate-300">{h.amount.toLocaleString()} บาท</span>
-                  <span className="inline-block text-[8px] font-bold px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400">
-                    ชำระแล้ว
+                  <span className={`inline-block text-[8px] font-bold px-2 py-0.5 rounded-full ${
+                    h.status === "paid" ? "bg-teal-500/10 text-teal-400" :
+                    h.status === "pending" ? "bg-amber-500/10 text-amber-400 animate-pulse" :
+                    "bg-red-500/10 text-red-400"
+                  }`}>
+                    {h.status === "paid" ? "ชำระแล้ว" : h.status === "pending" ? "รอตรวจสอบ" : "ค้างชำระ"}
                   </span>
                 </div>
               </div>
