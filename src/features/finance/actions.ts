@@ -285,7 +285,8 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
             deposit_amount: Number(settings.deposit_amount || 0),
             advance_rent: Number(settings.advance_rent || 0),
             lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
-            lease_expiry_action: settings.lease_expiry_action || "renew"
+            lease_expiry_action: settings.lease_expiry_action || "renew",
+            slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0)
           })
           .eq("id", workspaceId)
 
