@@ -63,6 +63,14 @@ function getCookie(name: string): string | undefined {
   return undefined
 }
 
+function formatMoney(val: number | string): string {
+  const num = Number(val || 0)
+  return num.toLocaleString("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
 export default function TaxPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [taxYear, setTaxYear] = useState("2026")
@@ -990,13 +998,13 @@ export default function TaxPage() {
             <div>
               <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้ค่าเช่าห้องพัก</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เฉพาะส่วนที่เป็นค่าเช่าห้องพักหลัก</p>
-              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{rent405Full.toLocaleString()} บาท</p>
+              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{formatMoney(rent405Full)} บาท</p>
             </div>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
             <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่เลือก:</p>
             <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
-              หักแบบ{deductionMethod405} : <span className="text-blue-600 dark:text-blue-400 font-bold">{deductionRent405Full.toLocaleString()} บาท</span>
+              หักแบบ{deductionMethod405} : <span className="text-blue-600 dark:text-blue-400 font-bold">{formatMoney(deductionRent405Full)} บาท</span>
             </div>
           </div>
         </div>
@@ -1011,13 +1019,13 @@ export default function TaxPage() {
             <div>
               <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">ค่าน้ำไฟและบริการ</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ค่ายูนิตน้ำ/ไฟ + ค่าบริการส่วนกลาง</p>
-              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{utilities408Full.toLocaleString()} บาท</p>
+              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{formatMoney(utilities408Full)} บาท</p>
             </div>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
             <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่เลือก:</p>
             <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
-              หักแบบ{deductionMethod408} : <span className="text-teal-600 dark:text-teal-400 font-bold">{deductionUtilities408Full.toLocaleString()} บาท</span>
+              หักแบบ{deductionMethod408} : <span className="text-teal-600 dark:text-teal-400 font-bold">{formatMoney(deductionUtilities408Full)} บาท</span>
             </div>
           </div>
         </div>
@@ -1032,14 +1040,14 @@ export default function TaxPage() {
             <div>
               <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้อื่น (ค่าปรับ/ริบมัดจำ)</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เงินปรับจ่ายล่าช้า หรือเงินริบมัดจำ</p>
-              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{other408Full.toLocaleString()} บาท</p>
+              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{formatMoney(other408Full)} บาท</p>
             </div>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
             <p>ไม่เข้าเกณฑ์หักเหมา 60% (หักแบบเหมาเป็น 0):</p>
             <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
               {deductionMethod408 === "เหมา 60%" ? (
-                <span>หักแบบเหมา 60% : <span className="text-amber-600 dark:text-amber-400 font-bold">0 บาท</span></span>
+                <span>หักแบบเหมา 60% : <span className="text-amber-600 dark:text-amber-400 font-bold">0.00 บาท</span></span>
               ) : (
                 <span>หักตามจ่ายจริง : <span className="text-teal-600 dark:text-teal-400 font-bold">ใช้สิทธิ์ตามจ่ายจริง</span></span>
               )}
@@ -1057,11 +1065,11 @@ export default function TaxPage() {
             <div>
               <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายจ่ายรวมหักลดหย่อน</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">รวมค่าใช้จ่ายหักเหมาหรือหักจริง</p>
-              <p className="text-xl font-bold mt-2 text-emerald-600 dark:text-emerald-400">{(deductionRent405Full + deductionUtilities408Full).toLocaleString()} บาท</p>
+              <p className="text-xl font-bold mt-2 text-emerald-600 dark:text-emerald-400">{formatMoney(deductionRent405Full + deductionUtilities408Full)} บาท</p>
             </div>
           </div>
           <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mt-auto pt-2">
-            เป็นการรวมยอดค่าลดหย่อนภาษีของค่าเช่าห้อง ({deductionRent405Full.toLocaleString()} บ.) และค่าน้ำไฟหลวง/บริการ ({deductionUtilities408Full.toLocaleString()} บ.)
+            เป็นการรวมยอดค่าลดหย่อนภาษีของค่าเช่าห้อง ({formatMoney(deductionRent405Full)} บ.) และค่าน้ำไฟหลวง/บริการ ({formatMoney(deductionUtilities408Full)} บ.)
           </p>
         </div>
       </div>
@@ -1196,7 +1204,7 @@ export default function TaxPage() {
                         )}
                       </td>
                       <td className="py-3.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {exp.amount.toLocaleString()} บาท
+                        {formatMoney(exp.amount)} บาท
                       </td>
                       <td className="py-3.5 text-center text-slate-550 dark:text-slate-400 text-[10px] font-mono">
                         {new Date(exp.created_at).toLocaleDateString("th-TH", {
@@ -1230,8 +1238,8 @@ export default function TaxPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-900 text-[11px] text-slate-500 dark:text-slate-400">
                 <div>* แสดงผลลัพธ์รายจ่ายของปีภาษี {taxYear} ทั้งหมดจำนวน {expenses.length} รายการ</div>
                 <div className="flex gap-4">
-                  <div>ยอดรวม 40(5) สะสม: <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">{dbActualExpense405.toLocaleString()} บ.</span></div>
-                  <div>ยอดรวม 40(8) สะสม: <span className="font-bold text-teal-600 dark:text-teal-400 font-mono">{dbActualExpense408.toLocaleString()} บ.</span></div>
+                  <div>ยอดรวม 40(5) สะสม: <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">{formatMoney(dbActualExpense405)} บ.</span></div>
+                  <div>ยอดรวม 40(8) สะสม: <span className="font-bold text-teal-600 dark:text-teal-400 font-mono">{formatMoney(dbActualExpense408)} บ.</span></div>
                 </div>
               </div>
             </div>
@@ -1342,9 +1350,9 @@ export default function TaxPage() {
                       <td className="py-3 text-center text-slate-500 dark:text-slate-400">
                         {dataSource === "system" && hasPaidBills ? `${paidBillsInMonth.length} ห้อง` : "-"}
                       </td>
-                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{Math.round(monthlyRent).toLocaleString()} บาท</td>
-                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{Math.round(monthlyUtil).toLocaleString()} บาท</td>
-                      <td className="py-3 text-right text-teal-600 dark:text-teal-400 font-bold font-mono">{Math.round(monthlyTotal).toLocaleString()} บาท</td>
+                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{formatMoney(monthlyRent)} บาท</td>
+                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{formatMoney(monthlyUtil)} บาท</td>
+                      <td className="py-3 text-right text-teal-600 dark:text-teal-400 font-bold font-mono">{formatMoney(monthlyTotal)} บาท</td>
                       <td className="py-3 text-center">
                         {hasRealData ? (
                           <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-500/10">บิลจริง</span>
@@ -1365,9 +1373,9 @@ export default function TaxPage() {
                       <td className="py-3.5 text-center text-slate-500 dark:text-slate-400">
                         {dataSource === "system" && hasPaidBills ? `${sumBills} บิล` : "-"}
                       </td>
-                      <td className="py-3.5 text-right text-blue-600 dark:text-blue-400 font-mono font-bold">{Math.round(sumRent).toLocaleString()} บาท</td>
-                      <td className="py-3.5 text-right text-teal-600 dark:text-teal-400 font-mono font-bold">{Math.round(sumUtil).toLocaleString()} บาท</td>
-                      <td className="py-3.5 text-right text-emerald-600 dark:text-emerald-400 font-mono font-extrabold">{Math.round(sumTotal).toLocaleString()} บาท</td>
+                      <td className="py-3.5 text-right text-blue-600 dark:text-blue-400 font-mono font-bold">{formatMoney(sumRent)} บาท</td>
+                      <td className="py-3.5 text-right text-teal-600 dark:text-teal-400 font-mono font-bold">{formatMoney(sumUtil)} บาท</td>
+                      <td className="py-3.5 text-right text-emerald-600 dark:text-emerald-400 font-mono font-extrabold">{formatMoney(sumTotal)} บาท</td>
                       <td className="py-3.5 text-center">
                         <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">ยอดรวม</span>
                       </td>
@@ -1413,7 +1421,7 @@ export default function TaxPage() {
                         <td className="py-2.5 pl-2 font-medium text-slate-800 dark:text-slate-200">
                           ห้อง {t.roomNumber} - {t.fullName}
                           <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
-                            ค่าเช่าห้อง: {roomRent.toLocaleString()} บ. (ล่วงหน้า {defaultAdvanceRent} เดือน)
+                            ค่าเช่าห้อง: {formatMoney(roomRent)} บ. (ล่วงหน้า {defaultAdvanceRent} เดือน)
                           </span>
                         </td>
                         <td className="py-2.5 text-center text-slate-500 dark:text-slate-400 font-mono text-[10px]">
@@ -1424,7 +1432,7 @@ export default function TaxPage() {
                           }) : "-"}
                         </td>
                         <td className="py-2.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
-                          {advanceRentVal.toLocaleString()} บ.
+                          {formatMoney(advanceRentVal)} บ.
                         </td>
                       </tr>
                     )
@@ -1434,7 +1442,7 @@ export default function TaxPage() {
               <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-900 text-[11px] text-slate-550 dark:text-slate-400 mt-2 font-semibold">
                 <span>จำนวนสัญญาที่เริ่มในปีนี้: {advanceRentBills.length} รายการ</span>
                 <span className="text-blue-600 dark:text-blue-400 font-bold font-mono">
-                  รวม {totalAdvanceRentAmount.toLocaleString()} บาท
+                  รวม {formatMoney(totalAdvanceRentAmount)} บาท
                 </span>
               </div>
             </div>
@@ -1455,11 +1463,11 @@ export default function TaxPage() {
           </h3>
           
           <div className="space-y-2 text-xs">
-            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>รายได้ครึ่งปีแรก (ม.ค. - มิ.ย.):</span><span className="font-semibold text-slate-800 dark:text-slate-200">{halfTotalRevenue.toLocaleString()} บาท</span></div>
-            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่าย ({deductionMethod405}) ของค่าเช่าห้อง:</span><span className="font-semibold text-red-600 dark:text-red-400">-{deductionRent405Half.toLocaleString()} บาท</span></div>
-            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่ายจริงของค่าน้ำไฟ (ครึ่งปี):</span><span className="font-semibold text-red-600 dark:text-red-400">-{deductionUtilities408Half.toLocaleString()} บาท</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>รายได้ครึ่งปีแรก (ม.ค. - มิ.ย.):</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(halfTotalRevenue)} บาท</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่าย ({deductionMethod405}) ของค่าเช่าห้อง:</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionRent405Half)} บาท</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่ายจริงของค่าน้ำไฟ (ครึ่งปี):</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionUtilities408Half)} บาท</span></div>
             <div className="h-px bg-slate-200 dark:bg-slate-900 my-2" />
-            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>เงินได้สุทธิประเมินครึ่งปี:</span><span className="text-blue-600 dark:text-blue-400">{netIncomeHalf.toLocaleString()} บาท</span></div>
+            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>เงินได้สุทธิประเมินครึ่งปี:</span><span className="text-blue-600 dark:text-blue-400">{formatMoney(netIncomeHalf)} บาท</span></div>
           </div>
           
           <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-[10px] text-slate-550 dark:text-slate-400 leading-relaxed">
@@ -1488,11 +1496,11 @@ export default function TaxPage() {
           </h3>
 
           <div className="space-y-2 text-xs">
-            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>รายได้เต็มปีสะสม (12 เดือน):</span><span className="font-semibold text-slate-800 dark:text-slate-200">{fullTotalRevenue.toLocaleString()} บาท</span></div>
-            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่าย ({deductionMethod405}) ของค่าเช่าห้อง:</span><span className="font-semibold text-red-600 dark:text-red-400">-{deductionRent405Full.toLocaleString()} บาท</span></div>
-            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่ายจริงค่าน้ำไฟ (หักตามจริงเต็มปี):</span><span className="font-semibold text-red-600 dark:text-red-400">-{deductionUtilities408Full.toLocaleString()} บาท</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>รายได้เต็มปีสะสม (12 เดือน):</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(fullTotalRevenue)} บาท</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่าย ({deductionMethod405}) ของค่าเช่าห้อง:</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionRent405Full)} บาท</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่ายจริงค่าน้ำไฟ (หักตามจริงเต็มปี):</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionUtilities408Full)} บาท</span></div>
             <div className="h-px bg-slate-200 dark:bg-slate-900 my-2" />
-            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>เงินได้สุทธิประเมินเต็มปี:</span><span className="text-teal-600 dark:text-teal-400">{netIncomeFull.toLocaleString()} บาท</span></div>
+            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>เงินได้สุทธิประเมินเต็มปี:</span><span className="text-teal-600 dark:text-teal-400">{formatMoney(netIncomeFull)} บาท</span></div>
           </div>
 
           <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-[10px] text-slate-550 dark:text-slate-400 leading-relaxed">
