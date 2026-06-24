@@ -737,7 +737,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       />
 
       {/* พื้นที่เนื้อหาหลัก (Main Content Area) */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden touch-pan-y overscroll-x-none">
         
         {/* Header แถบด้านบน */}
         <header className="flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-200/80 dark:border-slate-900/60 shrink-0">
@@ -821,54 +821,56 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         </header>
 
         {/* ตัวเนื้อหาภายในหน้าเว็บ (Page Content Injection) */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6 overflow-x-hidden">
-          {isPathAllowed() ? (
-            children
-          ) : (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
-              <div className="glass-panel p-8 sm:p-12 rounded-3xl max-w-md border border-red-500/20 shadow-xl relative overflow-hidden bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl">
-                {/* Glowing red accent */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent" />
-                
-                <div className="mx-auto w-16 h-16 bg-red-500/10 dark:bg-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-6 animate-pulse">
-                  <Lock className="w-8 h-8" />
-                </div>
-                
-                <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mb-3">
-                  คุณไม่มีสิทธิ์เข้าถึงหน้านี้
-                </h2>
-                
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                  สิทธิ์การใช้งานของพนักงาน (Staff) ของคุณถูกกำหนดไม่ให้เข้าถึงเมนูนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การเข้าใช้งาน
-                </p>
+        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6 overflow-x-hidden touch-pan-y overscroll-x-none">
+          <div className="w-full max-w-full overflow-hidden">
+            {isPathAllowed() ? (
+              children
+            ) : (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
+                <div className="glass-panel p-8 sm:p-12 rounded-3xl max-w-md border border-red-500/20 shadow-xl relative overflow-hidden bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl">
+                  {/* Glowing red accent */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent" />
+                  
+                  <div className="mx-auto w-16 h-16 bg-red-500/10 dark:bg-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-6 animate-pulse">
+                    <Lock className="w-8 h-8" />
+                  </div>
+                  
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mb-3">
+                    คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+                  </h2>
+                  
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+                    สิทธิ์การใช้งานของพนักงาน (Staff) ของคุณถูกกำหนดไม่ให้เข้าถึงเมนูนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การเข้าใช้งาน
+                  </p>
 
-                <div className="space-y-3">
-                  {userPermissions?.manage_meters_bills && (
+                  <div className="space-y-3">
+                    {userPermissions?.manage_meters_bills && (
+                      <button
+                        onClick={() => safeNavigate("/billing")}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
+                      >
+                        ไปยังหน้าจดมิเตอร์ & จัดการบิล
+                      </button>
+                    )}
+                    {userPermissions?.manage_rooms_tenants && (
+                      <button
+                        onClick={() => safeNavigate("/rooms")}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-slate-600 to-slate-800 hover:from-slate-500 hover:to-slate-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-slate-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
+                      >
+                        ไปยังหน้าจัดการห้องพักและผู้เช่า
+                      </button>
+                    )}
                     <button
-                      onClick={() => safeNavigate("/billing")}
-                      className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
+                      onClick={handleLogout}
+                      className="w-full py-2.5 px-4 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors text-xs font-bold"
                     >
-                      ไปยังหน้าจดมิเตอร์ & จัดการบิล
+                      ออกจากระบบ (Logout)
                     </button>
-                  )}
-                  {userPermissions?.manage_rooms_tenants && (
-                    <button
-                      onClick={() => safeNavigate("/rooms")}
-                      className="w-full py-3 px-4 bg-gradient-to-r from-slate-600 to-slate-800 hover:from-slate-500 hover:to-slate-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-slate-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
-                    >
-                      ไปยังหน้าจัดการห้องพักและผู้เช่า
-                    </button>
-                  )}
-                  <button
-                    onClick={handleLogout}
-                    className="w-full py-2.5 px-4 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors text-xs font-bold"
-                  >
-                    ออกจากระบบ (Logout)
-                  </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </main>
       </div>
 

@@ -95,10 +95,26 @@
 }
 
 html, body {
+  width: 100%;
   max-width: 100vw;
   overflow-x: hidden !important;
   touch-action: pan-y; /* Lock touch gestures to vertical panning only, disabling horizontal swiping */
   overscroll-behavior-x: none; /* Disable horizontal rubber-band bounce effects on iOS/Android */
+}
+
+/* 
+  Lock horizontal axis swiping, sliding, and rubber-banding for ALL vertical scroll containers 
+  and layout elements. This keeps the mobile viewport 100% rigid on the horizontal axis 
+  while retaining perfect vertical scroll and allowing intentional horizontal scrolling inside tables.
+*/
+.overflow-y-auto, 
+.overflow-y-scroll,
+main,
+[class*="flex-1"][class*="flex-col"] {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-x: none !important;
 }
 
 body {
