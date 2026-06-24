@@ -1751,7 +1751,7 @@ export default function RoomsPage() {
           {/* ========================================================= */}
           {/* SECTION: SECURITY DEPOSIT AND CANCELLATION LEDGER 40(8) */}
           {/* ========================================================= */}
-          <div className="glass-panel rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-5 md:p-6 space-y-4">
+          <div className="glass-panel rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-5 md:p-6 space-y-4 mt-12 md:mt-16">
             <div className="pb-1.5 border-b border-slate-100 dark:border-slate-800/40">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-red-500" /> 
