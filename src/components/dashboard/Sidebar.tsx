@@ -68,9 +68,16 @@ export default function Sidebar({
   return (
     <>
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
-      <aside className={`hidden md:flex flex-col h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0 overflow-x-hidden transition-all duration-300 ${
+      <aside className={`hidden md:flex flex-col h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0 overflow-x-hidden transition-all duration-500 ease-in-out ${
         desktopOpen ? "w-64 opacity-100" : "w-0 p-0 border-r-0 opacity-0 pointer-events-none"
       }`}>
+        <div 
+          className="w-52 h-full flex flex-col shrink-0 transition-all duration-500 ease-in-out"
+          style={{
+            opacity: desktopOpen ? 1 : 0,
+            transform: desktopOpen ? "translateX(0)" : "translateX(-24px)",
+          }}
+        >
         <div className="flex items-center gap-3 mb-8 px-1 min-w-0">
           <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-md shadow-blue-500/20 animate-pulse-subtle shrink-0">
             <Building className="w-5 h-5 text-white" />
@@ -246,6 +253,7 @@ export default function Sidebar({
             <LogOut className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 shrink-0" />
             <span className="truncate whitespace-nowrap">{t("common.logout") || "ออกจากระบบ"}</span>
           </button>
+        </div>
         </div>
       </aside>
 
