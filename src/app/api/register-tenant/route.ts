@@ -65,6 +65,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: `ไม่พบข้อมูลห้องพักหมายเลข ${roomNumber} ในอาคารนี้` }, { status: 400 })
     }
 
+    // ตรวจสอบว่าห้องนี้มีผู้เช่าที่ลงทะเบียน LINE ไปแล้วหรือไม่ (สมัครได้ครั้งเดียวเท่านั้น)
+    const { data: activeTenant, error: tenantError } = await supabaseAdmin
+      .from("tenants")
+      .select("id, line_user_id")
+      .eq("room_id", room.id)
+      .not("line_user_id", "is", null)
+      .maybeSingle()
+
+    if (tenantError) {
+      console.error("Query active tenant error:", tenantError)
+    }
+
+    if (activeTenant && activeTenant.line_user_id && activeTenant.line_user_id.trim() !== "") {
+      return NextResponse.json({
+        success: false,
+        error: "ลิงก์ลงทะเบียนนี้ได้ถูกใช้งานไปแล้ว ห้องพักนี้ลงทะเบียนผูก LINE เรียบร้อยแล้ว"
+      }, { status: 400 })
+    }
+
     // 3. เตรียมโครงสร้างออบเจกต์ข้อมูลในการบันทึกแถวใหม่
     const today = new Date()
     const nextYear = new Date()
@@ -154,6 +173,74 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: false,
       error: "เกิดข้อผิดพลาดภายในระบบเซิร์ฟเวอร์หลัก กรุณาลองใหม่อีกครั้งภายหลัง"
+    }, { status: 500 })
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const workspaceId = searchParams.get("workspaceId")
+    const roomNumber = searchParams.get("roomNumber")
+
+    if (!workspaceId || !roomNumber) {
+      return NextResponse.json({ success: false, error: "กรุณาระบุพารามิเตอร์ที่ครบถ้วน" }, { status: 400 })
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!url || !serviceKey || serviceKey.includes("placeholder")) {
+      return NextResponse.json({
+        success: false,
+        error: "เซิร์ฟเวอร์ระบบฐานข้อมูลไม่พร้อมใช้งานชั่วคราว"
+      }, { status: 500 })
+    }
+
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+
+    // 1. ค้นหาห้องพัก
+    const { data: room, error: roomError } = await supabaseAdmin
+      .from("rooms")
+      .select("id")
+      .eq("room_number", roomNumber.trim())
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (roomError || !room) {
+      return NextResponse.json({ success: false, registered: false, error: "ไม่พบห้องพักที่ระบุ" })
+    }
+
+    // 2. ตรวจสอบว่าห้องนี้มีผู้เช่าที่ลงทะเบียน LINE ไปแล้วหรือไม่
+    const { data: activeTenant, error: tenantError } = await supabaseAdmin
+      .from("tenants")
+      .select("id, line_user_id")
+      .eq("room_id", room.id)
+      .not("line_user_id", "is", null)
+      .maybeSingle()
+
+    if (tenantError) {
+      console.error("Check tenant error in GET:", tenantError)
+      return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบ" }, { status: 500 })
+    }
+
+    const isRegistered = !!(activeTenant && activeTenant.line_user_id && activeTenant.line_user_id.trim() !== "")
+
+    return NextResponse.json({
+      success: true,
+      registered: isRegistered
+    })
+
+  } catch (error) {
+    console.error("GET register-tenant Exception:", error)
+    return NextResponse.json({
+      success: false,
+      error: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"
     }, { status: 500 })
   }
 }

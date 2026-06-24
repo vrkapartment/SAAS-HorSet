@@ -15,6 +15,7 @@ function TenantRegisterContent() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false)
 
   // ฟังก์ชันล้างเบอร์โทรศัพท์ให้อยู่ในฟอร์แมตตัวเลข 10 หลัก
   const handlePhoneChange = (val: string) => {
@@ -87,6 +88,19 @@ function TenantRegisterContent() {
 
       const rNum = getUrlParam("room_number")
       setRoomNumber(rNum)
+
+      // ตรวจสอบว่าลิงก์นี้เปิดลงทะเบียนได้อีกหรือไม่ (สมัครได้ครั้งเดียวเท่านั้น)
+      if (wsId && rNum) {
+        try {
+          const checkRes = await fetch(`/api/register-tenant?workspaceId=${wsId}&roomNumber=${rNum}`)
+          const checkData = await checkRes.json()
+          if (checkData.success && checkData.registered) {
+            setAlreadyRegistered(true)
+          }
+        } catch (e) {
+          console.error("Error checking room registration:", e)
+        }
+      }
     } catch (err: any) {
       console.error("LIFF Init Error:", err)
       setError("ไม่สามารถเชื่อมต่อบริการ LINE ได้ กรุณาแชร์ลิงก์เปิดทางห้องแชท LINE")
@@ -181,8 +195,43 @@ function TenantRegisterContent() {
           {/* การ์ดแก้วพรีเมียม (Glassmorphism Card) */}
           <div className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-2xl shadow-emerald-950/5 relative">
             
-            {/* โชว์ความสำเร็จเมื่อสำเร็จ */}
-            {success ? (
+            {/* ตรวจสอบว่าลิงก์ถูกใช้งานไปแล้วหรือไม่ */}
+            {alreadyRegistered ? (
+              <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                <div className="inline-flex items-center justify-center p-4 bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 shadow-lg shadow-amber-500/5">
+                  <AlertCircle className="w-14 h-14" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black text-slate-100">ลิงก์ลงทะเบียนถูกใช้งานแล้ว</h2>
+                  <p className="text-slate-400 text-sm font-medium">
+                    ห้องพักหมายเลข <strong className="text-amber-400 font-mono">{roomNumber || "ไม่ระบุ"}</strong> ได้ลงทะเบียนผูก LINE เรียบร้อยแล้ว
+                  </p>
+                </div>
+
+                <div className="bg-slate-950/50 border border-slate-900/80 rounded-2xl p-5 text-left space-y-4">
+                  <p className="text-xs text-slate-300 leading-relaxed text-center">
+                    ลิงก์ลงทะเบียนห้องกับบัญชี LINE สามารถใช้สมัครได้เพียง <strong>ครั้งเดียวเท่านั้น</strong> เพื่อความปลอดภัยสูงสุดของข้อมูลผู้เช่า
+                  </p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed text-center">
+                    หากคุณเพิ่งย้ายเข้าใหม่ หรือต้องการเปลี่ยนบัญชี LINE ที่ใช้รับบิลค่าเช่า กรุณาติดต่อผู้ดูแลหอพักเพื่อตรวจสอบข้อมูลหรือขอรับลิงก์ลงทะเบียนชุดใหม่
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      const liff = (window as any).liff
+                      if (liff) {
+                        liff.closeWindow()
+                      }
+                    }}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 font-semibold rounded-2xl flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer"
+                  >
+                    เสร็จสิ้นและปิดหน้านี้
+                  </button>
+                </div>
+              </div>
+            ) : success ? (
               <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
                 <div className="inline-flex items-center justify-center p-4 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
                   <CheckCircle2 className="w-14 h-14" />
