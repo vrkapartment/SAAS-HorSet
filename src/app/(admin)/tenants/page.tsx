@@ -317,6 +317,20 @@ export default function TenantsPage() {
     }
   }
 
+  const isTerminateAction = financeSettings?.lease_expiry_action === "terminate"
+  const expiredCardTitle = isTerminateAction ? "อยู่ครบสัญญา" : "สัญญาหมดอายุ"
+  const expiredCardSub = isTerminateAction ? "ผู้เช่าที่อยู่ครบกำหนดระยะสัญญา" : "เกินกำหนดระยะสัญญาเดิม"
+  const ExpiredIcon = isTerminateAction ? CheckCircle2 : Clock
+  const expiredColors = isTerminateAction
+    ? {
+        text: "text-emerald-600 dark:text-emerald-400",
+        bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400"
+      }
+    : {
+        text: "text-red-500 dark:text-red-400",
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-500 dark:text-red-400"
+      }
+
   return (
     <div className="space-y-6">
       {/* Header and Title */}
@@ -387,16 +401,16 @@ export default function TenantsPage() {
         {/* Stat 2: Expired Current Tenants */}
         <div className="bg-white dark:bg-slate-850 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
           <div className="space-y-1.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">สัญญาหมดอายุ</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{expiredCardTitle}</span>
             <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono leading-none">
               {loading ? "-" : `${stats.expiredCount} สัญญา`}
             </h3>
-            <span className="text-[10px] md:text-xs text-amber-600 dark:text-amber-400 font-bold tracking-wide flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> เกินกำหนดระยะสัญญาเดิม
+            <span className={`text-[10px] md:text-xs font-bold tracking-wide flex items-center gap-1 ${expiredColors.text}`}>
+              <ExpiredIcon className="w-3.5 h-3.5" /> {expiredCardSub}
             </span>
           </div>
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-2xl">
-            <Clock className="w-6 h-6" />
+          <div className={`p-3 rounded-2xl ${expiredColors.bg}`}>
+            <ExpiredIcon className="w-6 h-6" />
           </div>
         </div>
 
