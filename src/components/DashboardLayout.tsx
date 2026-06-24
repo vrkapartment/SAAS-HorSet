@@ -557,7 +557,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "จัดการบิล",
+      name: "จัดการใบแจ้งหนี้",
       path: "/manage-bills",
       icon: Receipt,
       roles: ["admin", "staff", "super_admin"]
@@ -755,7 +755,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   {pathname === "/rooms" && (t("nav.rooms") || "จัดการห้องพักและผู้เช่า")}
                   {pathname === "/billing" && "จดเลขมิเตอร์ & สรุปบิลค่าเช่า"}
                   {pathname === "/meter" && "จดเลขมิเตอร์ & สรุปบิลค่าเช่า"}
-                  {pathname === "/manage-bills" && "ระบบจัดการบิลค่าเช่า"}
+                  {pathname === "/manage-bills" && "จัดการใบแจ้งหนี้"}
                   {pathname === "/daily-bills" && "จัดการบิลรายจ่ายรายวัน (40(5) / 40(8))"}
                   {pathname === "/tax" && (t("nav.tax") || "ระบบรายงานภาษีอพาร์ทเมนท์ ภ.ง.ด.")}
                   {pathname === "/finance-settings" && (t("nav.finance") || "ตั้งค่าการเงินและบัญชีรับเงิน")}

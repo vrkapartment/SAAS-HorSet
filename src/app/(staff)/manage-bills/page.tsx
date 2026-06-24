@@ -1413,10 +1413,10 @@ export default function ManageBillsPage() {
         <div>
           <div className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-indigo-500" />
-            <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>จัดการบิล</h2>
+            <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>จัดการใบแจ้งหนี้</h2>
           </div>
           <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-            ระบบจัดการบิลค่าเช่าหอพัก ตรวจสอบสลิปโอนเงิน ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดเพิ่มเติม
+            ระบบจัดการใบแจ้งหนี้ค่าเช่าหอพัก ตรวจสอบสลิปโอนเงิน ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดเพิ่มเติม
           </p>
         </div>
         

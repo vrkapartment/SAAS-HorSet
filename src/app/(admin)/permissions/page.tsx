@@ -369,7 +369,7 @@ WHERE role IN ('admin', 'super_admin');`;
                         { key: "view_dashboard_stats", label: "ดูสถิติภาพรวม" },
                         { key: "manage_rooms_tenants", label: "จัดการห้องพัก & ข้อมูลผู้เช่า" },
                         { key: "manage_meters_bills", label: "จดมิเตอร์ & สรุปบิล" },
-                        { key: "manage_bills", label: "จัดการบิล" },
+                        { key: "manage_bills", label: "จัดการใบแจ้งหนี้" },
                         { key: "manage_finance_expenses", label: "จัดการการเงิน & รายจ่าย" },
                         { key: "access_tax", label: "จัดการข้อมูลภาษี" },
                         { key: "manage_finance_settings", label: "ตั้งค่าระบบบัญชี/การเงิน" },
@@ -621,8 +621,8 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>จัดการบิล</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการบิลค่าเช่าทั้งหมด</span>
+                    <span>จัดการใบแจ้งหนี้</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการใบแจ้งหนี้ค่าเช่าทั้งหมด</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_bills ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -911,8 +911,8 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>จัดการบิล</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการบิลค่าเช่าทั้งหมด</span>
+                    <span>จัดการใบแจ้งหนี้</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการใบแจ้งหนี้ค่าเช่าทั้งหมด</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_bills ? "opacity-100" : "opacity-0"}`} />
                 </button>
