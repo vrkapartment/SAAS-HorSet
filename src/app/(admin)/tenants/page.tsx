@@ -105,13 +105,13 @@ export default function TenantsPage() {
       const action = financeSettings?.lease_expiry_action || "renew"
       if (action === "renew") {
         return {
-          label: "สัญญาหมดอายุ",
+          label: "เกินกำหนดระยะสัญญาเดิม",
           style: "bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 font-bold",
           dotColor: "bg-red-500"
         }
       } else {
         return {
-          label: "อยู่ครบสัญญา",
+          label: "อยู่ครบตามอายุสัญญา",
           style: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 font-bold",
           dotColor: "bg-emerald-500"
         }
@@ -317,11 +317,11 @@ export default function TenantsPage() {
     }
   }
 
-  const isTerminateAction = financeSettings?.lease_expiry_action === "terminate"
-  const expiredCardTitle = isTerminateAction ? "อยู่ครบสัญญา" : "สัญญาหมดอายุ"
-  const expiredCardSub = isTerminateAction ? "ผู้เช่าที่อยู่ครบกำหนดระยะสัญญา" : "เกินกำหนดระยะสัญญาเดิม"
-  const ExpiredIcon = isTerminateAction ? CheckCircle2 : Clock
-  const expiredColors = isTerminateAction
+  const isOriginalAction = financeSettings?.lease_expiry_action === "original"
+  const expiredCardTitle = isOriginalAction ? "อยู่ครบตามอายุสัญญา" : "เกินกำหนดระยะสัญญาเดิม"
+  const expiredCardSub = isOriginalAction ? "อยู่ครบตามอายุสัญญา" : "เกินกำหนดระยะสัญญาเดิม"
+  const ExpiredIcon = isOriginalAction ? CheckCircle2 : Clock
+  const expiredColors = isOriginalAction
     ? {
         text: "text-emerald-600 dark:text-emerald-400",
         bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400"

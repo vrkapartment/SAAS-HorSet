@@ -796,13 +796,13 @@ export default function RoomsPage() {
       const action = financeSettings?.lease_expiry_action || "renew"
       if (action === "renew") {
         return {
-          label: "สัญญาหมดอายุ",
+          label: "เกินกำหนดระยะสัญญาเดิม",
           style: "bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 font-bold",
           dotColor: "bg-red-500"
         }
       } else {
         return {
-          label: "อยู่ครบสัญญา",
+          label: "อยู่ครบตามอายุสัญญา",
           style: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 font-bold",
           dotColor: "bg-emerald-500"
         }

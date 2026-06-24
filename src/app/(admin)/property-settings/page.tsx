@@ -774,12 +774,12 @@ export default function PropertySettingsPage() {
                           ช่วง 2 เดือนสุดท้ายก่อนหมดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;เหลืออายุสัญญาอีก X เดือน&quot;</strong>
                         </li>
                         <li className="text-red-500 font-medium dark:text-red-400">
-                          เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;สัญญาหมดอายุ&quot;</strong>
+                          เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;เกินกำหนดระยะสัญญาเดิม&quot;</strong>
                         </li>
                       </>
                     ) : (
                       <li className="text-emerald-500 font-medium dark:text-emerald-400">
-                        เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;อยู่ครบสัญญา&quot;</strong>
+                        เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;อยู่ครบตามอายุสัญญา&quot;</strong>
                       </li>
                     )}
                   </ul>
