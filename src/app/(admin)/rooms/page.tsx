@@ -1371,10 +1371,10 @@ export default function RoomsPage() {
 
                                     {/* WAITING FOR LINE: Generate/Copy Link & View Details/Checkout */}
                                     {room.tenantName && !room.lineUserId && (
-                                      <div className="flex gap-2">
+                                      <div className="flex gap-1.5">
                                         <button
                                           onClick={() => handleOpenLineLinkModal(room)}
-                                          className="flex-1 h-9 text-[11px] font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/20 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                          className="flex-[0.8] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/20 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                           title="เจนลิงก์ LINE"
                                         >
                                           <Share2 className="w-3.5 h-3.5 shrink-0" />
@@ -1382,7 +1382,7 @@ export default function RoomsPage() {
                                         </button>
                                         <button
                                           onClick={() => handleOpenDetailModal(room)}
-                                          className="flex-[1.2] h-9 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="flex-[1.7] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                         >
                                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                           ดูรายละเอียด/ย้ายออก
@@ -1516,14 +1516,14 @@ export default function RoomsPage() {
                                       <>
                                         <button
                                           onClick={() => handleOpenLineLinkModal(room)}
-                                          className="h-8 px-2.5 text-[11px] font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                         >
                                           <Share2 className="w-3.5 h-3.5 shrink-0" />
                                           เจนลิงก์ LINE
                                         </button>
                                         <button
                                           onClick={() => handleOpenDetailModal(room)}
-                                          className="h-8 px-2.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                         >
                                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                           ดูรายละเอียด/ย้ายออก
@@ -1535,7 +1535,7 @@ export default function RoomsPage() {
                                     {room.tenantName && room.lineUserId && (
                                       <button
                                         onClick={() => handleOpenDetailModal(room)}
-                                        className="h-8 px-3 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        className="h-8 px-2.5 sm:px-3 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                       >
                                         <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                         ดูรายละเอียด/ย้ายออก
@@ -1687,36 +1687,36 @@ export default function RoomsPage() {
                               </button>
                             )}
 
-                            {/* WAITING: Generate LIFF LINK & View Details/Checkout */}
-                            {room.tenantName && !room.lineUserId && (
-                              <>
-                                <button
-                                  onClick={() => handleOpenLineLinkModal(room)}
-                                  className="flex-1 py-3 px-4 text-xs font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
-                                >
-                                  <Share2 className="w-4 h-4 shrink-0" />
-                                  เจนลิงก์ LINE
-                                </button>
-                                <button
-                                  onClick={() => handleOpenDetailModal(room)}
-                                  className="flex-1 py-3 px-4 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
-                                >
-                                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                                  ดูรายละเอียด/ย้ายออก
-                                </button>
-                              </>
-                            )}
+                             {/* WAITING: Generate LIFF LINK & View Details/Checkout */}
+                             {room.tenantName && !room.lineUserId && (
+                               <>
+                                 <button
+                                   onClick={() => handleOpenLineLinkModal(room)}
+                                   className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                 >
+                                   <Share2 className="w-4 h-4 shrink-0" />
+                                   เจนลิงก์ LINE
+                                 </button>
+                                 <button
+                                   onClick={() => handleOpenDetailModal(room)}
+                                   className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                 >
+                                   <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                   ดูรายละเอียด/ย้ายออก
+                                 </button>
+                               </>
+                             )}
 
-                            {/* OCCUPIED: View Details / Checkout */}
-                            {room.tenantName && room.lineUserId && (
-                              <button
-                                onClick={() => handleOpenDetailModal(room)}
-                                className="flex-1 py-3 px-4 text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
-                              >
-                                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                                ดูรายละเอียด/ย้ายออก
-                              </button>
-                            )}
+                             {/* OCCUPIED: View Details / Checkout */}
+                             {room.tenantName && room.lineUserId && (
+                               <button
+                                 onClick={() => handleOpenDetailModal(room)}
+                                 className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                               >
+                                 <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                 ดูรายละเอียด/ย้ายออก
+                               </button>
+                             )}
                           </div>
 
                           {/* Secondary Row: Room Configuration */}
@@ -1867,38 +1867,36 @@ export default function RoomsPage() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+              
+              <form onSubmit={handleSubmitRoomForm} className="space-y-4 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">หมายเลขห้องพัก (Room Number)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ระบุหมายเลขห้องพัก เช่น 101, 102..."
+                    className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
+                    value={newRoomNumber}
+                    onChange={(e) => {
+                      setNewRoomNumber(e.target.value)
+                      // เดาเลขชั้นให้อัตโนมัติเฉพาะตอนเพิ่มห้องพักใหม่
+                      if (!editingRoom) {
+                        setNewRoomFloor(guessFloorNumber(e.target.value))
+                      }
+                    }}
+                  />
+                </div>
 
-              <form onSubmit={handleSubmitRoomForm} className="space-y-5 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">หมายเลขห้องพัก (Room Number)</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ระบุหมายเลขห้องพัก เช่น 101, 102..."
-                      className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
-                      value={newRoomNumber}
-                      onChange={(e) => {
-                        setNewRoomNumber(e.target.value)
-                        // เดาเลขชั้นให้อัตโนมัติเฉพาะตอนเพิ่มห้องพักใหม่
-                        if (!editingRoom) {
-                          setNewRoomFloor(guessFloorNumber(e.target.value))
-                        }
-                      }}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ชั้นของห้องพัก (Floor)</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ระบุเลขชั้น เช่น 1, 2..."
-                      className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
-                      value={newRoomFloor}
-                      onChange={(e) => setNewRoomFloor(e.target.value)}
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ชั้นของห้องพัก (Floor)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ระบุเลขชั้น เช่น 1, 2..."
+                    className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
+                    value={newRoomFloor}
+                    onChange={(e) => setNewRoomFloor(e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
