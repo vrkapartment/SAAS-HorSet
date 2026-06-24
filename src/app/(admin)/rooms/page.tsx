@@ -64,6 +64,7 @@ function getCookie(name: string): string | undefined {
 interface RoomItem {
   id: string
   roomNumber: string
+  floor?: string
   status: "occupied" | "available"
   baseRent: number
   tenantId?: string | null
@@ -117,6 +118,7 @@ export default function RoomsPage() {
   // Room Form State
   const [editingRoom, setEditingRoom] = useState<RoomItem | null>(null)
   const [newRoomNumber, setNewRoomNumber] = useState("")
+  const [newRoomFloor, setNewRoomFloor] = useState("")
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState("")
   const [newBaseRent, setNewBaseRent] = useState<number | string>("")
   const [formSubmitting, setFormSubmitting] = useState(false)
@@ -316,6 +318,7 @@ export default function RoomsPage() {
   const handleAddClick = () => {
     setEditingRoom(null)
     setNewRoomNumber("")
+    setNewRoomFloor("")
     setSelectedRoomTypeId("")
     setNewBaseRent("")
     
@@ -331,6 +334,7 @@ export default function RoomsPage() {
   const handleEditClick = (room: RoomItem) => {
     setEditingRoom(room)
     setNewRoomNumber(room.roomNumber)
+    setNewRoomFloor(room.floor || "")
     setSelectedRoomTypeId(room.roomTypeId || "")
     setNewBaseRent(room.baseRent)
     setModalOpen(true)
@@ -408,7 +412,8 @@ export default function RoomsPage() {
         newRoomNumber,
         selectedRoomTypeId,
         Number(newBaseRent),
-        editingRoom.status
+        editingRoom.status,
+        newRoomFloor
       )
       if (res.success) {
         showToast("✓ อัปเดตข้อมูลห้องพักสำเร็จ", "success")
@@ -419,7 +424,7 @@ export default function RoomsPage() {
       }
     } else {
       // เพิ่มห้องพักใหม่
-      const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent))
+      const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent), newRoomFloor)
       if (res.success) {
         showToast("✓ เพิ่มห้องพักใหม่เข้าสู่ระบบสำเร็จ", "success")
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
@@ -925,9 +930,9 @@ export default function RoomsPage() {
   const waitingRoomsCount = rooms.filter(r => r.tenantName && !r.lineUserId).length
   const occupiedRoomsCount = rooms.filter(r => r.tenantName && r.lineUserId).length
 
-  // แยกเลขชั้นจากหมายเลขห้องพัก
-  const getFloorNumber = (roomNo: string) => {
-    if (!roomNo) return "1"
+  // เดาเลขชั้นแบบไดนามิกจากหมายเลขห้องพัก (ใช้เป็นตัวช่วยเดาตอนพิมพ์เพิ่มห้องพักใหม่)
+  const guessFloorNumber = (roomNo: string) => {
+    if (!roomNo) return ""
     const digits = roomNo.replace(/\D/g, "")
     if (digits.length === 3) return digits.charAt(0)
     if (digits.length === 4) return digits.substring(0, 2)
@@ -939,10 +944,16 @@ export default function RoomsPage() {
     return roomNo.charAt(0) || "1"
   }
 
+  // ดึงเลขชั้นของห้องพัก (ใช้อิงจากคอลัมน์ใน DB เป็นหลัก และใช้เดาชั้นกรณีเป็นห้องเก่าที่ไม่มีข้อมูล)
+  const getFloorNumber = (room: RoomItem) => {
+    if (room.floor) return room.floor
+    return guessFloorNumber(room.roomNumber) || "1"
+  }
+
   // จัดกลุ่มห้องพักแยกตามชั้น
   const groupedRoomsByFloor: { [floor: string]: RoomItem[] } = {}
   filteredRooms.forEach(room => {
-    const floor = getFloorNumber(room.roomNumber)
+    const floor = getFloorNumber(room)
     if (!groupedRoomsByFloor[floor]) groupedRoomsByFloor[floor] = []
     groupedRoomsByFloor[floor].push(room)
   })
@@ -1432,7 +1443,10 @@ export default function RoomsPage() {
                                 {/* 1. Room & Type */}
                                 <td className="p-4">
                                   <div className="flex flex-col gap-1.5">
-                                    <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm tracking-wide">ห้อง {room.roomNumber}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm tracking-wide">ห้อง {room.roomNumber}</span>
+                                      <span className="inline-flex items-center text-[10px] text-slate-500 dark:text-slate-400 font-extrabold bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">ชั้น {room.floor || getFloorNumber(room)}</span>
+                                    </div>
                                     <span className="inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded w-max border border-indigo-200/30 dark:border-indigo-800/30">
                                       <Tag className="w-2.5 h-2.5" /> {room.roomTypeName}
                                     </span>
@@ -1586,9 +1600,12 @@ export default function RoomsPage() {
                       >
                         {/* Mobile Header Card */}
                         <div className="flex items-start justify-between">
-                          <div className="space-y-0.5">
+                          <div className="space-y-1">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
-                            <span className="text-lg font-extrabold text-slate-850 dark:text-slate-100 tracking-wide">ห้อง {room.roomNumber}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-extrabold text-slate-850 dark:text-slate-100 tracking-wide">ห้อง {room.roomNumber}</span>
+                              <span className="inline-flex items-center text-[9px] font-extrabold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200/50 dark:border-slate-700/50">ชั้น {room.floor || getFloorNumber(room)}</span>
+                            </div>
                           </div>
                           <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
                             {statusDetails.label}
@@ -1852,16 +1869,36 @@ export default function RoomsPage() {
               </div>
 
               <form onSubmit={handleSubmitRoomForm} className="space-y-5 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">หมายเลขห้องพัก (Room Number)</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="ระบุหมายเลขห้องพัก เช่น 101, 102..."
-                    className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
-                    value={newRoomNumber}
-                    onChange={(e) => setNewRoomNumber(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">หมายเลขห้องพัก (Room Number)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ระบุหมายเลขห้องพัก เช่น 101, 102..."
+                      className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
+                      value={newRoomNumber}
+                      onChange={(e) => {
+                        setNewRoomNumber(e.target.value)
+                        // เดาเลขชั้นให้อัตโนมัติเฉพาะตอนเพิ่มห้องพักใหม่
+                        if (!editingRoom) {
+                          setNewRoomFloor(guessFloorNumber(e.target.value))
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ชั้นของห้องพัก (Floor)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ระบุเลขชั้น เช่น 1, 2..."
+                      className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
+                      value={newRoomFloor}
+                      onChange={(e) => setNewRoomFloor(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">

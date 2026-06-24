@@ -105,6 +105,7 @@ export async function getRooms() {
       return {
         id: room.id,
         roomNumber: room.room_number,
+        floor: room.floor || "",
         status: room.status,
         baseRent: room.room_types ? Number(room.room_types.default_rent) : Number(room.base_rent),
         tenantId: tenant ? tenant.id : null,
@@ -133,7 +134,7 @@ export async function getRooms() {
   }
 }
 
-export async function createRoom(roomNumber: string, roomTypeId: string, baseRent: number) {
+export async function createRoom(roomNumber: string, roomTypeId: string, baseRent: number, floor: string) {
   try {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -142,7 +143,8 @@ export async function createRoom(roomNumber: string, roomTypeId: string, baseRen
         room_number: roomNumber, 
         room_type_id: roomTypeId || null, 
         base_rent: baseRent, 
-        status: "available" 
+        status: "available",
+        floor: floor || null
       }])
       .select()
 
@@ -159,7 +161,8 @@ export async function updateRoom(
   roomNumber: string, 
   roomTypeId: string, 
   baseRent: number, 
-  status: "occupied" | "available"
+  status: "occupied" | "available",
+  floor: string
 ) {
   try {
     const supabase = await createClient()
@@ -170,6 +173,7 @@ export async function updateRoom(
         room_type_id: roomTypeId || null,
         base_rent: baseRent,
         status: status,
+        floor: floor || null,
         updated_at: new Date().toISOString()
       })
       .eq("id", id)
