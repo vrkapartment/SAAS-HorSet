@@ -1777,14 +1777,10 @@ export default function UnifiedBillingPage() {
                           {item.tenantName ? (
                             <div className="flex flex-col items-end">
                               <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                                {(item.billAmount && item.billAmount > 0) ? item.billAmount.toLocaleString() : simplifiedTotal.toLocaleString()}.-
+                                {simplifiedTotal.toLocaleString()}.-
                               </div>
                               <div className="text-[9px] text-slate-400 dark:text-slate-500">
-                                {(item.billAmount && item.billAmount > 0 && item.billAmount !== simplifiedTotal) ? (
-                                  <span className="text-amber-500 font-bold">ยอดเงินถูกปรับแต่ง</span>
-                                ) : (
-                                  `${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`
-                                )}
+                                {`${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`}
                               </div>
                             </div>
                           ) : (
@@ -1854,14 +1850,10 @@ export default function UnifiedBillingPage() {
                         <div className="text-right">
                           <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</div>
                           <div className="text-base font-black text-teal-600 dark:text-teal-400 font-mono">
-                            {(item.billAmount && item.billAmount > 0) ? item.billAmount.toLocaleString() : simplifiedTotal.toLocaleString()}.-
+                            {simplifiedTotal.toLocaleString()}.-
                           </div>
                           <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-                            {(item.billAmount && item.billAmount > 0 && item.billAmount !== simplifiedTotal) ? (
-                              <span className="text-amber-500 font-bold">ยอดเงินถูกปรับแต่ง</span>
-                            ) : (
-                              `${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`
-                            )}
+                            {`${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`}
                           </div>
                         </div>
                       )}
