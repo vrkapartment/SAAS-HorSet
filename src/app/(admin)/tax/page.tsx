@@ -761,38 +761,58 @@ export default function TaxPage() {
 
   return (
     <>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">สรุปข้อมูลเพื่อการยื่นภาษีเงินได้</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">คัดแยกรายได้อพาร์ทเมนท์ตามกฎหมายสรรพากรไทย ภ.ง.ด. 94 และ ภ.ง.ด. 90</p>
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-1">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20 dark:shadow-indigo-500/10">
+            <FileText className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
+              สรุปข้อมูลเพื่อการยื่นภาษีเงินได้
+            </h2>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              คัดแยกรายได้อพาร์ทเมนท์ตามกฎหมายสรรพากรไทย ภ.ง.ด. 94 และ ภ.ง.ด. 90
+            </p>
+          </div>
         </div>
         
-        <div className="flex gap-3">
-          <select
-            className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-sm"
-            value={taxYear}
-            onChange={(e) => setTaxYear(e.target.value)}
-          >
-            <option value="2026">ปีภาษี 2026</option>
-            <option value="2025">ปีภาษี 2025</option>
-          </select>
+        <div className="flex items-center gap-3 w-full md:w-auto self-stretch md:self-auto justify-end">
+          <div className="relative group min-w-[120px]">
+            <select
+              className="w-full appearance-none px-4 py-2.5 pr-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-sm transition-all cursor-pointer"
+              value={taxYear}
+              onChange={(e) => setTaxYear(e.target.value)}
+            >
+              <option value="2026">ปีภาษี 2026</option>
+              <option value="2025">ปีภาษี 2025</option>
+            </select>
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+              <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
           
           <button
             onClick={handleExport}
-            className="glow-btn bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded-xl flex items-center gap-2 text-xs shadow-lg shadow-blue-600/10"
+            className="glow-btn bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all duration-300 cursor-pointer"
           >
             <Download className="w-4 h-4" /> ส่งออกรายงานสรุป
           </button>
         </div>
       </div>
 
-      {/* คำเตือนความรับผิดชอบทางกฎหมาย */}
-      <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl text-xs text-amber-700 dark:text-amber-400">
-        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-bold">⚠️ ข้อสงวนสิทธิ์ทางกฎหมาย (Legal Disclaimer)</p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+      {/* ข้อสงวนสิทธิ์ทางกฎหมาย (Legal Disclaimer) */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-amber-500/[0.04] via-amber-500/[0.08] to-transparent dark:from-amber-500/[0.06] dark:via-amber-500/[0.03] dark:to-transparent border border-amber-500/20 dark:border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.03)] backdrop-blur-md p-5 rounded-2xl flex items-start gap-4 transition-all hover:shadow-[0_0_20px_rgba(245,158,11,0.06)] group">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-amber-500/10 transition-all duration-500"></div>
+        <div className="p-2.5 bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-xl shrink-0 shadow-inner">
+          <AlertTriangle className="w-5 h-5 animate-pulse" />
+        </div>
+        <div className="space-y-1.5 relative z-10">
+          <p className="text-xs font-bold text-amber-800 dark:text-amber-450 tracking-wide flex items-center gap-1.5">
+            ข้อสงวนสิทธิ์ทางกฎหมาย (Legal Disclaimer)
+          </p>
+          <p className="text-slate-600 dark:text-slate-350 text-[11px] leading-relaxed max-w-5xl">
             ข้อมูลการคำนวณและรายงานตัวเลขรายได้ในหน้านี้ จัดทำขึ้นเพื่อใช้เป็นข้อมูลอ้างอิงเบื้องต้นในการคำนวณภาษีเท่านั้น ผู้ใช้งานต้องนำส่งแบบฟอร์มภาษีและตรวจสอบเอกสารความถูกต้องด้วยตนเองผ่านช่องทางระบบอย่างเป็นทางการของกรมสรรพากรอีกครั้ง
           </p>
         </div>
@@ -800,378 +820,534 @@ export default function TaxPage() {
 
       {/* ส่วนตั้งค่าแหล่งข้อมูลการคำนวณและลดหย่อนภาษี */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
         {/* คอนฟิกแหล่งข้อมูล */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-6">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-100 dark:border-slate-900 pb-3">
-            <Database className="w-4 h-4 text-blue-500" /> แหล่งข้อมูลรายได้ภาษี
-          </h3>
+        <div className="relative overflow-hidden glass-card p-6 md:p-8 rounded-3xl border border-slate-200/80 dark:border-slate-900/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
           
-          <div className="space-y-4">
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => handleDataSourceChange("system")}
-                className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl border transition-all flex items-center justify-center gap-2 ${
-                  dataSource === "system"
-                    ? "bg-blue-50 dark:bg-blue-600/10 border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700"
-                }`}
-              >
-                <Database className="w-3.5 h-3.5" /> ดึงข้อมูลอัตโนมัติจากระบบ
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDataSourceChange("manual")}
-                className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl border transition-all flex items-center justify-center gap-2 ${
-                  dataSource === "manual"
-                    ? "bg-blue-50 dark:bg-blue-600/10 border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700"
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5" /> กำหนดตัวเลขเอง
-              </button>
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-900 pb-4">
+              <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl shadow-inner">
+                <Database className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">แหล่งข้อมูลรายได้ภาษี</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">เลือกรูปแบบการประมวลผลยอดเงินรับพึงประเมิน</p>
+              </div>
             </div>
+            
+            <div className="space-y-4">
+              <div className="flex gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-900/80">
+                <button
+                  type="button"
+                  onClick={() => handleDataSourceChange("system")}
+                  className={`flex-1 py-3 px-4 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                    dataSource === "system"
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 dark:shadow-blue-500/10 font-bold scale-[1.01]"
+                      : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  <Database className="w-3.5 h-3.5" /> ดึงข้อมูลอัตโนมัติจากระบบ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDataSourceChange("manual")}
+                  className={`flex-1 py-3 px-4 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                    dataSource === "manual"
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 dark:shadow-blue-500/10 font-bold scale-[1.01]"
+                      : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  <Settings className="w-3.5 h-3.5" /> กำหนดตัวเลขเอง
+                </button>
+              </div>
 
-            {dataSource === "system" ? (
-              <div className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-100 dark:border-slate-900 text-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 dark:text-slate-400">สถานะดึงข้อมูลบิล:</span>
-                  {hasPaidBills ? (
-                    <span className="inline-flex items-center gap-1 text-teal-600 dark:text-teal-400 font-semibold bg-teal-50 dark:bg-teal-500/10 px-2 py-0.5 rounded-full text-[10px]">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" /> ดึงข้อมูลจริงจากระบบสำเร็จ ({paidBillsInYear.length} บิล)
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full text-[10px]">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> ไม่พบประวัติบิลชำระเงิน (ยังไม่มีบิลชำระในปีนี้)
-                    </span>
-                  )}
+              {dataSource === "system" ? (
+                <div className="p-4 bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl border border-slate-200/50 dark:border-slate-900/80 text-xs space-y-3 shadow-inner">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-900/80 pb-2.5">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">สถานะดึงข้อมูลบิล:</span>
+                    {hasPaidBills ? (
+                      <span className="inline-flex items-center gap-1.5 text-teal-700 dark:text-teal-400 font-bold bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border border-emerald-500/20 px-3 py-1 rounded-full text-[10px]">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> ดึงข้อมูลจริงสำเร็จ ({paidBillsInYear.length} บิล)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/20 px-3 py-1 rounded-full text-[10px]">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> ไม่พบประวัติบิลชำระในปีภาษีนี้
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-450 leading-relaxed">
+                    {hasPaidBills 
+                      ? `ระบบประมวลผลรวบรวมรายได้จากบิลค่าเช่าในระบบที่เปลี่ยนสถานะเป็น "ชำระแล้ว" ในปี ${taxYear} โดยคัดแยกสัดส่วนค่าเช่าห้องพัก (มาตรา 40(5)) ค่าน้ำประปา/ค่าไฟฟ้า/ค่าส่วนกลาง (มาตรา 40(8)) และรายได้อื่นๆ ให้โดยอัตโนมัติตามหลักเกณฑ์ของกรมสรรพากร`
+                      : `ไม่พบประวัติบิลที่ชำระเงินในปี ${taxYear} ระบบจึงแสดงยอดรายได้พึงประเมินเป็น 0 บาท ท่านสามารถบันทึกบิลชำระเงินในระบบเพื่ออัปเดตยอดจริง หรือเปลี่ยนเป็นโหมด "กำหนดตัวเลขเอง" ด้านบน`
+                    }
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  {hasPaidBills 
-                    ? `ระบบทำการรวมรายได้จากบิลค่าเช่าในระบบที่เปลี่ยนสถานะเป็น "ชำระแล้ว" ในปี ${taxYear} โดยคำนวณแยกตามมิเตอร์และค่าเช่าสุทธิ`
-                    : `ไม่พบประวัติบิลที่ชำระเงินในปี ${taxYear} ระบบจึงแสดงยอดรายได้พึงประเมินเป็น 0 บาท ท่านสามารถบันทึกบิลชำระเงินในระบบเพื่ออัปเดตยอดจริง หรือเปลี่ยนเป็นโหมด "กำหนดตัวเลขเอง" ด้านบน`
-                  }
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">ป้อนรายได้เช่า 40(5) ทั้งปี (บาท)</label>
-                  <input
-                    type="number"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
-                    value={manualRent405}
-                    onChange={(e) => handleManualRentChange(Number(e.target.value))}
-                  />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">รายได้เช่า 40(5) ทั้งปี (บาท)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        className="w-full px-4 py-2.5 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-200 text-xs font-mono transition-all"
+                        value={manualRent405}
+                        onChange={(e) => handleManualRentChange(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">รายได้บริการ 40(8) ทั้งปี (บาท)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        className="w-full px-4 py-2.5 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-200 text-xs font-mono transition-all"
+                        value={manualUtilities408}
+                        onChange={(e) => handleManualUtilChange(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">รายได้อื่นๆ 40(8) ทั้งปี (บาท)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        className="w-full px-4 py-2.5 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-200 text-xs font-mono transition-all"
+                        value={manualOther408}
+                        onChange={(e) => handleManualOtherChange(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">ป้อนรายได้สาธารณูปโภค 40(8) ทั้งปี (บาท)</label>
-                  <input
-                    type="number"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
-                    value={manualUtilities408}
-                    onChange={(e) => handleManualUtilChange(Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">ป้อนรายได้อื่นๆ 40(8) ทั้งปี (บาท)</label>
-                  <input
-                    type="number"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-xs font-mono"
-                    value={manualOther408}
-                    onChange={(e) => handleManualOtherChange(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
         {/* คอนฟิกค่าใช้จ่ายและการหักค่าใช้จ่าย */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-6">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-100 dark:border-slate-900 pb-3">
-            <Sliders className="w-4 h-4 text-teal-500" /> การคำนวณหักค่าใช้จ่ายทางภาษี
-          </h3>
+        <div className="relative overflow-hidden glass-card p-6 md:p-8 rounded-3xl border border-slate-200/80 dark:border-slate-900/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
           
-          <div className="space-y-4">
-            {/* 40(5) Deduction Select */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">รูปแบบการหักรายจ่ายของ ค่าเช่า 40(5)</label>
-                <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-full font-semibold">มาตรา 40(5)</span>
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-900 pb-4">
+              <div className="p-2 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-xl shadow-inner">
+                <Sliders className="w-4 h-4" />
               </div>
-              <div className="flex gap-2">
-                {(["เหมา 30%", "ตามจริง"] as const).map(method => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => handleDeductionMethodChange(method)}
-                    className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all ${
-                      deductionMethod405 === method
-                        ? "bg-teal-50 dark:bg-teal-600/10 border-teal-500 text-teal-600 dark:text-teal-400"
-                        : "bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700"
-                    }`}
-                  >
-                    {method === "เหมา 30%" ? "หักเหมา 30%" : "หักตามจริง"}
-                  </button>
-                ))}
-              </div>
-              
-              {deductionMethod405 === "ตามจริง" && (
-                <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">ค่าใช้จ่ายจริงในการดำเนินงานเช่าหอพักสะสมต่อปี (บาท)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      readOnly
-                      placeholder="ระบบคำนวณจากบันทึกค่าใช้จ่าย 40(5) ด้านล่าง..."
-                      className="w-full pl-3 pr-24 py-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl text-slate-650 dark:text-slate-400 text-xs font-mono cursor-not-allowed"
-                      value={actualExpense405}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => loadExpensesData(taxYear, undefined, true)}
-                      disabled={loadingExpenses}
-                      className="absolute right-2 top-1.5 inline-flex items-center gap-1 text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/20 px-2 py-1 rounded font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95 animate-fade-in"
-                      title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
-                    >
-                      <RefreshCw className={`w-2.5 h-2.5 ${loadingExpenses ? "animate-spin" : ""}`} />
-                      ดึงอัตโนมัติ
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-500 leading-relaxed">
-                    * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 40(8) Deduction Select */}
-            <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/60 pt-3">
-              <div className="flex justify-between items-center">
-                <label className="text-xs text-slate-650 dark:text-slate-400 font-medium">รูปแบบการหักรายจ่ายของ ค่าน้ำไฟ/บริการ 40(8)</label>
-                <span className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full font-semibold">มาตรา 40(8)</span>
-              </div>
-              <div className="flex gap-2">
-                {(["เหมา 60%", "ตามจริง"] as const).map(method => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => handleDeductionMethod408Change(method)}
-                    className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all ${
-                      deductionMethod408 === method
-                        ? "bg-teal-50 dark:bg-teal-600/10 border-teal-500 text-teal-600 dark:text-teal-400"
-                        : "bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700"
-                    }`}
-                  >
-                    {method === "เหมา 60%" ? "หักเหมา 60%" : "หักตามจริง"}
-                  </button>
-                ))}
-              </div>
-              
-              {deductionMethod408 === "ตามจริง" && (
-                <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">ค่าใช้จ่ายจริงที่เกิดขึ้นของค่าน้ำไฟ/บริการ 40(8) ทั้งปี (บาท)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      readOnly
-                      placeholder="ระบบคำนวณจากบันทึกค่าใช้จ่าย 40(8) ด้านล่าง..."
-                      className="w-full pl-3 pr-24 py-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl text-slate-650 dark:text-slate-400 text-xs font-mono cursor-not-allowed"
-                      value={actualExpense408}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => loadExpensesData(taxYear, undefined, true)}
-                      disabled={loadingExpenses}
-                      className="absolute right-2 top-1.5 inline-flex items-center gap-1 text-[9px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/20 px-2 py-1 rounded font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95 animate-fade-in"
-                      title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
-                    >
-                      <RefreshCw className={`w-2.5 h-2.5 ${loadingExpenses ? "animate-spin" : ""}`} />
-                      ดึงอัตโนมัติ
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-500 leading-relaxed">
-                    * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
-                  </p>
-                </div>
-              )}
-              {deductionMethod408 === "เหมา 60%" && (
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  * ระบบทำการคำนวณหักรายจ่ายแบบเหมาในอัตรา 60% ของรายได้พึงประเมินมาตรา 40(8) ทั้งหมด
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* การแบ่งประเภทรายได้และเปรียบเทียบการหักลดหย่อน */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* รายได้ประเภทที่ 40(5) */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex justify-between items-start">
-              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400">มาตรา 40(5)</span>
-              <Landmark className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้ค่าเช่าห้องพัก</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เฉพาะส่วนที่เป็นค่าเช่าห้องพักหลัก</p>
-              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{formatMoney(rent405Full)} บาท</p>
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
-            <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่เลือก:</p>
-            <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
-              หักแบบ{deductionMethod405} : <span className="text-blue-600 dark:text-blue-400 font-bold">{formatMoney(deductionRent405Full)} บาท</span>
-            </div>
-          </div>
-        </div>
-
-        {/* รายได้ประเภทที่ 40(8) */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex justify-between items-start">
-              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400">มาตรา 40(8)</span>
-              <Zap className="w-5 h-5 text-teal-500" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">ค่าน้ำไฟและบริการ</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ค่ายูนิตน้ำ/ไฟ + ค่าบริการส่วนกลาง</p>
-              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{formatMoney(utilities408Full)} บาท</p>
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
-            <p>เงินได้ประเภทนี้สามารถหักค่าใช้จ่ายตามแบบที่เลือก:</p>
-            <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
-              หักแบบ{deductionMethod408} : <span className="text-teal-600 dark:text-teal-400 font-bold">{formatMoney(deductionUtilities408Full)} บาท</span>
-            </div>
-          </div>
-        </div>
-
-        {/* รายได้ประเภทที่ 40(8) อื่นๆ (ไม่หักเหมา) */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex justify-between items-start">
-              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400">ม. 40(8) อื่นๆ (ไม่หักเหมา)</span>
-              <Coins className="w-5 h-5 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายได้อื่น (ค่าปรับ/ริบมัดจำ)</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เงินปรับจ่ายล่าช้า หรือเงินริบมัดจำ</p>
-              <p className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{formatMoney(other408Full)} บาท</p>
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1 mt-auto pt-2">
-            <p>ไม่เข้าเกณฑ์หักเหมา 60% (หักแบบเหมาเป็น 0):</p>
-            <div className="bg-slate-50 dark:bg-slate-950/40 p-2 rounded-lg border border-slate-200 dark:border-slate-900 text-slate-700 dark:text-slate-300 font-medium">
-              {deductionMethod408 === "เหมา 60%" ? (
-                <span>หักแบบเหมา 60% : <span className="text-amber-600 dark:text-amber-400 font-bold">0.00 บาท</span></span>
-              ) : (
-                <span>หักตามจ่ายจริง : <span className="text-teal-600 dark:text-teal-400 font-bold">ใช้สิทธิ์ตามจ่ายจริง</span></span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* รายจ่ายจริงสะสม */}
-        <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-900/60 space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex justify-between items-start">
-              <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">รายจ่ายสะสม</span>
-              <Calculator className="w-5 h-5 text-emerald-500" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">รายจ่ายรวมหักลดหย่อน</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">รวมค่าใช้จ่ายหักเหมาหรือหักจริง</p>
-              <p className="text-xl font-bold mt-2 text-emerald-600 dark:text-emerald-400">{formatMoney(deductionRent405Full + deductionUtilities408Full)} บาท</p>
-            </div>
-          </div>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mt-auto pt-2">
-            เป็นการรวมยอดค่าลดหย่อนภาษีของค่าเช่าห้อง ({formatMoney(deductionRent405Full)} บ.) และค่าน้ำไฟหลวง/บริการ ({formatMoney(deductionUtilities408Full)} บ.)
-          </p>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 3. ระบบบันทึกค่าใช้จ่ายและคู่มือคำแนะนำทางภาษี */}
-      {/* ========================================================================= */}
-      <div className="space-y-6">
-        {/* ส่วนคู่มือแนะนำ (Recommendation Guide) */}
-        <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-900 pb-3">
-            <div className="flex items-center gap-2">
-              <HelpCircle className="w-5 h-5 text-blue-500" />
               <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">คู่มือแนะนำ: การเลือกประเภทรายจ่ายตามหลักสรรพากร</h3>
-                <p className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5">เลือกประเภทค่าใช้จ่ายอย่างถูกต้อง เพื่อลดหย่อนภาษีสูงสุดและป้องกันการตรวจสอบย้อนหลัง</p>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">การคำนวณหักค่าใช้จ่ายทางภาษี</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">เลือกใช้นโยบายลดหย่อนค่าใช้จ่ายตามเกณฑ์สรรพากร</p>
               </div>
             </div>
+            
+            <div className="space-y-4">
+              {/* 40(5) Deduction Select */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">รูปแบบการหักรายจ่ายของ ค่าเช่า 40(5)</label>
+                  <span className="inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10">มาตรา 40(5)</span>
+                </div>
+                <div className="flex gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-900/80">
+                  {(["เหมา 30%", "ตามจริง"] as const).map(method => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => handleDeductionMethodChange(method)}
+                      className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${
+                        deductionMethod405 === method
+                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/20 dark:shadow-teal-500/10 font-bold scale-[1.01]"
+                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      {method === "เหมา 30%" ? "หักเหมา 30%" : "หักตามจริง"}
+                    </button>
+                  ))}
+                </div>
+                
+                {deductionMethod405 === "ตามจริง" && (
+                  <div className="space-y-1.5 pt-1.5 animate-fade-in">
+                    <label className="text-[10px] text-slate-500 dark:text-slate-450 font-semibold tracking-wide">ค่าใช้จ่ายจริงในการดำเนินงานเช่าหอพักสะสมต่อปี (บาท)</label>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        readOnly
+                        placeholder="ระบบคำนวณจากบันทึกค่าใช้จ่าย 40(5) ด้านล่าง..."
+                        className="w-full pl-4 pr-32 py-2.5 bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900/80 rounded-xl text-slate-600 dark:text-slate-350 text-xs font-mono cursor-not-allowed"
+                        value={actualExpense405}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => loadExpensesData(taxYear, undefined, true)}
+                        disabled={loadingExpenses}
+                        className="absolute right-2.5 inline-flex items-center gap-1 text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+                        title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingExpenses ? "animate-spin" : ""}`} />
+                        ดึงอัตโนมัติ
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-450 leading-relaxed">
+                      * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* 40(8) Deduction Select */}
+              <div className="space-y-2 border-t border-slate-100 dark:border-slate-900/80 pt-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">รูปแบบการหักรายจ่ายของ ค่าน้ำไฟ/บริการ 40(8)</label>
+                  <span className="inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10">มาตรา 40(8)</span>
+                </div>
+                <div className="flex gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-900/80">
+                  {(["เหมา 60%", "ตามจริง"] as const).map(method => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => handleDeductionMethod408Change(method)}
+                      className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${
+                        deductionMethod408 === method
+                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/20 dark:shadow-teal-500/10 font-bold scale-[1.01]"
+                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      {method === "เหมา 60%" ? "หักเหมา 60%" : "หักตามจริง"}
+                    </button>
+                  ))}
+                </div>
+                
+                {deductionMethod408 === "ตามจริง" && (
+                  <div className="space-y-1.5 pt-1.5 animate-fade-in">
+                    <label className="text-[10px] text-slate-500 dark:text-slate-450 font-semibold tracking-wide">ค่าใช้จ่ายจริงที่เกิดขึ้นของค่าน้ำไฟ/บริการ 40(8) ทั้งปี (บาท)</label>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        readOnly
+                        placeholder="ระบบคำนวณจากบันทึกค่าใช้จ่าย 40(8) ด้านล่าง..."
+                        className="w-full pl-4 pr-32 py-2.5 bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900/80 rounded-xl text-slate-650 dark:text-slate-350 text-xs font-mono cursor-not-allowed"
+                        value={actualExpense408}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => loadExpensesData(taxYear, undefined, true)}
+                        disabled={loadingExpenses}
+                        className="absolute right-2.5 inline-flex items-center gap-1 text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+                        title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingExpenses ? "animate-spin" : ""}`} />
+                        ดึงอัตโนมัติ
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-450 leading-relaxed">
+                      * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
+                    </p>
+                  </div>
+                )}
+                {deductionMethod408 === "เหมา 60%" && (
+                  <p className="text-[10px] text-slate-400 dark:text-slate-455 leading-relaxed">
+                    * ระบบคำนวณหักค่าใช้จ่ายแบบเหมาในอัตราร้อยละ 60 ของยอดเงินได้รวมมาตรา 40(8) จากงานบริการส่วนกลาง ค่าน้ำประปา และไฟฟ้าตามหลักกฎหมายผู้เสียภาษี
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* บัตรรายได้และหักลดหย่อน (The Four Income Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        {/* บัตร 1: ม. 40(5) */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-blue-100 dark:border-blue-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-blue-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/[0.03] dark:bg-blue-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-blue-500/[0.08] transition-all duration-300"></div>
+          
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10 tracking-wider">
+                มาตรา 40(5)
+              </span>
+              <div className="p-2.5 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Landmark className="w-5 h-5" />
+              </div>
+            </div>
+            
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้ค่าเช่าห้องพัก</h4>
+              <p className="text-[10px] text-slate-400 leading-none">รายได้เฉพาะส่วนที่เป็นค่าเช่าห้องพักสุทธิ</p>
+              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300">
+                {formatMoney(rent405Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
+              </p>
+            </div>
+          </div>
+          
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">หักลดหย่อนแบบ {deductionMethod405}</span>
+              <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">
+                {formatMoney(deductionRent405Full)} บาท
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* บัตร 2: ม. 40(8) ค่าน้ำไฟ */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-teal-100 dark:border-teal-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-teal-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/[0.03] dark:bg-teal-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-teal-500/[0.08] transition-all duration-300"></div>
+          
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-teal-500/[0.08] dark:bg-teal-500/[0.12] text-teal-600 dark:text-teal-400 border border-teal-500/10 tracking-wider">
+                มาตรา 40(8)
+              </span>
+              <div className="p-2.5 bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-teal-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Zap className="w-5 h-5" />
+              </div>
+            </div>
+            
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ค่าน้ำไฟและบริการ</h4>
+              <p className="text-[10px] text-slate-400 leading-none">ค่ายูนิตสาธารณูปโภคและส่วนกลาง</p>
+              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-emerald-500 to-green-600 dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
+                {formatMoney(utilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
+              </p>
+            </div>
+          </div>
+          
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">หักลดหย่อนแบบ {deductionMethod408}</span>
+              <span className="text-xs font-extrabold text-teal-600 dark:text-teal-400 tracking-tight">
+                {formatMoney(deductionUtilities408Full)} บาท
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* บัตร 3: ม. 40(8) อื่นๆ */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-amber-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.03] dark:bg-amber-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-amber-500/[0.08] transition-all duration-300"></div>
+          
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10 tracking-wider">
+                ม. 40(8) อื่นๆ
+              </span>
+              <div className="p-2.5 bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Coins className="w-5 h-5" />
+              </div>
+            </div>
+            
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้อื่น (ปรับ/ริบมัดจำ)</h4>
+              <p className="text-[10px] text-slate-400 leading-none">เงินปรับชำระล่าช้าหรือเงินริบมัดจำทำสัญญา</p>
+              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-amber-600 via-orange-500 to-rose-650 dark:from-amber-400 dark:via-orange-400 dark:to-rose-450">
+                {formatMoney(other408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
+              </p>
+            </div>
+          </div>
+          
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">กฎหมายไม่ให้สิทธิ์หักแบบเหมา</span>
+              <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
+                {deductionMethod408 === "เหมา 60%" ? (
+                  "หักเหมา = 0.00 บาท"
+                ) : (
+                  "ใช้สิทธิ์ตามจ่ายจริงร่วมกัน"
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* บัตร 4: รายจ่ายรวมหักลดหย่อน */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-purple-100 dark:border-purple-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-purple-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/[0.03] dark:bg-purple-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-purple-500/[0.08] transition-all duration-300"></div>
+          
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-purple-500/[0.08] dark:bg-purple-500/[0.12] text-purple-600 dark:text-purple-450 border border-purple-500/10 tracking-wider">
+                รวมยอดลดหย่อน
+              </span>
+              <div className="p-2.5 bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Calculator className="w-5 h-5" />
+              </div>
+            </div>
+            
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายจ่ายลดหย่อนรวมทั้งสิ้น</h4>
+              <p className="text-[10px] text-slate-400 leading-none">รวมค่าลดหย่อนหักเหมาหรือลดจริงทุกประเภท</p>
+              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-650 dark:from-purple-400 dark:via-fuchsia-400 dark:to-pink-450">
+                {formatMoney(deductionRent405Full + deductionUtilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
+              </p>
+            </div>
+          </div>
+          
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">รายละเอียดองค์ประกอบ:</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 text-[10px] text-slate-500 dark:text-slate-400 space-y-1">
+              <div className="flex justify-between font-medium">
+                <span>ค่าเช่า ม.40(5):</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold">{formatMoney(deductionRent405Full)} บ.</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>บริการ ม.40(8):</span>
+                <span className="text-slate-700 dark:text-slate-300 font-bold">{formatMoney(deductionUtilities408Full)} บ.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. ระบบบันทึกค่าใช้จ่ายและคู่มือคำแนะนำทางภาษี */}
+      <div className="space-y-6">
+        
+        {/* คู่มือแนะนำ (Recommendation Guide) */}
+        <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-slate-900/60 p-6 md:p-8 space-y-5 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-slate-900 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">คู่มือแนะนำ: การเลือกประเภทรายจ่ายตามหลักสรรพากร</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">เลือกประเภทค่าใช้จ่ายอย่างถูกต้อง เพื่อลดหย่อนภาษีสูงสุดและป้องกันการตรวจสอบย้อนหลัง</p>
+              </div>
+            </div>
+            
             <button
               onClick={() => setShowGuide(!showGuide)}
-              className="p-1.5 bg-slate-100 dark:bg-slate-900/40 hover:bg-slate-200 dark:hover:bg-slate-900 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors text-xs flex items-center gap-1 cursor-pointer"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-900/40 hover:bg-slate-200 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-250 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-transparent hover:border-slate-200/30 active:scale-95"
             >
               {showGuide ? (
-                <>ซ่อนคู่มือ <ChevronUp className="w-3.5 h-3.5" /></>
+                <>ซ่อนคู่มือ <ChevronUp className="w-4 h-4" /></>
               ) : (
-                <>แสดงคู่มือ <ChevronDown className="w-3.5 h-3.5" /></>
+                <>แสดงคู่มือ <ChevronDown className="w-4 h-4" /></>
               )}
             </button>
           </div>
 
           {showGuide && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-scale-up">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1 animate-fade-in">
+              
               {/* รายจ่าย 40(5) */}
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-xl space-y-3">
-                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-xs">
-                  <Landmark className="w-4 h-4" /> มาตรา 40(5) (ค่าเช่าตึก / โครงสร้าง)
+              <div className="bg-gradient-to-br from-blue-500/[0.03] to-indigo-500/[0.01] dark:from-blue-500/[0.07] dark:to-transparent border border-blue-100 dark:border-blue-900/40 rounded-2xl p-6 space-y-4 shadow-inner group">
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-extrabold text-xs">
+                  <div className="p-1.5 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg">
+                    <Landmark className="w-4 h-4" />
+                  </div>
+                  มาตรา 40(5) (ค่าเช่าอาคารสิ่งปลูกสร้าง)
                 </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                  เป็นรายจ่ายที่เกี่ยวเนื่องโดยตรงกับ **ตัวโครงสร้างอาคารและสิทธิ์ในการจัดหาอพาร์ทเมนท์** เหมาะสำหรับธุรกิจเช่าห้องพักที่เลือกหักค่าใช้จ่าย "ตามจริง"
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                  เป็นรายจ่ายที่เกี่ยวเนื่องโดยตรงกับ <strong className="text-slate-700 dark:text-slate-300">ตัวโครงสร้างอาคารและสิทธิ์ในการจัดหาอพาร์ทเมนท์</strong> เหมาะสำหรับธุรกิจเช่าห้องพักที่เลือกหักค่าใช้จ่ายในรูปแบบ "ตามจริง"
                 </p>
-                <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-900">
-                  <div className="text-[10px] font-bold text-slate-700 dark:text-slate-300">✅ รายการที่หักภาษีได้:</div>
-                  <ul className="space-y-1 text-[10px] text-slate-600 dark:text-slate-400 list-disc pl-4 leading-relaxed">
-                    <li><strong className="text-slate-700 dark:text-slate-300">ค่าซ่อมแซมใหญ่โครงสร้าง:</strong> เช่น ทาสีอาคารใหม่ทั้งหมด, เปลี่ยนหลังคาป้องกันน้ำรั่วซึม, งานซ่อมแซมโครงสร้างตึก</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">ดอกเบี้ยกู้ยืม:</strong> ดอกเบี้ยธนาคารสำหรับวงเงินกู้ซื้อที่ดินหรือก่อสร้างอาคารหอพัก</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">ภาษีที่เกี่ยวข้อง:</strong> ภาษีที่ดินและสิ่งปลูกสร้างที่เจ้าของกิจการชำระให้ท้องถิ่น</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">เบี้ยประกันภัย:</strong> ค่าเบี้ยประกันอัคคีภัย ประกันภัยพิบัติของสิ่งปลูกสร้าง</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">ค่าเสื่อมราคาอาคาร:</strong> การหักค่าเสื่อมราคาสิ่งปลูกสร้างรายปีทางบัญชี</li>
+                
+                <div className="space-y-3 pt-3 border-t border-slate-250/30 dark:border-slate-800/80">
+                  <div className="text-[11px] font-extrabold text-slate-700 dark:text-slate-250 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> รายการที่หักภาษีได้:
+                  </div>
+                  <ul className="space-y-2.5 pl-1">
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ค่าซ่อมแซมใหญ่โครงสร้าง:</strong> เช่น งานทาสีอาคารภายนอกใหม่ทั้งหมด, การเปลี่ยนแผ่นกระเบื้องหลังคาอาคารหลักเพื่อป้องกันน้ำรั่วซึม, งานเทปูนฐานรากตึก
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ดอกเบี้ยกู้ยืม:</strong> อัตราดอกเบี้ยจ่ายจากทางธนาคารสำหรับการกู้ยืมเงินเพื่อนำมาซื้อที่ดินหรือก่อสร้างตึกอพาร์ทเมนท์
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ภาษีที่เกี่ยวข้อง:</strong> ยอดชำระภาษีที่ดินและสิ่งปลูกสร้างที่ผู้ประกอบการชำระให้แก่องค์กรปกครองส่วนท้องถิ่นประจำปี
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">เบี้ยประกันภัย:</strong> ค่าเบี้ยประกันอัคคีภัย ประกันวินาศภัย หรือประกันภัยพิบัติที่ครอบคลุมตัวสิ่งปลูกสร้างอาคาร
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ค่าเสื่อมราคาอาคาร:</strong> การคิดค่าเสื่อมราคาสินทรัพย์ประประเภทตึกหรือสิ่งก่อสร้างเป็นรายปีทางบัญชีเพื่อหักลดหย่อน
+                      </div>
+                    </li>
                   </ul>
                 </div>
-                <div className="p-2 bg-blue-50 dark:bg-blue-500/5 rounded text-[10px] text-blue-700 dark:text-blue-300 flex gap-1.5 items-start">
-                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span><strong>คำแนะนำ:</strong> เลือกข้อนี้เมื่อใช้จ่ายกับ "ตึกหรืองานก่อสร้างถาวร" ที่มีใบเสร็จ/ใบกำกับภาษีเต็มรูปแบบในนามกิจการ</span>
+                
+                <div className="p-3 bg-blue-500/[0.04] dark:bg-blue-500/[0.08] border border-blue-500/10 rounded-xl text-[10px] text-blue-800 dark:text-blue-300 flex gap-2 items-start shadow-inner">
+                  <Info className="w-4 h-4 shrink-0 text-blue-500" />
+                  <span className="leading-relaxed"><strong>คำแนะนำ:</strong> บันทึกเป็นรายจ่ายข้อนี้ เมื่อเกิดการใช้จ่ายกับตัวอาคารหรืองานระบบวิศวกรรมอาคารถาวร โดยต้องมีใบเสร็จรับเงินหรือใบกำกับภาษีเต็มรูปแบบในชื่อของกิจการอย่างชัดเจน</span>
                 </div>
               </div>
 
               {/* รายจ่าย 40(8) */}
-              <div className="p-4 bg-teal-50 dark:bg-teal-950/20 border border-teal-100 dark:border-teal-900/40 rounded-xl space-y-3">
-                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 font-bold text-xs">
-                  <Zap className="w-4 h-4" /> มาตรา 40(8) (ค่าน้ำไฟ / งานบริการ)
+              <div className="bg-gradient-to-br from-teal-500/[0.03] to-emerald-500/[0.01] dark:from-teal-500/[0.07] dark:to-transparent border border-teal-100 dark:border-teal-900/40 rounded-2xl p-6 space-y-4 shadow-inner group">
+                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 font-extrabold text-xs">
+                  <div className="p-1.5 bg-teal-500/10 dark:bg-teal-500/20 rounded-lg">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  มาตรา 40(8) (งานบริการสาธารณูปโภคและส่วนกลาง)
                 </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                  เป็นรายจ่ายที่เกี่ยวกับ **การให้บริการสาธารณูปโภคและอำนวยความสะดวก** แก่ผู้เช่า (กฎหมายสรรพากรบังคับให้รายรับน้ำไฟต้องยื่นแบบหักตามจริงเท่านั้น)
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                  เป็นรายจ่ายหมุนเวียนเกี่ยวกับ <strong className="text-slate-700 dark:text-slate-300">การให้บริการ น้ำประปา ไฟฟ้า และการบำรุงดูแลความสะดวกสบาย</strong> ให้กับผู้เช่าที่ลงทะเบียนในโครงการหอพัก
                 </p>
-                <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-900">
-                  <div className="text-[10px] font-bold text-slate-700 dark:text-slate-300">✅ รายการที่หักภาษีได้:</div>
-                  <ul className="space-y-1 text-[10px] text-slate-600 dark:text-slate-400 list-disc pl-4 leading-relaxed">
-                    <li><strong className="text-slate-700 dark:text-slate-300">ค่าน้ำไฟหลวง:</strong> บิลค่าน้ำประปาและค่าไฟฟ้าที่จ่ายตรงให้กับการไฟฟ้า/การประปาของหอพัก</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">ค่าซ่อมระบบบริการ:</strong> ซ่อมมิเตอร์น้ำไฟเสีย, ซ่อมท่อประปาแตกในตึก, เดินสายไฟทางเดินใหม่</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">ค่าจ้างพนักงาน:</strong> ค่าแรงแม่บ้านทำความสะอาดทางเดินส่วนกลาง, ช่างประจำตึก, ค่าแรงคนจดมิเตอร์</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">ค่าอินเทอร์เน็ต:</strong> บิลค่าเน็ตรายเดือนที่แชร์ให้ผู้เช่าใช้งานทั้งอพาร์ทเมนท์</li>
-                    <li><strong className="text-slate-700 dark:text-slate-300">ค่าอุปกรณ์บริการ:</strong> ซื้อหลอดไฟทางเดินส่วนกลาง, ซื้อปั๊มน้ำใหม่ทดแทนตัวเก่า</li>
+                
+                <div className="space-y-3 pt-3 border-t border-slate-250/30 dark:border-slate-800/80">
+                  <div className="text-[11px] font-extrabold text-slate-700 dark:text-slate-250 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span> รายการที่หักภาษีได้:
+                  </div>
+                  <ul className="space-y-2.5 pl-1">
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ค่าน้ำประปาและไฟฟ้าหลวง:</strong> ยอดจ่ายจริงตามบิลบิลของการไฟฟ้าและการประปานครหลวง/ภูมิภาคในส่วนมิเตอร์หลักของตึก
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ค่าซ่อมบำรุงระบบอำนวยความสะดวก:</strong> งานเปลี่ยนมิเตอร์น้ำไฟย่อยในห้องชำรุด, เดินสายอินเทอร์เน็ต, ซ่อมแซมระบบปั๊มน้ำขึ้นดาดฟ้า
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ค่าจ้างแรงงานและบริการภายนอก:</strong> ค่าจ้างแม่บ้านทำความสะอาดส่วนกลางรายเดือน, ช่างประจำตึกรายวัน หรือพนักงานจดมิเตอร์
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">ค่าอินเทอร์เน็ต / ดิจิทัล:</strong> บิลค่าเชื่อมโยงเครือข่ายความเร็วสูงรายเดือนสำหรับบริการแชร์ไวไฟให้แก่ผู้เช่าพักอาศัย
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-slate-800 dark:text-slate-300">อุปกรณ์อำนวยความสะดวก:</strong> จัดซื้อหลอดไฟทางเดินเปลี่ยนใหม่, ซื้อถังกรองสารเคมีน้ำประปา, น้ำยาถูพื้นทำความสะอาดส่วนกลาง
+                      </div>
+                    </li>
                   </ul>
                 </div>
-                <div className="p-2 bg-teal-50 dark:bg-teal-500/5 rounded text-[10px] text-teal-700 dark:text-teal-300 flex gap-1.5 items-start">
-                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span><strong>คำแนะนำ:</strong> เลือกข้อนี้สำหรับการดูแลน้ำไฟ สื่อสาร หรือความสะอาด ซึ่งเป็นรายจ่ายหมวนเวียนเพื่อการบริการ</span>
+                
+                <div className="p-3 bg-teal-500/[0.04] dark:bg-teal-500/[0.08] border border-teal-500/10 rounded-xl text-[10px] text-teal-800 dark:text-teal-300 flex gap-2 items-start shadow-inner">
+                  <Info className="w-4 h-4 shrink-0 text-teal-500" />
+                  <span className="leading-relaxed"><strong>คำแนะนำ:</strong> บันทึกค่าใช้จ่ายในข้อนี้ เมื่อเป็นการจ่ายตรงเพื่อระบบสาธารณูปโภคหรือการดูแลรักษาความสะอาด ซึ่งเป็นค่าใช้จ่ายดำเนินการทั่วไปที่มีการจ่ายซ้ำๆ หรือจ่ายหมุนเวียน</span>
                 </div>
               </div>
+
             </div>
           )}
         </div>
+
 
         {/* ตารางและเครื่องมือจัดการรายจ่าย (Expense Tracker) */}
         <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-slate-900/60 p-6 md:p-8 space-y-6 shadow-sm hover:shadow-md transition-all duration-300">
