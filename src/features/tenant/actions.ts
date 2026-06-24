@@ -111,7 +111,41 @@ export async function deleteTenant(id: string, roomNumber: string) {
   try {
     const supabase = await createClient()
 
-    // 1. ลบสัญญาผู้เช่า
+    // 1. ดึงข้อมูลผู้เช่ารายนี้ก่อนเพื่อนำไปสำรองประวัติลง tenants_old
+    const { data: tenant, error: fetchError } = await supabase
+      .from("tenants")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error("Error fetching tenant before deletion:", fetchError)
+    }
+
+    // 2. ถ้าเจอข้อมูลผู้เช่า ให้บันทึกไปที่ tenants_old ก่อนทำการลบจริง
+    if (tenant) {
+      const { error: archiveError } = await supabase
+        .from("tenants_old")
+        .insert([{
+          workspace_id: tenant.workspace_id,
+          tenant_id: tenant.id,
+          room_id: tenant.room_id,
+          room_number: roomNumber,
+          tenant_name: tenant.tenant_name,
+          tenant_phone: tenant.tenant_phone,
+          line_user_id: tenant.line_user_id,
+          lease_start: tenant.lease_start,
+          lease_end: tenant.lease_end,
+          moved_out_at: new Date().toISOString()
+        }])
+
+      if (archiveError) {
+        console.error("Failed to archive tenant to tenants_old:", archiveError)
+        // ดำเนินการต่อแม้ว่าการบันทึกประวัติล้มเหลว (เช่น ตารางยังไม่ได้รับการ Patch) เพื่อไม่ให้ระบบค้าง
+      }
+    }
+
+    // 3. ลบสัญญาผู้เช่า
     const { error: deleteError } = await supabase
       .from("tenants")
       .delete()
@@ -119,7 +153,7 @@ export async function deleteTenant(id: string, roomNumber: string) {
 
     if (deleteError) throw deleteError
 
-    // 2. ค้นหาห้องและตั้งค่าเป็นว่าง (available)
+    // 4. ค้นหาห้องและตั้งค่าเป็นว่าง (available)
     const { data: room } = await supabase
       .from("rooms")
       .select("id")
@@ -139,6 +173,66 @@ export async function deleteTenant(id: string, roomNumber: string) {
     return { success: false, error: errorMessage }
   }
 }
+
+export async function getOldTenants() {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true, data: [] }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("tenants_old")
+      .select("*")
+      .order("moved_out_at", { ascending: false })
+
+    if (error) {
+      if (error.code === "42P01") {
+        console.warn("Table tenants_old does not exist. Please run the SQL patch.")
+        return { success: false, error: "table_not_found", data: [] }
+      }
+      throw error
+    }
+
+    const formatted = data.map((t: any) => ({
+      id: t.id,
+      tenantId: t.tenant_id,
+      roomNumber: t.room_number || "ไม่มีข้อมูล",
+      fullName: t.tenant_name,
+      phone: t.tenant_phone,
+      lineUserId: t.line_user_id,
+      contractStart: t.lease_start,
+      contractEnd: t.lease_end,
+      movedOutAt: t.moved_out_at
+    }))
+
+    return { success: true, data: formatted }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลผู้เช่าเก่า"
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function deleteOldTenant(id: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from("tenants_old")
+      .delete()
+      .eq("id", id)
+
+    if (error) throw error
+    return { success: true }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบข้อมูลผู้เช่าเก่า"
+    return { success: false, error: errorMessage }
+  }
+}
+
 
 export async function updateTenant(
   id: string,

@@ -545,6 +545,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "staff", "super_admin"]
     },
     {
+      name: t("nav.tenants") || "จัดการสัญญา ผู้เช่า",
+      path: "/tenants",
+      icon: Users,
+      roles: ["admin", "staff", "super_admin"]
+    },
+    {
       name: "จดเลขมิเตอร์ & สรุปบิลค่าเช่า",
       path: "/billing",
       icon: Scroll,
