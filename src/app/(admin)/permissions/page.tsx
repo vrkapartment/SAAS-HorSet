@@ -367,7 +367,7 @@ WHERE role IN ('admin', 'super_admin');`;
                     {(() => {
                       const items = [
                         { key: "view_dashboard_stats", label: "ดูสถิติภาพรวม" },
-                        { key: "manage_rooms_tenants", label: "จัดการห้องพัก & ผู้เช่า" },
+                        { key: "manage_rooms_tenants", label: "จัดการห้องพัก & ข้อมูลผู้เช่า" },
                         { key: "manage_meters_bills", label: "จดมิเตอร์ & สรุปบิล" },
                         { key: "manage_bills", label: "จัดการบิล" },
                         { key: "manage_finance_expenses", label: "จัดการการเงิน & รายจ่าย" },
@@ -587,8 +587,8 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>จัดการห้องพัก & ผู้เช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก บันทึกสัญญาเช่า</span>
+                    <span>จัดการห้องพัก & ข้อมูลผู้เช่า</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก ทำสัญญา และเข้าดูหน้าข้อมูลผู้เช่าปัจจุบัน/ประวัติผู้เช่าเก่า (/rooms, /tenants)</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_rooms_tenants ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -877,8 +877,8 @@ WHERE role IN ('admin', 'super_admin');`;
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span>จัดการห้องพัก & ผู้เช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก บันทึกสัญญาเช่า</span>
+                    <span>จัดการห้องพัก & ข้อมูลผู้เช่า</span>
+                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก ทำสัญญา และเข้าดูหน้าข้อมูลผู้เช่าปัจจุบัน/ประวัติผู้เช่าเก่า (/rooms, /tenants)</span>
                   </div>
                   <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_rooms_tenants ? "opacity-100" : "opacity-0"}`} />
                 </button>
