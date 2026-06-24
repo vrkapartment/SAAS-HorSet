@@ -1174,102 +1174,120 @@ export default function TaxPage() {
         </div>
 
         {/* ตารางและเครื่องมือจัดการรายจ่าย (Expense Tracker) */}
-        <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-slate-900/60 p-6 md:p-8 space-y-6 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-100 dark:border-slate-900/40">
             <div>
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Coins className="w-4 h-4 text-amber-500" /> สมุดบันทึกรายจ่ายจริงประจำปีภาษี {taxYear}
+              <h3 className="text-base font-bold text-slate-850 dark:text-slate-50 flex items-center gap-2.5">
+                <Coins className="w-5 h-5 text-amber-500" /> สมุดบันทึกรายจ่ายจริงประจำปีภาษี {taxYear}
               </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">บันทึกค่าใช้จ่ายสะสมเพื่อนำไปหักลดหย่อนภาษีตามจริงโดยอิงหลักฐานเอกสาร</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                บันทึกค่าใช้จ่ายสะสมเพื่อนำไปหักลดหย่อนภาษีตามจริงโดยอิงหลักฐานเอกสาร (เลือกยื่นหักค่าใช้จ่ายตามจริงได้เมื่อยอดรายจ่ายสูงกว่าแบบเหมา)
+              </p>
             </div>
             
             <button
               onClick={handleOpenAddExpense}
-              className="glow-btn bg-teal-600 hover:bg-teal-500 text-white font-medium py-2 px-4 rounded-xl flex items-center gap-2 text-xs shadow-lg shadow-teal-600/10 transition-colors cursor-pointer"
+              className="glow-btn bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-semibold py-2.5 px-5 rounded-2xl flex items-center gap-2 text-xs shadow-lg shadow-teal-600/10 hover:shadow-teal-600/25 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" /> บันทึกค่าใช้จ่ายใหม่
             </button>
           </div>
 
           {loadingExpenses ? (
-            <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2 justify-center">
-              <div className="w-5 h-5 border-2 border-slate-700 border-t-teal-500 rounded-full animate-spin" />
-              กำลังโหลดข้อมูลรายจ่าย...
+            <div className="py-16 text-center text-xs text-slate-550 flex flex-col items-center gap-3 justify-center">
+              <div className="w-6 h-6 border-2 border-slate-300 border-t-teal-500 rounded-full animate-spin" />
+              <p className="font-medium">กำลังโหลดข้อมูลรายจ่าย...</p>
             </div>
           ) : expenses.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-900 text-slate-500 font-semibold">
-                    <th className="pb-3 pl-2">รายการค่าใช้จ่าย</th>
-                    <th className="pb-3">ประเภทภาษี</th>
-                    <th className="pb-3 text-right">จำนวนเงิน</th>
-                    <th className="pb-3 text-center">วันที่บันทึก</th>
-                    <th className="pb-3 text-center">การจัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-900/40">
-                  {expenses.map((exp) => (
-                    <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/10">
-                      <td className="py-3.5 pl-2 font-medium text-slate-800 dark:text-slate-200">{exp.title}</td>
-                      <td className="py-3.5">
-                        {exp.category === "40_5" ? (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-semibold bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-500/10">
-                            <Landmark className="w-3 h-3" /> 40(5) ค่าเช่าหอพัก
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-semibold bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-500/10">
-                            <Zap className="w-3 h-3" /> 40(8) น้ำไฟ/บริการ
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {formatMoney(exp.amount)} บาท
-                      </td>
-                      <td className="py-3.5 text-center text-slate-550 dark:text-slate-400 text-[10px] font-mono">
-                        {new Date(exp.created_at).toLocaleDateString("th-TH", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </td>
-                      <td className="py-3.5 text-center">
-                        <div className="flex items-center justify-center gap-2.5">
-                          <button
-                            onClick={() => handleOpenEditExpense(exp)}
-                            className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
-                            title="แก้ไข"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteExpense(exp.id, exp.title)}
-                            className="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
-                            title="ลบ"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500/80 hover:text-red-500" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-900 text-[11px] text-slate-500 dark:text-slate-400">
-                <div>* แสดงผลลัพธ์รายจ่ายของปีภาษี {taxYear} ทั้งหมดจำนวน {expenses.length} รายการ</div>
-                <div className="flex gap-4">
-                  <div>ยอดรวม 40(5) สะสม: <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">{formatMoney(dbActualExpense405)} บ.</span></div>
-                  <div>ยอดรวม 40(8) สะสม: <span className="font-bold text-teal-600 dark:text-teal-400 font-mono">{formatMoney(dbActualExpense408)} บ.</span></div>
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950/20">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-800/60">
+                        <th className="py-4 px-5 pl-5">รายการค่าใช้จ่าย</th>
+                        <th className="py-4 px-4">ประเภทภาษี</th>
+                        <th className="py-4 px-4 text-right">จำนวนเงิน</th>
+                        <th className="py-4 px-4 text-center">วันที่บันทึก</th>
+                        <th className="py-4 px-5 text-center">การจัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
+                      {expenses.map((exp) => (
+                        <tr key={exp.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors duration-200">
+                          <td className="py-4 px-5 pl-5 font-semibold text-slate-800 dark:text-slate-150 text-[13px]">{exp.title}</td>
+                          <td className="py-4 px-4">
+                            {exp.category === "40_5" ? (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold bg-blue-50/80 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-lg border border-blue-200/60 dark:border-blue-500/10 shadow-sm">
+                                <Landmark className="w-3.5 h-3.5" /> 40(5) ค่าเช่าหอพัก
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold bg-teal-50/80 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 px-2.5 py-1 rounded-lg border border-teal-200/60 dark:border-teal-500/10 shadow-sm">
+                                <Zap className="w-3.5 h-3.5" /> 40(8) น้ำไฟ/บริการ
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 px-4 text-right font-mono font-bold text-slate-800 dark:text-slate-200 text-[13px]">
+                            {formatMoney(exp.amount)} บาท
+                          </td>
+                          <td className="py-4 px-4 text-center text-slate-550 dark:text-slate-400 text-[11px] font-mono">
+                            {new Date(exp.created_at).toLocaleDateString("th-TH", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </td>
+                          <td className="py-4 px-5 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleOpenEditExpense(exp)}
+                                className="p-2 rounded-xl text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 cursor-pointer"
+                                title="แก้ไข"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteExpense(exp.id, exp.title)}
+                                className="p-2 rounded-xl text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 cursor-pointer"
+                                title="ลบ"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500/80 group-hover:text-red-500" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-5 border-t border-slate-200/80 dark:border-slate-800 text-[11.5px] text-slate-500 dark:text-slate-400 font-medium">
+                <div>
+                  * แสดงผลลัพธ์รายจ่ายของปีภาษี {taxYear} ทั้งหมดจำนวน <span className="font-bold text-slate-700 dark:text-slate-300">{expenses.length}</span> รายการ
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span>ยอดรวม 40(5) สะสม:</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400 font-mono text-[12px]">{formatMoney(dbActualExpense405)} บ.</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+                    <span>ยอดรวม 40(8) สะสม:</span>
+                    <span className="font-bold text-teal-600 dark:text-teal-400 font-mono text-[12px]">{formatMoney(dbActualExpense408)} บ.</span>
+                  </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="py-12 text-center rounded-xl bg-slate-50/50 dark:bg-slate-900/20 border border-dashed border-slate-200 dark:border-slate-900/60 text-slate-500 text-xs space-y-2">
-              <Coins className="w-8 h-8 text-slate-400 dark:text-slate-700 mx-auto animate-pulse" />
-              <p>ยังไม่มีบันทึกค่าใช้จ่ายจริงในปีภาษี {taxYear}</p>
+            <div className="py-16 text-center rounded-2xl bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 text-slate-500 text-xs space-y-3 shadow-inner">
+              <Coins className="w-10 h-10 text-slate-400/80 dark:text-slate-700 mx-auto animate-pulse" />
+              <p className="font-semibold text-slate-750 dark:text-slate-300">ยังไม่มีบันทึกค่าใช้จ่ายจริงในปีภาษี {taxYear}</p>
+              <p className="text-[10px] text-slate-400 max-w-sm mx-auto">เริ่มบันทึกค่าใช้จ่ายเกี่ยวกับการดูแลและดำเนินการหอพัก เช่น ค่าซ่อมแซม ค่าน้ำไฟส่วนกลาง เพื่อใช้อ้างอิงการยื่นลดหย่อนแบบตามจริง</p>
               <button
                 onClick={handleOpenAddExpense}
-                className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-355 underline cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 underline underline-offset-4 cursor-pointer pt-1 transition-all"
               >
                 + เริ่มต้นบันทึกรายการแรก
               </button>
@@ -1278,201 +1296,233 @@ export default function TaxPage() {
         </div>
       </div>
 
+
       {/* ตารางแสดงรายรับรายเดือน */}
-      <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6">
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
-          <TrendingUp className="w-4 h-4 text-blue-500" /> ตารางสรุปรายได้สะสมรายเดือน ({taxYear})
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-900 text-slate-500 font-semibold">
-                <th className="pb-3 pl-2">เดือน</th>
-                <th className="pb-3 text-center">จำนวนบิลจริงที่รับเงิน</th>
-                <th className="pb-3 text-right">ค่าเช่า 40(5)</th>
-                <th className="pb-3 text-right">สาธารณูปโภค 40(8)</th>
-                <th className="pb-3 text-right">รวมรายได้ประเมิน</th>
-                <th className="pb-3 text-center">สถานะข้อมูล</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-900/40">
-              {(() => {
-                let sumRent = 0
-                let sumUtil = 0
-                let sumTotal = 0
-                let sumBills = 0
+      <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-slate-900/60 p-6 md:p-8 space-y-6 shadow-sm hover:shadow-md transition-all duration-300">
+        <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-900/40">
+          <TrendingUp className="w-5 h-5 text-blue-500" />
+          <div>
+            <h3 className="text-base font-bold text-slate-850 dark:text-slate-50">
+              ตารางสรุปรายได้สะสมรายเดือน ({taxYear})
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              สรุปฐานรายได้ที่รับจริงแยกตามประเภทภาษีเพื่อตรวจสอบความครบถ้วนของยอดประเมินรายเดือน
+            </p>
+          </div>
+        </div>
+        
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950/20">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-800/60">
+                  <th className="py-4 px-4 pl-5">เดือน</th>
+                  <th className="py-4 px-4 text-center">จำนวนบิลจริงที่รับเงิน</th>
+                  <th className="py-4 px-4 text-right">ค่าเช่า 40(5)</th>
+                  <th className="py-4 px-4 text-right">สาธารณูปโภค 40(8)</th>
+                  <th className="py-4 px-4 text-right">รวมรายได้ประเมิน</th>
+                  <th className="py-4 px-4 pr-5 text-center">สถานะข้อมูล</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
+                {(() => {
+                  let sumRent = 0
+                  let sumUtil = 0
+                  let sumTotal = 0
+                  let sumBills = 0
 
-                const rows = monthsList.map(m => {
-                  const cycleStr = `${taxYear}-${m.num}`
-                  const paidBillsInMonth = bills.filter(b => b.status === "paid" && b.billingCycle === cycleStr)
-                  
-                  let monthlyRent = 0
-                  let monthlyUtil = 0
-                  
-                  if (dataSource === "system" && hasPaidBills) {
-                    paidBillsInMonth.forEach(bill => {
-                      const electricUnits = Number(bill.electricUnits || 0)
-                      const waterUnits = Number(bill.waterUnits || 0)
-                      
-                      const elecAmount = electricUnits * electricRate
-                      const waterAmount = waterUnits * waterRate
-                      
-                      // ค่าน้ำไฟ/บริการ 40(8) = ค่ายูนิตน้ำ + ค่ายูนิตไฟ + ค่าส่วนกลาง
-                      const utilitiesAmount = elecAmount + waterAmount + commonFee
-                      
-                      const billAmount = Number(bill.amount || 0)
-                      
-                      // ค้นหาค่าเช่าห้องพักหลัก (baseRent) จากข้อมูลห้อง หรือใช้ส่วนต่างบิลหักน้ำไฟส่วนกลางเป็นทางเลือกสุดท้าย
-                      const matchedRoom = rooms.find(r => r.roomNumber === bill.roomNumber)
-                      const baseRentVal = matchedRoom ? matchedRoom.baseRent : Math.max(0, billAmount - utilitiesAmount)
-                      
-                      // ค่าเช่า 40(5) = เฉพาะค่าเช่าห้องพักหลัก
-                      const rentAmount = Math.max(0, Math.min(baseRentVal, billAmount))
-                      
-                      // รายได้อื่นๆ 40(8) = ยอดชำระสุทธิ - ค่าเช่าห้อง - ค่าน้ำไฟ/บริการส่วนกลาง (เช่น เงินปรับล่าช้า / มัดจำ)
-                      const otherAmount = Math.max(0, billAmount - rentAmount - utilitiesAmount)
-
-                      monthlyRent += rentAmount
-                      monthlyUtil += (utilitiesAmount + otherAmount)
-                    })
+                  const rows = monthsList.map(m => {
+                    const cycleStr = `${taxYear}-${m.num}`
+                    const paidBillsInMonth = bills.filter(b => b.status === "paid" && b.billingCycle === cycleStr)
                     
-                    // บวกค่าเช่าล่วงหน้าสะสมของเดือนนี้ (40(5))
-                    const advanceRentBillsInMonth = advanceRentBills.filter(t => t.contractStart && t.contractStart.startsWith(`${taxYear}-${m.num}`))
-                    const advanceRentAmountInMonth = advanceRentBillsInMonth.reduce((sum, t) => {
-                      const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
-                      const roomRent = matchedRoom ? matchedRoom.baseRent : 0
-                      return sum + (roomRent * defaultAdvanceRent)
-                    }, 0)
+                    let monthlyRent = 0
+                    let monthlyUtil = 0
                     
-                    // บวกเงินประกันริบสะสมของเดือนนี้ (40(8))
-                    const forfeitedBillsInMonth = cancelledInYear.filter(c => c.cancellationDate && c.cancellationDate.startsWith(`${taxYear}-${m.num}`))
-                    const forfeitedAmountInMonth = forfeitedBillsInMonth.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
+                    if (dataSource === "system" && hasPaidBills) {
+                      paidBillsInMonth.forEach(bill => {
+                        const electricUnits = Number(bill.electricUnits || 0)
+                        const waterUnits = Number(bill.waterUnits || 0)
+                        
+                        const elecAmount = electricUnits * electricRate
+                        const waterAmount = waterUnits * waterRate
+                        
+                        // ค่าน้ำไฟ/บริการ 40(8) = ค่ายูนิตน้ำ + ค่ายูนิตไฟ + ค่าส่วนกลาง
+                        const utilitiesAmount = elecAmount + waterAmount + commonFee
+                        
+                        const billAmount = Number(bill.amount || 0)
+                        
+                        // ค้นหาค่าเช่าห้องพักหลัก (baseRent) จากข้อมูลห้อง หรือใช้ส่วนต่างบิลหักน้ำไฟส่วนกลางเป็นทางเลือกสุดท้าย
+                        const matchedRoom = rooms.find(r => r.roomNumber === bill.roomNumber)
+                        const baseRentVal = matchedRoom ? matchedRoom.baseRent : Math.max(0, billAmount - utilitiesAmount)
+                        
+                        // ค่าเช่า 40(5) = เฉพาะค่าเช่าห้องพักหลัก
+                        const rentAmount = Math.max(0, Math.min(baseRentVal, billAmount))
+                        
+                        // รายได้อื่นๆ 40(8) = ยอดชำระสุทธิ - ค่าเช่าห้อง - ค่าน้ำไฟ/บริการส่วนกลาง (เช่น เงินปรับล่าช้า / มัดจำ)
+                        const otherAmount = Math.max(0, billAmount - rentAmount - utilitiesAmount)
 
-                    monthlyRent += advanceRentAmountInMonth
-                    monthlyUtil += forfeitedAmountInMonth
-                    sumBills += paidBillsInMonth.length
-                  } else {
-                    // ข้อมูลจำลอง/ manual หาร 12
-                    monthlyRent = rent405Full / 12
-                    monthlyUtil = (utilities408Full + other408Full) / 12
-                  }
-                  
-                  const monthlyTotal = monthlyRent + monthlyUtil
-                  const hasRealData = paidBillsInMonth.length > 0 && dataSource === "system"
+                        monthlyRent += rentAmount
+                        monthlyUtil += (utilitiesAmount + otherAmount)
+                      })
+                      
+                      // บวกค่าเช่าล่วงหน้าสะสมของเดือนนี้ (40(5))
+                      const advanceRentBillsInMonth = advanceRentBills.filter(t => t.contractStart && t.contractStart.startsWith(`${taxYear}-${m.num}`))
+                      const advanceRentAmountInMonth = advanceRentBillsInMonth.reduce((sum, t) => {
+                        const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
+                        const roomRent = matchedRoom ? matchedRoom.baseRent : 0
+                        return sum + (roomRent * defaultAdvanceRent)
+                      }, 0)
+                      
+                      // บวกเงินประกันริบสะสมของเดือนนี้ (40(8))
+                      const forfeitedBillsInMonth = cancelledInYear.filter(c => c.cancellationDate && c.cancellationDate.startsWith(`${taxYear}-${m.num}`))
+                      const forfeitedAmountInMonth = forfeitedBillsInMonth.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
 
-                  sumRent += monthlyRent
-                  sumUtil += monthlyUtil
-                  sumTotal += monthlyTotal
+                      monthlyRent += advanceRentAmountInMonth
+                      monthlyUtil += forfeitedAmountInMonth
+                      sumBills += paidBillsInMonth.length
+                    } else {
+                      // ข้อมูลจำลอง/ manual หาร 12
+                      monthlyRent = rent405Full / 12
+                      monthlyUtil = (utilities408Full + other408Full) / 12
+                    }
+                    
+                    const monthlyTotal = monthlyRent + monthlyUtil
+                    const hasRealData = paidBillsInMonth.length > 0 && dataSource === "system"
+
+                    sumRent += monthlyRent
+                    sumUtil += monthlyUtil
+                    sumTotal += monthlyTotal
+
+                    return (
+                      <tr key={m.num} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors duration-150">
+                        <td className="py-3.5 px-4 pl-5 font-bold text-slate-800 dark:text-slate-150 text-[13px]">{m.name}</td>
+                        <td className="py-3.5 px-4 text-center text-slate-500 dark:text-slate-400 font-medium">
+                          {dataSource === "system" && hasPaidBills ? `${paidBillsInMonth.length} ห้อง` : "-"}
+                        </td>
+                        <td className="py-3.5 px-4 text-right text-slate-700 dark:text-slate-350 font-mono text-[13px]">{formatMoney(monthlyRent)} บาท</td>
+                        <td className="py-3.5 px-4 text-right text-slate-700 dark:text-slate-350 font-mono text-[13px]">{formatMoney(monthlyUtil)} บาท</td>
+                        <td className="py-3.5 px-4 text-right text-teal-650 dark:text-teal-400 font-bold font-mono text-[13px]">{formatMoney(monthlyTotal)} บาท</td>
+                        <td className="py-3.5 px-4 pr-5 text-center">
+                          {hasRealData ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-50/80 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-100/60 dark:border-teal-500/10 shadow-sm">
+                              บิลจริง
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-800 shadow-sm">
+                              คำนวณจำลอง
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })
 
                   return (
-                    <tr key={m.num} className="hover:bg-slate-50 dark:hover:bg-slate-900/10">
-                      <td className="py-3 pl-2 font-medium text-slate-800 dark:text-slate-200">{m.name}</td>
-                      <td className="py-3 text-center text-slate-500 dark:text-slate-400">
-                        {dataSource === "system" && hasPaidBills ? `${paidBillsInMonth.length} ห้อง` : "-"}
-                      </td>
-                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{formatMoney(monthlyRent)} บาท</td>
-                      <td className="py-3 text-right text-slate-700 dark:text-slate-300 font-mono">{formatMoney(monthlyUtil)} บาท</td>
-                      <td className="py-3 text-right text-teal-600 dark:text-teal-400 font-bold font-mono">{formatMoney(monthlyTotal)} บาท</td>
-                      <td className="py-3 text-center">
-                        {hasRealData ? (
-                          <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-500/10">บิลจริง</span>
-                        ) : (
-                          <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">คำนวณจำลอง</span>
-                        )}
-                      </td>
-                    </tr>
+                    <>
+                      {rows}
+                      {/* แถวสรุปผลรวมสะสมที่ถูกต้องสมบูรณ์เพื่อไม่ให้เกิดเศษหรือข้อผิดพลาด */}
+                      <tr className="border-t-2 border-slate-250 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/60 font-bold text-slate-850 dark:text-slate-50">
+                        <td className="py-4.5 px-4 pl-5 text-[13px]">รวมสะสมทั้งปี</td>
+                        <td className="py-4.5 px-4 text-center text-slate-600 dark:text-slate-400 font-semibold">
+                          {dataSource === "system" && hasPaidBills ? `${sumBills} บิล` : "-"}
+                        </td>
+                        <td className="py-4.5 px-4 text-right text-blue-600 dark:text-blue-400 font-mono font-bold text-[13.5px]">{formatMoney(sumRent)} บาท</td>
+                        <td className="py-4.5 px-4 text-right text-teal-650 dark:text-teal-400 font-mono font-bold text-[13.5px]">{formatMoney(sumUtil)} บาท</td>
+                        <td className="py-4.5 px-4 text-right text-emerald-600 dark:text-emerald-400 font-mono font-extrabold text-[14px]">
+                          <span className="bg-emerald-50/40 dark:bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-100/30 dark:border-emerald-500/10">
+                            {formatMoney(sumTotal)} บาท
+                          </span>
+                        </td>
+                        <td className="py-4.5 px-4 pr-5 text-center">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/40 dark:border-slate-700/60 shadow-sm">
+                            ยอดรวม
+                          </span>
+                        </td>
+                      </tr>
+                    </>
                   )
-                })
-
-                return (
-                  <>
-                    {rows}
-                    {/* แถวสรุปผลรวมสะสมที่ถูกต้องสมบูรณ์เพื่อไม่ให้เกิดเศษหรือข้อผิดพลาด */}
-                    <tr className="border-t-2 border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 font-semibold text-slate-800 dark:text-slate-200">
-                      <td className="py-3.5 pl-2">รวมสะสมทั้งปี</td>
-                      <td className="py-3.5 text-center text-slate-500 dark:text-slate-400">
-                        {dataSource === "system" && hasPaidBills ? `${sumBills} บิล` : "-"}
-                      </td>
-                      <td className="py-3.5 text-right text-blue-600 dark:text-blue-400 font-mono font-bold">{formatMoney(sumRent)} บาท</td>
-                      <td className="py-3.5 text-right text-teal-600 dark:text-teal-400 font-mono font-bold">{formatMoney(sumUtil)} บาท</td>
-                      <td className="py-3.5 text-right text-emerald-600 dark:text-emerald-400 font-mono font-extrabold">{formatMoney(sumTotal)} บาท</td>
-                      <td className="py-3.5 text-center">
-                        <span className="inline-block text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">ยอดรวม</span>
-                      </td>
-                    </tr>
-                  </>
-                )
-              })()}
-            </tbody>
-          </table>
+                })()}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
+
 
       {/* ส่วนจัดการสัญญา ค่าเช่าล่วงหน้า (มาตรา 40(5)) */}
       <div>
         {/* บล็อกค่าเช่าล่วงหน้าสะสม (มาตรา 40(5)) */}
-        <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-4">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-blue-500" /> ค่าเช่าล่วงหน้าสะสม มาตรา 40(5)
+        <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-slate-900/60 p-6 md:p-8 space-y-6 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="pb-2 border-b border-slate-100 dark:border-slate-900/40">
+            <h3 className="text-base font-bold text-slate-850 dark:text-slate-50 flex items-center gap-2.5">
+              <Landmark className="w-5 h-5 text-blue-500" /> ค่าเช่าล่วงหน้าสะสม มาตรา 40(5)
             </h3>
-            <p className="text-[10px] text-slate-550 dark:text-slate-400 mt-0.5">
-              สัญญาเช่าที่เริ่มต้นในปีภาษี {taxYear} จะนำยอดค่าเช่าล่วงหน้าวิ่งไปคำนวณเป็นรายได้ 40(5) ของปีนั้นๆ ทันที
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              สัญญาเช่าที่เริ่มต้นในปีภาษี {taxYear} จะนำยอดค่าเช่าล่วงหน้าไปบันทึกเป็นรายได้มาตรา 40(5) เพื่อรับรู้รายได้ทางภาษีในปีเริ่มต้นสัญญาทันทีตามกฎหมายสรรพากร
             </p>
           </div>
 
           {advanceRentBills.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-900 text-slate-550 font-semibold text-[11px]">
-                    <th className="pb-2.5 pl-2">ห้องพัก / ผู้เช่า</th>
-                    <th className="pb-2.5 text-center">วันที่เริ่มสัญญา</th>
-                    <th className="pb-2.5 text-right">ยอดเช่าล่วงหน้า</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-900/40">
-                  {advanceRentBills.map((t) => {
-                    const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
-                    const roomRent = matchedRoom ? matchedRoom.baseRent : 0
-                    const advanceRentVal = roomRent * defaultAdvanceRent
-                    return (
-                      <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/5">
-                        <td className="py-2.5 pl-2 font-medium text-slate-800 dark:text-slate-200">
-                          ห้อง {t.roomNumber} - {t.fullName}
-                          <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
-                            ค่าเช่าห้อง: {formatMoney(roomRent)} บ. (ล่วงหน้า {defaultAdvanceRent} เดือน)
-                          </span>
-                        </td>
-                        <td className="py-2.5 text-center text-slate-500 dark:text-slate-400 font-mono text-[10px]">
-                          {t.contractStart ? new Date(t.contractStart).toLocaleDateString("th-TH", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          }) : "-"}
-                        </td>
-                        <td className="py-2.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
-                          {formatMoney(advanceRentVal)} บ.
-                        </td>
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950/20">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-800/60">
+                        <th className="py-4 px-4 pl-5">ห้องพัก / ผู้เช่า</th>
+                        <th className="py-4 px-4 text-center">วันที่เริ่มสัญญา</th>
+                        <th className="py-4 px-4 pr-5 text-right">ยอดค่าเช่าล่วงหน้าสะสม</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-900 text-[11px] text-slate-550 dark:text-slate-400 mt-2 font-semibold">
-                <span>จำนวนสัญญาที่เริ่มในปีนี้: {advanceRentBills.length} รายการ</span>
-                <span className="text-blue-600 dark:text-blue-400 font-bold font-mono">
-                  รวม {formatMoney(totalAdvanceRentAmount)} บาท
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
+                      {advanceRentBills.map((t) => {
+                        const matchedRoom = rooms.find(r => r.roomNumber === t.roomNumber)
+                        const roomRent = matchedRoom ? matchedRoom.baseRent : 0
+                        const advanceRentVal = roomRent * defaultAdvanceRent
+                        return (
+                          <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors duration-150">
+                            <td className="py-4 px-4 pl-5 font-bold text-slate-850 dark:text-slate-100 text-[13px]">
+                              ห้อง {t.roomNumber} — {t.fullName}
+                              <span className="block text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1">
+                                อัตราค่าเช่า: <span className="font-semibold text-slate-700 dark:text-slate-300">{formatMoney(roomRent)} บ./เดือน</span> (รับล่วงหน้า {defaultAdvanceRent} เดือน)
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 text-center text-slate-600 dark:text-slate-400 font-mono text-[12px] font-medium">
+                              {t.contractStart ? new Date(t.contractStart).toLocaleDateString("th-TH", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              }) : "-"}
+                            </td>
+                            <td className="py-4 px-4 pr-5 text-right font-mono font-bold text-slate-800 dark:text-slate-200 text-[13px]">
+                              {formatMoney(advanceRentVal)} บาท
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-4 border-t border-slate-200/80 dark:border-slate-800 text-[12px] text-slate-550 dark:text-slate-400 font-bold">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">
+                  จำนวนสัญญาก่อตั้งที่เริ่มต้นในรอบปีภาษีนี้: <span className="text-slate-700 dark:text-slate-300 font-bold">{advanceRentBills.length}</span> รายการ
+                </span>
+                <span className="text-blue-600 dark:text-blue-400 font-bold font-mono text-[13.5px] bg-blue-50/50 dark:bg-blue-550/10 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-550/10 shadow-sm">
+                  รวมล่วงหน้าสะสม: {formatMoney(totalAdvanceRentAmount)} บาท
                 </span>
               </div>
             </div>
           ) : (
-            <div className="py-8 text-center rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-900/60 text-slate-550 text-xs">
-              <p>ไม่มีสัญญาใหม่ที่เริ่มเช่าในปีภาษี {taxYear}</p>
+            <div className="py-12 text-center rounded-2xl bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 text-slate-500 text-xs">
+              <p className="font-semibold text-slate-700 dark:text-slate-300">ไม่มีสัญญาใหม่ที่เริ่มเช่าในรอบปีภาษี {taxYear}</p>
+              <p className="text-[10px] text-slate-400 mt-1 max-w-xs mx-auto">เมื่อมีการเพิ่มผู้เช่าใหม่และระบุวันที่เริ่มสัญญาตรงกับรอบปีภาษี ระบบจะนำค่าเช่าล่วงหน้าสะสมมาแสดงที่นี่โดยอัตโนมัติ</p>
             </div>
           )}
         </div>
       </div>
+
 
       {/* แถวการคำนวณแบ่งยื่นครึ่งปีและเต็มปี */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
