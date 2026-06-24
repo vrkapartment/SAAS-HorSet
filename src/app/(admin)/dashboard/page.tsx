@@ -29,6 +29,7 @@ import {
 import { getRooms } from "@/features/room/actions"
 import { getTenants } from "@/features/tenant/actions"
 import { getBills } from "@/features/billing/actions"
+import { getExpenses } from "@/features/expenses/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
@@ -40,6 +41,28 @@ function getCookie(name: string): string | undefined {
   return undefined
 }
 
+const THAI_MONTHS = [
+  { value: "01", label: "มกราคม" },
+  { value: "02", label: "กุมภาพันธ์" },
+  { value: "03", label: "มีนาคม" },
+  { value: "04", label: "เมษายน" },
+  { value: "05", label: "พฤษภาคม" },
+  { value: "06", label: "มิถุนายน" },
+  { value: "07", label: "กรกฎาคม" },
+  { value: "08", label: "สิงหาคม" },
+  { value: "09", label: "กันยายน" },
+  { value: "10", label: "ตุลาคม" },
+  { value: "11", label: "พฤศจิกายน" },
+  { value: "12", label: "ธันวาคม" }
+]
+
+const YEARS = [
+  { value: "2024", label: "2567" },
+  { value: "2025", label: "2568" },
+  { value: "2026", label: "2569" },
+  { value: "2027", label: "2570" }
+]
+
 export default function AdminDashboard() {
   const router = useRouter()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
@@ -50,9 +73,10 @@ export default function AdminDashboard() {
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
 
-  // Dynamic Month / Billing cycle
+  // Dynamic Month / Year Selection
+  const [selectedMonth, setSelectedMonth] = useState("06")
+  const [selectedYear, setSelectedYear] = useState("2026")
   const [selectedCycle, setSelectedCycle] = useState("2026-06")
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false)
 
   // Dynamic Welcome Name
   const [welcomeName, setWelcomeName] = useState<string>("")
@@ -61,11 +85,17 @@ export default function AdminDashboard() {
   const [rawRooms, setRawRooms] = useState<any[]>([])
   const [rawTenants, setRawTenants] = useState<any[]>([])
   const [rawBills, setRawBills] = useState<any[]>([])
+  const [rawExpenses, setRawExpenses] = useState<any[]>([])
 
   // Adaptive Switcher on Mobile/Tablet Compact
   const [activeTab, setActiveTab] = useState<"transactions" | "activities">("transactions")
 
-  const calculateStats = (rooms: any[], tenants: any[], bills: any[], cycle: string) => {
+  // Sync Cycle state whenever Month or Year changes
+  useEffect(() => {
+    setSelectedCycle(`${selectedYear}-${selectedMonth}`)
+  }, [selectedMonth, selectedYear])
+
+  const calculateStats = (rooms: any[], tenants: any[], bills: any[], expenses: any[], cycle: string) => {
     const totalRooms = rooms.length
     const occupiedRooms = rooms.filter((r: any) => r.status === "occupied").length
     const availableRooms = rooms.filter((r: any) => r.status === "available").length
@@ -77,24 +107,31 @@ export default function AdminDashboard() {
 
     const totalRevenue = paidBills.reduce((sum, b) => sum + Number(b.amount), 0)
     const unpaidAmount = unpaidBills.reduce((sum, b) => sum + Number(b.amount), 0)
+    const totalBilled = currentMonthBills.reduce((sum, b) => sum + Number(b.amount), 0)
 
-    const cycleLabel = cycle === "2026-06" ? "มิ.ย." : cycle === "2026-05" ? "พ.ค." : "เม.ย."
+    // Calculate Expenses for this month cycle
+    const currentMonthExpenses = expenses.filter((e: any) => e.created_at && e.created_at.substring(0, 7) === cycle)
+    const totalExpenses = currentMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
+
+    const netProfit = totalRevenue - totalExpenses
+
+    // Calculate Late Payment Rate (บิลที่จ่ายล่าช้า หรือ ค้างชำระ)
+    const lateBills = currentMonthBills.filter((b: any) => (b.lateDays && b.lateDays > 0) || (b.penaltyAmount && b.penaltyAmount > 0))
+    const latePaymentRate = currentMonthBills.length > 0 ? (lateBills.length / currentMonthBills.length) * 100 : 0
+
+    // Collections Progress Rate
+    const collectionsRate = totalBilled > 0 ? (totalRevenue / totalBilled) * 100 : 0
+
+    const cycleYear = cycle.split("-")[0]
+    const cycleMonth = cycle.split("-")[1]
+    const thaiMonthObj = THAI_MONTHS.find(m => m.value === cycleMonth)
+    const cycleLabel = thaiMonthObj ? `${thaiMonthObj.label} ${Number(cycleYear) + 543}` : cycle
 
     setStats([
       {
-        title: `รายรับรอบเดือน ${cycleLabel}`,
-        value: `${totalRevenue.toLocaleString()} บาท`,
-        change: `จ่ายแล้ว ${paidBills.length} ห้อง`,
-        isPositive: true,
-        icon: DollarSign,
-        color: "text-blue-500 dark:text-blue-400",
-        bg: "bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30",
-        path: "/billing"
-      },
-      {
-        title: "จำนวนผู้เช่าปัจจุบัน",
+        title: "จำนวนห้องที่มีผู้เช่า",
         value: `${occupiedRooms} / ${totalRooms} ห้อง`,
-        change: `คิดเป็น ${(totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0).toFixed(1)}% ของหอพัก`,
+        change: `อัตราเข้าพัก ${(totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0).toFixed(1)}%`,
         isPositive: true,
         icon: Users,
         color: "text-teal-500 dark:text-teal-400",
@@ -102,24 +139,54 @@ export default function AdminDashboard() {
         path: "/tenants"
       },
       {
-        title: "ห้องว่างพร้อมเช่า",
-        value: `${availableRooms} ห้อง`,
-        change: rooms.filter((r: any) => r.status === "available").slice(0, 2).map((r: any) => `ห้อง ${r.roomNumber}`).join(", ") || "ไม่มีห้องว่าง",
-        isPositive: false,
-        icon: Home,
-        color: "text-amber-500 dark:text-amber-400",
-        bg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
-        path: "/rooms"
+        title: "รายได้เก็บแล้ว",
+        value: `${totalRevenue.toLocaleString()} บาท`,
+        change: `ยอดแจ้งหนี้รวม ${totalBilled.toLocaleString()} บาท`,
+        isPositive: true,
+        icon: DollarSign,
+        color: "text-emerald-500 dark:text-emerald-400",
+        bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/30",
+        path: "/manage-bills"
       },
       {
-        title: "บิลค้างชำระเงิน",
-        value: `${unpaidBills.length} บิล`,
-        change: `ค้างชำระ ${unpaidAmount.toLocaleString()} บาท (${pendingBills.length} รอยืนยัน)`,
+        title: "ค่าใช้จ่ายเดือนนี้",
+        value: `${totalExpenses.toLocaleString()} บาท`,
+        change: `บันทึกไว้ ${currentMonthExpenses.length} รายการ`,
         isPositive: false,
-        icon: Clock,
-        color: "text-red-500 dark:text-red-400",
-        bg: "bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/30",
-        path: "/billing"
+        icon: TrendingDown,
+        color: "text-rose-500 dark:text-rose-400",
+        bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/30",
+        path: "/daily-bills"
+      },
+      {
+        title: "กำไรสุทธิคาดการณ์",
+        value: `${netProfit.toLocaleString()} บาท`,
+        change: netProfit >= 0 ? "ผลประกอบการเป็นบวก" : "ผลประกอบการติดลบ",
+        isPositive: netProfit >= 0,
+        icon: TrendingUp,
+        color: netProfit >= 0 ? "text-indigo-500 dark:text-indigo-400" : "text-amber-500 dark:text-amber-400",
+        bg: netProfit >= 0 ? "bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/30" : "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
+        path: "/daily-bills"
+      },
+      {
+        title: "อัตราการจ่ายล่าช้า",
+        value: `${latePaymentRate.toFixed(1)}%`,
+        change: `พบ ${lateBills.length} บิลที่จ่ายช้า/มีค่าปรับ`,
+        isPositive: latePaymentRate < 10,
+        icon: AlertTriangle,
+        color: "text-amber-500 dark:text-amber-400",
+        bg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
+        path: "/manage-bills"
+      },
+      {
+        title: "อัตราการเก็บเงิน",
+        value: `${collectionsRate.toFixed(1)}%`,
+        change: `ชำระแล้ว ${paidBills.length} / ${currentMonthBills.length} บิล`,
+        isPositive: collectionsRate >= 80,
+        icon: CheckCircle2,
+        color: "text-purple-500 dark:text-purple-400",
+        bg: "bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/30",
+        path: "/manage-bills"
       }
     ])
 
@@ -151,6 +218,14 @@ export default function AdminDashboard() {
           time: "ล่าสุด"
         })
       }
+    }
+    if (currentMonthExpenses.length > 0) {
+      const latestExpense = currentMonthExpenses[0]
+      activities.push({
+        user: "ระบบค่าใช้จ่าย",
+        action: `เพิ่มรายจ่ายด่วน: ${latestExpense.title} (${latestExpense.amount.toLocaleString()} บาท)`,
+        time: "ล่าสุด"
+      })
     }
     activities.push({
       user: "ระบบเชื่อมต่อ",
@@ -208,10 +283,11 @@ export default function AdminDashboard() {
       // โหลดข้อมูลแบบคู่ขนาน (Parallel Fetching) เพื่อประสิทธิภาพสูงสุด
       const fetchPromises = [];
 
-      const currentYear = selectedCycle.split("-")[0] || "2026"
+      const currentYear = selectedYear
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
       let tenants = wsId ? getCachedData(wsId, "tenants") : null
       let bills = wsId ? getCachedData(wsId, `bills_year_${currentYear}`) : null
+      let expenses = wsId ? getCachedData(wsId, `expenses_year_${currentYear}`) : null
 
       if (!rooms || forceRefresh) {
         fetchPromises.push(
@@ -249,6 +325,18 @@ export default function AdminDashboard() {
         );
       }
 
+      if (!expenses || forceRefresh) {
+        fetchPromises.push(
+          getExpenses(currentYear, wsId).then(expensesRes => {
+            if (expensesRes && expensesRes.success === false) {
+              throw new Error(expensesRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลค่าใช้จ่ายได้")
+            }
+            expenses = expensesRes.success && expensesRes.data ? expensesRes.data : []
+            if (wsId) setCachedData(wsId, `expenses_year_${currentYear}`, expenses)
+          })
+        );
+      }
+
       if (fetchPromises.length > 0) {
         await Promise.all(fetchPromises)
       }
@@ -260,11 +348,12 @@ export default function AdminDashboard() {
         setRawRooms(rooms)
         setRawTenants(tenants)
         setRawBills(bills)
+        setRawExpenses(expenses)
         
-        calculateStats(rooms, tenants, bills, selectedCycle)
+        calculateStats(rooms, tenants, bills, expenses, `${selectedYear}-${selectedMonth}`)
       } else {
         setIsDemo(true)
-        setupDemoFallback(selectedCycle)
+        setupDemoFallback(`${selectedYear}-${selectedMonth}`)
       }
     } catch (e) {
       console.error("Failed to load dashboard data:", e)
@@ -275,10 +364,11 @@ export default function AdminDashboard() {
         setRawRooms([])
         setRawTenants([])
         setRawBills([])
-        calculateStats([], [], [], selectedCycle)
+        setRawExpenses([])
+        calculateStats([], [], [], [], `${selectedYear}-${selectedMonth}`)
       } else {
         setIsDemo(true)
-        setupDemoFallback(selectedCycle)
+        setupDemoFallback(`${selectedYear}-${selectedMonth}`)
       }
     } finally {
       setLoading(false)
@@ -286,62 +376,120 @@ export default function AdminDashboard() {
   }
 
   const setupDemoFallback = (cycle: string) => {
-    let localBills: any[] = []
-    let localRooms: any[] = []
+    const cycleYear = cycle.split("-")[0]
+    const cycleMonth = cycle.split("-")[1]
+    const thaiMonthObj = THAI_MONTHS.find(m => m.value === cycleMonth)
+    const cycleLabel = thaiMonthObj ? `${thaiMonthObj.label} ${Number(cycleYear) + 543}` : cycle
 
-    const cycleLabel = cycle === "2026-06" ? "มิ.ย." : cycle === "2026-05" ? "พ.ค." : "เม.ย."
+    let occupiedRooms = 22
+    let totalRooms = 24
+    let totalRevenue = 118250
+    let totalBilled = 135050
+    let totalExpenses = 24500
+    let lateBillsCount = 2
+    let paidBillsCount = 19
+    let totalBillsCount = 22
 
-    if (localRooms.length > 0 || localBills.length > 0) {
-      const totalRooms = localRooms.length || 24
-      const occupiedRooms = localRooms.filter((r: any) => r.status === "occupied").length || 22
-      const availableRooms = totalRooms - occupiedRooms
-      
-      const currentCycleBills = localBills.filter((b: any) => b.billingCycle === cycle)
-      const paidBills = currentCycleBills.filter((b: any) => b.status === "paid")
-      const unpaidBills = currentCycleBills.filter((b: any) => b.status !== "paid")
-      const totalRevenue = paidBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0)
-      const unpaidAmount = unpaidBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0)
-
-      setStats([
-        { title: `รายรับรอบเดือน ${cycleLabel}`, value: `${totalRevenue.toLocaleString()} บาท`, change: "+12.5% จากเดือนก่อน", isPositive: true, icon: DollarSign, color: "text-blue-500 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30", path: "/billing" },
-        { title: "จำนวนผู้เช่าปัจจุบัน", value: `${occupiedRooms} / ${totalRooms} ห้อง`, change: `คิดเป็น ${(totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0).toFixed(1)}% ของหอพัก`, isPositive: true, icon: Users, color: "text-teal-500 dark:text-teal-400", bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/30", path: "/tenants" },
-        { title: "ห้องว่างพร้อมเช่า", value: `${availableRooms} ห้อง`, change: localRooms.filter((r: any) => r.status === "available").slice(0, 2).map((r: any) => `ห้อง ${r.roomNumber}`).join(", ") || "ห้อง 104, ห้อง 208", isPositive: false, icon: Home, color: "text-amber-500 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30", path: "/rooms" },
-        { title: "บิลค้างชำระเงิน", value: `${unpaidBills.length} บิล`, change: `ค้างชำระ ${unpaidAmount.toLocaleString()} บาท`, isPositive: false, icon: Clock, color: "text-red-500 dark:text-red-400", bg: "bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/30", path: "/billing" }
-      ])
+    if (cycleMonth === "05") {
+      totalRevenue = 125400
+      totalBilled = 131000
+      totalExpenses = 18200
+      lateBillsCount = 1
+      paidBillsCount = 21
+    } else if (cycleMonth === "04") {
+      totalRevenue = 130000
+      totalBilled = 130000
+      totalExpenses = 15000
+      lateBillsCount = 0
+      paidBillsCount = 22
     } else {
-      let totalRevenue = "148,250 บาท"
-      let unpaidBills = "3 บิล"
-      let unpaidAmount = "ค้างชำระ 16,800 บาท"
-      let changeText = "+12.5% จากเดือนก่อน"
-
-      if (cycle === "2026-05") {
-        totalRevenue = "159,400 บาท"
-        unpaidBills = "1 บิล"
-        unpaidAmount = "ค้างชำระ 5,600 บาท"
-        changeText = "+8.3% จากเดือนก่อน"
-      } else if (cycle === "2026-04") {
-        totalRevenue = "165,000 บาท"
-        unpaidBills = "0 บิล"
-        unpaidAmount = "ชำระครบ 100% แล้ว"
-        changeText = "ยอดเยี่ยมมาก"
-      }
-
-      setStats([
-        { title: `รายรับรอบเดือน ${cycleLabel}`, value: totalRevenue, change: changeText, isPositive: true, icon: DollarSign, color: "text-blue-500 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30", path: "/billing" },
-        { title: "จำนวนผู้เช่าปัจจุบัน", value: "22 / 24 ห้อง", change: "คิดเป็น 91.6% ของหอพัก", isPositive: true, icon: Users, color: "text-teal-500 dark:text-teal-400", bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/30", path: "/tenants" },
-        { title: "ห้องว่างพร้อมเช่า", value: "2 ห้อง", change: "ห้อง 104, ห้อง 208", isPositive: false, icon: Home, color: "text-amber-500 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30", path: "/rooms" },
-        { title: "บิลค้างชำระเงิน", value: unpaidBills, change: unpaidAmount, isPositive: false, icon: Clock, color: "text-red-500 dark:text-red-400", bg: "bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/30", path: "/billing" }
-      ])
+      // General formula for other months in demo mode
+      const monthNum = Number(cycleMonth) || 6
+      occupiedRooms = 20 + (monthNum % 4)
+      totalRevenue = 100000 + (monthNum * 3500)
+      totalBilled = totalRevenue + (monthNum % 3 === 0 ? 5600 : 0)
+      totalExpenses = 12000 + (monthNum * 1200)
+      lateBillsCount = monthNum % 2
+      paidBillsCount = occupiedRooms - lateBillsCount
+      totalBillsCount = occupiedRooms
     }
 
-    if (cycle === "2026-06") {
+    const netProfit = totalRevenue - totalExpenses
+    const occupancyRate = (occupiedRooms / totalRooms) * 100
+    const latePaymentRate = totalBillsCount > 0 ? (lateBillsCount / totalBillsCount) * 100 : 0
+    const collectionsRate = totalBilled > 0 ? (totalRevenue / totalBilled) * 100 : 0
+
+    setStats([
+      {
+        title: "จำนวนห้องที่มีผู้เช่า",
+        value: `${occupiedRooms} / ${totalRooms} ห้อง`,
+        change: `อัตราเข้าพัก ${occupancyRate.toFixed(1)}%`,
+        isPositive: true,
+        icon: Users,
+        color: "text-teal-500 dark:text-teal-400",
+        bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/30",
+        path: "/tenants"
+      },
+      {
+        title: "รายได้เก็บแล้ว",
+        value: `${totalRevenue.toLocaleString()} บาท`,
+        change: `ยอดแจ้งหนี้รวม ${totalBilled.toLocaleString()} บาท`,
+        isPositive: true,
+        icon: DollarSign,
+        color: "text-emerald-500 dark:text-emerald-400",
+        bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/30",
+        path: "/manage-bills"
+      },
+      {
+        title: "ค่าใช้จ่ายเดือนนี้",
+        value: `${totalExpenses.toLocaleString()} บาท`,
+        change: `รายการจำลองแบบเดโม`,
+        isPositive: false,
+        icon: TrendingDown,
+        color: "text-rose-500 dark:text-rose-400",
+        bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/30",
+        path: "/daily-bills"
+      },
+      {
+        title: "กำไรสุทธิคาดการณ์",
+        value: `${netProfit.toLocaleString()} บาท`,
+        change: netProfit >= 0 ? "ผลประกอบการเป็นบวก" : "ผลประกอบการติดลบ",
+        isPositive: netProfit >= 0,
+        icon: TrendingUp,
+        color: netProfit >= 0 ? "text-indigo-500 dark:text-indigo-400" : "text-amber-500 dark:text-amber-400",
+        bg: netProfit >= 0 ? "bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/30" : "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
+        path: "/daily-bills"
+      },
+      {
+        title: "อัตราการจ่ายล่าช้า",
+        value: `${latePaymentRate.toFixed(1)}%`,
+        change: `พบ ${lateBillsCount} บิลที่จ่ายล่าช้าในเดโม`,
+        isPositive: latePaymentRate < 10,
+        icon: AlertTriangle,
+        color: "text-amber-500 dark:text-amber-400",
+        bg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
+        path: "/manage-bills"
+      },
+      {
+        title: "อัตราการเก็บเงิน",
+        value: `${collectionsRate.toFixed(1)}%`,
+        change: `ชำระแล้ว ${paidBillsCount} / ${totalBillsCount} บิล`,
+        isPositive: collectionsRate >= 80,
+        icon: CheckCircle2,
+        color: "text-purple-500 dark:text-purple-400",
+        bg: "bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/30",
+        path: "/manage-bills"
+      }
+    ])
+
+    if (cycleMonth === "06") {
       setRecentTransactions([
         { room: "ห้อง 101", tenant: "คุณวิภาวี", type: "โอนผ่านพร้อมเพย์", amount: "5,400 บาท", status: "สำเร็จ", time: "10 นาทีที่แล้ว" },
         { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: "โอนผ่านพร้อมเพย์", amount: "6,200 บาท", status: "สำเร็จ", time: "1 ชั่วโมงที่แล้ว" },
         { room: "ห้อง 105", tenant: "คุณณัฐพล", type: "อัปโหลดสลิปค้างยืนยัน", amount: "5,800 บาท", status: "รอยืนยัน", time: "2 ชั่วโมงที่แล้ว" },
         { room: "ห้อง 302", tenant: "คุณรภัสสร", type: "ยังไม่ได้ชำระ", amount: "5,600 บาท", status: "ค้างชำระ", time: "1 วันที่แล้ว" }
       ])
-    } else if (cycle === "2026-05") {
+    } else if (cycleMonth === "05") {
       setRecentTransactions([
         { room: "ห้อง 101", tenant: "คุณวิภาวี", type: "โอนผ่านพร้อมเพย์", amount: "5,400 บาท", status: "สำเร็จ", time: "เมื่อเดือนที่แล้ว" },
         { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: "โอนผ่านพร้อมเพย์", amount: "6,200 บาท", status: "สำเร็จ", time: "เมื่อเดือนที่แล้ว" },
@@ -355,32 +503,33 @@ export default function AdminDashboard() {
     }
 
     setRecentActivities([
-      { user: "พนักงานสมชาย", action: "บันทึกตัวเลขมิเตอร์น้ำไฟรอบเดือน มิ.ย. ครบถ้วน", time: "เมื่อวานนี้" },
-      { user: "ระบบอัตโนมัติ", action: "ส่งใบแจ้งหนี้ PDF ไปยัง LINE OA ของผู้เช่าทั้งหมด 22 ห้อง", time: "2 วันก่อน" },
-      { user: "แอดมินสมเจตน์", action: "เพิ่มผู้เช่าใหม่สัญญา 1 ปี ห้อง 205 (คุณสุรศักดิ์)", time: "3 วันก่อน" }
+      { user: "พนักงานสมชาย", action: "บันทึกตัวเลขมิเตอร์น้ำไฟรอบเดโมสำเร็จ", time: "เมื่อวานนี้" },
+      { user: "ระบบอัตโนมัติ", action: "ส่งใบแจ้งหนี้จำลองไปยังแผงควบคุมหลักสำเร็จ", time: "2 วันก่อน" },
+      { user: "แอดมินสมเจตน์", action: "ทดสอบเลือกช่วงเวลาเดโม " + cycleLabel, time: "ล่าสุด" }
     ])
   }
 
+  // Fetch when selected year changes
   useEffect(() => {
     loadDashboardData()
-  }, [])
+  }, [selectedYear])
 
-  // Handle client-side filtering on month changes
+  // Sync calculations when selected month changes (without reloading db if rawBills already has the selected year's data)
   useEffect(() => {
     if (!loading) {
       if (isDemo) {
-        setupDemoFallback(selectedCycle)
+        setupDemoFallback(`${selectedYear}-${selectedMonth}`)
       } else {
-        calculateStats(rawRooms, rawTenants, rawBills, selectedCycle)
+        calculateStats(rawRooms, rawTenants, rawBills, rawExpenses, `${selectedYear}-${selectedMonth}`)
       }
     }
-  }, [selectedCycle])
+  }, [selectedMonth])
 
   const SkeletonLoader = () => (
     <div className="space-y-6">
       {/* Stats Cards Skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-pulse">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 animate-pulse">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-28 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
@@ -458,40 +607,26 @@ export default function AdminDashboard() {
         {/* DESKTOP Month Dropdown Selector & RLS Badge (>= 768px) */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
           {/* Dynamic Month Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowMonthDropdown(!showMonthDropdown)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-850 transition-all text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm cursor-pointer"
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             >
-              <Calendar className="w-4 h-4 text-blue-500" />
-              <span>รอบบิล: {selectedCycle === "2026-06" ? "มิถุนายน 2569" : selectedCycle === "2026-05" ? "พฤษภาคม 2569" : "เมษายน 2569"}</span>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            </button>
-            {showMonthDropdown && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-1.5 space-y-1 z-30 animate-fade-in">
-                {[
-                  { value: "2026-06", label: "มิถุนายน 2569" },
-                  { value: "2026-05", label: "พฤษภาคม 2569" },
-                  { value: "2026-04", label: "เมษายน 2569" }
-                ].map((item) => (
-                  <button
-                    key={item.value}
-                    onClick={() => {
-                      setSelectedCycle(item.value)
-                      setShowMonthDropdown(false)
-                    }}
-                    className={`w-full text-left text-xs px-3 py-2.5 rounded-lg transition-colors flex items-center justify-between cursor-pointer ${
-                      selectedCycle === item.value
-                        ? "bg-blue-600 text-white font-semibold"
-                        : "text-slate-650 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850"
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    {selectedCycle === item.value && <Check className="w-3.5 h-3.5 text-white" />}
-                  </button>
-                ))}
-              </div>
-            )}
+              {THAI_MONTHS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+            >
+              {YEARS.map(y => (
+                <option key={y.value} value={y.value}>พ.ศ. {y.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="text-xs font-bold px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2.5 shadow-sm">
@@ -504,27 +639,29 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* MOBILE Horizontal Month Swipe Pill-Selector (< 768px) */}
-      <div className="flex md:hidden items-center gap-2 mt-4 overflow-x-auto pb-2 scrollbar-none shrink-0 border-b border-slate-100 dark:border-slate-800/50">
-        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 shrink-0">เลือกเดือน:</span>
-        {[
-          { value: "2026-06", label: "มิ.ย. 69" },
-          { value: "2026-05", label: "พ.ค. 69" },
-          { value: "2026-04", label: "เม.ย. 69" }
-        ].map((item) => (
-          <button
-            key={item.value}
-            onClick={() => setSelectedCycle(item.value)}
-            className={`px-4 py-2 rounded-full text-xs font-extrabold shrink-0 transition-all cursor-pointer ${
-              selectedCycle === item.value
-                ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-500"
-                : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350"
-            }`}
-            style={{ minHeight: "38px" }}
+      {/* MOBILE View Selector (< 768px) */}
+      <div className="flex md:hidden items-center gap-2 mt-4 pb-2 border-b border-slate-100 dark:border-slate-800/50 w-full">
+        <span className="text-xs font-bold text-slate-400 shrink-0">เลือกช่วงเวลา:</span>
+        <div className="flex gap-2 flex-1">
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
           >
-            {item.label}
-          </button>
-        ))}
+            {THAI_MONTHS.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
+          >
+            {YEARS.map(y => (
+              <option key={y.value} value={y.value}>พ.ศ. {y.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -557,7 +694,7 @@ export default function AdminDashboard() {
       ) : (
         <>
           {/* Grid การ์ดสถิติ (Stats Grid) - Fully Adaptive & Clickable with premium interactions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6 mt-6">
             {stats.map((stat, idx) => {
               const Icon = stat.icon
               return (
@@ -569,17 +706,17 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-start">
                     <div className="space-y-2">
                       <span className="text-xs text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">{stat.title}</span>
-                      <h3 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-1">{stat.value}</h3>
-                      <span className={`inline-flex items-center text-[10px] md:text-xs font-bold tracking-wide ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-450"}`}>
+                      <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-1 leading-none">{stat.value}</h3>
+                      <span className={`inline-flex items-center text-[10px] md:text-xs font-bold tracking-wide mt-1.5 ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-450"}`}>
                         {stat.change}
                       </span>
                     </div>
-                    <div className={`p-3 rounded-xl transition-transform duration-300 group-hover:scale-110 shrink-0 ${stat.bg} ${stat.color}`}>
-                      <Icon className="w-5.5 h-5.5" />
+                    <div className={`p-2 rounded-xl transition-transform duration-300 group-hover:scale-110 shrink-0 ${stat.bg} ${stat.color}`}>
+                      <Icon className="w-5 h-5" />
                     </div>
                   </div>
                   {/* Subtle link arrow indicator */}
-                  <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-150 transition-opacity duration-300">
+                  <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
                   </div>
                 </div>

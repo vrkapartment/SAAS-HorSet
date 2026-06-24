@@ -533,7 +533,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   // เมนูนำทาง
   const menuItems = [
     {
-      name: t("nav.dashboard") || "หน้าแรก ภาพรวมสถิติ",
+      name: t("nav.dashboard") || "Dashboard",
       path: "/dashboard",
       icon: LayoutDashboard,
       roles: ["admin", "super_admin"]
@@ -745,7 +745,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <div className="min-w-0">
               <h1 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <span className="truncate max-w-[130px] sm:max-w-none">
-                  {pathname === "/dashboard" && (t("nav.dashboard") || "หน้าแรกภาพรวมสถิติ")}
+                  {pathname === "/dashboard" && (t("nav.dashboard") || "Dashboard")}
                   {pathname === "/rooms" && (t("nav.rooms") || "จัดการห้องพักและผู้เช่า")}
                   {pathname === "/billing" && "จดเลขมิเตอร์ & สรุปบิลค่าเช่า"}
                   {pathname === "/meter" && "จดเลขมิเตอร์ & สรุปบิลค่าเช่า"}

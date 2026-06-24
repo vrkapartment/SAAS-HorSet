@@ -15,7 +15,7 @@
     "profile_settings": "Profile & Password Settings"
   },
   "nav": {
-    "dashboard": "Dashboard Overview",
+    "dashboard": "Dashboard",
     "rooms": "Manage Rooms & Tenants",
     "tenants": "Tenant Contracts",
     "billing": "Billing & Meters",
