@@ -66,7 +66,7 @@ export default function Sidebar({
   return (
     <>
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0">
+      <aside className="hidden md:flex flex-col w-64 h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0 overflow-x-hidden">
         <div className="flex items-center gap-3 mb-8 px-1 min-w-0">
           <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-md shadow-blue-500/20 animate-pulse-subtle shrink-0">
             <Building className="w-5 h-5 text-white" />
@@ -249,7 +249,7 @@ export default function Sidebar({
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="relative flex flex-col w-64 glass-panel h-full p-6 animate-slide-right">
+          <aside className="relative flex flex-col w-64 glass-panel h-full p-6 animate-slide-right overflow-x-hidden">
             <div className="flex items-center justify-between mb-8 px-1 min-w-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg shadow-md shadow-blue-500/15 shrink-0">
