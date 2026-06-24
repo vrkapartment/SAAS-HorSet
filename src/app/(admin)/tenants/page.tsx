@@ -28,6 +28,15 @@ import {
   ArrowUpDown
 } from "lucide-react"
 import { getTenants, getOldTenants, deleteOldTenant } from "@/features/tenant/actions"
+import { getFinanceSettings } from "@/features/finance/actions"
+
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(";").shift()
+  return undefined
+}
 
 interface TenantItem {
   id: string
@@ -61,6 +70,7 @@ export default function TenantsPage() {
   const [error, setError] = useState<string | null>(null)
   const [tableNotFound, setTableNotFound] = useState(false)
   const [isRefreshing, setIsSubmitting] = useState(false)
+  const [financeSettings, setFinanceSettings] = useState<any>(null)
 
   // Data lists
   const [currentTenants, setCurrentTenants] = useState<TenantItem[]>([])
@@ -79,24 +89,117 @@ export default function TenantsPage() {
     oldTotalCount: 0
   })
 
+  // คำนวณสถานะสัญญาเช่าผู้เช่า (สัญญาปกติ / เหลืออายุสัญญา X เดือน / สัญญาหมดอายุ / อยู่ครบสัญญา)
+  const getContractStatus = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined) => {
+    if (!leaseStart || !leaseEnd) return null
+
+    const now = new Date()
+    // ล้างเวลาเพื่อความแม่นยำในการเปรียบเทียบวันที่
+    const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    const endDate = new Date(leaseEnd)
+    const endDateTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+
+    // ตรวจสอบว่าหมดอายุหรือยัง
+    if (currentDate > endDateTime) {
+      const action = financeSettings?.lease_expiry_action || "renew"
+      if (action === "renew") {
+        return {
+          label: "สัญญาหมดอายุ",
+          style: "bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 font-bold",
+          dotColor: "bg-red-500"
+        }
+      } else {
+        return {
+          label: "อยู่ครบสัญญา",
+          style: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 font-bold",
+          dotColor: "bg-emerald-500"
+        }
+      }
+    }
+
+    // คำนวณความแตกต่างของจำนวนเดือน
+    const diffYears = endDate.getFullYear() - now.getFullYear()
+    const diffMonths = endDate.getMonth() - now.getMonth()
+    const totalMonths = diffYears * 12 + diffMonths
+
+    // คำนวณความแตกต่างของจำนวนวันจริงที่เหลือ
+    const diffTime = endDateTime.getTime() - currentDate.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    const action = financeSettings?.lease_expiry_action || "renew"
+
+    if (action === "renew") {
+      // ช่วง 2 เดือนสุดท้าย (60 วัน หรือ totalMonths <= 2)
+      if (totalMonths <= 2 && totalMonths >= 0) {
+        let label = ""
+        if (diffDays <= 30) {
+          label = "เหลืออายุสัญญาอีก 1 เดือน"
+        } else if (diffDays <= 60) {
+          label = "เหลืออายุสัญญาอีก 2 เดือน"
+        } else {
+          label = `เหลืออายุสัญญาอีก ${totalMonths} เดือน`
+        }
+        return {
+          label: label,
+          style: "bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400 font-bold",
+          dotColor: "bg-amber-500 animate-pulse"
+        }
+      }
+    }
+
+    // สัญญาเช่ายังปกติอยู่
+    return {
+      label: "สัญญาปกติ",
+      style: "bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 font-bold",
+      dotColor: "bg-blue-500"
+    }
+  }
+
   // Load Data
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true)
     setError(null)
     setTableNotFound(false)
     try {
-      const [currentRes, oldRes] = await Promise.all([
+      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      const [currentRes, oldRes, financeRes] = await Promise.all([
         getTenants(),
-        getOldTenants()
+        getOldTenants(),
+        getFinanceSettings(wsId).catch(() => ({ success: false, data: null }))
       ])
+
+      let activeSettings = null
+      if (financeRes?.success && financeRes.data) {
+        setFinanceSettings(financeRes.data)
+        activeSettings = financeRes.data
+      }
 
       if (currentRes.success && currentRes.data) {
         const tenants = currentRes.data as TenantItem[]
         setCurrentTenants(tenants)
         
-        // Count stats
-        const activeCount = tenants.filter(t => t.status === "active").length
-        const expiredCount = tenants.filter(t => t.status === "expired").length
+        // Count stats precisely matching getContractStatus
+        const now = new Date()
+        const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        
+        let activeCount = 0
+        let expiredCount = 0
+
+        tenants.forEach(t => {
+          if (!t.contractStart || !t.contractEnd) {
+            activeCount++
+            return
+          }
+          const endDate = new Date(t.contractEnd)
+          const endDateTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+          
+          if (currentDate > endDateTime) {
+            expiredCount++
+          } else {
+            activeCount++
+          }
+        })
         setStats(prev => ({ ...prev, activeCount, expiredCount }))
       } else if (currentRes.error) {
         setError(currentRes.error)
@@ -466,13 +569,16 @@ export default function TenantsPage() {
                       </div>
                     </td>
                     <td className="py-4 px-5 text-center">
-                      <span className={`inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                        t.status === "active"
-                          ? "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30"
-                          : "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-100/40 dark:border-amber-900/30"
-                      }`}>
-                        {t.status === "active" ? "กำลังเช่าอยู่" : "หมดระยะเช่าแล้ว"}
-                      </span>
+                      {(() => {
+                        const status = getContractStatus(t.contractStart, t.contractEnd)
+                        if (!status) return "-"
+                        return (
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] ${status.style}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                            {status.label}
+                          </span>
+                        )
+                      })()}
                     </td>
                   </tr>
                 ))}
