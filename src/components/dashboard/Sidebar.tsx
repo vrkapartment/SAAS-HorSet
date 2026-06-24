@@ -68,8 +68,10 @@ export default function Sidebar({
   return (
     <>
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
-      <aside className={`hidden md:flex flex-col h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0 overflow-x-hidden transition-all duration-500 ease-in-out ${
-        desktopOpen ? "w-64 opacity-100" : "w-0 p-0 border-r-0 opacity-0 pointer-events-none"
+      <aside className={`hidden md:flex flex-col h-full glass-panel z-20 shrink-0 overflow-x-hidden transition-all duration-500 ease-in-out ${
+        desktopOpen 
+          ? "w-64 p-6 border-r border-slate-200/80 dark:border-slate-900/60 opacity-100" 
+          : "w-0 p-0 border-r-0 opacity-0 pointer-events-none"
       }`}>
         <div 
           className="w-52 h-full flex flex-col shrink-0 transition-all duration-500 ease-in-out"
