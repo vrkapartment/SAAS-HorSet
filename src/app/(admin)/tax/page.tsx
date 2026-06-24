@@ -760,7 +760,7 @@ export default function TaxPage() {
   ]
 
   return (
-    <>
+    <div className="space-y-6 md:space-y-8 pb-12">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-1">
         <div className="flex items-center gap-4">
@@ -1957,6 +1957,6 @@ export default function TaxPage() {
       )}
 
 
-    </>
+    </div>
   )
 }
