@@ -26,7 +26,9 @@ import {
   ClipboardCheck,
   Building,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  LayoutGrid,
+  List
 } from "lucide-react"
 import { 
   getRooms, 
@@ -92,6 +94,7 @@ export default function RoomsPage() {
   
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"all" | "available" | "waiting" | "occupied">("all")
+  const [viewMode, setViewMode] = useState<"floor" | "table">("floor")
   
   // Modals Control
   const [modalOpen, setModalOpen] = useState(false) // Room Modal
@@ -922,24 +925,81 @@ export default function RoomsPage() {
   const waitingRoomsCount = rooms.filter(r => r.tenantName && !r.lineUserId).length
   const occupiedRoomsCount = rooms.filter(r => r.tenantName && r.lineUserId).length
 
+  // แยกเลขชั้นจากหมายเลขห้องพัก
+  const getFloorNumber = (roomNo: string) => {
+    if (!roomNo) return "1"
+    const digits = roomNo.replace(/\D/g, "")
+    if (digits.length === 3) return digits.charAt(0)
+    if (digits.length === 4) return digits.substring(0, 2)
+    const match = roomNo.match(/^([A-Za-z-]*\d+)/)
+    if (match) {
+      const pureDigits = match[0].replace(/\D/g, "")
+      if (pureDigits.length >= 3) return pureDigits.substring(0, pureDigits.length - 2)
+    }
+    return roomNo.charAt(0) || "1"
+  }
+
+  // จัดกลุ่มห้องพักแยกตามชั้น
+  const groupedRoomsByFloor: { [floor: string]: RoomItem[] } = {}
+  filteredRooms.forEach(room => {
+    const floor = getFloorNumber(room.roomNumber)
+    if (!groupedRoomsByFloor[floor]) groupedRoomsByFloor[floor] = []
+    groupedRoomsByFloor[floor].push(room)
+  })
+
+  const sortedFloors = Object.keys(groupedRoomsByFloor).sort((a, b) => {
+    const numA = parseInt(a, 10)
+    const numB = parseInt(b, 10)
+    if (isNaN(numA) || isNaN(numB)) return a.localeCompare(b)
+    return numA - numB
+  })
+
   // Skeletons Loader component for loading states
   const SkeletonLoader = () => (
     <div className="space-y-4">
-      {/* Desktop Table Skeleton */}
-      <div className="hidden md:block space-y-3">
-        <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse w-full" />
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex justify-between items-center py-4 px-4 border-b border-slate-100 dark:border-slate-800 animate-pulse">
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/12" />
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/12" />
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/12" />
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/12" />
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/12" />
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/12" />
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/12" />
+      {viewMode === "floor" ? (
+        /* Floor Card Grid Skeleton */
+        <div className="space-y-8 animate-pulse">
+          <div className="flex items-center gap-3 justify-center">
+            <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
+            <div className="h-6 bg-slate-200 dark:bg-slate-850 rounded-full w-24" />
+            <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
           </div>
-        ))}
-      </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="p-5 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl space-y-4 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1">
+                    <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-12" />
+                    <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded w-20" />
+                  </div>
+                  <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-16" />
+                </div>
+                <div className="h-7 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
+                <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-full" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-4/5" />
+                </div>
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 h-10 bg-slate-100 dark:bg-slate-850 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* Desktop Table Skeleton */
+        <div className="hidden md:block space-y-3">
+          <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse w-full" />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex justify-between items-center py-4 px-4 border-b border-slate-100 dark:border-slate-800 animate-pulse">
+              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/12" />
+              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/12" />
+              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/12" />
+              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/12" />
+              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/12" />
+            </div>
+          ))}
+        </div>
+      )}
       
       {/* Mobile Cards Skeleton */}
       <div className="block md:hidden space-y-4">
@@ -1072,7 +1132,7 @@ export default function RoomsPage() {
         </div>
 
         {/* 3. SEARCH & STATUS FILTERS */}
-        <div className="glass-panel p-4 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="glass-panel p-4 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           {/* Search bar with ambient border glow */}
           <div className="relative flex-1 max-w-md">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-450 dark:text-slate-500">
@@ -1095,27 +1155,56 @@ export default function RoomsPage() {
             )}
           </div>
 
-          {/* Filter Badges Row */}
-          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">ตัวกรอง:</span>
-            {[
-              { id: "all", label: "ทั้งหมด" },
-              { id: "available", label: "เฉพาะห้องว่าง" },
-              { id: "waiting", label: "มีผู้เช่าแล้ว (ยังไม่ลงทะเบียนไลน์)" },
-              { id: "occupied", label: "มีผู้เช่าแล้ว (เชื่อม LINE)" }
-            ].map(tab => (
+          {/* Filters & View switcher Row */}
+          <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 w-full xl:w-auto">
+            {/* Filter Badges Row */}
+            <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">ตัวกรอง:</span>
+              {[
+                { id: "all", label: "ทั้งหมด" },
+                { id: "available", label: "เฉพาะห้องว่าง" },
+                { id: "waiting", label: "มีผู้เช่า (รอ LINE)" },
+                { id: "occupied", label: "มีผู้เช่า (เชื่อม LINE)" }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilter(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filter === tab.id
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow shadow-slate-950/10"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 shrink-0">
               <button
-                key={tab.id}
-                onClick={() => setFilter(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  filter === tab.id
-                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow shadow-slate-950/10"
-                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-200"
+                onClick={() => setViewMode("floor")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === "floor"
+                    ? "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 }`}
               >
-                {tab.label}
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>บล็อกตามชั้น</span>
               </button>
-            ))}
+              <button
+                onClick={() => setViewMode("table")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === "table"
+                    ? "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>ตาราง</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1137,180 +1226,352 @@ export default function RoomsPage() {
             <SkeletonLoader />
           ) : (
             <>
-              {/* DESKTOP VIEW: HIGH-DENSITY DATA TABLE (hidden on mobile, visible on desktop) */}
-              <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/60 dark:border-slate-900/60 shadow-sm">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200/60 dark:border-slate-900/60">
-                      <th className="p-4 w-28">หมายเลขห้อง</th>
-                      <th className="p-4 w-40">สถานะห้อง</th>
-                      <th className="p-4 w-32 text-right">ค่าเช่ารายเดือน</th>
-                      <th className="p-4">ประเภทห้อง</th>
-                      <th className="p-4">ผู้เช่าสัญญา</th>
-                      <th className="p-4">เบอร์โทรศัพท์</th>
-                      <th className="p-4 w-36">สถานะสัญญา</th>
-                      <th className="p-4 text-center w-[270px]">การดำเนินการ</th>
-                      <th className="p-4 text-center w-24">ตั้งค่าห้อง</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900/50">
-                    {filteredRooms.length > 0 ? (
-                      filteredRooms.map((room) => {
-                        const statusDetails = getRoomStatusDetails(room)
-                        return (
-                          <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/15 transition-colors">
-                            {/* 1. Room Number */}
-                            <td className="p-4 font-extrabold text-slate-850 dark:text-slate-100 text-sm tracking-wide">{room.roomNumber}</td>
-                            
-                            {/* 2. Room Status */}
-                            <td className="p-4">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
-                                {statusDetails.label}
-                              </span>
-                            </td>
+              {/* DESKTOP VIEW: FLOOR GRID VIEW or CONDENSED TABLE VIEW */}
+              <div className="hidden md:block">
+                {viewMode === "floor" ? (
+                  /* FLOOR GRID VIEW: Groups rooms by floor */
+                  <div className="space-y-10">
+                    {sortedFloors.length > 0 ? (
+                      sortedFloors.map((floor) => (
+                        <div key={floor} className="space-y-4">
+                          {/* Floor Header */}
+                          <div className="flex items-center gap-3">
+                            <div className="h-px bg-slate-200 dark:bg-slate-800/60 flex-1" />
+                            <h3 className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-4 py-1.5 bg-slate-100 dark:bg-slate-950 rounded-full border border-slate-200/40 dark:border-slate-800/40">
+                              ชั้นที่ {floor}
+                            </h3>
+                            <div className="h-px bg-slate-200 dark:bg-slate-800/60 flex-1" />
+                          </div>
 
-                            {/* 3. Rent */}
-                            <td className="p-4 text-right font-extrabold text-slate-850 dark:text-slate-100">
-                              {room.baseRent.toLocaleString()} บาท
-                            </td>
+                          {/* Grid of Room Cards */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {groupedRoomsByFloor[floor].map((room) => {
+                              const statusDetails = getRoomStatusDetails(room)
+                              const hasTenant = !!room.tenantName
+                              return (
+                                <div
+                                  key={room.id}
+                                  className={`relative p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card ${
+                                    hasTenant 
+                                      ? "hover:border-teal-500/30 dark:hover:border-teal-500/20" 
+                                      : "hover:border-blue-500/30 dark:hover:border-blue-500/20"
+                                  }`}
+                                >
+                                  {/* Card Header */}
+                                  <div>
+                                    <div className="flex items-start justify-between gap-2 mb-3">
+                                      <div>
+                                        <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
+                                        <h4 className="text-base font-black text-slate-850 dark:text-slate-100 tracking-wide">
+                                          ห้อง {room.roomNumber}
+                                        </h4>
+                                      </div>
+                                      
+                                      {/* Edit / Delete Buttons (Top-right corner, visible on card hover) */}
+                                      <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200/30 dark:border-slate-800/30 opacity-60 group-hover/card:opacity-100 transition-opacity">
+                                        <button
+                                          onClick={() => handleEditClick(room)}
+                                          className="p-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                                          title="แก้ไขข้อมูลห้องพัก"
+                                        >
+                                          <Edit className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
+                                          className="p-1 text-red-500 hover:text-red-400 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                                          title="ลบห้องพัก"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
 
-                            {/* 4. Type Name */}
-                            <td className="p-4">
-                              <span className="inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30">
-                                <Tag className="w-3 h-3" /> {room.roomTypeName}
-                              </span>
-                            </td>
+                                    {/* Room Type & Base Rent */}
+                                    <div className="flex items-center justify-between gap-2 mb-4">
+                                      <span className="inline-flex items-center gap-1 text-[9px] text-indigo-600 dark:text-indigo-400 font-extrabold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30 uppercase tracking-wide">
+                                        <Tag className="w-2.5 h-2.5" /> {room.roomTypeName}
+                                      </span>
+                                      <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                                        {room.baseRent.toLocaleString()} บ.
+                                      </span>
+                                    </div>
 
-                            {/* 5. Tenant Name */}
-                            <td className="p-4 text-slate-700 dark:text-slate-300 font-bold">
-                              {room.tenantName ? (
-                                <div className="flex items-center gap-1.5">
-                                  <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <span className="truncate max-w-[140px]" title={room.tenantName}>{room.tenantName}</span>
+                                    {/* Status Badge */}
+                                    <div className="mb-4">
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
+                                        {statusDetails.label}
+                                      </span>
+                                    </div>
+
+                                    {/* Tenant Information block if occupied */}
+                                    {hasTenant ? (
+                                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2 mb-4">
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="text-slate-400 dark:text-slate-500 font-medium">ผู้เช่า:</span>
+                                          <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 truncate max-w-[150px]" title={room.tenantName || ""}>
+                                            <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            {room.tenantName}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                                          <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1 font-mono">
+                                            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            {room.tenantPhone || "-"}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="text-slate-400 dark:text-slate-500 font-medium">สถานะสัญญา:</span>
+                                          <span>
+                                            {(() => {
+                                              const status = getContractStatus(room.leaseStart, room.leaseEnd)
+                                              if (status) {
+                                                return (
+                                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] ${status.style}`}>
+                                                    {status.label}
+                                                  </span>
+                                                )
+                                              }
+                                              return <span className="text-slate-400 dark:text-slate-600">-</span>
+                                            })()}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center h-20 text-slate-400 dark:text-slate-600 text-[11px] mb-4">
+                                        ไม่มีผู้เช่าปัจจุบัน (ห้องว่าง)
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Card Actions (Footer) */}
+                                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 mt-auto">
+                                    {/* VACANT: Generate LINE Link */}
+                                    {!room.tenantName && (
+                                      <button
+                                        onClick={() => handleOpenLineLinkModal(room)}
+                                        className="w-full h-9 text-[11px] font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                      >
+                                        <Share2 className="w-3.5 h-3.5 shrink-0" />
+                                        เจนลิงก์ LINE
+                                      </button>
+                                    )}
+
+                                    {/* WAITING FOR LINE: Generate/Copy Link & View Details/Checkout */}
+                                    {room.tenantName && !room.lineUserId && (
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleOpenLineLinkModal(room)}
+                                          className="flex-1 h-9 text-[11px] font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/20 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                          title="เจนลิงก์ LINE"
+                                        >
+                                          <Share2 className="w-3.5 h-3.5 shrink-0" />
+                                          เจนลิงก์
+                                        </button>
+                                        <button
+                                          onClick={() => handleOpenDetailModal(room)}
+                                          className="flex-[1.2] h-9 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                          ดูรายละเอียด/ย้ายออก
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* REGISTERED: View details / checkout */}
+                                    {room.tenantName && room.lineUserId && (
+                                      <button
+                                        onClick={() => handleOpenDetailModal(room)}
+                                        className="w-full h-9 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                        ดูรายละเอียด / ย้ายออก
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                              ) : (
-                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                              )}
-                            </td>
-
-                            {/* 6. Phone Number */}
-                            <td className="p-4 text-slate-500 dark:text-slate-400 font-mono">
-                              {room.tenantPhone ? (
-                                <div className="flex items-center gap-1.5">
-                                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <span>{room.tenantPhone}</span>
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                              )}
-                            </td>
-
-                            {/* 6.5 Contract Status Column */}
-                            <td className="p-4">
-                              {room.tenantName ? (() => {
-                                const status = getContractStatus(room.leaseStart, room.leaseEnd)
-                                if (status) {
-                                  return (
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] ${status.style}`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
-                                      {status.label}
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs bg-slate-50/50 dark:bg-slate-900/10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                        <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
+                          <div className="p-3 bg-slate-100 dark:bg-slate-900 text-slate-400 rounded-full border border-slate-200/50">
+                            <Home className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">ไม่พบข้อมูลห้องพักหรือเงื่อนไขผู้เช่า</p>
+                            <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">ทดลองกรอกค้นหาข้อมูลอื่น สลับฟิลเตอร์สถานะ หรือกดปุ่มเพิ่มห้องพักใหม่ด้านบน</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* CONDENSED TABLE VIEW: Elegant 5-Column layout to eliminate crowding */
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/60 dark:border-slate-900/60 shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200/60 dark:border-slate-900/60">
+                          <th className="p-4 w-36">ห้องและประเภท</th>
+                          <th className="p-4 w-44">สถานะและค่าเช่า</th>
+                          <th className="p-4">ผู้เช่าและสัญญา</th>
+                          <th className="p-4 w-64">การจัดการผู้เช่า</th>
+                          <th className="p-4 text-center w-24 border-l border-slate-100 dark:border-slate-900/50">ตั้งค่าห้อง</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-900/50">
+                        {filteredRooms.length > 0 ? (
+                          filteredRooms.map((room) => {
+                            const statusDetails = getRoomStatusDetails(room)
+                            return (
+                              <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/15 transition-colors">
+                                {/* 1. Room & Type */}
+                                <td className="p-4">
+                                  <div className="flex flex-col gap-1.5">
+                                    <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm tracking-wide">ห้อง {room.roomNumber}</span>
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded w-max border border-indigo-200/30 dark:border-indigo-800/30">
+                                      <Tag className="w-2.5 h-2.5" /> {room.roomTypeName}
                                     </span>
-                                  )
-                                }
-                                return <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                              })() : (
-                                <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
-                              )}
-                            </td>
+                                  </div>
+                                </td>
+                                
+                                {/* 2. Status & Monthly Rent */}
+                                <td className="p-4">
+                                  <div className="flex flex-col gap-1.5">
+                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider w-max ${statusDetails.badgeStyle}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
+                                      {statusDetails.label}
+                                    </span>
+                                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-450">
+                                      ค่าเช่า: {room.baseRent.toLocaleString()} บาท/ด.
+                                    </span>
+                                  </div>
+                                </td>
 
-                            {/* 7. Action Button column (Status-dependent) */}
-                            <td className="p-4 text-center">
-                              <div className="flex items-center justify-center gap-2 max-w-[260px] mx-auto">
-                                {/* VACANT: Generate LINE Link */}
-                                {!room.tenantName && (
-                                  <button
-                                    onClick={() => handleOpenLineLinkModal(room)}
-                                    className="w-[145px] h-8 text-[11px] font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-lg hover:-translate-y-0.5 transition-all shadow-sm hover:shadow-[#06C755]/15 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
-                                  >
-                                    <Share2 className="w-3.5 h-3.5 shrink-0" />
-                                    เจนลิงก์ LINE
-                                  </button>
-                                )}
+                                {/* 3. Tenant & Contract */}
+                                <td className="p-4">
+                                  {room.tenantName ? (
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex items-center gap-1 text-xs text-slate-800 dark:text-slate-200 font-bold">
+                                        <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span className="truncate max-w-[140px]" title={room.tenantName}>{room.tenantName}</span>
+                                      </div>
+                                      {room.tenantPhone && (
+                                        <div className="flex items-center gap-1 text-[11px] text-slate-550 dark:text-slate-400 font-mono">
+                                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                          <span>{room.tenantPhone}</span>
+                                        </div>
+                                      )}
+                                      {(() => {
+                                        const status = getContractStatus(room.leaseStart, room.leaseEnd)
+                                        if (status) {
+                                          return (
+                                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] w-max mt-0.5 ${status.style}`}>
+                                              {status.label}
+                                            </span>
+                                          )
+                                        }
+                                        return null
+                                      })()}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
+                                  )}
+                                </td>
 
-                                {/* WAITING FOR LINE: Generate/Copy Link & View Details/Checkout */}
-                                {room.tenantName && !room.lineUserId && (
-                                  <>
-                                    <button
-                                      onClick={() => handleOpenLineLinkModal(room)}
-                                      className="w-[115px] h-8 text-[11px] font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                {/* 4. Actions dependent on Status */}
+                                <td className="p-4">
+                                  <div className="flex items-center justify-start gap-2">
+                                    {/* VACANT: Generate LINE Link */}
+                                    {!room.tenantName && (
+                                      <button
+                                        onClick={() => handleOpenLineLinkModal(room)}
+                                        className="h-8 px-3 text-[11px] font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                      >
+                                        <Share2 className="w-3.5 h-3.5 shrink-0" />
+                                        เจนลิงก์ LINE
+                                      </button>
+                                    )}
+
+                                    {/* WAITING FOR LINE: Generate/Copy Link & View Details/Checkout */}
+                                    {room.tenantName && !room.lineUserId && (
+                                      <>
+                                        <button
+                                          onClick={() => handleOpenLineLinkModal(room)}
+                                          className="h-8 px-2.5 text-[11px] font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        >
+                                          <Share2 className="w-3.5 h-3.5 shrink-0" />
+                                          เจนลิงก์ LINE
+                                        </button>
+                                        <button
+                                          onClick={() => handleOpenDetailModal(room)}
+                                          className="h-8 px-2.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                          ดูรายละเอียด/ย้ายออก
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {/* REGISTERED: View details / checkout */}
+                                    {room.tenantName && room.lineUserId && (
+                                      <button
+                                        onClick={() => handleOpenDetailModal(room)}
+                                        className="h-8 px-3 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                        ดูรายละเอียด/ย้ายออก
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* 5. Edit/Delete room */}
+                                <td className="p-4 text-center border-l border-slate-100 dark:border-slate-900/50">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button 
+                                      onClick={() => handleEditClick(room)}
+                                      className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
+                                      title="แก้ไขข้อมูลห้องพัก"
                                     >
-                                      <Share2 className="w-3.5 h-3.5 shrink-0" />
-                                      เจนลิงก์ LINE
+                                      <Edit className="w-3.5 h-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleOpenDetailModal(room)}
-                                      className="w-[125px] h-8 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                      onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
+                                      className="p-1.5 text-red-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
+                                      title="ลบห้องพัก"
                                     >
-                                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                      ดูรายละเอียด/ย้ายออก
+                                      <Trash2 className="w-3.5 h-3.5" />
                                     </button>
-                                  </>
-                                )}
-
-                                {/* REGISTERED: View details / checkout */}
-                                {room.tenantName && room.lineUserId && (
-                                  <button
-                                    onClick={() => handleOpenDetailModal(room)}
-                                    className="w-[145px] h-8 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm hover:shadow-teal-600/10 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                    ดูรายละเอียด/ย้ายออก
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* 8. Room Management Buttons */}
-                            <td className="p-4 text-center border-l border-slate-100 dark:border-slate-900/50">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <button 
-                                  onClick={() => handleEditClick(room)}
-                                  className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
-                                  title="แก้ไขข้อมูลห้องพัก"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
-                                  className="p-1.5 text-red-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
-                                  title="ลบห้องพัก"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs">
+                              {/* Empty State Block */}
+                              <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-900 text-slate-400 rounded-full border border-slate-200/50">
+                                  <Home className="w-6 h-6" />
+                                </div>
+                                <div>
+                                  <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">ไม่พบข้อมูลห้องพักหรือเงื่อนไขผู้เช่า</p>
+                                  <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">ทดลองกรอกค้นหาข้อมูลอื่น สลับฟิลเตอร์สถานะ หรือกดปุ่มเพิ่มห้องพักใหม่ด้านบน</p>
+                                </div>
                               </div>
                             </td>
                           </tr>
-                        )
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={9} className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs">
-                          {/* Empty State Block */}
-                          <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
-                            <div className="p-3 bg-slate-100 dark:bg-slate-900 text-slate-400 rounded-full border border-slate-200/50">
-                              <Home className="w-6 h-6" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">ไม่พบข้อมูลห้องพักหรือเงื่อนไขผู้เช่า</p>
-                              <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">ทดลองกรอกค้นหาข้อมูลอื่น สลับฟิลเตอร์สถานะ หรือกดปุ่มเพิ่มห้องพักใหม่ด้านบน</p>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* MOBILE VIEW: PREMIUM CARD-BASED LIST (visible on mobile, hidden on desktop) */}
