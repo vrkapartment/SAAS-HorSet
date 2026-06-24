@@ -1491,23 +1491,23 @@ export default function TaxPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-800/60">
+                <tr className="bg-slate-100/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 font-extrabold text-[12px] uppercase tracking-wider border-b-2 border-slate-250 dark:border-slate-800 shadow-sm">
                   <th className="py-4 px-4 pl-5">เดือน</th>
                   <th className="py-4 px-4 text-center">จำนวนบิลจริงที่รับเงิน</th>
-                  <th className="py-4 px-4 text-right">ค่าเช่า 40(5)</th>
-                  <th className="py-4 px-4 text-right">สาธารณูปโภค 40(8)</th>
-                  <th className="py-4 px-4 text-right">รวมรายได้ประเมิน</th>
+                  <th className="py-4 px-4 text-right text-blue-700 dark:text-blue-350">ค่าเช่า 40(5)</th>
+                  <th className="py-4 px-4 text-right text-teal-700 dark:text-teal-350">สาธารณูปโภค 40(8)</th>
+                  <th className="py-4 px-4 text-right text-indigo-700 dark:text-indigo-350">รวมรายได้ประเมิน</th>
                   <th className="py-4 px-4 pr-5 text-center">สถานะข้อมูล</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
+              <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800/60 bg-white dark:bg-transparent">
                 {(() => {
                   let sumRent = 0
                   let sumUtil = 0
                   let sumTotal = 0
                   let sumBills = 0
 
-                  const rows = monthsList.map(m => {
+                  const rows = monthsList.map((m, idx) => {
                     const cycleStr = `${taxYear}-${m.num}`
                     const paidBillsInMonth = bills.filter(b => b.status === "paid" && b.billingCycle === cycleStr)
                     
@@ -1569,22 +1569,27 @@ export default function TaxPage() {
                     sumUtil += monthlyUtil
                     sumTotal += monthlyTotal
 
+                    const isEven = idx % 2 === 0;
+
                     return (
-                      <tr key={m.num} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors duration-150">
-                        <td className="py-3.5 px-4 pl-5 font-bold text-slate-800 dark:text-slate-150 text-[13px]">{m.name}</td>
-                        <td className="py-3.5 px-4 text-center text-slate-500 dark:text-slate-400 font-medium">
+                      <tr 
+                        key={m.num} 
+                        className={`${isEven ? "bg-slate-50/[0.35] dark:bg-slate-900/[0.15]" : "bg-white dark:bg-transparent"} hover:bg-blue-500/[0.05] dark:hover:bg-blue-500/[0.09] transition-all duration-150 border-b border-slate-100 dark:border-slate-800/60`}
+                      >
+                        <td className="py-3.5 px-4 pl-5 font-extrabold text-slate-900 dark:text-slate-100 text-[13px]">{m.name}</td>
+                        <td className="py-3.5 px-4 text-center text-slate-700 dark:text-slate-300 font-semibold">
                           {dataSource === "system" && hasPaidBills ? `${paidBillsInMonth.length} ห้อง` : "-"}
                         </td>
-                        <td className="py-3.5 px-4 text-right text-slate-700 dark:text-slate-350 font-mono text-[13px]">{formatMoney(monthlyRent)} บาท</td>
-                        <td className="py-3.5 px-4 text-right text-slate-700 dark:text-slate-350 font-mono text-[13px]">{formatMoney(monthlyUtil)} บาท</td>
-                        <td className="py-3.5 px-4 text-right text-teal-650 dark:text-teal-400 font-bold font-mono text-[13px]">{formatMoney(monthlyTotal)} บาท</td>
+                        <td className="py-3.5 px-4 text-right text-slate-900 dark:text-slate-100 font-mono font-semibold text-[13px]">{formatMoney(monthlyRent)} บาท</td>
+                        <td className="py-3.5 px-4 text-right text-slate-900 dark:text-slate-100 font-mono font-semibold text-[13px]">{formatMoney(monthlyUtil)} บาท</td>
+                        <td className="py-3.5 px-4 text-right text-blue-600 dark:text-blue-400 font-extrabold font-mono text-[13.5px] bg-blue-500/[0.01] dark:bg-blue-500/[0.03]">{formatMoney(monthlyTotal)} บาท</td>
                         <td className="py-3.5 px-4 pr-5 text-center">
                           {hasRealData ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-50/80 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-100/60 dark:border-teal-500/10 shadow-sm">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-500/[0.08] dark:bg-teal-500/[0.12] text-teal-700 dark:text-teal-400 border border-teal-500/20 shadow-sm">
                               บิลจริง
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-800 shadow-sm">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
                               คำนวณจำลอง
                             </span>
                           )}
@@ -1597,20 +1602,20 @@ export default function TaxPage() {
                     <>
                       {rows}
                       {/* แถวสรุปผลรวมสะสมที่ถูกต้องสมบูรณ์เพื่อไม่ให้เกิดเศษหรือข้อผิดพลาด */}
-                      <tr className="border-t-2 border-slate-250 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/60 font-bold text-slate-850 dark:text-slate-50">
-                        <td className="py-4.5 px-4 pl-5 text-[13px]">รวมสะสมทั้งปี</td>
-                        <td className="py-4.5 px-4 text-center text-slate-600 dark:text-slate-400 font-semibold">
+                      <tr className="border-t-2 border-slate-300 dark:border-slate-700 bg-gradient-to-r from-slate-100/90 to-slate-50/90 dark:from-slate-900 dark:to-slate-900/60 font-black text-slate-900 dark:text-slate-100 shadow-md">
+                        <td className="py-4.5 px-4 pl-5 text-[13px] font-black">รวมสะสมทั้งปี</td>
+                        <td className="py-4.5 px-4 text-center text-slate-900 dark:text-slate-200 font-bold">
                           {dataSource === "system" && hasPaidBills ? `${sumBills} บิล` : "-"}
                         </td>
-                        <td className="py-4.5 px-4 text-right text-blue-600 dark:text-blue-400 font-mono font-bold text-[13.5px]">{formatMoney(sumRent)} บาท</td>
-                        <td className="py-4.5 px-4 text-right text-teal-650 dark:text-teal-400 font-mono font-bold text-[13.5px]">{formatMoney(sumUtil)} บาท</td>
-                        <td className="py-4.5 px-4 text-right text-emerald-600 dark:text-emerald-400 font-mono font-extrabold text-[14px]">
-                          <span className="bg-emerald-50/40 dark:bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-100/30 dark:border-emerald-500/10">
+                        <td className="py-4.5 px-4 text-right text-blue-700 dark:text-blue-350 font-mono font-bold text-[14px]">{formatMoney(sumRent)} บาท</td>
+                        <td className="py-4.5 px-4 text-right text-teal-700 dark:text-teal-350 font-mono font-bold text-[14px]">{formatMoney(sumUtil)} บาท</td>
+                        <td className="py-4.5 px-4 text-right text-blue-800 dark:text-blue-300 font-mono font-black text-[14.5px]">
+                          <span className="bg-blue-500/[0.08] dark:bg-blue-500/[0.15] px-3 py-1.5 rounded-xl border border-blue-500/20 dark:border-blue-500/35 shadow-inner">
                             {formatMoney(sumTotal)} บาท
                           </span>
                         </td>
                         <td className="py-4.5 px-4 pr-5 text-center">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/40 dark:border-slate-700/60 shadow-sm">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-3 py-1 rounded-lg bg-blue-600 dark:bg-blue-500 text-white dark:text-white border border-blue-600 dark:border-blue-500 shadow-md shadow-blue-500/25">
                             ยอดรวม
                           </span>
                         </td>
