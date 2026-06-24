@@ -34,6 +34,7 @@ interface MeterReadingTableProps {
   workspaceName: string
   currentWorkspaceId: string
   userPermissions?: StaffPermissions
+  hasEditPermission?: boolean
   handleLateDaysChange?: (roomNumber: string, value: string) => void
   handleSaveLateDays?: (roomNumber: string) => Promise<void>
   latePenaltyRate?: number
@@ -73,6 +74,7 @@ export default function MeterReadingTable({
   workspaceName,
   currentWorkspaceId,
   userPermissions,
+  hasEditPermission,
   handleLateDaysChange,
   handleSaveLateDays,
   latePenaltyRate = 0,
@@ -83,6 +85,7 @@ export default function MeterReadingTable({
   onMeterReplacementsChange
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
+  const hasEdit = hasEditPermission !== undefined ? hasEditPermission : permissions.manage_meters_bills_edit
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">(
     mode === "meters" ? "electric" : "all"
   )
@@ -640,7 +643,7 @@ export default function MeterReadingTable({
               const isMeterAlreadySaved = item.tenantName
                 ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
                 : item.isMeterSaved
-              const isSaveDisabled = isMeterAlreadySaved || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
+              const isSaveDisabled = !hasEdit || isMeterAlreadySaved || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
 
               return (
                 <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
@@ -829,7 +832,7 @@ export default function MeterReadingTable({
                               type="text"
                               inputMode="numeric"
                               placeholder="0"
-                              disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                              disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                               className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                 isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                               }`}
@@ -859,7 +862,7 @@ export default function MeterReadingTable({
                               type="text"
                               inputMode="numeric"
                               placeholder="0"
-                              disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                              disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                               className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                 isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                               }`}
@@ -911,7 +914,7 @@ export default function MeterReadingTable({
                             type="text"
                             inputMode="decimal"
                             placeholder="จดเลขมิเตอร์ไฟฟ้า..."
-                            disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                            disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                             className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
                               isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
                             }`}
@@ -1065,7 +1068,7 @@ export default function MeterReadingTable({
                             type="text"
                             inputMode="decimal"
                             placeholder="จดเลขมิเตอร์น้ำประปา..."
-                            disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                            disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                             className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
                             value={item.waterCurr}
                             onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
@@ -1349,7 +1352,7 @@ export default function MeterReadingTable({
                   
                   const isElectricInvalid = hasElecCurr && elecUnitsUsed > 3000
                   const isWaterInvalid = hasWaterCurr && waterUnitsUsed > 3000
-                  const isSaveDisabled = (item.tenantName
+                  const isSaveDisabled = !hasEdit || (item.tenantName
                     ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
                     : item.isMeterSaved) || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
 
@@ -1437,7 +1440,7 @@ export default function MeterReadingTable({
                                   type="text"
                                   inputMode="numeric"
                                   placeholder="0"
-                                  disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                   className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                     isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                   }`}
@@ -1460,7 +1463,7 @@ export default function MeterReadingTable({
                                     type="text"
                                     inputMode="numeric"
                                     placeholder="0"
-                                    disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                    disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                     className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                       isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                     }`}
@@ -1676,7 +1679,7 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 placeholder="กรอกเลข"
-                                disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                 className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                 }`}
@@ -1828,7 +1831,7 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 placeholder="กรอกเลข"
-                                disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                 className={`w-24 text-center py-1.5 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                 }`}
@@ -1969,7 +1972,10 @@ export default function MeterReadingTable({
               onClick={async () => {
                 await onSaveAllWithRolloverCheck(activeTab as "electric" | "water");
               }}
-              className={`w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg transition-all cursor-pointer active:scale-[0.98] border animate-pulse hover:animate-none ${
+              disabled={!hasEdit}
+              className={`w-full md:w-auto min-w-[280px] h-14 md:h-12 bg-gradient-to-r text-white font-extrabold px-8 rounded-2xl flex items-center justify-center gap-2.5 text-sm md:text-xs shadow-lg transition-all cursor-pointer active:scale-[0.98] border disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ${
+                !hasEdit ? "" : "animate-pulse hover:animate-none"
+              } ${
                 activeTab === "electric"
                   ? "from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-600/20 hover:shadow-blue-500/30 border-blue-500/30"
                   : "from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 shadow-teal-600/20 hover:shadow-teal-500/30 border-teal-500/30"

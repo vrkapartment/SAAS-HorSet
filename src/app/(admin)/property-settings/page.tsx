@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Building, Save, ShieldCheck, Check, AlertTriangle, Loader2, Droplet, Zap, Sliders, Clock, FileText } from "lucide-react"
+import { Building, Save, ShieldCheck, Check, AlertTriangle, AlertCircle, Loader2, Droplet, Zap, Sliders, Clock, FileText } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings, cleanupExpiredSlipsAction } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRoomTypes, updateRoomTypeDeposit, migrateRoomTypeDeposits } from "@/features/room/actions"
+import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 
 function setCookie(name: string, value: string, days = 7) {
   if (typeof document === "undefined") return
@@ -70,6 +71,7 @@ export default function PropertySettingsPage() {
   const [workspaceId, setWorkspaceId] = useState<string>("")
   const [isDatabaseBacked, setIsDatabaseBacked] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [hasEditPermission, setHasEditPermission] = useState(true)
 
   // โหลดค่าเริ่มต้นจาก Database
   useEffect(() => {
@@ -81,12 +83,26 @@ export default function PropertySettingsPage() {
         let currentWsId: string | undefined = undefined
         
         if (userRes.success && userRes.data) {
-          const isSuperAdmin = userRes.data.role === "super_admin"
-          if (!isSuperAdmin && userRes.data.workspace_id) {
-            currentWsId = userRes.data.workspace_id
+          const profile = userRes.data
+          const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
+          if (isUserAdminOrSuper) {
+            setHasEditPermission(true)
+          } else {
+            let perms = profile.permissions
+            if (typeof perms === "string") {
+              try { perms = JSON.parse(perms) } catch { perms = null }
+            }
+            const defaultPerms = DEFAULT_STAFF_PERMISSIONS
+            const userPerms = { ...defaultPerms, ...perms }
+            setHasEditPermission(!!userPerms.manage_property_settings_edit)
+          }
+
+          const isSuperAdmin = profile.role === "super_admin"
+          if (!isSuperAdmin && profile.workspace_id) {
+            currentWsId = profile.workspace_id
           } else {
             const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
-            currentWsId = cookieWsId || userRes.data.workspace_id || undefined
+            currentWsId = cookieWsId || profile.workspace_id || undefined
           }
         }
 
@@ -235,6 +251,10 @@ export default function PropertySettingsPage() {
   }, [])
 
   const handleManualCleanup = async () => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     if (!workspaceId) {
       alert("ไม่สามารถดำเนินการได้เนื่องจากไม่พบรหัสหอพัก")
       return
@@ -266,6 +286,10 @@ export default function PropertySettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     setIsSubmitting(true)
     setErrorMsg(null)
 
@@ -330,10 +354,19 @@ export default function PropertySettingsPage() {
 
   return (
     <>
-      {/* Toast แจ้งเตือน */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 text-teal-400 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
-          <Check className="w-4 h-4 text-teal-400 animate-pulse" /> {toastMessage}
+        <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
+          {toastMessage.includes("ไม่มีสิทธิ์") ? (
+            <>
+              <AlertCircle className="w-4 h-4 text-rose-400 animate-pulse" />
+              <span className="text-rose-400">{toastMessage}</span>
+            </>
+          ) : (
+            <>
+              <Check className="w-4 h-4 text-teal-400 animate-pulse" />
+              <span className="text-teal-400">{toastMessage}</span>
+            </>
+          )}
         </div>
       )}
 
@@ -834,9 +867,13 @@ export default function PropertySettingsPage() {
                     {/* ปุ่มสั่งงานแบบแมนนวล */}
                     <button
                       type="button"
-                      disabled={isCleaning}
+                      disabled={isCleaning || !hasEditPermission}
                       onClick={handleManualCleanup}
-                      className="w-full text-xs font-bold text-center py-2 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white rounded-lg shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                      className={`w-full text-xs font-bold text-center py-2 text-white rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 ${
+                        !hasEditPermission
+                          ? "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50 shadow-none"
+                          : "bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 cursor-pointer"
+                      }`}
                     >
                       {isCleaning ? (
                         <>
@@ -857,8 +894,12 @@ export default function PropertySettingsPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full glow-btn bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-600/15 transition-all cursor-pointer"
+              disabled={isSubmitting || !hasEditPermission}
+              className={`w-full glow-btn text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg transition-all ${
+                !hasEditPermission 
+                  ? "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50 shadow-none" 
+                  : "bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 shadow-teal-600/15 cursor-pointer"
+              }`}
             >
               {isSubmitting ? (
                 <>

@@ -37,6 +37,7 @@ import {
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 
 // คู่มือรายจ่ายยอดนิยมและคำอธิบายประเภทภาษี
 const commonExpensesGuide = [
@@ -75,6 +76,15 @@ export default function DailyBillsPage() {
   // สิทธิ์และสถานะการช่วยเหลือสำหรับ Super Admin
   const [userRole, setUserRole] = useState<string>("admin")
   const [supportApproved, setSupportApproved] = useState<boolean>(true)
+  const [hasEditPermission, setHasEditPermission] = useState(true)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 3000)
+  }
   
   // ตัวกรองตาราง
   const [categoryFilter, setCategoryFilter] = useState<"all" | "40_5" | "40_8">("all")
@@ -158,6 +168,27 @@ export default function DailyBillsPage() {
     setUserRole(mockRole)
 
     const checkSupportStatus = async () => {
+      try {
+        const res = await getCurrentUserProfileClient()
+        if (res.success && res.data) {
+          const profile = res.data
+          const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
+          if (isUserAdminOrSuper) {
+            setHasEditPermission(true)
+          } else {
+            let perms = profile.permissions
+            if (typeof perms === "string") {
+              try { perms = JSON.parse(perms) } catch { perms = null }
+            }
+            const defaultPerms = DEFAULT_STAFF_PERMISSIONS
+            const userPerms = { ...defaultPerms, ...perms }
+            setHasEditPermission(!!userPerms.manage_finance_expenses_edit)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check permissions in daily-bills page", err)
+      }
+
       if (mockRole === "super_admin") {
         const activeWsId = getCookie("horset_current_workspace_id")
         if (!activeWsId) {
@@ -233,6 +264,10 @@ export default function DailyBillsPage() {
 
   // จัดการฟอร์มบันทึกบิล
   const handleOpenAddModal = () => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     setEditingExpense(null)
     setFormTitle("")
     setFormAmount("")
@@ -242,6 +277,10 @@ export default function DailyBillsPage() {
   }
 
   const handleOpenEditModal = (item: ExpenseItem) => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     setEditingExpense(item)
     setFormTitle(item.title)
     setFormAmount(item.amount)
@@ -252,6 +291,10 @@ export default function DailyBillsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     if (!formTitle.trim()) {
       setFormError("กรุณากรอกรายละเอียดของบิลค่าใช้จ่าย")
       return
@@ -307,11 +350,19 @@ export default function DailyBillsPage() {
 
   // เรียกใช้ Trigger เพื่อแสดง Custom Delete Modal แทน confirm ดั้งเดิม
   const handleDeleteTrigger = (item: ExpenseItem) => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     setDeleteTarget(item)
     setDeleteConfirmOpen(true)
   }
 
   const handleConfirmDelete = async () => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     if (!deleteTarget) return
     setDeleting(true)
     try {
@@ -423,6 +474,12 @@ export default function DailyBillsPage() {
 
   return (
     <>
+      {/* Toast แจ้งเตือน */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 text-teal-400 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
+          <AlertCircle className="w-4 h-4 text-teal-400" /> {toastMessage}
+        </div>
+      )}
       {/* Header section with responsive layout and action toggles */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -451,7 +508,9 @@ export default function DailyBillsPage() {
 
           <button
             onClick={handleOpenAddModal}
-            className="hidden md:flex px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-bold items-center gap-2 shadow-lg shadow-teal-500/10 active:scale-95 transition-all duration-150 h-9 cursor-pointer"
+            className={`hidden md:flex px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-bold items-center gap-2 shadow-lg shadow-teal-500/10 active:scale-95 transition-all duration-150 h-9 ${
+              !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "cursor-pointer"
+            }`}
           >
             <Plus className="w-4 h-4" /> บันทึกบิลรายวันใหม่
           </button>
@@ -840,7 +899,9 @@ export default function DailyBillsPage() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 p-3.5 flex items-center justify-between gap-3.5 z-40 pb-safe shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
         <button
           onClick={handleOpenAddModal}
-          className="flex-1 h-12 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 active:scale-95 text-white font-extrabold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-500/20 transition-all duration-200 cursor-pointer"
+          className={`flex-1 h-12 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 active:scale-95 text-white font-extrabold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-500/20 transition-all duration-200 ${
+            !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "cursor-pointer"
+          }`}
         >
           <Plus className="w-5 h-5" /> บันทึกบิลรายวันใหม่
         </button>

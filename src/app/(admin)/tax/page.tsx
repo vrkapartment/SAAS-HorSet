@@ -27,7 +27,8 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from "lucide-react"
 import { 
   getExpenses, 
@@ -42,6 +43,7 @@ import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getBills } from "@/features/billing/actions"
 import { getTenants, getCancelledContracts, migrateLocalStorageCancelledContracts } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 
 interface BillItem {
   id: string
@@ -74,6 +76,15 @@ function formatMoney(val: number | string): string {
 export default function TaxPage() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [taxYear, setTaxYear] = useState("2026")
+  const [hasEditPermission, setHasEditPermission] = useState(true)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 3000)
+  }
 
   // สำหรับเงินประกันและค่าเช่าล่วงหน้า
   const [workspaceId, setWorkspaceId] = useState("")
@@ -139,15 +150,29 @@ export default function TaxPage() {
         let currentWsId: string | undefined = undefined
         
         if (userRes.success && userRes.data) {
-          const isSuperAdmin = userRes.data.role === "super_admin"
+          const profile = userRes.data
+          const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
+          if (isUserAdminOrSuper) {
+            setHasEditPermission(true)
+          } else {
+            let perms = profile.permissions
+            if (typeof perms === "string") {
+              try { perms = JSON.parse(perms) } catch { perms = null }
+            }
+            const defaultPerms = DEFAULT_STAFF_PERMISSIONS
+            const userPerms = { ...defaultPerms, ...perms }
+            setHasEditPermission(!!userPerms.access_tax_edit)
+          }
+
+          const isSuperAdmin = profile.role === "super_admin"
           
-          if (!isSuperAdmin && userRes.data.workspace_id) {
+          if (!isSuperAdmin && profile.workspace_id) {
             // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
-            currentWsId = userRes.data.workspace_id
+            currentWsId = profile.workspace_id
           } else {
             // สำหรับ Super Admin: ดึงจาก Cookie เพื่อรองรับการสลับ Workspace คอนโซลด้านบน
             const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
-            currentWsId = cookieWsId || userRes.data.workspace_id || undefined
+            currentWsId = cookieWsId || profile.workspace_id || undefined
           }
         }
 
@@ -402,6 +427,10 @@ export default function TaxPage() {
 
   // จัดการฟอร์มบันทึกค่าใช้จ่าย
   const handleOpenAddExpense = () => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     setEditingExpense(null)
     setExpenseTitle("")
     setExpenseAmount("")
@@ -411,6 +440,10 @@ export default function TaxPage() {
   }
 
   const handleOpenEditExpense = (expense: ExpenseItem) => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     setEditingExpense(expense)
     setExpenseTitle(expense.title)
     setExpenseAmount(expense.amount)
@@ -421,6 +454,10 @@ export default function TaxPage() {
 
   const handleSubmitExpense = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     if (!expenseTitle.trim()) {
       setExpenseError("กรุณากรอกชื่อรายการค่าใช้จ่าย")
       return
@@ -477,6 +514,10 @@ export default function TaxPage() {
   }
 
   const handleDeleteExpense = async (id: string, title: string) => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรายการ "${title}"?`)) return
 
     setLoadingExpenses(true)
@@ -712,6 +753,10 @@ export default function TaxPage() {
   }
 
   const handleDownloadPdf = async (type: "90" | "94") => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     setLoadingPdf(type)
     try {
       const { generatePndPdf } = await import("@/lib/pdfHelper")
@@ -761,6 +806,13 @@ export default function TaxPage() {
 
   return (
     <div className="space-y-6 md:space-y-8 pb-12">
+      {/* Toast แจ้งเตือน */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 text-teal-400 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
+          <AlertCircle className="w-4 h-4 text-teal-400" /> {toastMessage}
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-1">
         <div className="flex items-center gap-4">
@@ -1363,7 +1415,9 @@ export default function TaxPage() {
             
             <button
               onClick={handleOpenAddExpense}
-              className="glow-btn bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-semibold py-2.5 px-5 rounded-2xl flex items-center gap-2 text-xs shadow-lg shadow-teal-600/10 hover:shadow-teal-600/25 transition-all cursor-pointer"
+              className={`glow-btn bg-teal-600 text-white font-semibold py-2.5 px-5 rounded-2xl flex items-center gap-2 text-xs shadow-lg shadow-teal-600/10 transition-all ${
+                !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 active:scale-95 hover:shadow-teal-600/25 cursor-pointer"
+              }`}
             >
               <Plus className="w-4 h-4" /> บันทึกค่าใช้จ่ายใหม่
             </button>
@@ -1417,14 +1471,18 @@ export default function TaxPage() {
                             <div className="flex items-center justify-center gap-1">
                               <button
                                 onClick={() => handleOpenEditExpense(exp)}
-                                className="p-2 rounded-xl text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 cursor-pointer"
+                                className={`p-2 rounded-xl text-slate-400 dark:text-slate-500 transition-all duration-200 ${
+                                  !hasEditPermission ? "opacity-50 cursor-not-allowed" : "hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
+                                }`}
                                 title="แก้ไข"
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteExpense(exp.id, exp.title)}
-                                className="p-2 rounded-xl text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 cursor-pointer"
+                                className={`p-2 rounded-xl text-slate-400 dark:text-slate-500 transition-all duration-200 ${
+                                  !hasEditPermission ? "opacity-50 cursor-not-allowed" : "hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+                                }`}
                                 title="ลบ"
                               >
                                 <Trash2 className="w-4 h-4 text-red-500/80 group-hover:text-red-500" />
@@ -1463,7 +1521,9 @@ export default function TaxPage() {
               <p className="text-[10px] text-slate-400 max-w-sm mx-auto">เริ่มบันทึกค่าใช้จ่ายเกี่ยวกับการดูแลและดำเนินการหอพัก เช่น ค่าซ่อมแซม ค่าน้ำไฟส่วนกลาง เพื่อใช้อ้างอิงการยื่นลดหย่อนแบบตามจริง</p>
               <button
                 onClick={handleOpenAddExpense}
-                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 underline underline-offset-4 cursor-pointer pt-1 transition-all"
+                className={`inline-flex items-center gap-1.5 text-[11px] font-bold underline underline-offset-4 transition-all ${
+                  !hasEditPermission ? "opacity-50 cursor-not-allowed" : "text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 cursor-pointer"
+                }`}
               >
                 + เริ่มต้นบันทึกรายการแรก
               </button>
@@ -1728,7 +1788,9 @@ export default function TaxPage() {
           <button
             onClick={() => handleDownloadPdf("94")}
             disabled={loadingPdf !== null}
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-600/10 transition-colors"
+            className={`w-full py-2.5 bg-blue-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-600/10 transition-colors ${
+              !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-blue-500 cursor-pointer"
+            }`}
           >
             {loadingPdf === "94" ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1761,7 +1823,9 @@ export default function TaxPage() {
           <button
             onClick={() => handleDownloadPdf("90")}
             disabled={loadingPdf !== null}
-            className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-teal-600/10 transition-colors"
+            className={`w-full py-2.5 bg-teal-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-teal-600/10 transition-colors ${
+              !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 cursor-pointer"
+            }`}
           >
             {loadingPdf === "90" ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

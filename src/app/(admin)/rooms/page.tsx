@@ -52,6 +52,8 @@ import {
 } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
+import { getCurrentUserProfileClient } from "@/features/auth/client"
+import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -92,6 +94,33 @@ export default function RoomsPage() {
   const [cancelledContracts, setCancelledContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasEditPermission, setHasEditPermission] = useState(true)
+  
+  useEffect(() => {
+    async function checkPermissions() {
+      try {
+        const res = await getCurrentUserProfileClient()
+        if (res.success && res.data) {
+          const profile = res.data
+          const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
+          if (isUserAdminOrSuper) {
+            setHasEditPermission(true)
+          } else {
+            let perms = profile.permissions
+            if (typeof perms === "string") {
+              try { perms = JSON.parse(perms) } catch { perms = null }
+            }
+            const defaultPerms = DEFAULT_STAFF_PERMISSIONS
+            const userPerms = { ...defaultPerms, ...perms }
+            setHasEditPermission(!!userPerms.manage_rooms_tenants_edit)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check permissions in rooms page", err)
+      }
+    }
+    checkPermissions()
+  }, [])
   
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"all" | "available" | "waiting" | "occupied">("all")
@@ -354,6 +383,10 @@ export default function RoomsPage() {
 
   // การดำเนินการลบจริงหลังกดยืนยันใน Custom Modal
   const handleConfirmDelete = async () => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
     if (!deleteTarget) return
     setLoading(true)
     setDeleteConfirmOpen(false)
@@ -402,6 +435,10 @@ export default function RoomsPage() {
   // การส่งแบบฟอร์มบันทึกห้องพัก (เพิ่ม / แก้ไข)
   const handleSubmitRoomForm = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
     if (!newRoomNumber) return
     setFormSubmitting(true)
 
@@ -439,6 +476,10 @@ export default function RoomsPage() {
   // จัดการประเภทห้องพัก (เพิ่ม / แก้ไข)
   const handleSubmitTypeForm = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
     if (!newTypeName) return
     setTypeSubmitting(true)
 
@@ -528,6 +569,10 @@ export default function RoomsPage() {
   // ส่งแบบฟอร์มทำสัญญา
   const handleSubmitContract = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
     if (!selectedRoom || !tenantNameInput || !tenantPhoneInput) return
     setContractSubmitting(true)
 
@@ -624,6 +669,10 @@ export default function RoomsPage() {
 
   // บันทึกการแก้ไขข้อมูลผู้เช่า
   const handleSaveTenantEdits = async () => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
     if (!selectedRoom || !selectedRoom.tenantId) return
     if (!editTenantName.trim()) {
       showToast("กรุณากรอกชื่อผู้เช่า", "error")
@@ -716,6 +765,10 @@ export default function RoomsPage() {
   // ดำเนินการย้ายออกผู้เช่า บันทึกเงินประกันริบเข้าตารางยกเลิกสัญญา และลบผู้เช่า
   const handleConfirmCheckout = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasEditPermission) {
+      setCheckoutError("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     if (!selectedRoom || !selectedRoom.tenantId) return
     
     if (!checkoutDate) {
@@ -776,6 +829,10 @@ export default function RoomsPage() {
 
   // ลบประวัติการยกเลิกสัญญา มาตรา 40(8)
   const handleDeleteCancellation = async (id: string) => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
     if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการยกเลิกสัญญานี้? สำหรับยอดภาษีจะคำนวณใหม่โดยอัตโนมัติ")) return
     const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
     const res = await deleteCancelledContract(id)
@@ -1081,17 +1138,24 @@ export default function RoomsPage() {
               className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
             >
               <Settings className="w-4 h-4 text-indigo-500 animate-spin-hover" />
-              ตั้งค่าประเภทห้องพัก
+              {hasEditPermission ? "ตั้งค่าประเภทห้องพัก" : "ดูประเภทห้องพัก"}
             </button>
 
             {/* Add Room Button (desktop only) */}
-            <button
-              onClick={handleAddClick}
-              className="hidden md:flex px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs items-center gap-2 transition-all shadow shadow-blue-500/10 active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              เพิ่มห้องพักใหม่
-            </button>
+            {!hasEditPermission ? (
+              <span className="px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center gap-1.5 shadow-sm">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
+                โหมดดูข้อมูลอย่างเดียว
+              </span>
+            ) : (
+              <button
+                onClick={handleAddClick}
+                className="hidden md:flex px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs items-center gap-2 transition-all shadow shadow-blue-500/10 active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                เพิ่มห้องพักใหม่
+              </button>
+            )}
           </div>
         </div>
 
@@ -1279,22 +1343,24 @@ export default function RoomsPage() {
                                       </div>
                                       
                                       {/* Edit / Delete Buttons (Top-right corner, visible on card hover) */}
-                                      <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200/30 dark:border-slate-800/30 opacity-60 group-hover/card:opacity-100 transition-opacity">
-                                        <button
-                                          onClick={() => handleEditClick(room)}
-                                          className="p-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
-                                          title="แก้ไขข้อมูลห้องพัก"
-                                        >
-                                          <Edit className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
-                                          className="p-1 text-red-500 hover:text-red-400 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
-                                          title="ลบห้องพัก"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
+                                      {hasEditPermission && (
+                                        <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200/30 dark:border-slate-800/30 opacity-60 group-hover/card:opacity-100 transition-opacity">
+                                          <button
+                                            onClick={() => handleEditClick(room)}
+                                            className="p-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                                            title="แก้ไขข้อมูลห้องพัก"
+                                          >
+                                            <Edit className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
+                                            className="p-1 text-red-500 hover:text-red-400 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                                            title="ลบห้องพัก"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
 
                                     {/* Room Type & Base Rent */}
@@ -1547,20 +1613,26 @@ export default function RoomsPage() {
                                 {/* 5. Edit/Delete room */}
                                 <td className="p-4 text-center border-l border-slate-100 dark:border-slate-900/50">
                                   <div className="flex items-center justify-center gap-1.5">
-                                    <button 
-                                      onClick={() => handleEditClick(room)}
-                                      className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
-                                      title="แก้ไขข้อมูลห้องพัก"
-                                    >
-                                      <Edit className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
-                                      className="p-1.5 text-red-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
-                                      title="ลบห้องพัก"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                    {hasEditPermission ? (
+                                      <>
+                                        <button 
+                                          onClick={() => handleEditClick(room)}
+                                          className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
+                                          title="แก้ไขข้อมูลห้องพัก"
+                                        >
+                                          <Edit className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
+                                          className="p-1.5 text-red-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
+                                          title="ลบห้องพัก"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">ไม่มีสิทธิ์</span>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -1831,19 +1903,27 @@ export default function RoomsPage() {
 
         {/* MOBILE STICKY BOTTOM ACTION BAR (Strictly Adaptive, handles notches with pb-safe) */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 p-3.5 flex items-center justify-between gap-3.5 z-40 pb-safe shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
-          <button
-            onClick={() => setTypesModalOpen(true)}
-            className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 active:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 dark:active:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm transition-all duration-200 active:scale-95 cursor-pointer"
-          >
-            <Settings className="w-5 h-5 text-indigo-500" /> ตั้งค่าประเภท
-          </button>
-          
-          <button
-            onClick={handleAddClick}
-            className="flex-[2] h-12 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-500/20 transition-all duration-200 active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-5 h-5" /> เพิ่มห้องพักใหม่
-          </button>
+          {!hasEditPermission ? (
+            <div className="flex-1 h-12 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-sm">
+              <AlertCircle className="w-5 h-5 text-amber-500" /> โหมดดูข้อมูลอย่างเดียว
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setTypesModalOpen(true)}
+                className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 active:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 dark:active:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm transition-all duration-200 active:scale-95 cursor-pointer"
+              >
+                <Settings className="w-5 h-5 text-indigo-500" /> ตั้งค่าประเภท
+              </button>
+              
+              <button
+                onClick={handleAddClick}
+                className="flex-[2] h-12 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-500/20 transition-all duration-200 active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-5 h-5" /> เพิ่มห้องพักใหม่
+              </button>
+            </>
+          )}
         </div>
 
         {/* ========================================================= */}

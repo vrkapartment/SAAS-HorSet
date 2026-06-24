@@ -24,7 +24,17 @@ import {
   Calendar,
   Building,
   KeyRound,
-  FileCode
+  FileCode,
+  LayoutDashboard,
+  Home,
+  Scroll,
+  Receipt,
+  Coins,
+  FileText,
+  Landmark,
+  Send,
+  Download,
+  Settings
 } from "lucide-react"
 import { 
   getWorkspaceStaffAction, 
@@ -236,12 +246,329 @@ WHERE role IN ('admin', 'super_admin');`;
     setTimeout(() => setSqlCopied(false), 3000)
   }
 
-  const handlePermissionToggle = (type: "add" | "edit", field: keyof StaffPermissions) => {
-    if (type === "add") {
-      setAddPermissions(prev => ({ ...prev, [field]: !prev[field] }))
-    } else {
-      setEditPermissions(prev => ({ ...prev, [field]: !prev[field] }))
-    }
+  const handlePermissionChange = (type: "add" | "edit", field: keyof StaffPermissions, value?: boolean) => {
+    const setPerms = type === "add" ? setAddPermissions : setEditPermissions
+    setPerms(prev => {
+      const targetValue = value !== undefined ? value : !prev[field]
+      const next = { ...prev, [field]: targetValue }
+      
+      // If view permission is turned off, also turn off edit permission
+      if (field === "manage_rooms_tenants" && !targetValue) next.manage_rooms_tenants_edit = false
+      if (field === "manage_meters_bills" && !targetValue) next.manage_meters_bills_edit = false
+      if (field === "manage_bills" && !targetValue) next.manage_bills_edit = false
+      if (field === "manage_finance_expenses" && !targetValue) next.manage_finance_expenses_edit = false
+      if (field === "access_tax" && !targetValue) next.access_tax_edit = false
+      if (field === "manage_finance_settings" && !targetValue) next.manage_finance_settings_edit = false
+      if (field === "manage_property_settings" && !targetValue) next.manage_property_settings_edit = false
+      if (field === "manage_staff_permissions" && !targetValue) next.manage_staff_permissions_edit = false
+      
+      // If edit permission is turned on, make sure view permission is also turned on
+      if (field === "manage_rooms_tenants_edit" && targetValue) next.manage_rooms_tenants = true
+      if (field === "manage_meters_bills_edit" && targetValue) next.manage_meters_bills = true
+      if (field === "manage_bills_edit" && targetValue) next.manage_bills = true
+      if (field === "manage_finance_expenses_edit" && targetValue) next.manage_finance_expenses = true
+      if (field === "access_tax_edit" && targetValue) next.access_tax = true
+      if (field === "manage_finance_settings_edit" && targetValue) next.manage_finance_settings = true
+      if (field === "manage_property_settings_edit" && targetValue) next.manage_property_settings = true
+      if (field === "manage_staff_permissions_edit" && targetValue) next.manage_staff_permissions = true
+
+      return next
+    })
+  }
+
+  const renderPermissionsSettings = (type: "add" | "edit") => {
+    const permissions = type === "add" ? addPermissions : editPermissions
+
+    // List of modules that support separate View vs Edit permissions
+    const modules = [
+      {
+        key: "manage_rooms_tenants",
+        editKey: "manage_rooms_tenants_edit",
+        name: "จัดการห้องพัก และข้อมูลผู้เช่า",
+        description: "เข้าดูรายชื่อห้องพัก รายละเอียด และประวัติข้อมูลผู้เช่าทั้งหมด",
+        editDescription: "เพิ่ม แก้ไขข้อมูลห้อง ทำสัญญาเช่า หรือทำรายการย้ายออก",
+        icon: Home,
+      },
+      {
+        key: "manage_meters_bills",
+        editKey: "manage_meters_bills_edit",
+        name: "จดเลขมิเตอร์ & สรุปบิลค่าเช่า",
+        description: "เข้าดูมิเตอร์น้ำ/ไฟ และดูรายงานคำนวณสรุปค่าใช้จ่ายประจำเดือน",
+        editDescription: "กรอกเลขอัตรามิเตอร์ และสร้างสรุปบิลเก็บเงินผู้เช่า",
+        icon: Scroll,
+      },
+      {
+        key: "manage_bills",
+        editKey: "manage_bills_edit",
+        name: "จัดการใบแจ้งหนี้",
+        description: "เข้าดูใบแจ้งหนี้ค่าเช่า ตรวจสอบสถานะการจ่ายเงินของผู้เช่า",
+        editDescription: "ยืนยันยอดโอน แก้ไข หรือยกเลิกใบแจ้งหนี้ค่าเช่า",
+        icon: Receipt,
+      },
+      {
+        key: "manage_finance_expenses",
+        editKey: "manage_finance_expenses_edit",
+        name: "จัดการบิล รายจ่ายรายวัน",
+        description: "เข้าดูประวัติบันทึกค่าใช้จ่าย และบิลเงินออกประจำหอพัก",
+        editDescription: "บันทึกเพิ่มรายการรายจ่ายรายวัน หรือแก้ไขบิลรายจ่าย",
+        icon: Coins,
+      },
+      {
+        key: "access_tax",
+        editKey: "access_tax_edit",
+        name: "จัดการภาษี ภ.ง.ด.",
+        description: "เข้าดูรายงานสรุปรายได้สะสมเพื่อวัตถุประสงค์ในการคำนวณภาษี",
+        editDescription: "เพิ่ม/แก้ไข และบันทึกข้อมูลยื่นแบบรายการภาษีเงินได้",
+        icon: FileText,
+      },
+      {
+        key: "manage_finance_settings",
+        editKey: "manage_finance_settings_edit",
+        name: "ตั้งค่าระบบการเงิน",
+        description: "เข้าดูการตั้งค่าบัญชีธนาคาร และวิธีการชำระเงินของหอพัก",
+        editDescription: "แก้ไข เพิ่ม หรือลบการตั้งค่าบัญชีรับโอนเงิน/พร้อมเพย์",
+        icon: Landmark,
+      },
+      {
+        key: "manage_property_settings",
+        editKey: "manage_property_settings_edit",
+        name: "ตั้งค่าข้อมูลหอพัก",
+        description: "เข้าดูอัตราราคาน้ำ/ไฟ ค่าบริการรายเดือน และข้อมูลหอพัก",
+        editDescription: "ปรับเปลี่ยนเรตราคาน้ำไฟ แก้ไขค่าบริการ และรายละเอียดตึก",
+        icon: Building,
+      },
+      {
+        key: "manage_staff_permissions",
+        editKey: "manage_staff_permissions_edit",
+        name: "จัดการสิทธิ์พนักงาน (Staff)",
+        description: "เข้าดูรายชื่อพนักงาน ข้อมูลติดต่อ และระดับสิทธิ์ของพนักงาน",
+        editDescription: "เพิ่มลบพนักงาน หรือปรับสิทธิ์การทำงานของทีมงานในหอพัก",
+        icon: Shield,
+      },
+    ] as const
+
+    return (
+      <div className="space-y-4">
+        {/* Section 1: Main Pages/Modules with View/Edit toggles */}
+        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-3.5">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-850">
+            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+              <Settings className="w-4 h-4 text-blue-500" />
+              <span>สิทธิ์การเข้าใช้งานรายหน้าต่าง ๆ</span>
+            </span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">
+              * ต้องให้สิทธิ์ "เข้าดูหน้า" ก่อน จึงจะปรับสิทธิ์แก้ไขได้
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {/* Dashboard Stats Row (View Only) */}
+            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/20 shrink-0 mt-0.5">
+                  <LayoutDashboard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">ดูแดชบอร์ดสถิติภาพรวม</h4>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                    เข้าดูหน้าแดชบอร์ด รายได้ค้างจ่าย และสถิติสถานะผู้เช่า (จำกัดดูอย่างเดียวเท่านั้น)
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 self-end sm:self-auto shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เปิดเข้าดู</span>
+                  <button
+                    type="button"
+                    onClick={() => handlePermissionChange(type, "view_dashboard_stats")}
+                    className={`w-12 h-6 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none ${
+                      permissions.view_dashboard_stats ? "bg-emerald-500" : "bg-slate-250 dark:bg-slate-800"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                      permissions.view_dashboard_stats ? "translate-x-6" : "translate-x-0"
+                    }`} />
+                  </button>
+                </div>
+                <div className="w-24 text-center">
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-md font-bold bg-slate-100 dark:bg-slate-950 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-900">
+                    ดูได้อย่างเดียว
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modular Pages */}
+            {modules.map((m) => {
+              const hasView = !!permissions[m.key]
+              const hasEdit = !!permissions[m.editKey]
+
+              return (
+                <div 
+                  key={m.key} 
+                  className={`p-3 border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:shadow-sm ${
+                    hasView 
+                      ? "bg-white dark:bg-slate-900 border-blue-500/20 shadow-sm shadow-blue-500/[0.02]" 
+                      : "bg-white/60 dark:bg-slate-900/60 border-slate-200 dark:border-slate-850/80 opacity-75"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 mt-0.5 transition-colors ${
+                      hasView 
+                        ? "bg-blue-500/10 text-blue-500 border-blue-500/20" 
+                        : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-950 dark:border-slate-900"
+                    }`}>
+                      <m.icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 flex flex-wrap items-center gap-1.5">
+                        <span>{m.name}</span>
+                        {hasView && (
+                          <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
+                            hasEdit 
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+                              : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                          }`}>
+                            {hasEdit ? "แก้ไขได้" : "ดูอย่างเดียว"}
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                        {hasEdit ? m.editDescription : m.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dual Action Toggles */}
+                  <div className="flex items-center gap-5 self-end sm:self-auto shrink-0">
+                    {/* View Toggle */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เข้าหน้าเว็บ</span>
+                      <button
+                        type="button"
+                        onClick={() => handlePermissionChange(type, m.key)}
+                        className={`w-12 h-6 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none ${
+                          hasView ? "bg-blue-600" : "bg-slate-250 dark:bg-slate-800"
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                          hasView ? "translate-x-6" : "translate-x-0"
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* Edit Selector (View Only vs Edit/Write) */}
+                    <div className="flex items-center gap-2 w-28">
+                      <span className={`text-[10px] font-bold ${
+                        hasView ? "text-slate-400 dark:text-slate-500" : "text-slate-300 dark:text-slate-700"
+                      }`}>
+                        การทำงาน
+                      </span>
+                      <button
+                        type="button"
+                        disabled={!hasView}
+                        onClick={() => handlePermissionChange(type, m.editKey)}
+                        className={`px-2 py-0.5 text-[9px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                          !hasView 
+                            ? "bg-slate-50 text-slate-300 dark:bg-slate-950 dark:text-slate-750 border-slate-150 dark:border-slate-900 cursor-not-allowed"
+                            : hasEdit
+                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/15 dark:text-emerald-400"
+                              : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-850 hover:bg-slate-200"
+                        }`}
+                      >
+                        {!hasView ? "ไม่มีสิทธิ์เข้าถึง" : hasEdit ? "เขียน/แก้ไขได้" : "ดูได้อย่างเดียว"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Section 2: Special Actions (Send Line, PDF download, Copy summary) */}
+        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-3.5">
+          <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5 border-b border-slate-200 dark:border-slate-850 pb-2">
+            <ShieldAlert className="w-4 h-4 text-indigo-500" />
+            <span>สิทธิ์การทำรายการพิเศษ</span>
+          </span>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* billing_send_line */}
+            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-500 flex items-center justify-center shrink-0">
+                  <Send className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate">ส่งบิล Line OA</h5>
+                  <p className="text-[8.5px] text-slate-400 dark:text-slate-500 truncate">ส่งบิลให้ผู้เช่าทางแชทไลน์</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handlePermissionChange(type, "billing_send_line")}
+                className={`w-10 h-5.5 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
+                  permissions.billing_send_line ? "bg-teal-500" : "bg-slate-250 dark:bg-slate-800"
+                }`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                  permissions.billing_send_line ? "translate-x-4.5" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+
+            {/* billing_download_pdf */}
+            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate">ดาวน์โหลด PDF</h5>
+                  <p className="text-[8.5px] text-slate-400 dark:text-slate-500 truncate">เซฟไฟล์ใบแจ้งหนี้เป็น PDF</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handlePermissionChange(type, "billing_download_pdf")}
+                className={`w-10 h-5.5 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
+                  permissions.billing_download_pdf ? "bg-indigo-500" : "bg-slate-250 dark:bg-slate-800"
+                }`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                  permissions.billing_download_pdf ? "translate-x-4.5" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+
+            {/* billing_copy_summary */}
+            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                  <Copy className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate">คัดลอกข้อความสรุป</h5>
+                  <p className="text-[8.5px] text-slate-400 dark:text-slate-500 truncate">ก๊อปปี้สรุปบิลไปส่งในแชทอื่น</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handlePermissionChange(type, "billing_copy_summary")}
+                className={`w-10 h-5.5 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
+                  permissions.billing_copy_summary ? "bg-amber-500" : "bg-slate-250 dark:bg-slate-800"
+                }`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                  permissions.billing_copy_summary ? "translate-x-4.5" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -366,18 +693,18 @@ WHERE role IN ('admin', 'super_admin');`;
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
                       const items = [
-                        { key: "view_dashboard_stats", label: "ดูสถิติภาพรวม" },
-                        { key: "manage_rooms_tenants", label: "จัดการห้องพัก & ข้อมูลผู้เช่า" },
-                        { key: "manage_meters_bills", label: "จดมิเตอร์ & สรุปบิล" },
-                        { key: "manage_bills", label: "จัดการใบแจ้งหนี้" },
-                        { key: "manage_finance_expenses", label: "จัดการการเงิน & รายจ่าย" },
-                        { key: "access_tax", label: "จัดการข้อมูลภาษี" },
-                        { key: "manage_finance_settings", label: "ตั้งค่าระบบบัญชี/การเงิน" },
-                        { key: "manage_property_settings", label: "ตั้งค่าหอพัก" },
-                        { key: "manage_staff_permissions", label: "จัดการสิทธิ์พนักงาน" },
-                        { key: "billing_send_line", label: "ส่ง Line OA" },
-                        { key: "billing_download_pdf", label: "ดาวน์โหลด PDF" },
-                        { key: "billing_copy_summary", label: "คัดลอกสรุปบิล" }
+                        { key: "view_dashboard_stats", editKey: null, label: "ดูสถิติภาพรวม" },
+                        { key: "manage_rooms_tenants", editKey: "manage_rooms_tenants_edit", label: "จัดการห้องพัก & ผู้เช่า" },
+                        { key: "manage_meters_bills", editKey: "manage_meters_bills_edit", label: "จดมิเตอร์ & สรุปบิล" },
+                        { key: "manage_bills", editKey: "manage_bills_edit", label: "จัดการใบแจ้งหนี้" },
+                        { key: "manage_finance_expenses", editKey: "manage_finance_expenses_edit", label: "จัดการรายจ่าย" },
+                        { key: "access_tax", editKey: "access_tax_edit", label: "จัดการภาษี ภ.ง.ด." },
+                        { key: "manage_finance_settings", editKey: "manage_finance_settings_edit", label: "ตั้งค่าบัญชี/การเงิน" },
+                        { key: "manage_property_settings", editKey: "manage_property_settings_edit", label: "ตั้งค่าหอพัก" },
+                        { key: "manage_staff_permissions", editKey: "manage_staff_permissions_edit", label: "จัดการสิทธิ์พนักงาน" },
+                        { key: "billing_send_line", editKey: null, label: "ส่ง Line OA" },
+                        { key: "billing_download_pdf", editKey: null, label: "ดาวน์โหลด PDF" },
+                        { key: "billing_copy_summary", editKey: null, label: "คัดลอกสรุปบิล" }
                       ] as const;
 
                       const sortedItems = [...items].sort((a, b) => {
@@ -390,17 +717,26 @@ WHERE role IN ('admin', 'super_admin');`;
 
                       return sortedItems.map(item => {
                         const hasPermission = !!staff.permissions[item.key];
+                        const hasEdit = item.editKey ? !!staff.permissions[item.editKey] : false;
+                        
+                        let displayLabel = item.label;
+                        if (hasPermission && item.editKey) {
+                          displayLabel += hasEdit ? " (แก้ไขได้)" : " (ดูอย่างเดียว)";
+                        }
+
                         return (
                           <span
                             key={item.key}
                             className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
                               hasPermission
-                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                                ? hasEdit
+                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                                  : "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400"
                                 : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
                             }`}
                           >
                             <Check className={`w-3 h-3 ${hasPermission ? "opacity-100" : "opacity-20"}`} />
-                            <span>{item.label}</span>
+                            <span>{displayLabel}</span>
                           </span>
                         );
                       });
@@ -472,7 +808,7 @@ WHERE role IN ('admin', 'super_admin');`;
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
           <form 
             onSubmit={handleAddStaffSubmit}
-            className="w-full max-w-lg p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh] overflow-y-auto"
           >
             <button
               type="button"
@@ -557,212 +893,7 @@ WHERE role IN ('admin', 'super_admin');`;
             {/* Permissions Toggles */}
             <div className="pt-3 border-t border-slate-200 dark:border-slate-850 space-y-3">
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">กำหนดสิทธิ์ทีมงาน:</span>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* view_dashboard_stats */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "view_dashboard_stats")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.view_dashboard_stats
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ดูแดชบอร์ดสถิติภาพรวม</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูสถิติรายรับ-รายจ่าย ข้อมูลสรุปในหน้าแรก</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.view_dashboard_stats ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_rooms_tenants */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "manage_rooms_tenants")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.manage_rooms_tenants
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการห้องพัก & ข้อมูลผู้เช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก ทำสัญญา และเข้าดูหน้าข้อมูลผู้เช่าปัจจุบัน/ประวัติผู้เช่าเก่า (/rooms, /tenants)</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_rooms_tenants ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_meters_bills */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "manage_meters_bills")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.manage_meters_bills
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และสรุปยอดบิล</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_meters_bills ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_bills */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "manage_bills")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.manage_bills
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการใบแจ้งหนี้</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการใบแจ้งหนี้ค่าเช่าทั้งหมด</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_bills ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_finance_expenses */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "manage_finance_expenses")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.manage_finance_expenses
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการการเงิน & รายจ่าย</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">บันทึกบิลรายจ่ายรายวัน ตรวจสอบสลิปโอน</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_finance_expenses ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* access_tax */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "access_tax")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.access_tax
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการข้อมูลภาษีหอพัก</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูและพิมพ์รายงานภาษีหอพัก ภ.ง.ด. 90/94</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.access_tax ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_finance_settings */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "manage_finance_settings")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.manage_finance_settings
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ตั้งค่าระบบบัญชีและการเงิน</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร และตั้งค่าวิธีรับเงินสำหรับการออกบิล</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_finance_settings ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_property_settings */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "manage_property_settings")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.manage_property_settings
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ตั้งค่าข้อมูลหอพัก</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดอัตราส่วนกลาง ค่าปรับจ่ายล่าช้า อัตราค่าน้ำค่าไฟ และเงินประกัน</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_property_settings ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_staff_permissions */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "manage_staff_permissions")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.manage_staff_permissions
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการสิทธิ์พนักงาน (Staff)</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/ลบพนักงาน และกำหนดสิทธิ์การใช้งานระบบ</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.manage_staff_permissions ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* billing_send_line */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "billing_send_line")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.billing_send_line
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ส่ง Line OA</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ส่งใบแจ้งหนี้ผ่านทาง Line OA ประจำห้องพัก</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.billing_send_line ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* billing_download_pdf */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "billing_download_pdf")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.billing_download_pdf
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ดาวน์โหลด PDF</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดาวน์โหลดเอกสารบิล/ใบเสร็จเป็น PDF</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.billing_download_pdf ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* billing_copy_summary */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("add", "billing_copy_summary")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    addPermissions.billing_copy_summary
-                      ? "bg-blue-500/5 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>คัดลอกสรุปบิล</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">คัดลอกข้อความสรุปค่าเช่าส่งผู้เช่า</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${addPermissions.billing_copy_summary ? "opacity-100" : "opacity-0"}`} />
-                </button>
-              </div>
+              {renderPermissionsSettings("add")}
             </div>
 
             {/* Submit Button */}
@@ -798,7 +929,7 @@ WHERE role IN ('admin', 'super_admin');`;
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
           <form 
             onSubmit={handleEditStaffSubmit}
-            className="w-full max-w-lg p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh] overflow-y-auto"
           >
             <button
               type="button"
@@ -847,212 +978,7 @@ WHERE role IN ('admin', 'super_admin');`;
             {/* Permissions Toggles */}
             <div className="pt-3 border-t border-slate-200 dark:border-slate-850 space-y-3">
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">ปรับสิทธิ์การเข้าทำรายการ:</span>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* view_dashboard_stats */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "view_dashboard_stats")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.view_dashboard_stats
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ดูแดชบอร์ดสถิติภาพรวม</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูสถิติรายรับ-รายจ่าย ข้อมูลสรุปในหน้าแรก</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.view_dashboard_stats ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_rooms_tenants */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "manage_rooms_tenants")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.manage_rooms_tenants
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการห้องพัก & ข้อมูลผู้เช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/แก้ไขห้องพัก ทำสัญญา และเข้าดูหน้าข้อมูลผู้เช่าปัจจุบัน/ประวัติผู้เช่าเก่า (/rooms, /tenants)</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_rooms_tenants ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_meters_bills */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "manage_meters_bills")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.manage_meters_bills
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">จดค่าน้ำ/ค่าไฟ และดูสรุปยอดบิล</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_meters_bills ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_bills */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "manage_bills")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.manage_bills
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการใบแจ้งหนี้</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เข้าดูและจัดการใบแจ้งหนี้ค่าเช่าทั้งหมด</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_bills ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_finance_expenses */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "manage_finance_expenses")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.manage_finance_expenses
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการการเงิน & รายจ่าย</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">บันทึกบิลรายจ่ายรายวัน ตรวจสอบสลิปโอน</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_finance_expenses ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* access_tax */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "access_tax")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.access_tax
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการข้อมูลภาษีหอพัก</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดูและพิมพ์รายงานภาษีหอพัก ภ.ง.ด. 90/94</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.access_tax ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_finance_settings */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "manage_finance_settings")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.manage_finance_settings
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ตั้งค่าระบบบัญชีและการเงิน</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดบัญชีธนาคาร และตั้งค่าวิธีรับเงินสำหรับการออกบิล</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_finance_settings ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_property_settings */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "manage_property_settings")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.manage_property_settings
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ตั้งค่าข้อมูลหอพัก</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">กำหนดอัตราส่วนกลาง ค่าปรับจ่ายล่าช้า อัตราค่าน้ำค่าไฟ และเงินประกัน</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_property_settings ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* manage_staff_permissions */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "manage_staff_permissions")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.manage_staff_permissions
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>จัดการสิทธิ์พนักงาน (Staff)</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">เพิ่ม/ลบพนักงาน และกำหนดสิทธิ์การใช้งานระบบ</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.manage_staff_permissions ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* billing_send_line */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "billing_send_line")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.billing_send_line
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ส่ง Line OA</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ส่งใบแจ้งหนี้ผ่านทาง Line OA ประจำห้องพัก</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.billing_send_line ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* billing_download_pdf */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "billing_download_pdf")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.billing_download_pdf
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>ดาวน์โหลด PDF</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">ดาวน์โหลดเอกสารบิล/ใบเสร็จเป็น PDF</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.billing_download_pdf ? "opacity-100" : "opacity-0"}`} />
-                </button>
-
-                {/* billing_copy_summary */}
-                <button
-                  type="button"
-                  onClick={() => handlePermissionToggle("edit", "billing_copy_summary")}
-                  className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                    editPermissions.billing_copy_summary
-                      ? "bg-indigo-500/5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
-                      : "bg-slate-50 border-slate-200 text-slate-500 dark:bg-slate-950 dark:border-slate-850"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span>คัดลอกสรุปบิล</span>
-                    <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">คัดลอกข้อความสรุปค่าเช่าส่งผู้เช่า</span>
-                  </div>
-                  <Check className={`w-4 h-4 shrink-0 transition-opacity ${editPermissions.billing_copy_summary ? "opacity-100" : "opacity-0"}`} />
-                </button>
-              </div>
+              {renderPermissionsSettings("edit")}
             </div>
 
             {/* Submit Button */}

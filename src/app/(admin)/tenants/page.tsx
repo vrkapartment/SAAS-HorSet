@@ -25,10 +25,14 @@ import {
   XCircle,
   HelpCircle,
   Sparkles,
-  ArrowUpDown
+  ArrowUpDown,
+  AlertCircle,
+  Info
 } from "lucide-react"
 import { getTenants, getOldTenants, deleteOldTenant } from "@/features/tenant/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
+import { getCurrentUserProfileClient } from "@/features/auth/client"
+import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -88,6 +92,22 @@ export default function TenantsPage() {
     expiredCount: 0,
     oldTotalCount: 0
   })
+
+  const [hasEditPermission, setHasEditPermission] = useState(true)
+
+  // Custom Toast State
+  const [toast, setToast] = useState<{
+    show: boolean
+    message: string
+    type: "success" | "error" | "info"
+  }>({ show: false, message: "", type: "success" })
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ show: true, message, type })
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }))
+    }, 4000)
+  }
 
   // คำนวณสถานะสัญญาเช่าผู้เช่า (สัญญาปกติ / เหลืออายุสัญญา X เดือน / สัญญาหมดอายุ / อยู่ครบสัญญา)
   const getContractStatus = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined) => {
@@ -223,6 +243,29 @@ export default function TenantsPage() {
   }
 
   useEffect(() => {
+    async function checkPermissions() {
+      try {
+        const res = await getCurrentUserProfileClient()
+        if (res.success && res.data) {
+          const profile = res.data
+          const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
+          if (isUserAdminOrSuper) {
+            setHasEditPermission(true)
+          } else {
+            let perms = profile.permissions
+            if (typeof perms === "string") {
+              try { perms = JSON.parse(perms) } catch { perms = null }
+            }
+            const defaultPerms = DEFAULT_STAFF_PERMISSIONS
+            const userPerms = { ...defaultPerms, ...perms }
+            setHasEditPermission(!!userPerms.manage_rooms_tenants_edit)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check permissions in tenants page", err)
+      }
+    }
+    checkPermissions()
     loadData()
   }, [])
 
@@ -233,6 +276,10 @@ export default function TenantsPage() {
 
   // Handle deletion of old tenant history log
   const handleDeleteOldTenant = async (id: string) => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
     setDeleteSubmitting(true)
     try {
       const res = await deleteOldTenant(id)
@@ -332,7 +379,26 @@ export default function TenantsPage() {
       }
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className={`px-5 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 backdrop-blur-md font-bold text-xs ${
+            toast.type === "success" 
+              ? "bg-emerald-500/90 text-white shadow-emerald-500/10 border border-emerald-400/20"
+              : toast.type === "error"
+              ? "bg-red-500/90 text-white shadow-red-500/10 border border-red-400/20"
+              : "bg-blue-600/90 text-white shadow-blue-600/10 border border-blue-500/20"
+          }`}>
+            {toast.type === "success" && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+            {toast.type === "error" && <AlertCircle className="w-4 h-4 shrink-0" />}
+            {toast.type === "info" && <Info className="w-4 h-4 shrink-0" />}
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
       {/* Header and Title */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -656,9 +722,20 @@ export default function TenantsPage() {
                     </td>
                     <td className="py-4 px-5 text-center">
                       <button
-                        onClick={() => setDeleteConfirmId(t.id)}
-                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 rounded-lg active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center border border-rose-100/30 dark:border-rose-900/20"
-                        title="ลบข้อมูลประวัติผู้เช่าถาวร"
+                        onClick={() => {
+                          if (!hasEditPermission) {
+                            showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+                            return
+                          }
+                          setDeleteConfirmId(t.id)
+                        }}
+                        disabled={!hasEditPermission}
+                        className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
+                          hasEditPermission
+                            ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-100/30 dark:border-rose-900/20"
+                            : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
+                        }`}
+                        title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -733,5 +810,6 @@ export default function TenantsPage() {
         </div>
       )}
     </div>
+    </>
   )
 }

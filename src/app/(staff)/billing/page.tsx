@@ -1630,6 +1630,7 @@ export default function UnifiedBillingPage() {
           isDark={isDark}
           loading={loading}
           userPermissions={userPermissions}
+          hasEditPermission={userPermissions.manage_meters_bills_edit}
           unifiedItems={unifiedItems}
           commonFee={commonFee}
           electricMinChecked={electricMinChecked}

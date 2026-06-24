@@ -761,6 +761,10 @@ export default function ManageBillsPage() {
 
   // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
   const handleSaveLateDays = async (roomNumber: string) => {
+    if (!userPermissions.manage_bills_edit) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     console.log("🚀 [Client] handleSaveLateDays started for room:", roomNumber)
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
     
@@ -827,8 +831,8 @@ export default function ManageBillsPage() {
   }
 
   const handleApproveSlip = async (id: string) => {
-    if (currentUserRole === "staff") {
-      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์อนุมัติสลิปโอนเงิน")
+    if (!userPermissions.manage_bills_edit) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
       return
     }
     const res = await updateBillStatus(id, "paid")
@@ -845,8 +849,8 @@ export default function ManageBillsPage() {
   }
 
   const handleRejectSlip = async (id: string) => {
-    if (currentUserRole === "staff") {
-      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์ปฏิเสธสลิปโอนเงิน")
+    if (!userPermissions.manage_bills_edit) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
       return
     }
     const res = await updateBillStatus(id, "unpaid", null)
@@ -863,8 +867,8 @@ export default function ManageBillsPage() {
   }
 
   const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
-    if (currentUserRole === "staff") {
-      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์กดรับเงินและบันทึกการชำระเงินโดยตรง")
+    if (!userPermissions.manage_bills_edit) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
       return
     }
     if (!confirm(`คุณต้องการเปลี่ยนสถานะบิลของห้อง ${roomNumber} เป็น "ชำระเงินแล้ว" ใช่หรือไม่? (โปรดยืนยันหากได้รับเงินแล้ว)`)) return
@@ -880,6 +884,10 @@ export default function ManageBillsPage() {
   }
 
   const handleSaveRow = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
+    if (!userPermissions.manage_bills_edit) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
     if (!item) return
 
@@ -1018,6 +1026,10 @@ export default function ManageBillsPage() {
   }
 
   const handleSaveAll = async (type?: "electric" | "water") => {
+    if (!userPermissions.manage_bills_edit) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     const editedItems = unifiedItems.filter(item => {
       if (item.isMeterSaved) return false;
       if (type === "electric") {
@@ -1349,6 +1361,10 @@ export default function ManageBillsPage() {
 
   const handleCreateBillManual = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!userPermissions.manage_bills_edit) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      return
+    }
     
     let targetTenant = ""
     const room = roomsList.find(r => r.roomNumber === newRoomNumber)
@@ -1494,6 +1510,7 @@ export default function ManageBillsPage() {
         isDark={isDark}
         loading={loading}
         userPermissions={userPermissions}
+        hasEditPermission={userPermissions.manage_bills_edit}
         unifiedItems={unifiedItems}
         commonFee={commonFee}
         electricMinChecked={electricMinChecked}
