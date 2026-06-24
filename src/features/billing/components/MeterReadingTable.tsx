@@ -637,9 +637,10 @@ export default function MeterReadingTable({
               
               const isElectricInvalid = hasElecCurr && elecUnitsUsed > 3000
               const isWaterInvalid = hasWaterCurr && waterUnitsUsed > 3000
-              const isSaveDisabled = (item.tenantName
+              const isMeterAlreadySaved = item.tenantName
                 ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
-                : item.isMeterSaved) || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
+                : item.isMeterSaved
+              const isSaveDisabled = isMeterAlreadySaved || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
 
               return (
                 <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
@@ -1014,19 +1015,21 @@ export default function MeterReadingTable({
                         </div>
                       </div>
 
-                      <button
-                        onClick={async () => {
-                          await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
-                        }}
-                        disabled={isSaveDisabled}
-                        className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                          isSaveDisabled
-                            ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
-                        }`}
-                      >
-                        <Save className="w-4 h-4" /> บันทึกมิเตอร์ไฟห้อง {item.roomNumber}
-                      </button>
+                      {!isMeterAlreadySaved && (
+                        <button
+                          onClick={async () => {
+                            await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
+                          }}
+                          disabled={isSaveDisabled}
+                          className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            isSaveDisabled
+                              ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                              : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
+                          }`}
+                        >
+                          <Save className="w-4 h-4" /> บันทึกมิเตอร์ไฟห้อง {item.roomNumber}
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -1164,19 +1167,21 @@ export default function MeterReadingTable({
                         </div>
                       </div>
 
-                      <button
-                        onClick={async () => {
-                          await onSaveRowWithRolloverCheck(item.roomNumber, "water");
-                        }}
-                        disabled={isSaveDisabled}
-                        className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                          isSaveDisabled
-                            ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                            : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
-                        }`}
-                      >
-                        <Save className="w-4 h-4" /> บันทึกมิเตอร์น้ำห้อง {item.roomNumber}
-                      </button>
+                      {!isMeterAlreadySaved && (
+                        <button
+                          onClick={async () => {
+                            await onSaveRowWithRolloverCheck(item.roomNumber, "water");
+                          }}
+                          disabled={isSaveDisabled}
+                          className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            isSaveDisabled
+                              ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-250 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                              : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
+                          }`}
+                        >
+                          <Save className="w-4 h-4" /> บันทึกมิเตอร์น้ำห้อง {item.roomNumber}
+                        </button>
+                      )}
                     </div>
                   )}
 
