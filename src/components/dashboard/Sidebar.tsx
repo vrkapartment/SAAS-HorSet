@@ -19,6 +19,7 @@ interface MenuItem {
 interface SidebarProps {
   mobileOpen: boolean
   setMobileOpen: (open: boolean) => void
+  desktopOpen: boolean
   userRole: "admin" | "staff" | "super_admin"
   workspaceLoading: boolean
   showDropdown: boolean
@@ -43,6 +44,7 @@ interface SidebarProps {
 export default function Sidebar({
   mobileOpen,
   setMobileOpen,
+  desktopOpen,
   userRole,
   workspaceLoading,
   showDropdown,
@@ -66,7 +68,9 @@ export default function Sidebar({
   return (
     <>
       {/* Sidebar สำหรับหน้าจอขนาดใหญ่ (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0 overflow-x-hidden">
+      <aside className={`hidden md:flex flex-col h-full glass-panel border-r border-slate-200/80 dark:border-slate-900/60 p-6 z-20 shrink-0 overflow-x-hidden transition-all duration-300 ${
+        desktopOpen ? "w-64 opacity-100" : "w-0 p-0 border-r-0 opacity-0 pointer-events-none"
+      }`}>
         <div className="flex items-center gap-3 mb-8 px-1 min-w-0">
           <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-md shadow-blue-500/20 animate-pulse-subtle shrink-0">
             <Building className="w-5 h-5 text-white" />

@@ -85,6 +85,66 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     router.push(path)
   }
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [desktopOpen, setDesktopOpen] = useState(true)
+
+  // โหลดพฤติกรรมการย่อขยายแถบเมนูในเครื่องผู้ใช้จาก localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("horset_desktop_sidebar_open")
+      if (saved !== null) {
+        setDesktopOpen(saved === "true")
+      }
+    }
+  }, [])
+
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    setTouchStart({ x: touch.clientX, y: touch.clientY })
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStart) return
+    const touch = e.touches[0]
+    const diffX = touch.clientX - touchStart.x
+    const diffY = touch.clientY - touchStart.y
+
+    // ตรวจจับพฤติกรรมการปัดแนวขนาน (Horizontal Swipe) เป็นหลัก
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 70) {
+      if (diffX > 0) {
+        // Swipe ปัดซ้ายไปขวา: แสดง Sidebar (ตรวจเฉพาะเมื่อสไลด์จากขอบซ้ายจอมา เพื่อความลื่นไหลเป็นธรรมชาติ)
+        if (touchStart.x < 100) {
+          if (typeof window !== "undefined") {
+            if (window.innerWidth < 768) {
+              setMobileOpen(true)
+            } else {
+              setDesktopOpen(true)
+              localStorage.setItem("horset_desktop_sidebar_open", "true")
+            }
+          }
+        }
+      } else {
+        // Swipe ปัดขวาไปซ้าย: ซ่อน Sidebar
+        if (typeof window !== "undefined") {
+          if (window.innerWidth < 768) {
+            if (mobileOpen) setMobileOpen(false)
+          } else {
+            if (desktopOpen) {
+              setDesktopOpen(false)
+              localStorage.setItem("horset_desktop_sidebar_open", "false")
+            }
+          }
+        }
+      }
+      setTouchStart(null)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    setTouchStart(null)
+  }
+
   const { t } = useLanguage()
   const { getCachedData, setCachedData, clearAllCache } = useWorkspaceData()
 
@@ -710,11 +770,17 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   }
 
   return (
-    <div className="h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans overflow-hidden">
+    <div 
+      className="h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       
       <Sidebar
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
+        desktopOpen={desktopOpen}
         userRole={userRole}
         workspaceLoading={workspaceLoading}
         showDropdown={showDropdown}
@@ -743,8 +809,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         <header className="flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-200/80 dark:border-slate-900/60 shrink-0">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
-              onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.innerWidth < 768) {
+                  setMobileOpen(true)
+                } else {
+                  const newVal = !desktopOpen
+                  setDesktopOpen(newVal)
+                  localStorage.setItem("horset_desktop_sidebar_open", String(newVal))
+                }
+              }}
+              className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50 cursor-pointer transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>
