@@ -27,7 +27,7 @@ import {
   Check
 } from "lucide-react"
 import { getRooms } from "@/features/room/actions"
-import { getTenants } from "@/features/tenant/actions"
+import { getTenants, getOldTenants } from "@/features/tenant/actions"
 import { getBills } from "@/features/billing/actions"
 import { getExpenses } from "@/features/expenses/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -86,6 +86,7 @@ export default function AdminDashboard() {
   const [rawTenants, setRawTenants] = useState<any[]>([])
   const [rawBills, setRawBills] = useState<any[]>([])
   const [rawExpenses, setRawExpenses] = useState<any[]>([])
+  const [rawOldTenants, setRawOldTenants] = useState<any[]>([])
 
   // Adaptive Switcher on Mobile/Tablet Compact
   const [activeTab, setActiveTab] = useState<"transactions" | "activities">("transactions")
@@ -95,12 +96,60 @@ export default function AdminDashboard() {
     setSelectedCycle(`${selectedYear}-${selectedMonth}`)
   }, [selectedMonth, selectedYear])
 
-  const calculateStats = (rooms: any[], tenants: any[], bills: any[], expenses: any[], cycle: string) => {
+  const calculateStats = (rooms: any[], tenants: any[], bills: any[], expenses: any[], cycle: string, oldTenants: any[] = []) => {
     const totalRooms = rooms.length
-    const occupiedRooms = rooms.filter((r: any) => r.status === "occupied").length
-    const availableRooms = rooms.filter((r: any) => r.status === "available").length
     
+    // Helper function to check if a lease overlaps with the selected cycle month
+    const isLeaseOverlappingCycle = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined) => {
+      if (!leaseStart || !leaseEnd) return false
+      
+      const [yearStr, monthStr] = cycle.split("-")
+      const year = parseInt(yearStr, 10)
+      const month = parseInt(monthStr, 10) - 1 // 0-indexed month
+      
+      const cycleStart = new Date(year, month, 1)
+      const cycleEnd = new Date(year, month + 1, 0, 23, 59, 59) // last day of month
+
+      const leaseS = new Date(leaseStart)
+      const leaseE = new Date(leaseEnd)
+
+      // Normalize times
+      const startD = new Date(leaseS.getFullYear(), leaseS.getMonth(), leaseS.getDate())
+      const endD = new Date(leaseE.getFullYear(), leaseE.getMonth(), leaseE.getDate())
+
+      return startD <= cycleEnd && endD >= cycleStart
+    }
+
     const currentMonthBills = bills.filter((b: any) => b.billingCycle === cycle)
+
+    // ตรวจสอบห้องพักที่มีผู้เช่าพักอยู่จริงในช่วงเดือนที่เลือก (cycle)
+    const occupiedRooms = rooms.filter((r: any) => {
+      // 1. ตรวจสอบจากบิลที่มีในเดือนนั้น
+      const hasBillInCycle = currentMonthBills.some((b: any) => b.roomNumber === r.roomNumber)
+      if (hasBillInCycle) return true
+
+      // 2. ตรวจสอบจากระยะเวลาผู้เช่าปัจจุบัน
+      const hasMatchingTenant = tenants.some((t: any) => {
+        if (t.roomNumber !== r.roomNumber) return false
+        return isLeaseOverlappingCycle(t.contractStart, t.contractEnd)
+      })
+      if (hasMatchingTenant) return true
+
+      // 3. ตรวจสอบจากระยะเวลาผู้เช่าเก่า (tenants_old)
+      const hasMatchingOldTenant = oldTenants.some((t: any) => {
+        if (t.roomNumber !== r.roomNumber) return false
+        return isLeaseOverlappingCycle(t.contractStart, t.contractEnd)
+      })
+      if (hasMatchingOldTenant) return true
+
+      // 4. ตรวจสอบจากระยะเวลาเช่าที่ติดมากับห้องพัก (ถ้ามี)
+      const hasRoomLeaseOverlap = isLeaseOverlappingCycle(r.leaseStart, r.leaseEnd)
+      if (hasRoomLeaseOverlap) return true
+
+      return false
+    }).length
+
+    const availableRooms = totalRooms - occupiedRooms
     const paidBills = currentMonthBills.filter((b: any) => b.status === "paid")
     const unpaidBills = currentMonthBills.filter((b: any) => b.status === "unpaid" || b.status === "pending")
     const pendingBills = currentMonthBills.filter((b: any) => b.status === "pending")
@@ -288,6 +337,7 @@ export default function AdminDashboard() {
       let tenants = wsId ? getCachedData(wsId, "tenants") : null
       let bills = wsId ? getCachedData(wsId, `bills_year_${currentYear}`) : null
       let expenses = wsId ? getCachedData(wsId, `expenses_year_${currentYear}`) : null
+      let oldTenants = wsId ? getCachedData(wsId, "oldTenants") : null
 
       if (!rooms || forceRefresh) {
         fetchPromises.push(
@@ -337,6 +387,17 @@ export default function AdminDashboard() {
         );
       }
 
+      if (!oldTenants || forceRefresh) {
+        fetchPromises.push(
+          getOldTenants().then(oldTenantsRes => {
+            oldTenants = oldTenantsRes.success && oldTenantsRes.data ? oldTenantsRes.data : []
+            if (wsId) setCachedData(wsId, "oldTenants", oldTenants)
+          }).catch(() => {
+            oldTenants = []
+          })
+        );
+      }
+
       if (fetchPromises.length > 0) {
         await Promise.all(fetchPromises)
       }
@@ -349,8 +410,9 @@ export default function AdminDashboard() {
         setRawTenants(tenants)
         setRawBills(bills)
         setRawExpenses(expenses)
+        setRawOldTenants(oldTenants || [])
         
-        calculateStats(rooms, tenants, bills, expenses, `${selectedYear}-${selectedMonth}`)
+        calculateStats(rooms, tenants, bills, expenses, `${selectedYear}-${selectedMonth}`, oldTenants || [])
       } else {
         setIsDemo(true)
         setupDemoFallback(`${selectedYear}-${selectedMonth}`)
@@ -365,7 +427,8 @@ export default function AdminDashboard() {
         setRawTenants([])
         setRawBills([])
         setRawExpenses([])
-        calculateStats([], [], [], [], `${selectedYear}-${selectedMonth}`)
+        setRawOldTenants([])
+        calculateStats([], [], [], [], `${selectedYear}-${selectedMonth}`, [])
       } else {
         setIsDemo(true)
         setupDemoFallback(`${selectedYear}-${selectedMonth}`)
@@ -520,7 +583,7 @@ export default function AdminDashboard() {
       if (isDemo) {
         setupDemoFallback(`${selectedYear}-${selectedMonth}`)
       } else {
-        calculateStats(rawRooms, rawTenants, rawBills, rawExpenses, `${selectedYear}-${selectedMonth}`)
+        calculateStats(rawRooms, rawTenants, rawBills, rawExpenses, `${selectedYear}-${selectedMonth}`, rawOldTenants)
       }
     }
   }, [selectedMonth])
