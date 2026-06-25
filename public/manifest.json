@@ -1,0 +1,36 @@
+{
+  "name": "HorSet (หอเสร็จ) - บริหารหอพักครบวงจร",
+  "short_name": "HorSet",
+  "description": "SaaS บริหารจัดการหอพัก อพาร์ทเมนท์ จดมิเตอร์ ออกบิล แจ้งเตือนผ่าน LINE และคำนวณภาษี",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/horset_icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/horset_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/horset_icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/horset_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

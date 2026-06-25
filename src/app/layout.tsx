@@ -14,6 +14,12 @@ const promptFont = Prompt({
 export const metadata: Metadata = {
   title: "HorSet (หอเสร็จ) - ระบบบริหารจัดการหอพักครบวงจร",
   description: "SaaS บริหารจัดการหอพัก อพาร์ทเมนท์ จดมิเตอร์ ออกบิล แจ้งเตือนผ่าน LINE และคำนวณภาษี ภ.ง.ด. 90/94",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "HorSet",
+  },
 };
 
 export const viewport: Viewport = {
@@ -21,6 +27,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({
