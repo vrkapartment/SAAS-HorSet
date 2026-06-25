@@ -16,6 +16,7 @@ function TenantRegisterContent() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
   const [alreadyRegistered, setAlreadyRegistered] = useState(false)
+  const [pageInitializing, setPageInitializing] = useState(true)
 
   // ฟังก์ชันล้างเบอร์โทรศัพท์ให้อยู่ในฟอร์แมตตัวเลข 10 หลัก
   const handlePhoneChange = (val: string) => {
@@ -109,6 +110,11 @@ function TenantRegisterContent() {
     } catch (err: any) {
       console.error("LIFF Init Error:", err)
       setError("ไม่สามารถเชื่อมต่อบริการ LINE ได้ กรุณาแชร์ลิงก์เปิดทางห้องแชท LINE")
+    } finally {
+      const liff = (window as any).liff
+      if (liff) {
+        setPageInitializing(false)
+      }
     }
   }
 
@@ -191,17 +197,57 @@ function TenantRegisterContent() {
         onLoad={initLiff}
       />
 
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden font-sans">
-        {/* แสงวิบวับพรีเมียมรอบตัวหลังบ้าน (Ambient Glow Background) */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
-        <div className="absolute bottom-1/4 left-1/3 w-[260px] h-[260px] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
+      {pageInitializing ? (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden font-sans">
+          {/* แสงวิบวับพรีเมียมรอบตัวหลังบ้าน (Ambient Glow Background) */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute bottom-1/4 left-1/3 w-[260px] h-[260px] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
 
-        <div className="w-full max-w-md z-10 space-y-6">
-          {/* การ์ดแก้วพรีเมียม (Glassmorphism Card) */}
-          <div className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-2xl shadow-emerald-950/5 relative">
-            
-            {/* ตรวจสอบว่าลิงก์ถูกใช้งานไปแล้วหรือไม่ */}
-            {alreadyRegistered ? (
+          <div className="w-full max-w-md z-10 space-y-6 text-center">
+            {/* การ์ดแก้วพรีเมียม (Glassmorphism Card) */}
+            <div className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-8 shadow-2xl shadow-emerald-950/5 flex flex-col items-center space-y-6 animate-in fade-in duration-300">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 animate-pulse">
+                  <Sparkles className="w-8 h-8" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-black text-slate-100">กำลังดึงข้อมูลผู้เช่าและระบบ LINE...</h3>
+                <p className="text-slate-400 text-xs font-semibold leading-relaxed">
+                  กรุณารอสักครู่ ระบบกำลังยืนยันบัญชี LINE และดึงข้อมูลสัญญาเช่าของห้องพักคุณ
+                </p>
+              </div>
+
+              {/* Indeterminate loading bar */}
+              <div className="w-full bg-slate-950/80 rounded-full h-2.5 overflow-hidden border border-slate-805 relative">
+                <div 
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full absolute top-0 left-0 w-1/3 animate-[loadingBar_1.5s_infinite_ease-in-out]" 
+                />
+              </div>
+            </div>
+          </div>
+
+          <style dangerouslySetInnerHTML={{__html: `
+            @keyframes loadingBar {
+              0% { left: -35%; width: 35%; }
+              50% { width: 45%; }
+              100% { left: 100%; width: 35%; }
+            }
+          `}} />
+        </div>
+      ) : (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden font-sans">
+          {/* แสงวิบวับพรีเมียมรอบตัวหลังบ้าน (Ambient Glow Background) */}
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute bottom-1/4 left-1/3 w-[260px] h-[260px] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
+
+          <div className="w-full max-w-md z-10 space-y-6">
+            {/* การ์ดแก้วพรีเมียม (Glassmorphism Card) */}
+            <div className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-2xl shadow-emerald-950/5 relative">
+              
+              {/* ตรวจสอบว่าลิงก์ถูกใช้งานไปแล้วหรือไม่ */}
+              {alreadyRegistered ? (
               <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
                 <div className="inline-flex items-center justify-center p-4 bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 shadow-lg shadow-amber-500/5">
                   <AlertCircle className="w-14 h-14" />
@@ -419,6 +465,7 @@ function TenantRegisterContent() {
           </p>
         </div>
       </div>
+      )}
     </>
   )
 }
