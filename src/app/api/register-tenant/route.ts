@@ -65,85 +65,99 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: `ไม่พบข้อมูลห้องพักหมายเลข ${roomNumber} ในอาคารนี้` }, { status: 400 })
     }
 
-    // ตรวจสอบว่าห้องนี้มีผู้เช่าที่ลงทะเบียน LINE ไปแล้วหรือไม่ (สมัครได้ครั้งเดียวเท่านั้น)
-    const { data: activeTenant, error: tenantError } = await supabaseAdmin
+    // ตรวจสอบว่าห้องนี้มีผู้เช่าอยู่เดิมหรือไม่
+    const { data: existingTenant, error: tenantError } = await supabaseAdmin
       .from("tenants")
       .select("id, line_user_id")
       .eq("room_id", room.id)
-      .not("line_user_id", "is", null)
       .maybeSingle()
 
     if (tenantError) {
-      console.error("Query active tenant error:", tenantError)
+      console.error("Query tenant error:", tenantError)
     }
 
-    if (activeTenant && activeTenant.line_user_id && activeTenant.line_user_id.trim() !== "") {
+    if (existingTenant && existingTenant.line_user_id && existingTenant.line_user_id.trim() !== "") {
       return NextResponse.json({
         success: false,
         error: "ลิงก์ลงทะเบียนนี้ได้ถูกใช้งานไปแล้ว ห้องพักนี้ลงทะเบียนผูก LINE เรียบร้อยแล้ว"
       }, { status: 400 })
     }
 
-    // 3. เตรียมโครงสร้างออบเจกต์ข้อมูลในการบันทึกแถวใหม่
-    const today = new Date()
-    const nextYear = new Date()
-    nextYear.setFullYear(nextYear.getFullYear() + 1)
-    nextYear.setDate(nextYear.getDate() - 1)
-
-    const leaseStart = today.toISOString().split("T")[0]
-    const leaseEnd = nextYear.toISOString().split("T")[0]
-
-    const tenantPayload = {
-      room_id: room.id,
-      line_user_id: lineUserId,
-      workspace_id: workspaceId,
-      tenant_name: tenantName.trim(),
-      tenant_phone: tenantPhone.trim(),
-      lease_start: leaseStart,
-      lease_end: leaseEnd,
-      updated_at: new Date().toISOString()
-    }
-
     let saveError: any = null
 
-    // 4. บันทึกข้อมูลลงตาราง tenants ด้วยคำสั่ง .upsert() ระบุ onConflict: 'line_user_id' เพื่อแก้ไขทับข้อมูลเก่าเมื่อลงทะเบียนซ้ำ
-    const { error: upsertError } = await supabaseAdmin
-      .from("tenants")
-      .upsert(tenantPayload, { onConflict: "line_user_id" })
+    if (existingTenant) {
+      // 3. มีผู้เช่าเดิมที่แอดมินสร้างไว้ (line_user_id เป็น null) ให้ทำการอัปเดตทับเพื่อรักษาประวัติสัญญาและวันที่ตั้งค่าไว้
+      const { error: updateError } = await supabaseAdmin
+        .from("tenants")
+        .update({
+          line_user_id: lineUserId,
+          tenant_name: tenantName.trim(),
+          tenant_phone: tenantPhone.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", existingTenant.id)
 
-    if (upsertError) {
-      // ตรวจจับกรณีตาราง tenants ในฐานข้อมูล PostgreSQL ของผู้ใช้ยังไม่ได้กำหนดค่า Unique Constraint บน line_user_id
-      // ซึ่งอาจทำให้คำสั่ง upsert ล้มเหลว (Postgres Error 42P10) เราจึงสร้างระบบ Fallback ที่ทนทานสูงสุด
-      if (upsertError.code === "42P10" || upsertError.message?.includes("unique") || upsertError.message?.includes("conflict")) {
-        console.warn("Standard database table public.tenants has no unique index on line_user_id. Running Select-then-Update/Insert fallback flow.")
-        
-        // ค้นหาผู้เช่าเดิมที่มี LINE ID นี้อยู่ก่อนแล้ว
-        const { data: existing, error: selectError } = await supabaseAdmin
-          .from("tenants")
-          .select("id")
-          .eq("line_user_id", lineUserId)
-          .maybeSingle()
+      if (updateError) saveError = updateError
+    } else {
+      // 3. ไม่มีข้อมูลผู้เช่าเลย ให้สร้างแถวสัญญาใหม่
+      const today = new Date()
+      const nextYear = new Date()
+      nextYear.setFullYear(nextYear.getFullYear() + 1)
+      nextYear.setDate(nextYear.getDate() - 1)
 
-        if (selectError) {
-          saveError = selectError
-        } else if (existing) {
-          // อัปเดตข้อมูลทับเรคคอร์ดเดิมทันที
-          const { error: updateError } = await supabaseAdmin
-            .from("tenants")
-            .update(tenantPayload)
-            .eq("id", existing.id)
+      const leaseStart = today.toISOString().split("T")[0]
+      const leaseEnd = nextYear.toISOString().split("T")[0]
+
+      const tenantPayload = {
+        room_id: room.id,
+        line_user_id: lineUserId,
+        workspace_id: workspaceId,
+        tenant_name: tenantName.trim(),
+        tenant_phone: tenantPhone.trim(),
+        lease_start: leaseStart,
+        lease_end: leaseEnd,
+        updated_at: new Date().toISOString()
+      }
+
+      // 4. บันทึกข้อมูลลงตาราง tenants ด้วยคำสั่ง .upsert() ระบุ onConflict: 'line_user_id' เพื่อแก้ไขทับข้อมูลเก่าเมื่อลงทะเบียนซ้ำ
+      const { error: upsertError } = await supabaseAdmin
+        .from("tenants")
+        .upsert(tenantPayload, { onConflict: "line_user_id" })
+
+      if (upsertError) {
+        // ตรวจจับกรณีตาราง tenants ในฐานข้อมูล PostgreSQL ของผู้ใช้ยังไม่ได้กำหนดค่า Unique Constraint บน line_user_id
+        // ซึ่งอาจทำให้คำสั่ง upsert ล้มเหลว (Postgres Error 42P10) เราจึงสร้างระบบ Fallback ที่ทนทานสูงสุด
+        if (upsertError.code === "42P10" || upsertError.message?.includes("unique") || upsertError.message?.includes("conflict")) {
+          console.warn("Standard database table public.tenants has no unique index on line_user_id. Running Select-then-Update/Insert fallback flow.")
           
-          if (updateError) saveError = updateError
+          // ค้นหาผู้เช่าเดิมที่มี LINE ID นี้อยู่ก่อนแล้ว
+          const { data: existing, error: selectError } = await supabaseAdmin
+            .from("tenants")
+            .select("id")
+            .eq("line_user_id", lineUserId)
+            .maybeSingle()
+
+          if (selectError) {
+            saveError = selectError
+          } else if (existing) {
+            // อัปเดตข้อมูลทับเรคคอร์ดเดิมทันที
+            const { error: updateError } = await supabaseAdmin
+              .from("tenants")
+              .update(tenantPayload)
+              .eq("id", existing.id)
+            
+            if (updateError) saveError = updateError
+          } else {
+            // แทรกแถวสัญญาใหม่หากไม่พบข้อมูล
+            const { error: insertError } = await supabaseAdmin
+              .from("tenants")
+              .insert([tenantPayload])
+            
+            if (insertError) saveError = insertError
+          }
         } else {
-          // แทรกแถวสัญญาใหม่หากไม่พบข้อมูล
-          const { error: insertError } = await supabaseAdmin
-            .from("tenants")
-            .insert([tenantPayload])
-          
-          if (insertError) saveError = insertError
+          saveError = upsertError
         }
-      } else {
-        saveError = upsertError
       }
     }
 
@@ -216,12 +230,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, registered: false, error: "ไม่พบห้องพักที่ระบุ" })
     }
 
-    // 2. ตรวจสอบว่าห้องนี้มีผู้เช่าที่ลงทะเบียน LINE ไปแล้วหรือไม่
-    const { data: activeTenant, error: tenantError } = await supabaseAdmin
+    // 2. ตรวจสอบว่าห้องนี้มีผู้เช่าอยู่เดิมหรือไม่ (ทั้งแบบผูกไลน์แล้ว และยังไม่ได้ผูก)
+    const { data: tenant, error: tenantError } = await supabaseAdmin
       .from("tenants")
-      .select("id, line_user_id")
+      .select("id, tenant_name, tenant_phone, line_user_id")
       .eq("room_id", room.id)
-      .not("line_user_id", "is", null)
       .maybeSingle()
 
     if (tenantError) {
@@ -229,11 +242,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: "เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบ" }, { status: 500 })
     }
 
-    const isRegistered = !!(activeTenant && activeTenant.line_user_id && activeTenant.line_user_id.trim() !== "")
+    const isRegistered = !!(tenant && tenant.line_user_id && tenant.line_user_id.trim() !== "")
 
     return NextResponse.json({
       success: true,
-      registered: isRegistered
+      registered: isRegistered,
+      tenant: tenant ? {
+        name: tenant.tenant_name,
+        phone: tenant.tenant_phone
+      } : null
     })
 
   } catch (error) {

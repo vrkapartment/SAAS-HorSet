@@ -94,8 +94,13 @@ function TenantRegisterContent() {
         try {
           const checkRes = await fetch(`/api/register-tenant?workspaceId=${wsId}&roomNumber=${rNum}`)
           const checkData = await checkRes.json()
-          if (checkData.success && checkData.registered) {
-            setAlreadyRegistered(true)
+          if (checkData.success) {
+            if (checkData.registered) {
+              setAlreadyRegistered(true)
+            } else if (checkData.tenant) {
+              setTenantName(checkData.tenant.name || "")
+              setPhone(checkData.tenant.phone || "")
+            }
           }
         } catch (e) {
           console.error("Error checking room registration:", e)
