@@ -1492,21 +1492,21 @@ export default function RoomsPage() {
 
                                     {/* REGISTERED: View details / checkout */}
                                     {room.tenantName && room.lineUserId && (
-                                      <div className="flex gap-1.5">
+                                      <div className="flex flex-col gap-1.5 w-full">
+                                        <button
+                                          onClick={() => handleOpenDetailModal(room)}
+                                          className="w-full h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                          ดูรายละเอียด/ย้ายออก
+                                        </button>
                                         <button
                                           onClick={() => handleDisconnectLineTrigger(room)}
-                                          className="flex-[1.1] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-550/10 border border-red-500/20 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="w-full h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-550/10 border border-red-500/20 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                           title="หยุดเชื่อมต่อไลน์"
                                         >
                                           <Unlink className="w-3.5 h-3.5 shrink-0" />
                                           หยุดเชื่อมต่อไลน์
-                                        </button>
-                                        <button
-                                          onClick={() => handleOpenDetailModal(room)}
-                                          className="flex-[1.4] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
-                                        >
-                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                          ดูรายละเอียด/ย้ายออก
                                         </button>
                                       </div>
                                     )}
@@ -1800,7 +1800,7 @@ export default function RoomsPage() {
                         <div className="pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
                           
                           {/* Primary Action Row based on state */}
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             {/* VACANT: Generate LINE Link */}
                             {!room.tenantName && (
                               <button
@@ -1836,18 +1836,18 @@ export default function RoomsPage() {
                              {room.tenantName && room.lineUserId && (
                                <>
                                  <button
-                                   onClick={() => handleDisconnectLineTrigger(room)}
-                                   className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
-                                 >
-                                   <Unlink className="w-4 h-4 shrink-0" />
-                                   หยุดเชื่อมต่อไลน์
-                                 </button>
-                                 <button
                                    onClick={() => handleOpenDetailModal(room)}
                                    className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
                                  >
                                    <CheckCircle2 className="w-4 h-4 shrink-0" />
                                    ดูรายละเอียด/ย้ายออก
+                                 </button>
+                                 <button
+                                   onClick={() => handleDisconnectLineTrigger(room)}
+                                   className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                 >
+                                   <Unlink className="w-4 h-4 shrink-0" />
+                                   หยุดเชื่อมต่อไลน์
                                  </button>
                                </>
                              )}
