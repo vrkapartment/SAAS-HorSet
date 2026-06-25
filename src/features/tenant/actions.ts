@@ -992,5 +992,28 @@ export async function migrateLocalStorageCancelledContracts(workspaceId: string,
   }
 }
 
+export async function disconnectLine(tenantId: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("tenants")
+      .update({ line_user_id: null, updated_at: new Date().toISOString() })
+      .eq("id", tenantId)
+      .select()
+
+    if (error) throw error
+
+    return { success: true, data: data[0] }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการหยุดเชื่อมต่อ LINE"
+    return { success: false, error: errorMessage }
+  }
+}
+
+
 
 

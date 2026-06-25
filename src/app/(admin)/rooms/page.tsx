@@ -28,7 +28,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   LayoutGrid,
-  List
+  List,
+  Unlink
 } from "lucide-react"
 import { 
   getRooms, 
@@ -48,7 +49,8 @@ import {
   getCancelledContracts,
   saveCancelledContract,
   deleteCancelledContract,
-  migrateLocalStorageCancelledContracts
+  migrateLocalStorageCancelledContracts,
+  disconnectLine
 } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
@@ -135,6 +137,8 @@ export default function RoomsPage() {
   const [contractModalOpen, setContractModalOpen] = useState(false)
   const [tenantDetailModalOpen, setTenantDetailModalOpen] = useState(false)
   const [lineLinkModalOpen, setLineLinkModalOpen] = useState(false)
+  const [lineDisconnectConfirmOpen, setLineDisconnectConfirmOpen] = useState(false)
+  const [disconnectSubmitting, setDisconnectSubmitting] = useState(false)
   
   const [selectedRoom, setSelectedRoom] = useState<RoomItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -642,6 +646,36 @@ export default function RoomsPage() {
     const link = getLiffRegistrationLink(roomNum)
     navigator.clipboard.writeText(link)
     showToast(`✓ คัดลอกลิงก์ LINE LIFF ของห้อง ${roomNum} สำเร็จ! สามารถส่งแชทให้ผู้เช่าลงทะเบียนได้เลย`, "success")
+  }
+
+  // เตรียมและเปิด Modal ยืนยันหยุดเชื่อมต่อ LINE
+  const handleDisconnectLineTrigger = (room: RoomItem) => {
+    setSelectedRoom(room)
+    setLineDisconnectConfirmOpen(true)
+  }
+
+  // กดยืนยันหยุดเชื่อมต่อ LINE ใน Modal
+  const handleConfirmDisconnectLine = async () => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
+    if (!selectedRoom || !selectedRoom.tenantId) return
+    setDisconnectSubmitting(true)
+    try {
+      const res = await disconnectLine(selectedRoom.tenantId)
+      if (res.success) {
+        showToast(`✓ หยุดเชื่อมต่อ LINE ของห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว!`, "success")
+        setLineDisconnectConfirmOpen(false)
+        await loadData(true)
+      } else {
+        showToast(res.error || "หยุดเชื่อมต่อ LINE ไม่สำเร็จ", "error")
+      }
+    } catch (err) {
+      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "error")
+    } finally {
+      setDisconnectSubmitting(false)
+    }
   }
 
   // เปิดดูรายละเอียดและแจ้งย้ายออก
@@ -1458,13 +1492,23 @@ export default function RoomsPage() {
 
                                     {/* REGISTERED: View details / checkout */}
                                     {room.tenantName && room.lineUserId && (
-                                      <button
-                                        onClick={() => handleOpenDetailModal(room)}
-                                        className="w-full h-9 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
-                                      >
-                                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                        ดูรายละเอียด / ย้ายออก
-                                      </button>
+                                      <div className="flex gap-1.5">
+                                        <button
+                                          onClick={() => handleDisconnectLineTrigger(room)}
+                                          className="flex-[1.1] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-550/10 border border-red-500/20 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          title="หยุดเชื่อมต่อไลน์"
+                                        >
+                                          <Unlink className="w-3.5 h-3.5 shrink-0" />
+                                          หยุดเชื่อมต่อไลน์
+                                        </button>
+                                        <button
+                                          onClick={() => handleOpenDetailModal(room)}
+                                          className="flex-[1.4] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                          ดูรายละเอียด/ย้ายออก
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -1599,13 +1643,22 @@ export default function RoomsPage() {
 
                                     {/* REGISTERED: View details / checkout */}
                                     {room.tenantName && room.lineUserId && (
-                                      <button
-                                        onClick={() => handleOpenDetailModal(room)}
-                                        className="h-8 px-2.5 sm:px-3 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
-                                      >
-                                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                        ดูรายละเอียด/ย้ายออก
-                                      </button>
+                                      <>
+                                        <button
+                                          onClick={() => handleDisconnectLineTrigger(room)}
+                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                        >
+                                          <Unlink className="w-3.5 h-3.5 shrink-0" />
+                                          หยุดเชื่อมต่อไลน์
+                                        </button>
+                                        <button
+                                          onClick={() => handleOpenDetailModal(room)}
+                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                          ดูรายละเอียด/ย้ายออก
+                                        </button>
+                                      </>
                                     )}
                                   </div>
                                 </td>
@@ -1781,13 +1834,22 @@ export default function RoomsPage() {
 
                              {/* OCCUPIED: View Details / Checkout */}
                              {room.tenantName && room.lineUserId && (
-                               <button
-                                 onClick={() => handleOpenDetailModal(room)}
-                                 className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
-                               >
-                                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                                 ดูรายละเอียด/ย้ายออก
-                               </button>
+                               <>
+                                 <button
+                                   onClick={() => handleDisconnectLineTrigger(room)}
+                                   className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                 >
+                                   <Unlink className="w-4 h-4 shrink-0" />
+                                   หยุดเชื่อมต่อไลน์
+                                 </button>
+                                 <button
+                                   onClick={() => handleOpenDetailModal(room)}
+                                   className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
+                                 >
+                                   <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                   ดูรายละเอียด/ย้ายออก
+                                 </button>
+                               </>
                              )}
                           </div>
 
@@ -2670,6 +2732,64 @@ export default function RoomsPage() {
                   )}
                 </div>
 
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL 5.5: LINE DISCONNECT CONFIRMATION MODAL */}
+        {/* ========================================================= */}
+        {lineDisconnectConfirmOpen && selectedRoom && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+            <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-750 shadow-2xl p-6 space-y-6 relative overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-red-500/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-full border border-red-100 dark:border-red-900/40 shrink-0">
+                  <AlertTriangle className="w-6 h-6 animate-pulse" />
+                </div>
+                
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100">
+                    ยืนยันการหยุดเชื่อมต่อ LINE
+                  </h3>
+                  <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed space-y-2">
+                    <p>
+                      คุณแน่ใจหรือไม่ที่จะหยุดเชื่อมต่อบัญชี LINE ของผู้เช่าคุณ <strong className="text-slate-850 dark:text-slate-100 font-extrabold">{selectedRoom.tenantName}</strong> (ห้อง {selectedRoom.roomNumber})?
+                    </p>
+                    <p className="bg-amber-500/10 text-amber-600 dark:text-amber-400 p-3 rounded-xl border border-amber-500/20 font-medium">
+                      💡 <strong>ข้อดี:</strong> หากผู้เช่าเปลี่ยนบัญชี LINE ใหม่ คุณสามารถกดหยุดเชื่อมต่อตรงนี้แล้วเจนลิงก์ใหม่ให้ผู้เช่าสแกนเพื่อผูกบัญชีได้ทันที <strong>โดยไม่ต้องย้ายออกหรือทำลายสัญญาเช่าเดิม</strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons with touch-friendly heights */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLineDisconnectConfirmOpen(false)
+                  }}
+                  disabled={disconnectSubmitting}
+                  className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDisconnectLine}
+                  disabled={disconnectSubmitting}
+                  className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-red-600 hover:bg-red-500 text-white text-sm md:text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50 shadow-md shadow-red-650/10"
+                >
+                  {disconnectSubmitting ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "ยืนยันหยุดเชื่อมต่อ LINE"
+                  )}
+                </button>
               </div>
             </div>
           </div>
