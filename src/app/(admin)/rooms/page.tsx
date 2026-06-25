@@ -1492,21 +1492,21 @@ export default function RoomsPage() {
 
                                     {/* REGISTERED: View details / checkout */}
                                     {room.tenantName && room.lineUserId && (
-                                      <div className="flex flex-col gap-1.5 w-full">
+                                      <div className="flex gap-1.5 w-full">
+                                        <button
+                                          onClick={() => handleDisconnectLineTrigger(room)}
+                                          className="flex-[1.1] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-550/10 border border-red-500/20 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          title="หยุดเชื่อมไลน์"
+                                        >
+                                          <Unlink className="w-3.5 h-3.5 shrink-0" />
+                                          หยุดเชื่อมไลน์
+                                        </button>
                                         <button
                                           onClick={() => handleOpenDetailModal(room)}
-                                          className="w-full h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                          className="flex-[1.7] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                         >
                                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                           ดูรายละเอียด/ย้ายออก
-                                        </button>
-                                        <button
-                                          onClick={() => handleDisconnectLineTrigger(room)}
-                                          className="w-full h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-550/10 border border-red-500/20 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
-                                          title="หยุดเชื่อมต่อไลน์"
-                                        >
-                                          <Unlink className="w-3.5 h-3.5 shrink-0" />
-                                          หยุดเชื่อมต่อไลน์
                                         </button>
                                       </div>
                                     )}
@@ -1649,7 +1649,7 @@ export default function RoomsPage() {
                                           className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                         >
                                           <Unlink className="w-3.5 h-3.5 shrink-0" />
-                                          หยุดเชื่อมต่อไลน์
+                                          หยุดเชื่อมไลน์
                                         </button>
                                         <button
                                           onClick={() => handleOpenDetailModal(room)}
@@ -1847,7 +1847,7 @@ export default function RoomsPage() {
                                    className="flex-1 py-3 px-4 text-xs tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 h-11 whitespace-nowrap"
                                  >
                                    <Unlink className="w-4 h-4 shrink-0" />
-                                   หยุดเชื่อมต่อไลน์
+                                   หยุดเชื่อมไลน์
                                  </button>
                                </>
                              )}
