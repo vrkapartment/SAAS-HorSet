@@ -2713,7 +2713,7 @@ export default function RoomsPage() {
                         <button
                           type="button"
                           onClick={() => setTenantDetailModalOpen(false)}
-                          className="order-2 sm:order-1 flex-1 h-12 md:h-10 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-sm md:text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer"
+                          className="order-2 sm:order-1 flex-1 h-11 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
                         >
                           ปิดหน้าต่าง
                         </button>
@@ -2722,9 +2722,9 @@ export default function RoomsPage() {
                         <button
                           type="button"
                           onClick={handleCheckoutTenantTrigger}
-                          className="order-1 sm:order-2 flex-1 h-12 md:h-10 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 text-sm md:text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all duration-150 border border-red-200 dark:border-red-900/50 active:scale-95 cursor-pointer"
+                          className="order-1 sm:order-2 flex-1 h-11 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all duration-150 border border-red-200/60 dark:border-red-900/50 active:scale-95 cursor-pointer"
                         >
-                          <LogOut className="w-4 h-4" />
+                          <LogOut className="w-3.5 h-3.5" />
                           แจ้งคืนห้อง/ย้ายออก
                         </button>
                       </div>
