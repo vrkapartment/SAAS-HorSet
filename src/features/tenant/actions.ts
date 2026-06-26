@@ -491,7 +491,8 @@ export async function getTenantPortalData() {
             waterUnits: Number(b.water_units),
             penaltyAmount: penaltyAmount,
             lateDays: lateDays,
-            otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
+            otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
+            invoiceId: b.invoice_id
           }
         })
       }
@@ -715,7 +716,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
           waterUnits: Number(b.water_units),
           penaltyAmount: penaltyAmount,
           lateDays: lateDays,
-          otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
+          otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
+          invoiceId: b.invoice_id
         }
       })
     }

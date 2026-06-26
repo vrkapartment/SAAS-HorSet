@@ -40,7 +40,8 @@ export async function getBills(billingCycle?: string, year?: string) {
       waterUnits: Number(b.water_units),
       penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
       lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
-      otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
+      otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
+      invoiceId: b.invoice_id
     }))
 
     return { success: true, data: formatted }
@@ -70,7 +71,7 @@ export async function createBill(
     // Check if a bill already exists for this room and cycle
     const { data: existing } = await supabase
       .from("bills")
-      .select("id, penalty_amount")
+      .select("id, penalty_amount, invoice_id")
       .eq("room_number", roomNumber)
       .eq("billing_cycle", billingCycle)
       .maybeSingle()
@@ -80,6 +81,8 @@ export async function createBill(
       // ป้องกันยอดเงินรวมโดนทับ หากมีค่าปรับบันทึกไว้อยู่แล้ว
       const existingPenalty = Number(existing.penalty_amount || 0)
       const finalAmount = amount + existingPenalty
+      
+      const invoiceId = (existing as any).invoice_id || `INV-${billingCycle.replace('-', '')}-${roomNumber}`
 
       result = await supabase
         .from("bills")
@@ -89,7 +92,8 @@ export async function createBill(
           status,
           electric_units: electricUnits,
           water_units: waterUnits,
-          other_service_amount: otherServiceAmount
+          other_service_amount: otherServiceAmount,
+          invoice_id: invoiceId
         })
         .eq("id", existing.id)
         .select()
@@ -106,7 +110,8 @@ export async function createBill(
           water_units: waterUnits,
           other_service_amount: otherServiceAmount,
           late_days: null,
-          penalty_amount: null
+          penalty_amount: null,
+          invoice_id: `INV-${billingCycle.replace('-', '')}-${roomNumber}`
         }])
         .select()
     }

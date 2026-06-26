@@ -245,6 +245,7 @@ export interface BillPdfData {
   otherServiceAmount?: number
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
+  invoiceId?: string
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -299,6 +300,9 @@ export async function generateBillPdf(data: BillPdfData) {
   // รายละเอียดบิล
   drawText(`หมายเลขห้อง (Room No.): ${data.roomNumber}`, 50, 700, 10, rgb(0.1, 0.1, 0.1))
   drawText(`ชื่อผู้เช่า (Tenant Name): ${data.tenantName}`, 50, 680, 10, rgb(0.1, 0.1, 0.1))
+  if (data.invoiceId) {
+    drawText(`รหัสใบแจ้งหนี้ (Invoice ID): ${data.invoiceId}`, 50, 661, 10, rgb(0.06, 0.45, 0.35))
+  }
   drawText(`รอบบิลประจำเดือน (Cycle): ${data.billingCycle}`, 340, 700, 10, rgb(0.1, 0.1, 0.1))
   drawText(`วันที่ออกเอกสาร (Date): ${new Date().toLocaleDateString('th-TH')}`, 340, 680, 10, rgb(0.1, 0.1, 0.1))
 

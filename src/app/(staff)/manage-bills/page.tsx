@@ -68,6 +68,7 @@ interface UnifiedRoomBillingItem {
   isEdited?: boolean
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
+  invoiceId?: string
 }
 
 function getCookie(name: string): string | undefined {
@@ -493,7 +494,8 @@ export default function ManageBillsPage() {
           lateDays: finalLateDays,
           otherServiceAmount: roomBill ? Number(roomBill.otherServiceAmount || 0) : 0,
           waiveElectricMin: !!r.waive_electric_min || !!r.waiveElectricMin,
-          waiveWaterMin: !!r.waive_water_min || !!r.waiveWaterMin
+          waiveWaterMin: !!r.waive_water_min || !!r.waiveWaterMin,
+          invoiceId: roomBill?.invoiceId || undefined
         }
       })
       setUnifiedItems(compiled)
@@ -732,7 +734,8 @@ export default function ManageBillsPage() {
             waterUnits: formattedBill.waterUnits,
             penaltyAmount: formattedBill.penaltyAmount || 0,
             lateDays: formattedBill.lateDays || 0,
-            otherServiceAmount: formattedBill.otherServiceAmount
+            otherServiceAmount: formattedBill.otherServiceAmount,
+            invoiceId: formattedBill.invoiceId
           } : {})
         }
       }
@@ -1264,7 +1267,8 @@ export default function ManageBillsPage() {
         workspaceTaxId,
         penaltyAmount: item.penaltyAmount || 0,
         lateDays: item.lateDays || 0,
-        latePenaltyRate: latePenaltyRate
+        latePenaltyRate: latePenaltyRate,
+        invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`
       })
 
       const link = document.createElement("a")
@@ -1340,7 +1344,8 @@ export default function ManageBillsPage() {
           workspaceTaxId,
           penaltyAmount: item.penaltyAmount || 0,
           lateDays: item.lateDays || 0,
-          latePenaltyRate: latePenaltyRate
+          latePenaltyRate: latePenaltyRate,
+          invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`
         })
 
         const fileName = `bill_room${item.roomNumber}_${billingCycle}.pdf`

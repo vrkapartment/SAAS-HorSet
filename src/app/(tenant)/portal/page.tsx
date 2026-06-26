@@ -365,7 +365,8 @@ export default function TenantPortal() {
         latePenaltyRate,
         otherServiceAmount,
         waiveElectricMin,
-        waiveWaterMin
+        waiveWaterMin,
+        invoiceId: bill ? (bill.invoiceId || bill.invoice_id) : `INV-${(bill?.billingCycle || '2026-06').replace('-', '')}-${roomNumber}`
       })
 
       const link = document.createElement("a")
@@ -532,6 +533,14 @@ export default function TenantPortal() {
             <div>
               <span className="text-[10px] text-slate-400 font-semibold uppercase">ใบแจ้งหนี้รอบประจำเดือน</span>
               <h2 className="text-lg font-bold text-slate-200 mt-0.5">{billingCycle}</h2>
+              {bill && (bill.invoiceId || bill.invoice_id) && (
+                <div className="text-[10px] text-blue-400 font-semibold mt-1 flex items-center gap-1">
+                  <span>รหัสใบแจ้งหนี้ (Invoice ID):</span>
+                  <span className="font-mono bg-blue-500/10 px-1.5 py-0.5 rounded text-[10px] text-blue-300">
+                    {bill.invoiceId || bill.invoice_id}
+                  </span>
+                </div>
+              )}
             </div>
             
             <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full ${
