@@ -116,6 +116,8 @@ export async function getRooms() {
         leaseEnd: tenant ? tenant.lease_end : null,
         roomTypeId: room.room_type_id,
         roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ",
+        waiveElectricMin: !!room.waive_electric_min,
+        waiveWaterMin: !!room.waive_water_min,
         allTenants: (room.tenants || []).map((t: any) => ({
           id: t.id,
           tenantName: t.tenant_name,
@@ -162,7 +164,9 @@ export async function updateRoom(
   roomTypeId: string, 
   baseRent: number, 
   status: "occupied" | "available",
-  floor: string
+  floor: string,
+  waiveElectricMin: boolean = false,
+  waiveWaterMin: boolean = false
 ) {
   try {
     const supabase = await createClient()
@@ -174,6 +178,8 @@ export async function updateRoom(
         base_rent: baseRent,
         status: status,
         floor: floor || null,
+        waive_electric_min: waiveElectricMin,
+        waive_water_min: waiveWaterMin,
         updated_at: new Date().toISOString()
       })
       .eq("id", id)

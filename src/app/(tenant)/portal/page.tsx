@@ -124,6 +124,8 @@ export default function TenantPortal() {
   const [waterRate, setWaterRate] = useState(18)
   const [electricRate, setElectricRate] = useState(7)
   const [latePenaltyRate, setLatePenaltyRate] = useState(0)
+  const [waiveElectricMin, setWaiveElectricMin] = useState(false)
+  const [waiveWaterMin, setWaiveWaterMin] = useState(false)
 
 
 
@@ -203,6 +205,12 @@ export default function TenantPortal() {
         }
         if (data.latePenaltyRate !== undefined) {
           setLatePenaltyRate(data.latePenaltyRate)
+        }
+        if (data.waiveElectricMin !== undefined) {
+          setWaiveElectricMin(!!data.waiveElectricMin)
+        }
+        if (data.waiveWaterMin !== undefined) {
+          setWaiveWaterMin(!!data.waiveWaterMin)
         }
 
         const activeBills = data.bills as any[]
@@ -355,7 +363,9 @@ export default function TenantPortal() {
         penaltyAmount,
         lateDays,
         latePenaltyRate,
-        otherServiceAmount
+        otherServiceAmount,
+        waiveElectricMin,
+        waiveWaterMin
       })
 
       const link = document.createElement("a")

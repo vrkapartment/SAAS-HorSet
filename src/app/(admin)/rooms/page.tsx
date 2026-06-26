@@ -79,6 +79,8 @@ interface RoomItem {
   leaseEnd?: string | null
   roomTypeId: string | null
   roomTypeName: string
+  waiveElectricMin?: boolean
+  waiveWaterMin?: boolean
 }
 
 interface RoomTypeItem {
@@ -154,6 +156,8 @@ export default function RoomsPage() {
   const [newRoomFloor, setNewRoomFloor] = useState("")
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState("")
   const [newBaseRent, setNewBaseRent] = useState<number | string>("")
+  const [waiveElectricMin, setWaiveElectricMin] = useState(false)
+  const [waiveWaterMin, setWaiveWaterMin] = useState(false)
   const [formSubmitting, setFormSubmitting] = useState(false)
 
   // Room Type Form State (inside Manage Types modal)
@@ -354,6 +358,8 @@ export default function RoomsPage() {
     setNewRoomFloor("")
     setSelectedRoomTypeId("")
     setNewBaseRent("")
+    setWaiveElectricMin(false)
+    setWaiveWaterMin(false)
     
     // ตั้งค่าประเภทห้องแรกเป็นดีฟอลต์ถ้ามี
     if (roomTypes.length > 0) {
@@ -370,6 +376,8 @@ export default function RoomsPage() {
     setNewRoomFloor(room.floor || "")
     setSelectedRoomTypeId(room.roomTypeId || "")
     setNewBaseRent(room.baseRent)
+    setWaiveElectricMin(!!room.waiveElectricMin)
+    setWaiveWaterMin(!!room.waiveWaterMin)
     setModalOpen(true)
   }
 
@@ -454,7 +462,9 @@ export default function RoomsPage() {
         selectedRoomTypeId,
         Number(newBaseRent),
         editingRoom.status,
-        newRoomFloor
+        newRoomFloor,
+        waiveElectricMin,
+        waiveWaterMin
       )
       if (res.success) {
         showToast("✓ อัปเดตข้อมูลห้องพักสำเร็จ", "success")
@@ -2077,6 +2087,45 @@ export default function RoomsPage() {
                     <Info className="w-3.5 h-3.5 shrink-0" />
                     🔒 ล็อคตามราคามาตรฐานของประเภทห้องที่เลือก
                   </span>
+                </div>
+
+                {/* Waive Minimum Charges Config */}
+                <div className="bg-slate-50/80 dark:bg-slate-900/50 p-3.5 rounded-2xl border border-slate-150 dark:border-slate-800/80 space-y-3.5">
+                  <span className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ตั้งค่าการยกเว้นค่าบริการขั้นต่ำ</span>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label htmlFor="waiveElectricMin" className="text-xs md:text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">ยกเว้นหน่วยขั้นต่ำค่าไฟ</label>
+                      <p className="text-[10px] text-slate-450 dark:text-slate-500">คำนวณตามหน่วยใช้งานจริง ไม่ใช้หน่วยขั้นต่ำ</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        id="waiveElectricMin"
+                        className="sr-only peer" 
+                        checked={waiveElectricMin}
+                        onChange={(e) => setWaiveElectricMin(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-slate-200 dark:bg-slate-850 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-150 dark:border-slate-800/60 pt-3">
+                    <div className="space-y-0.5">
+                      <label htmlFor="waiveWaterMin" className="text-xs md:text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">ยกเว้นหน่วยขั้นต่ำค่าน้ำ</label>
+                      <p className="text-[10px] text-slate-450 dark:text-slate-500">คำนวณตามหน่วยใช้งานจริง ไม่ใช้หน่วยขั้นต่ำ</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        id="waiveWaterMin"
+                        className="sr-only peer" 
+                        checked={waiveWaterMin}
+                        onChange={(e) => setWaiveWaterMin(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-slate-200 dark:bg-slate-850 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Buttons */}

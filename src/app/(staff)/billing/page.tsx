@@ -70,6 +70,8 @@ interface UnifiedRoomBillingItem {
   otherServiceAmount?: number
 
   isEdited?: boolean
+  waiveElectricMin?: boolean
+  waiveWaterMin?: boolean
 }
 
 function getCookie(name: string): string | undefined {
@@ -207,10 +209,14 @@ export default function UnifiedBillingPage() {
   const [savingProgress, setSavingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
 
   const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
-  const computedElecCost = electricMinChecked && elecUnitsManual <= electricMinUnit
+  const selectedManualRoom = roomsList.find(r => r.roomNumber === newRoomNumber)
+  const isElecWaived = selectedManualRoom?.waiveElectricMin ?? false
+  const isWaterWaived = selectedManualRoom?.waiveWaterMin ?? false
+
+  const computedElecCost = !isElecWaived && electricMinChecked && elecUnitsManual <= electricMinUnit
     ? electricMinUnit * elecRate
     : elecUnitsManual * elecRate
-  const computedWaterCost = waterMinChecked && waterUnitsManual <= waterMinUnit
+  const computedWaterCost = !isWaterWaived && waterMinChecked && waterUnitsManual <= waterMinUnit
     ? waterMinUnit * waterRate
     : waterUnitsManual * waterRate
   const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual
@@ -506,7 +512,9 @@ export default function UnifiedBillingPage() {
           waterUnits: roomBill ? Number(roomBill.waterUnits) : 0,
           penaltyAmount: finalPenaltyAmount,
           lateDays: finalLateDays,
-          otherServiceAmount: roomBill ? Number(roomBill.otherServiceAmount || 0) : 0
+          otherServiceAmount: roomBill ? Number(roomBill.otherServiceAmount || 0) : 0,
+          waiveElectricMin: !!r.waive_electric_min || !!r.waiveElectricMin,
+          waiveWaterMin: !!r.waive_water_min || !!r.waiveWaterMin
         }
       })
       setUnifiedItems(compiled)
@@ -1007,13 +1015,13 @@ export default function UnifiedBillingPage() {
 
     const elecCost = elecVal === "" 
       ? 0 
-      : (electricMinChecked && eUnits <= electricMinUnit
+      : (!item.waiveElectricMin && electricMinChecked && eUnits <= electricMinUnit
           ? electricMinUnit * elecRate
           : eUnits * elecRate)
 
     const waterCost = waterVal === "" 
       ? 0 
-      : (waterMinChecked && wUnits <= waterMinUnit
+      : (!item.waiveWaterMin && waterMinChecked && wUnits <= waterMinUnit
           ? waterMinUnit * waterRate
           : wUnits * waterRate)
           
@@ -1174,13 +1182,13 @@ export default function UnifiedBillingPage() {
         
         const elecCost = elecVal === "" 
           ? 0 
-          : (electricMinChecked && eUnits <= electricMinUnit
+          : (!item.waiveElectricMin && electricMinChecked && eUnits <= electricMinUnit
               ? electricMinUnit * elecRate
               : eUnits * elecRate)
 
         const waterCost = waterVal === "" 
           ? 0 
-          : (waterMinChecked && wUnits <= waterMinUnit
+          : (!item.waiveWaterMin && waterMinChecked && wUnits <= waterMinUnit
               ? waterMinUnit * waterRate
               : wUnits * waterRate)
               
@@ -1390,10 +1398,12 @@ export default function UnifiedBillingPage() {
         electricMinChecked,
         electricMinUnit,
         amount: item.billAmount || (() => {
-          const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-          const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+          const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+          const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
           return item.baseRent + elecCost + waterCost + commonFee
         })(),
+        waiveElectricMin: item.waiveElectricMin,
+        waiveWaterMin: item.waiveWaterMin,
         promptPayId,
         promptPayName,
         workspaceName,
@@ -1462,10 +1472,12 @@ export default function UnifiedBillingPage() {
           electricMinChecked,
           electricMinUnit,
           amount: item.billAmount || (() => {
-            const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-            const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+            const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+            const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
             return item.baseRent + elecCost + waterCost + commonFee
           })(),
+          waiveElectricMin: item.waiveElectricMin,
+          waiveWaterMin: item.waiveWaterMin,
           promptPayId,
           promptPayName,
           workspaceName,

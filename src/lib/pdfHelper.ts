@@ -243,6 +243,8 @@ export interface BillPdfData {
   lateDays?: number
   latePenaltyRate?: number
   otherServiceAmount?: number
+  waiveElectricMin?: boolean
+  waiveWaterMin?: boolean
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -322,8 +324,8 @@ export async function generateBillPdf(data: BillPdfData) {
   const electricMinChecked = data.electricMinChecked !== undefined ? data.electricMinChecked : true
   const electricMinUnit = data.electricMinUnit !== undefined ? data.electricMinUnit : 10
 
-  const isElecMin = electricMinChecked && data.electricUnits <= electricMinUnit
-  const isWaterMin = waterMinChecked && data.waterUnits <= waterMinUnit
+  const isElecMin = !data.waiveElectricMin && electricMinChecked && data.electricUnits <= electricMinUnit
+  const isWaterMin = !data.waiveWaterMin && waterMinChecked && data.waterUnits <= waterMinUnit
 
   const elecAmount = isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate
   const waterAmount = isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate

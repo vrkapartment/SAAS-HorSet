@@ -373,8 +373,8 @@ export default function MeterReadingTable({
     const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
     const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
 
-    const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-    const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+    const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+    const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
 
     let portalLink = ""
     if (currentWorkspaceId) {
@@ -480,8 +480,8 @@ export default function MeterReadingTable({
           const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
           const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
 
-          const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-          const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+          const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+          const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
 
           const result = await sendLineBillNotificationAction({
             lineUserId,
@@ -625,13 +625,13 @@ export default function MeterReadingTable({
               const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
               const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
               const elecCost = hasElecCurr && elecUnitsUsed >= 0
-                ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
+                ? (!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                 : 0
 
               const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
               const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
               const waterCost = hasWaterCurr && waterUnitsUsed >= 0
-                ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
+                ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
               
               const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0)
@@ -1012,7 +1012,7 @@ export default function MeterReadingTable({
                           <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
                           <span className="font-bold text-slate-700 dark:text-slate-300">
                             {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
-                              ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                              ? `${elecCost.toLocaleString()}.- ${!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                               : "-"}
                           </span>
                         </div>
@@ -1164,7 +1164,7 @@ export default function MeterReadingTable({
                           <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
                           <span className="font-bold text-slate-700 dark:text-slate-300">
                             {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000
-                              ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                              ? `${waterCost.toLocaleString()}.- ${!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
                               : "-"}
                           </span>
                         </div>
@@ -1336,13 +1336,13 @@ export default function MeterReadingTable({
                   const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
                   const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
                   const elecCost = hasElecCurr && elecUnitsUsed >= 0
-                    ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
+                    ? (!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                     : 0
 
                   const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
                   const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
                   const waterCost = hasWaterCurr && waterUnitsUsed >= 0
-                    ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
+                    ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
                   
                   const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0)
@@ -1759,7 +1759,7 @@ export default function MeterReadingTable({
                             </div>
                             <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
                               {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
-                                ? `${elecCost.toLocaleString()}.- ${electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                ? `${elecCost.toLocaleString()}.- ${!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                                 : "-"}
                             </div>
                             {(() => {
@@ -1911,7 +1911,7 @@ export default function MeterReadingTable({
                             </div>
                             <div className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
                               {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000
-                                ? `${waterCost.toLocaleString()}.- ${waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                ? `${waterCost.toLocaleString()}.- ${!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
                                 : "-"}
                             </div>
                             {(() => {

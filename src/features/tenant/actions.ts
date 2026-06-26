@@ -342,6 +342,8 @@ export async function getTenantPortalData() {
           id,
           room_number,
           base_rent,
+          waive_electric_min,
+          waive_water_min,
           room_types (
             default_rent
           )
@@ -502,6 +504,8 @@ export async function getTenantPortalData() {
         roomNumber: roomNumber || null,
         tenantName: tenant.tenant_name || profile.full_name,
         baseRent: tenant.rooms?.room_types ? Number((tenant.rooms as any).room_types.default_rent) : (tenant.rooms?.base_rent ? Number(tenant.rooms.base_rent) : 0),
+        waiveElectricMin: tenant.rooms?.waive_electric_min,
+        waiveWaterMin: tenant.rooms?.waive_water_min,
         bills: formattedBills,
         promptPayId,
         promptPayName,
@@ -589,7 +593,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     // 1. ค้นหาข้อมูลห้องพัก
     const { data: room, error: roomError } = await supabase
       .from("rooms")
-      .select("id, base_rent, room_types(default_rent)")
+      .select("id, base_rent, waive_electric_min, waive_water_min, room_types(default_rent)")
       .eq("workspace_id", workspaceId)
       .eq("room_number", roomNumber)
       .maybeSingle()
@@ -724,6 +728,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         roomNumber,
         tenantName: tenant ? tenant.tenant_name : "ผู้เช่า",
         baseRent,
+        waiveElectricMin: room.waive_electric_min,
+        waiveWaterMin: room.waive_water_min,
         bills: formattedBills,
         promptPayId,
         promptPayName,
