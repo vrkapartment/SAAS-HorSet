@@ -348,50 +348,50 @@ WHERE role IN ('admin', 'super_admin');`;
     ] as const
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Section 1: Main Pages/Modules with View/Edit toggles */}
-        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-3.5">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-850">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
-              <Settings className="w-4 h-4 text-blue-500" />
+        <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-4">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 dark:border-slate-850">
+            <span className="text-xs sm:text-sm font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2">
+              <Settings className="w-5 h-5 text-blue-500" />
               <span>สิทธิ์การเข้าใช้งานรายหน้าต่าง ๆ</span>
             </span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">
+            <span className="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline">
               * ต้องให้สิทธิ์ "เข้าดูหน้า" ก่อน จึงจะปรับสิทธิ์แก้ไขได้
             </span>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Dashboard Stats Row (View Only) */}
-            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/20 shrink-0 mt-0.5">
-                  <LayoutDashboard className="w-5 h-5" />
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:shadow-sm">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/20 shrink-0 mt-0.5">
+                  <LayoutDashboard className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">ดูแดชบอร์ดสถิติภาพรวม</h4>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                  <h4 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-200">ดูแดชบอร์ดสถิติภาพรวม</h4>
+                  <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
                     เข้าดูหน้าแดชบอร์ด รายได้ค้างจ่าย และสถิติสถานะผู้เช่า (จำกัดดูอย่างเดียวเท่านั้น)
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 self-end sm:self-auto shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เปิดเข้าดู</span>
+              <div className="flex items-center gap-4.5 self-end sm:self-auto shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">เปิดเข้าดู</span>
                   <button
                     type="button"
                     onClick={() => handlePermissionChange(type, "view_dashboard_stats")}
-                    className={`w-12 h-6 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none ${
+                    className={`w-14 h-7 rounded-full p-1 transition-colors cursor-pointer focus:outline-none ${
                       permissions.view_dashboard_stats ? "bg-emerald-500" : "bg-slate-250 dark:bg-slate-800"
                     }`}
                   >
                     <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
-                      permissions.view_dashboard_stats ? "translate-x-6" : "translate-x-0"
+                      permissions.view_dashboard_stats ? "translate-x-7" : "translate-x-0"
                     }`} />
                   </button>
                 </div>
-                <div className="w-24 text-center">
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-md font-bold bg-slate-100 dark:bg-slate-950 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-900">
+                <div className="w-28 text-center">
+                  <span className="text-xs px-3 py-1 rounded-md font-bold bg-slate-100 dark:bg-slate-950 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-900">
                     ดูได้อย่างเดียว
                   </span>
                 </div>
@@ -406,25 +406,25 @@ WHERE role IN ('admin', 'super_admin');`;
               return (
                 <div 
                   key={m.key} 
-                  className={`p-3 border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:shadow-sm ${
+                  className={`p-4 border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:shadow-sm ${
                     hasView 
                       ? "bg-white dark:bg-slate-900 border-blue-500/20 shadow-sm shadow-blue-500/[0.02]" 
                       : "bg-white/60 dark:bg-slate-900/60 border-slate-200 dark:border-slate-850/80 opacity-75"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 mt-0.5 transition-colors ${
+                  <div className="flex items-start gap-3.5">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border shrink-0 mt-0.5 transition-colors ${
                       hasView 
                         ? "bg-blue-500/10 text-blue-500 border-blue-500/20" 
                         : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-950 dark:border-slate-900"
                     }`}>
-                      <m.icon className="w-5 h-5" />
+                      <m.icon className="w-6 h-6" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 flex flex-wrap items-center gap-1.5">
+                      <h4 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-200 flex flex-wrap items-center gap-2">
                         <span>{m.name}</span>
                         {hasView && (
-                          <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
+                          <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded font-extrabold uppercase ${
                             hasEdit 
                               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
                               : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
@@ -433,7 +433,7 @@ WHERE role IN ('admin', 'super_admin');`;
                           </span>
                         )}
                       </h4>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-relaxed">
                         {hasEdit ? m.editDescription : m.description}
                       </p>
                     </div>
@@ -442,24 +442,24 @@ WHERE role IN ('admin', 'super_admin');`;
                   {/* Dual Action Toggles */}
                   <div className="flex items-center gap-5 self-end sm:self-auto shrink-0">
                     {/* View Toggle */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เข้าหน้าเว็บ</span>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">เข้าหน้าเว็บ</span>
                       <button
                         type="button"
                         onClick={() => handlePermissionChange(type, m.key)}
-                        className={`w-12 h-6 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none ${
+                        className={`w-14 h-7 rounded-full p-1 transition-colors cursor-pointer focus:outline-none ${
                           hasView ? "bg-blue-600" : "bg-slate-250 dark:bg-slate-800"
                         }`}
                       >
                         <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
-                          hasView ? "translate-x-6" : "translate-x-0"
+                          hasView ? "translate-x-7" : "translate-x-0"
                         }`} />
                       </button>
                     </div>
 
                     {/* Edit Selector (View Only vs Edit/Write) */}
-                    <div className="flex items-center gap-2 w-28">
-                      <span className={`text-[10px] font-bold ${
+                    <div className="flex items-center gap-2.5 w-32">
+                      <span className={`text-xs sm:text-sm font-bold ${
                         hasView ? "text-slate-400 dark:text-slate-500" : "text-slate-300 dark:text-slate-700"
                       }`}>
                         การทำงาน
@@ -468,7 +468,7 @@ WHERE role IN ('admin', 'super_admin');`;
                         type="button"
                         disabled={!hasView}
                         onClick={() => handlePermissionChange(type, m.editKey)}
-                        className={`px-2 py-0.5 text-[9px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                        className={`px-3 py-1 text-[10px] sm:text-xs font-extrabold rounded-lg border transition-all cursor-pointer ${
                           !hasView 
                             ? "bg-slate-50 text-slate-300 dark:bg-slate-950 dark:text-slate-750 border-slate-150 dark:border-slate-900 cursor-not-allowed"
                             : hasEdit
@@ -487,81 +487,81 @@ WHERE role IN ('admin', 'super_admin');`;
         </div>
 
         {/* Section 2: Special Actions (Send Line, PDF download, Copy summary) */}
-        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-3.5">
-          <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5 border-b border-slate-200 dark:border-slate-850 pb-2">
-            <ShieldAlert className="w-4 h-4 text-indigo-500" />
+        <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-4">
+          <span className="text-xs sm:text-sm font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2 border-b border-slate-200 dark:border-slate-850 pb-2.5">
+            <ShieldAlert className="w-5 h-5 text-indigo-500" />
             <span>สิทธิ์การทำรายการพิเศษ</span>
           </span>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* billing_send_line */}
-            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-500 flex items-center justify-center shrink-0">
-                  <Send className="w-4 h-4" />
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-teal-500/10 text-teal-500 flex items-center justify-center shrink-0">
+                  <Send className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate">ส่งบิล Line OA</h5>
-                  <p className="text-[8.5px] text-slate-400 dark:text-slate-500 truncate">ส่งบิลให้ผู้เช่าทางแชทไลน์</p>
+                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">ส่งบิล Line OA</h5>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">ส่งบิลให้ผู้เช่าทางแชทไลน์</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => handlePermissionChange(type, "billing_send_line")}
-                className={`w-10 h-5.5 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
+                className={`w-12 h-6 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
                   permissions.billing_send_line ? "bg-teal-500" : "bg-slate-250 dark:bg-slate-800"
                 }`}
               >
-                <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm ${
-                  permissions.billing_send_line ? "translate-x-4.5" : "translate-x-0"
+                <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                  permissions.billing_send_line ? "translate-x-6" : "translate-x-0"
                 }`} />
               </button>
             </div>
 
             {/* billing_download_pdf */}
-            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
-                  <Download className="w-4 h-4" />
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+                  <Download className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate">ดาวน์โหลด PDF</h5>
-                  <p className="text-[8.5px] text-slate-400 dark:text-slate-500 truncate">เซฟไฟล์ใบแจ้งหนี้เป็น PDF</p>
+                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">ดาวน์โหลด PDF</h5>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">เซฟไฟล์ใบแจ้งหนี้เป็น PDF</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => handlePermissionChange(type, "billing_download_pdf")}
-                className={`w-10 h-5.5 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
+                className={`w-12 h-6 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
                   permissions.billing_download_pdf ? "bg-indigo-500" : "bg-slate-250 dark:bg-slate-800"
                 }`}
               >
-                <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm ${
-                  permissions.billing_download_pdf ? "translate-x-4.5" : "translate-x-0"
+                <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                  permissions.billing_download_pdf ? "translate-x-6" : "translate-x-0"
                 }`} />
               </button>
             </div>
 
             {/* billing_copy_summary */}
-            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-                  <Copy className="w-4 h-4" />
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                  <Copy className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate">คัดลอกข้อความสรุป</h5>
-                  <p className="text-[8.5px] text-slate-400 dark:text-slate-500 truncate">ก๊อปปี้สรุปบิลไปส่งในแชทอื่น</p>
+                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">คัดลอกข้อความสรุป</h5>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">ก๊อปปี้สรุปบิลไปส่งในแชทอื่น</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => handlePermissionChange(type, "billing_copy_summary")}
-                className={`w-10 h-5.5 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
+                className={`w-12 h-6 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none shrink-0 ${
                   permissions.billing_copy_summary ? "bg-amber-500" : "bg-slate-250 dark:bg-slate-800"
                 }`}
               >
-                <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm ${
-                  permissions.billing_copy_summary ? "translate-x-4.5" : "translate-x-0"
+                <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                  permissions.billing_copy_summary ? "translate-x-6" : "translate-x-0"
                 }`} />
               </button>
             </div>
@@ -574,68 +574,68 @@ WHERE role IN ('admin', 'super_admin');`;
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* 1. Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 p-5 rounded-3xl border border-blue-500/20 shadow-sm backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 p-6 rounded-3xl border border-blue-500/20 shadow-sm backdrop-blur-md">
         <div>
-          <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <Shield className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+          <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
+            <Shield className="w-7 h-7 text-blue-500 dark:text-blue-400" />
             <span>ระบบจัดการสิทธิ์การใช้งาน (Staff Permissions)</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
             กำหนดบทบาทและสิทธิ์ของ Staff ประจำหอพักได้อย่างละเอียด เพื่อควบคุมสิทธิ์ในการเข้าถึงหน้าข้อมูลห้องพัก บิลค่าเช่า การเงิน และส่วนข้อมูลภาษี
           </p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="h-11 px-5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/10 active:scale-[0.98] shrink-0 self-stretch sm:self-auto justify-center"
+          className="h-12 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-sm flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/10 active:scale-[0.98] shrink-0 self-stretch sm:self-auto justify-center"
         >
-          <UserPlus className="w-4.5 h-4.5" />
+          <UserPlus className="w-5 h-5" />
           <span>เพิ่ม Staff ใหม่</span>
         </button>
       </div>
 
       {/* 2. Alert & Result Boxes */}
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2.5">
-          <AlertCircle className="w-5 h-5 shrink-0" />
+        <div className="p-4.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs sm:text-sm font-bold flex items-center gap-2.5">
+          <AlertCircle className="w-5.5 h-5.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2.5">
-          <CheckCircle2 className="w-5 h-5 shrink-0" />
+        <div className="p-4.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs sm:text-sm font-bold flex items-center gap-2.5">
+          <CheckCircle2 className="w-5.5 h-5.5 shrink-0" />
           <span>{success}</span>
         </div>
       )}
 
       {/* 3. Stats Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-5 rounded-3xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-500 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
-            <Users className="w-5 h-5" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5">
+        <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-4">
+          <div className="w-14 h-12.5 rounded-2xl bg-blue-500/10 text-blue-500 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+            <Users className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Staff ทั้งหมด</span>
-            <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 mt-0.5">{staffList.length} คน</h3>
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">Staff ทั้งหมด</span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{staffList.length} คน</h3>
           </div>
         </div>
 
-        <div className="p-5 rounded-3xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20">
-            <ShieldAlert className="w-5 h-5" />
+        <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-4">
+          <div className="w-14 h-12.5 rounded-2xl bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+            <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">สิทธิ์การทำงานละเอียด</span>
-            <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 mt-0.5">7 ด้านแยกอิสระ</h3>
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">สิทธิ์การทำงานละเอียด</span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">7 ด้านแยกอิสระ</h3>
           </div>
         </div>
 
-        <div className="p-5 rounded-3xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-            <Building className="w-5 h-5" />
+        <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-4">
+          <div className="w-14 h-12.5 rounded-2xl bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+            <Building className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">บทบาทปัจจุบันของคุณ</span>
-            <h3 className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">บทบาทปัจจุบันของคุณ</span>
+            <h3 className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
               {currentUser?.role === "super_admin" ? "SUPER ADMIN" : "WORKSPACE ADMIN"}
             </h3>
           </div>
@@ -643,10 +643,10 @@ WHERE role IN ('admin', 'super_admin');`;
       </div>
 
       {/* 4. Active Staff Members Section */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl p-5 shadow-sm">
-        <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl p-6 shadow-sm">
+        <h3 className="text-base font-black text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2.5">
           <span>รายชื่อ Staff ประจำ Workspace ของคุณ</span>
-          {loading && <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />}
+          {loading && <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />}
         </h3>
 
         {loading ? (
@@ -664,30 +664,30 @@ WHERE role IN ('admin', 'super_admin');`;
                 {/* Staff Basic Info */}
                 <div className="flex justify-between items-start gap-3">
                   <div>
-                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-200">
+                    <h4 className="text-base font-black text-slate-800 dark:text-slate-200">
                       {staff.full_name || <span className="text-slate-450 italic">ไม่มีข้อมูลชื่อ</span>}
                     </h4>
-                    <div className="flex flex-col gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                      <span className="flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="flex flex-col gap-2 mt-2.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-mono">
+                      <span className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-slate-400" />
                         {staff.email}
                       </span>
                       {staff.phone && (
-                        <span className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-slate-400" />
                           {staff.phone}
                         </span>
                       )}
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold text-teal-600 bg-teal-500/10 dark:text-teal-400 dark:bg-teal-500/5 border border-teal-500/20 px-2.5 py-0.5 rounded-full uppercase shrink-0">
+                  <span className="text-xs font-bold text-teal-600 bg-teal-500/10 dark:text-teal-400 dark:bg-teal-500/5 border border-teal-500/20 px-3 py-1 rounded-full uppercase shrink-0">
                     STAFF
                   </span>
                 </div>
 
                 {/* Staff Permissions Visual List */}
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-850 space-y-2">
-                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
+                <div className="pt-3.5 border-t border-slate-200 dark:border-slate-850 space-y-2">
+                  <span className="text-[11px] sm:text-xs font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
                     สิทธิ์ที่ได้รับมอบหมาย:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -727,7 +727,7 @@ WHERE role IN ('admin', 'super_admin');`;
                         return (
                           <span
                             key={item.key}
-                            className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1 ${
+                            className={`text-xs px-3 py-1.5 rounded-lg font-bold border transition-colors flex items-center gap-1.5 ${
                               hasPermission
                                 ? hasEdit
                                   ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
@@ -735,7 +735,7 @@ WHERE role IN ('admin', 'super_admin');`;
                                 : "bg-slate-100 text-slate-400 dark:bg-slate-950 border-slate-200 dark:border-slate-900"
                             }`}
                           >
-                            <Check className={`w-3 h-3 ${hasPermission ? "opacity-100" : "opacity-20"}`} />
+                            <Check className={`w-3.5 h-3.5 ${hasPermission ? "opacity-100" : "opacity-20"}`} />
                             <span>{displayLabel}</span>
                           </span>
                         );
@@ -745,19 +745,19 @@ WHERE role IN ('admin', 'super_admin');`;
                 </div>
 
                 {/* Staff Actions */}
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-850">
+                <div className="flex justify-end gap-2.5 pt-3.5 border-t border-slate-200 dark:border-slate-850">
                   <button
                     onClick={() => handleOpenEditModal(staff)}
-                    className="h-8 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-250 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-[10px] flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-250 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                    <Edit3 className="w-4 h-4 text-slate-500" />
                     <span>แก้ไขสิทธิ์</span>
                   </button>
                   <button
                     onClick={() => handleDeleteClick(staff.id)}
-                    className="h-8 px-3 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold text-[10px] flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="h-10 px-4 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                     <span>ลบ Staff</span>
                   </button>
                 </div>
@@ -766,9 +766,9 @@ WHERE role IN ('admin', 'super_admin');`;
           </div>
         ) : (
           <div className="py-16 text-center border-2 border-dashed border-slate-250 dark:border-slate-800/80 rounded-2xl max-w-xl mx-auto">
-            <Users className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <h4 className="text-xs font-black text-slate-700 dark:text-slate-300">ยังไม่มีรายชื่อ Staff ใน Workspace นี้</h4>
-            <p className="text-[11px] text-slate-450 dark:text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+            <Users className="w-14 h-14 text-slate-400 mx-auto mb-3" />
+            <h4 className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-300">ยังไม่มีรายชื่อ Staff ใน Workspace นี้</h4>
+            <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed">
               คุณสามารถสร้างและจัดการบัญชีให้กับผู้ช่วยหรือผู้จดมิเตอร์ประจำหอพักของคุณได้ง่าย ๆ โดยคลิกปุ่ม **"เพิ่ม Staff ใหม่"** ด้านบนได้ทันทีครับ
             </p>
           </div>
@@ -777,28 +777,28 @@ WHERE role IN ('admin', 'super_admin');`;
 
       {/* 5. SQL Patch Information Card */}
       {!isDemo && (
-        <div className="bg-gradient-to-r from-amber-500/5 to-yellow-500/5 border border-amber-500/20 rounded-3xl p-5 space-y-4">
-          <div className="flex gap-3">
-            <Database className="w-6 h-6 text-amber-500 shrink-0" />
+        <div className="bg-gradient-to-r from-amber-500/5 to-yellow-500/5 border border-amber-500/20 rounded-3xl p-6 space-y-4">
+          <div className="flex gap-3.5">
+            <Database className="w-7 h-7 text-amber-500 shrink-0" />
             <div>
-              <h4 className="text-sm font-black text-slate-800 dark:text-slate-200">คู่มือการติดตั้งคอลัมน์สิทธิ์ในฐานข้อมูลจริง (Supabase SQL Setup)</h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              <h4 className="text-base font-black text-slate-800 dark:text-slate-200">คู่มือการติดตั้งคอลัมน์สิทธิ์ในฐานข้อมูลจริง (Supabase SQL Setup)</h4>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                 เนื่องจากระบบเพิ่งติดตั้งฟังก์ชันกำหนดสิทธิ์อย่างละเอียดแบบ JSONB หากใช้งานในฐานข้อมูล Supabase แอดมินต้องทำการรันคำสั่ง SQL ด้านล่างนี้ในหน้า **SQL Editor** ของเครื่องตนเองเพื่อเพิ่มคอลัมน์ `permissions` เสียก่อนครับ
               </p>
             </div>
           </div>
 
-          <div className="p-3 bg-slate-950 text-slate-300 font-mono text-[10px] rounded-xl relative border border-slate-800 overflow-x-auto select-all max-h-[150px]">
+          <div className="p-4 bg-slate-950 text-slate-300 font-mono text-xs sm:text-sm rounded-xl relative border border-slate-800 overflow-x-auto select-all max-h-[180px]">
             <pre>{sqlScript}</pre>
             <button
               onClick={copySqlToClipboard}
-              className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white cursor-pointer transition-colors"
+              className="absolute top-3 right-3 p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white cursor-pointer transition-colors"
             >
-              {sqlCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              {sqlCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
             </button>
           </div>
           {sqlCopied && (
-            <span className="text-[10px] font-bold text-emerald-500 block">คัดลอกสคริปต์ SQL ลงคลิปบอร์ดแล้ว! นำไปรันในช่อง SQL Editor ของ Supabase Dashboard ได้ทันที</span>
+            <span className="text-xs sm:text-sm font-bold text-emerald-500 block">คัดลอกสคริปต์ SQL ลงคลิปบอร์ดแล้ว! นำไปรันในช่อง SQL Editor ของ Supabase Dashboard ได้ทันที</span>
           )}
         </div>
       )}

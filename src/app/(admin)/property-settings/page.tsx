@@ -371,21 +371,21 @@ export default function PropertySettingsPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">ตั้งค่าหอพัก</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-sans">ตั้งค่าหอพัก</h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
             ระบุอัตราส่วนกลาง ค่าปรับจ่ายล่าช้า อัตราค่าน้ำค่าไฟ และเงินประกันแยกตามประเภทห้องพัก
           </p>
         </div>
         
         {/* Badge แจ้งเตือนสถานะฐานข้อมูล */}
         {isDatabaseBacked ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-[10px] font-bold text-teal-400 shadow-sm">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-extrabold text-teal-400 shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" /> Cloud Database Connected
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 shadow-sm">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-extrabold text-amber-400 shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> Local Storage Fallback Mode
           </span>
         )}
@@ -404,12 +404,12 @@ export default function PropertySettingsPage() {
             
             {/* กล่อง 1: ค่าบริการส่วนกลางและค่าปรับล่าช้า */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <Sliders className="w-4 h-4 text-blue-400" /> ค่าบริการส่วนกลางและค่าปรับล่าช้า
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <Sliders className="w-5 h-5 text-blue-400" /> ค่าบริการส่วนกลางและค่าปรับล่าช้า
               </h3>
 
               {errorMsg && (
-                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2 animate-shake">
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs sm:text-sm text-red-400 flex items-start gap-2 animate-shake">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
                 </div>
@@ -417,24 +417,24 @@ export default function PropertySettingsPage() {
 
               {/* ค่าบริการส่วนกลาง */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <Building className="w-4 h-4 text-teal-400" /> ค่าบริการส่วนกลางคงที่
+                <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
+                  <Building className="w-4.5 h-4.5 text-teal-400" /> ค่าบริการส่วนกลางคงที่
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
                   <div className="relative">
                     <input
                       type="number"
                       required
                       min={0}
                       placeholder="50"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       value={commonFee}
                       onChange={(e) => setCommonFee(Number(e.target.value))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
                     ค่าส่วนกลางคงที่รายเดือน สำหรับนำไปบวกเพิ่มในใบแจ้งหนี้ทุกห้องพักอัตโนมัติ
                   </p>
                 </div>
@@ -442,24 +442,24 @@ export default function PropertySettingsPage() {
 
               {/* ค่าปรับจ่ายล่าช้าสะสมรายวัน */}
               <div className="space-y-2 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <Clock className="w-4 h-4 text-amber-500 animate-pulse" /> ค่าปรับจ่ายบิลล่าช้า (สะสมต่อวัน)
+                <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
+                  <Clock className="w-4.5 h-4.5 text-amber-500 animate-pulse" /> ค่าปรับจ่ายบิลล่าช้า (สะสมต่อวัน)
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">อัตราค่าปรับล่าช้าต่อวัน (บาท / วัน)</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">อัตราค่าปรับล่าช้าต่อวัน (บาท / วัน)</label>
                   <div className="relative">
                     <input
                       type="number"
                       required
                       min={0}
                       placeholder="50"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       value={latePenaltyRate}
                       onChange={(e) => setLatePenaltyRate(Number(e.target.value))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
                     สะสมค่าปรับเพิ่มขึ้นอัตโนมัติทุกวันเมื่อพ้นกำหนดส่งเงิน (ตั้งแต่วันที่ 6 ของรอบบิลเป็นต้นไป)
                   </p>
                 </div>
@@ -468,14 +468,14 @@ export default function PropertySettingsPage() {
 
             {/* กล่อง 2: เงินประกันและค่าเช่าล่วงหน้า */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <ShieldCheck className="w-4 h-4 text-teal-400" /> เงินประกันและค่าเช่าล่วงหน้า
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <ShieldCheck className="w-5 h-5 text-teal-400" /> เงินประกันและค่าเช่าล่วงหน้า
               </h3>
 
               {/* เงินประกัน (เงินมัดจำ) */}
               <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <label className="text-xs text-slate-400 font-medium">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">
                     เงินประกัน (เงินมัดจำ) {depositType === "months" ? "(จำนวนเดือน)" : "(จำนวนเงินบาท)"}
                   </label>
                   
@@ -489,7 +489,7 @@ export default function PropertySettingsPage() {
                           setDepositAmount(1)
                         }
                       }}
-                      className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition-all cursor-pointer ${
                         depositType === "months"
                           ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
                           : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -505,7 +505,7 @@ export default function PropertySettingsPage() {
                           setDepositAmount(5000)
                         }
                       }}
-                      className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition-all cursor-pointer ${
                         depositType === "fixed"
                           ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
                           : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -523,15 +523,15 @@ export default function PropertySettingsPage() {
                     min={0}
                     step={depositType === "months" ? 0.5 : 100}
                     placeholder="0"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(Number(e.target.value))}
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">
                     {depositType === "months" ? "เดือน" : "บาท"}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-relaxed">
                   {depositType === "months" 
                     ? "ระบุจำนวนเดือนของเงินประกัน (เช่น 2 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อพักยอดเงินประกันไว้ในสถานะหนี้สิน และคำนวณหักกลบลบด้วยยอดคืนเงินจริงเมื่อยกเลิกสัญญาเพื่อส่งเป็นรายได้ 40(8)"
                     : "ระบุจำนวนเงินประกันเริ่มต้น (เช่น 5,000 บาท) สำหรับห้องพักทั่วไปหรือใช้เป็นค่าเริ่มต้นหากประเภทห้องพักนั้นๆ ไม่ได้ระบุแยกเอาไว้ด้านล่าง"
@@ -542,18 +542,18 @@ export default function PropertySettingsPage() {
                 {depositType === "fixed" && roomTypes.length > 0 && (
                   <div className="space-y-4 border-t border-slate-100 dark:border-slate-900/40 pt-4 mt-2 animate-fade-in">
                     <div className="flex items-center gap-1.5">
-                      <Sliders className="w-3.5 h-3.5 text-teal-400" />
-                      <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <Sliders className="w-4 h-4 text-teal-400" />
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300">
                         ระบุเงินประกันแยกตามประเภทห้องพัก
                       </h4>
                     </div>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       {roomTypes.map((rt) => {
                         const val = roomTypeDeposits[rt.id] !== undefined ? roomTypeDeposits[rt.id] : depositAmount;
                         return (
-                          <div key={rt.id} className="relative group/input flex flex-col gap-1 bg-slate-50/50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/60 dark:border-slate-850/60 hover:border-teal-500/30 transition-all duration-300">
-                            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover/input:text-teal-400 transition-colors">
+                          <div key={rt.id} className="relative group/input flex flex-col gap-1.5 bg-slate-50/50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/60 dark:border-slate-850/60 hover:border-teal-500/30 transition-all duration-300">
+                            <span className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400 group-hover/input:text-teal-400 transition-colors">
                               ประเภท: {rt.name}
                             </span>
                             <div className="relative">
@@ -563,14 +563,14 @@ export default function PropertySettingsPage() {
                                 min={0}
                                 step={100}
                                 placeholder={depositAmount.toString()}
-                                className="w-full pr-12 pl-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-xs tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-full pr-12 pl-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-xs sm:text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 value={val}
                                 onChange={(e) => {
                                   const updated = { ...roomTypeDeposits, [rt.id]: Number(e.target.value) }
                                   setRoomTypeDeposits(updated)
                                 }}
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 dark:text-slate-500 font-bold">
                                 บาท
                               </span>
                             </div>
@@ -584,7 +584,7 @@ export default function PropertySettingsPage() {
 
               {/* ค่าเช่าล่วงหน้า */}
               <div className="space-y-1.5 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <label className="text-xs text-slate-400 font-medium">ค่าเช่าล่วงหน้า (จำนวนเดือน)</label>
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">ค่าเช่าล่วงหน้า (จำนวนเดือน)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -592,13 +592,13 @@ export default function PropertySettingsPage() {
                     min={0}
                     step={0.5}
                     placeholder="0"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={advanceRent}
                     onChange={(e) => setAdvanceRent(Number(e.target.value))}
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">เดือน</span>
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">เดือน</span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
                   ระบุจำนวนเดือนของค่าเช่าล่วงหน้า (เช่น 1 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อบันทึกเป็นรายได้กลุ่มมาตรา 40(5) (ค่าเช่าทรัพย์สิน) ประจำปีภาษีที่สัญญาเริ่มเช่าทันที
                 </p>
               </div>
@@ -610,19 +610,19 @@ export default function PropertySettingsPage() {
             
             {/* กล่อง 3: อัตราค่าสาธารณูปโภค (ค่าน้ำประปาและค่าไฟฟ้า) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <Sliders className="w-4 h-4 text-blue-400" /> อัตราค่าสาธารณูปโภค (น้ำ / ไฟ)
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <Sliders className="w-5 h-5 text-blue-400" /> อัตราค่าสาธารณูปโภค (น้ำ / ไฟ)
               </h3>
 
               {/* ค่าน้ำประปา */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <Droplet className="w-4 h-4 text-blue-400" /> ค่าน้ำประปา (Water Utility)
+                <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
+                  <Droplet className="w-4.5 h-4.5 text-blue-400" /> ค่าน้ำประปา (Water Utility)
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">ราคาต่อหน่วย (บาท / หน่วย)</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ราคาต่อหน่วย (บาท / หน่วย)</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -630,42 +630,42 @@ export default function PropertySettingsPage() {
                         min={0}
                         step="0.01"
                         placeholder="18"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base transition-all"
                         value={waterRate}
                         onChange={(e) => setWaterRate(Number(e.target.value))}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col justify-end space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 rounded border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
+                        className="w-4.5 h-4.5 rounded border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-blue-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
                         checked={waterMinChecked}
                         onChange={(e) => setWaterMinChecked(e.target.checked)}
                       />
-                      <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                      <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">กำหนดจำนวนหน่วยขั้นต่ำ</span>
                     </label>
                   </div>
                 </div>
 
                 {waterMinChecked && (
-                  <div className="p-3 bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-2 animate-fade-in">
-                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่าน้ำประปา</label>
+                  <div className="p-3.5 bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-bold block">จำนวนหน่วยขั้นต่ำค่าน้ำประปา</label>
                     <div className="relative max-w-[200px]">
                       <input
                         type="number"
                         required
                         min={1}
-                        className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
                         value={waterMinUnit}
                         onChange={(e) => setWaterMinUnit(Number(e.target.value))}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-semibold">หน่วย</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">หน่วย</span>
                     </div>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-xs sm:text-sm text-slate-450 mt-1">
                       * หากใช้น้ำประปาไม่ถึง {waterMinUnit} หน่วย ระบบจะคิดเหมาจ่ายเทียบเท่า {waterMinUnit} หน่วย ({waterMinUnit * waterRate} บาท)
                     </p>
                   </div>
@@ -674,13 +674,13 @@ export default function PropertySettingsPage() {
 
               {/* ค่าไฟฟ้า */}
               <div className="space-y-4 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <Zap className="w-4 h-4 text-amber-400" /> ค่ากระแสไฟฟ้า (Electricity Utility)
+                <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
+                  <Zap className="w-4.5 h-4.5 text-amber-400" /> ค่ากระแสไฟฟ้า (Electricity Utility)
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-medium">ราคาต่อหน่วย (บาท / หน่วย)</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ราคาต่อหน่วย (บาท / หน่วย)</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -688,42 +688,42 @@ export default function PropertySettingsPage() {
                         min={0}
                         step="0.01"
                         placeholder="7"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base transition-all"
                         value={electricRate}
                         onChange={(e) => setElectricRate(Number(e.target.value))}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">บาท</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col justify-end space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 rounded border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
+                        className="w-4.5 h-4.5 rounded border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-amber-500 focus:ring-0 focus:ring-offset-0 focus:outline-none"
                         checked={electricMinChecked}
                         onChange={(e) => setElectricMinChecked(e.target.checked)}
                       />
-                      <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                      <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">กำหนดจำนวนหน่วยขั้นต่ำ</span>
                     </label>
                   </div>
                 </div>
 
                 {electricMinChecked && (
-                  <div className="p-3 bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/10 rounded-xl space-y-2 animate-fade-in">
-                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">จำนวนหน่วยขั้นต่ำค่ากระแสไฟฟ้า</label>
+                  <div className="p-3.5 bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/10 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-bold block">จำนวนหน่วยขั้นต่ำค่ากระแสไฟฟ้า</label>
                     <div className="relative max-w-[200px]">
                       <input
                         type="number"
                         required
                         min={1}
-                        className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
+                        className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm transition-all"
                         value={electricMinUnit}
                         onChange={(e) => setElectricMinUnit(Number(e.target.value))}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-semibold">หน่วย</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">หน่วย</span>
                     </div>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-xs sm:text-sm text-slate-450 mt-1">
                       * หากใช้ไฟฟ้าไม่ถึง {electricMinUnit} หน่วย ระบบจะคิดเหมาจ่ายเทียบเท่า {electricMinUnit} หน่วย ({electricMinUnit * electricRate} บาท)
                     </p>
                   </div>
@@ -733,30 +733,30 @@ export default function PropertySettingsPage() {
             
             {/* กล่อง 4: ตั้งค่าสัญญาเช่าเริ่มต้น (Default Lease Settings) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3 font-sans">
-                <FileText className="w-4 h-4 text-emerald-400" /> ตั้งค่าสัญญาเช่าเริ่มต้น
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3 font-sans">
+                <FileText className="w-5 h-5 text-emerald-400" /> ตั้งค่าสัญญาเช่าเริ่มต้น
               </h3>
 
               {/* ระยะเวลาสัญญาเช่า */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <Clock className="w-4 h-4 text-teal-400" /> ระยะเวลาสัญญาเช่าเริ่มต้น
+                <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
+                  <Clock className="w-4.5 h-4.5 text-teal-400" /> ระยะเวลาสัญญาเช่าเริ่มต้น
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">ระยะเวลาสัญญาเริ่มต้น (เดือน)</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">ระยะเวลาสัญญาเริ่มต้น (เดือน)</label>
                   <div className="relative">
                     <input
                       type="number"
                       required
                       min={1}
                       placeholder="6"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base tracking-wide transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       value={leaseDuration}
                       onChange={(e) => setLeaseDuration(Number(e.target.value))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">เดือน</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">เดือน</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                  <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
                     เมื่อเพิ่มผู้เช่าใหม่ ระบบจะคำนวณวันสิ้นสุดสัญญาอัตโนมัติจาก วันเริ่มสัญญา + ระยะเวลาสัญญานี้
                   </p>
                 </div>
@@ -764,8 +764,8 @@ export default function PropertySettingsPage() {
 
               {/* รูปแบบการหมดสัญญา */}
               <div className="space-y-3 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <label className="text-xs text-slate-400 font-medium">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">
                     รูปแบบสัญญาเมื่อครบกำหนด
                   </label>
                   
@@ -774,7 +774,7 @@ export default function PropertySettingsPage() {
                     <button
                       type="button"
                       onClick={() => setLeaseExpiryAction("renew")}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      className={`px-3.5 py-1.5 text-xs font-extrabold rounded-md transition-all cursor-pointer ${
                         leaseExpiryAction === "renew"
                           ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
                           : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -785,7 +785,7 @@ export default function PropertySettingsPage() {
                     <button
                       type="button"
                       onClick={() => setLeaseExpiryAction("original")}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      className={`px-3.5 py-1.5 text-xs font-extrabold rounded-md transition-all cursor-pointer ${
                         leaseExpiryAction === "original"
                           ? "bg-white dark:bg-slate-900 text-teal-500 shadow-sm border border-slate-200/50 dark:border-slate-800"
                           : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -796,11 +796,11 @@ export default function PropertySettingsPage() {
                   </div>
                 </div>
 
-                <div className="p-3 bg-teal-500/5 dark:bg-teal-950/20 border border-teal-500/10 rounded-xl space-y-1.5 animate-fade-in">
-                  <h4 className="text-[11px] text-slate-700 dark:text-slate-300 font-bold">
+                <div className="p-3.5 bg-teal-500/5 dark:bg-teal-950/20 border border-teal-500/10 rounded-xl space-y-2 animate-fade-in">
+                  <h4 className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">
                     คำอธิบาย Logic สัญญาเช่า:
                   </h4>
-                  <ul className="list-disc list-inside text-[10px] text-slate-500 space-y-1 leading-normal">
+                  <ul className="list-disc list-inside text-xs sm:text-sm text-slate-500 space-y-1 leading-normal">
                     {leaseExpiryAction === "renew" ? (
                       <>
                         <li className="text-amber-500 font-medium dark:text-amber-400">
@@ -822,17 +822,17 @@ export default function PropertySettingsPage() {
 
             {/* กล่อง 5: ตั้งค่าระยะเวลาการเก็บไฟล์สลิปโอนเงิน (Slip Retention Settings) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <Clock className="w-4 h-4 text-rose-500" /> ระยะเวลาการเก็บไฟล์สลิปโอนเงิน (Slip)
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <Clock className="w-5 h-5 text-rose-500" /> ระยะเวลาการเก็บไฟล์สลิปโอนเงิน (Slip)
               </h3>
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium block">
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">
                     ระยะเวลาเก็บไฟล์สลิป (สลิปโอนเงินในตารางบิล)
                   </label>
                   <select
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-rose-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-rose-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base transition-all font-bold"
                     value={slipRetentionMonths}
                     onChange={(e) => setSlipRetentionMonths(Number(e.target.value))}
                   >
@@ -842,20 +842,20 @@ export default function PropertySettingsPage() {
                     <option value={6}>เก็บไว้ 6 เดือน (ลบไฟล์สลิปที่อายุเกิน 6 เดือน)</option>
                     <option value={12}>เก็บไว้ 12 เดือน / 1 ปี (ลบไฟล์สลิปที่อายุเกิน 1 ปี)</option>
                   </select>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                  <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
                     ระบบจะลบรูปภาพสลิปที่อายุเกินระยะเวลาที่กำหนดออกจาก Supabase Storage และลบที่อยู่ไฟล์ (URL) ออกจากตารางบิลโดยอัตโนมัติทุกๆ สิ้นเดือนเพื่อช่วยประหยัดพื้นที่จัดเก็บข้อมูล แต่ยังคงเก็บข้อมูลบิลและยอดเงินเดิมไว้ทั้งหมดเพื่อความโปร่งใสและการบัญชี
                   </p>
                 </div>
 
                 {slipRetentionMonths > 0 && (
-                  <div className="p-3 bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/10 rounded-xl space-y-3 animate-fade-in">
+                  <div className="p-3.5 bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/10 rounded-xl space-y-3 animate-fade-in">
                     <div className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-                      <span className="text-[11px] text-rose-700 dark:text-rose-400 font-bold">
+                      <AlertTriangle className="w-4 h-4 text-rose-500" />
+                      <span className="text-xs sm:text-sm text-rose-700 dark:text-rose-400 font-bold">
                         ระบบทำความสะอาดไฟล์สลิป:
                       </span>
                     </div>
-                    <ul className="list-disc list-inside text-[10px] text-slate-500 space-y-1 leading-normal">
+                    <ul className="list-disc list-inside text-xs sm:text-sm text-slate-500 space-y-1.5 leading-normal">
                       <li>
                         ภาพสลิปที่มีอายุเกินกว่า <strong className="font-semibold text-rose-500">{slipRetentionMonths} เดือน</strong> จะถูกเคลียร์อัตโนมัติเพื่อประหยัดพื้นที่คลาวด์
                       </li>
@@ -869,7 +869,7 @@ export default function PropertySettingsPage() {
                       type="button"
                       disabled={isCleaning || !hasEditPermission}
                       onClick={handleManualCleanup}
-                      className={`w-full text-xs font-bold text-center py-2 text-white rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 ${
+                      className={`w-full text-xs sm:text-sm font-bold text-center py-2.5 text-white rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 ${
                         !hasEditPermission
                           ? "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50 shadow-none"
                           : "bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 cursor-pointer"
@@ -877,12 +877,12 @@ export default function PropertySettingsPage() {
                     >
                       {isCleaning ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           กำลังเคลียร์สลิปหมดอายุ...
                         </>
                       ) : (
                         <>
-                          <Clock className="w-3.5 h-3.5" />
+                          <Clock className="w-4 h-4" />
                           ล้างไฟล์สลิปหมดอายุทันที (Manual Run)
                         </>
                       )}
@@ -895,7 +895,7 @@ export default function PropertySettingsPage() {
             <button
               type="submit"
               disabled={isSubmitting || !hasEditPermission}
-              className={`w-full glow-btn text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg transition-all ${
+              className={`w-full glow-btn text-white font-extrabold py-3.5 px-5 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base shadow-lg transition-all ${
                 !hasEditPermission 
                   ? "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50 shadow-none" 
                   : "bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 shadow-teal-600/15 cursor-pointer"
@@ -903,12 +903,12 @@ export default function PropertySettingsPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
                   กำลังบันทึกข้อมูลหอพัก...
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" /> บันทึกข้อมูลตั้งค่าหอพักทั้งหมด
+                  <Save className="w-5 h-5" /> บันทึกข้อมูลตั้งค่าหอพักทั้งหมด
                 </>
               )}
             </button>

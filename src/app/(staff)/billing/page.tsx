@@ -1589,21 +1589,21 @@ export default function UnifiedBillingPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
         <div>
-          <div className="flex items-center gap-2">
-            <Gauge className="w-5 h-5 text-blue-500" />
-            <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</h2>
+          <div className="flex items-center gap-2.5">
+            <Gauge className="w-6 h-6 text-blue-500" />
+            <h2 className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</h2>
           </div>
-          <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          <p className={`text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             ระบบบันทึกจดเลขมิเตอร์ไฟฟ้า มิเตอร์น้ำประปา และตรวจสอบสรุปยอดบิลอย่างง่ายประจำหอพัก
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className={`w-full md:w-auto h-12 md:h-9 px-3.5 border rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold transition-all cursor-pointer ${
+            className={`w-full md:w-auto h-11 px-4 border rounded-xl focus:outline-none focus:border-blue-500 text-sm font-bold transition-all cursor-pointer ${
               isDark ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
             }`}
             value={billingCycle}
@@ -1617,27 +1617,27 @@ export default function UnifiedBillingPage() {
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 mt-6 mb-6">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 mt-8 mb-8">
         <button
           onClick={() => setPageActiveTab("meters")}
-          className={`px-5 py-2.5 font-bold text-xs md:text-sm transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2 ${
+          className={`px-6 py-3.5 font-bold text-sm md:text-base transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2.5 ${
             pageActiveTab === "meters"
-              ? "border-blue-500 text-blue-600 dark:text-blue-400 font-extrabold"
+              ? "border-blue-500 text-blue-600 dark:text-blue-400 font-black"
               : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
           }`}
         >
-          <Gauge className="w-4 h-4 text-blue-500" />
+          <Gauge className="w-5 h-5 text-blue-500" />
           <span>จดเลขมิเตอร์</span>
         </button>
         <button
           onClick={() => setPageActiveTab("summary")}
-          className={`px-5 py-2.5 font-bold text-xs md:text-sm transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2 ${
+          className={`px-6 py-3.5 font-bold text-sm md:text-base transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2.5 ${
             pageActiveTab === "summary"
-              ? "border-teal-500 text-teal-600 dark:text-teal-400 font-extrabold"
+              ? "border-teal-500 text-teal-600 dark:text-teal-400 font-black"
               : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
           }`}
         >
-          <FileText className="w-4 h-4 text-teal-500" />
+          <FileText className="w-5 h-5 text-teal-500" />
           <span>สรุปบิล</span>
         </button>
       </div>

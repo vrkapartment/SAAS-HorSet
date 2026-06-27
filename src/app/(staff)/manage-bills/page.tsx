@@ -1442,24 +1442,24 @@ export default function ManageBillsPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
         <div>
-          <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-indigo-500" />
-            <h2 className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}>จัดการใบแจ้งหนี้</h2>
+          <div className="flex items-center gap-2.5">
+            <Receipt className="w-6 h-6 text-indigo-500" />
+            <h2 className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จัดการใบแจ้งหนี้</h2>
           </div>
-          <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          <p className={`text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             ระบบจัดการใบแจ้งหนี้ค่าเช่าหอพัก ตรวจสอบสลิปโอนเงิน ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดเพิ่มเติม
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           {/* ปุ่มดาวน์โหลด PDF บิลรวมทุกห้อง */}
           {userPermissions.billing_download_pdf && (
             <button
               onClick={handleDownloadAllBillsPdf}
               disabled={downloadingAllPdf}
-              className={`h-12 md:h-9 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer ${
+              className={`h-11 px-5 rounded-xl flex items-center justify-center gap-2 text-sm font-extrabold transition-all shadow-md active:scale-95 cursor-pointer ${
                 downloadingAllPdf
                   ? "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
                   : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/20"
@@ -1467,12 +1467,12 @@ export default function ManageBillsPage() {
             >
               {downloadingAllPdf ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>กำลังบีบอัด ZIP...</span>
                 </>
               ) : (
                 <>
-                  <Download className="w-3.5 h-3.5" />
+                  <Download className="w-4 h-4" />
                   <span>ดาวน์โหลด PDF ทั้งหมด (.ZIP)</span>
                 </>
               )}
@@ -1490,16 +1490,16 @@ export default function ManageBillsPage() {
                 }
                 setCreateBillModalOpen(true)
               }}
-              className="h-12 md:h-9 px-4 rounded-xl bg-slate-850 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 border border-slate-700/30 dark:border-slate-300 shadow-md text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              className="h-11 px-5 rounded-xl bg-slate-850 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 border border-slate-700/30 dark:border-slate-300 shadow-md text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>สร้างบิลด้วยตนเอง</span>
             </button>
           )}
 
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className={`w-full md:w-auto h-12 md:h-9 px-3.5 border rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold transition-all cursor-pointer ${
+            className={`w-full md:w-auto h-11 px-4 border rounded-xl focus:outline-none focus:border-blue-500 text-sm font-bold transition-all cursor-pointer ${
               isDark ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
             }`}
             value={billingCycle}

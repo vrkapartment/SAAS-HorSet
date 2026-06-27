@@ -497,21 +497,21 @@ export default function FinanceSettingsPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">ตั้งค่าการเงินและบัญชีรับเงิน</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-sans">ตั้งค่าการเงินและบัญชีรับเงิน</h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5">
             ระบุข้อมูลผู้เสียภาษีและพร้อมเพย์เพื่อสร้างบิลสแกนจ่ายจริงและออกใบยื่นแบบภาษี ภ.ง.ด. รายหอพัก
           </p>
         </div>
         
         {/* Badge แจ้งเตือนสถานะฐานข้อมูล */}
         {isDatabaseBacked ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-[10px] font-bold text-teal-400 shadow-sm">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-bold text-teal-400 shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" /> Cloud Database Connected
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 shadow-sm">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-400 shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> Local Storage Fallback Mode
           </span>
         )}
@@ -520,21 +520,21 @@ export default function FinanceSettingsPage() {
       {loading ? (
         <div className="w-full min-h-[400px] flex flex-col items-center justify-center gap-3">
           <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
-          <p className="text-xs text-slate-400">กำลังโหลดข้อมูลการตั้งค่าการเงินของหอพักนี้...</p>
+          <p className="text-sm text-slate-400">กำลังโหลดข้อมูลการตั้งค่าการเงินของหอพักนี้...</p>
         </div>
       ) : (
-        <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+        <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {/* คอลัมน์ซ้าย: ข้อมูลผู้ยื่นเสียภาษี และ ค่าปรับล่าช้า */}
           <div className="flex flex-col gap-6">
             
             {/* กล่อง 1: ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา */}
-            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <User className="w-4 h-4 text-blue-400" /> ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <User className="w-5 h-5 text-blue-400" /> ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา
               </h3>
 
               {errorMsg && (
-                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2 animate-shake">
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs sm:text-sm text-red-400 flex items-start gap-2 animate-shake">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
                 </div>
@@ -542,22 +542,22 @@ export default function FinanceSettingsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">ชื่อจริง</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">ชื่อจริง</label>
                   <input
                     type="text"
                     required
                     placeholder="ชื่อจริง (เช่น สมเจตน์)"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">นามสกุล</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">นามสกุล</label>
                   <input
                     type="text"
                     placeholder="นามสกุล (เช่น แสนสุข)"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                   />
@@ -565,13 +565,13 @@ export default function FinanceSettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 font-medium">เลขประจำตัวผู้เสียภาษีอากร / เลขบัตรประชาชน (13 หลัก)</label>
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">เลขประจำตัวผู้เสียภาษีอากร / เลขบัตรประชาชน (13 หลัก)</label>
                 <input
                   type="text"
                   required
                   maxLength={13}
                   placeholder="1100100222333"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
                   value={taxId}
                   onChange={(e) => setTaxId(e.target.value)}
                 />
@@ -579,12 +579,12 @@ export default function FinanceSettingsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 font-medium">เบอร์โทรศัพท์ติดต่อ</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">เบอร์โทรศัพท์ติดต่อ</label>
                   <input
                     type="text"
                     required
                     placeholder="089-999-9999"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                   />
@@ -593,26 +593,26 @@ export default function FinanceSettingsPage() {
 
               {/* ฟอร์มกรอกที่อยู่แบบแยกประเภท */}
               <div className="space-y-4 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <label className="text-xs text-slate-500 dark:text-slate-400 font-bold block uppercase tracking-wider">ที่อยู่ตามทะเบียนบ้าน (เพื่อกรอกในแบบยื่นภาษีกรมสรรพากร)</label>
+                <label className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold block uppercase tracking-wide">ที่อยู่ตามทะเบียนบ้าน (เพื่อกรอกในแบบยื่นภาษีกรมสรรพากร)</label>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">เลขที่ / ซอย / หมู่บ้าน / อาคาร</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">เลขที่ / ซอย / หมู่บ้าน / อาคาร</label>
                     <input
                       type="text"
                       required
                       placeholder="เช่น 21 ซอยหงษ์อ่อน"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressNo}
                       onChange={(e) => setAddressNo(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">ถนน (ถ้าไม่มีให้ใส่ -)</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ถนน (ถ้าไม่มีให้ใส่ -)</label>
                     <input
                       type="text"
                       placeholder="เช่น ประชาราษฎร์บำเพ็ญ"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressRoad}
                       onChange={(e) => setAddressRoad(e.target.value)}
                     />
@@ -621,23 +621,23 @@ export default function FinanceSettingsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">ตำบล / แขวง</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ตำบล / แขวง</label>
                     <input
                       type="text"
                       required
                       placeholder="เช่น ห้วยขวาง"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressSubdistrict}
                       onChange={(e) => setAddressSubdistrict(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">อำเภอ / เขต</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">อำเภอ / เขต</label>
                     <input
                       type="text"
                       required
                       placeholder="เช่น ห้วยขวาง"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressDistrict}
                       onChange={(e) => setAddressDistrict(e.target.value)}
                     />
@@ -646,24 +646,24 @@ export default function FinanceSettingsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">จังหวัด</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">จังหวัด</label>
                     <input
                       type="text"
                       required
                       placeholder="เช่น กรุงเทพมหานคร"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressProvince}
                       onChange={(e) => setAddressProvince(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">รหัสไปรษณีย์</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">รหัสไปรษณีย์</label>
                     <input
                       type="text"
                       required
                       maxLength={5}
                       placeholder="เช่น 10310"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
                       value={addressZipcode}
                       onChange={(e) => setAddressZipcode(e.target.value)}
                     />
@@ -677,21 +677,21 @@ export default function FinanceSettingsPage() {
           <div className="flex flex-col gap-6">
             
             {/* กล่อง 3: พร้อมเพย์ */}
-            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <CreditCard className="w-4 h-4 text-teal-400" /> ตั้งค่าระบบรับเงินพร้อมเพย์ (PromptPay QR)
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <CreditCard className="w-5 h-5 text-teal-400" /> ตั้งค่าระบบรับเงินพร้อมเพย์ (PromptPay QR)
               </h3>
 
-              <div className="space-y-2">
-                <label className="text-xs text-slate-400 font-medium block">ประเภทพร้อมเพย์</label>
-                <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2.5">
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">ประเภทพร้อมเพย์</label>
+                <div className="grid grid-cols-2 gap-3.5">
                   <button
                     type="button"
                     onClick={() => {
                       setPromptPayType("phone")
                       if (promptPayId === "1100100222333") setPromptPayId("0899999999")
                     }}
-                    className={`py-2.5 px-4 text-xs font-semibold rounded-xl transition-all border ${
+                    className={`py-3 px-4 text-xs sm:text-sm font-bold rounded-xl transition-all border cursor-pointer ${
                       promptPayType === "phone"
                         ? "bg-teal-600/10 border-teal-500 text-teal-400"
                         : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700"
@@ -705,7 +705,7 @@ export default function FinanceSettingsPage() {
                       setPromptPayType("national_id")
                       if (promptPayId === "0899999999") setPromptPayId("1100100222333")
                     }}
-                    className={`py-2.5 px-4 text-xs font-semibold rounded-xl transition-all border ${
+                    className={`py-3 px-4 text-xs sm:text-sm font-bold rounded-xl transition-all border cursor-pointer ${
                       promptPayType === "national_id"
                         ? "bg-teal-600/10 border-teal-500 text-teal-400"
                         : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700"
@@ -717,34 +717,34 @@ export default function FinanceSettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 font-medium">
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">
                   {promptPayType === "phone" ? "หมายเลขโทรศัพท์พร้อมเพย์ (10 หลัก)" : "เลขประจำตัวบัตรประชาชนพร้อมเพย์ (13 หลัก)"}
                 </label>
                 <input
                   type="text"
                   required
                   placeholder={promptPayType === "phone" ? "0899999999" : "1100100222333"}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm tracking-wide transition-all"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
                   value={promptPayId}
                   onChange={(e) => setPromptPayId(e.target.value)}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 font-medium">ชื่อบัญชีรับเงินพร้อมเพย์ (ภาษาไทย/อังกฤษ)</label>
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">ชื่อบัญชีรับเงินพร้อมเพย์ (ภาษาไทย/อังกฤษ)</label>
                 <input
                   type="text"
                   required
                   placeholder="เช่น นายสมเจตน์ แสนสุข"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-sm transition-all"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                   value={promptPayName}
                   onChange={(e) => setPromptPayName(e.target.value)}
                 />
               </div>
 
               <div className="p-4 bg-teal-500/5 border border-teal-500/10 rounded-xl flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                <ShieldCheck className="w-5.5 h-5.5 text-teal-400 shrink-0 mt-0.5" />
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                   <span className="font-bold text-slate-700 dark:text-slate-300">สแกนจ่ายได้จริง:</span> ข้อมูลนี้จะนำไปประกอบการสร้าง QR Code ด้วยรูปแบบมาตรฐาน EMVCo ของประเทศไทยโดยตรง เพื่อให้ผู้เช่าสามารถนำโทรศัพท์ไปสแกนและชำระค่าเช่าเข้าบัญชีคุณได้ทันทีในยอดสุทธิที่ถูกต้อง
                 </div>
               </div>
@@ -752,7 +752,7 @@ export default function FinanceSettingsPage() {
             <button
               type="submit"
               disabled={isSubmitting || !hasEditPermission}
-              className={`w-full glow-btn text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg transition-all ${
+              className={`w-full glow-btn text-white font-extrabold py-3.5 px-5 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base shadow-lg transition-all ${
                 !hasEditPermission 
                   ? "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50 shadow-none" 
                   : "bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 shadow-blue-600/15 cursor-pointer"
@@ -760,12 +760,12 @@ export default function FinanceSettingsPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
                   กำลังบันทึกข้อมูลเข้าฐานข้อมูล...
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" /> บันทึกข้อมูลตั้งค่าการเงิน
+                  <Save className="w-5 h-5" /> บันทึกข้อมูลตั้งค่าการเงิน
                 </>
               )}
             </button>
