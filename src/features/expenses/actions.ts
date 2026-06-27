@@ -78,7 +78,7 @@ export async function getExpenses(taxYear?: string, workspaceId?: string) {
 /**
  * บันทึกค่าใช้จ่ายใหม่
  */
-export async function createExpense(title: string, amount: number, taxYear: string, category: "40_5" | "40_8", workspaceId?: string) {
+export async function createExpense(title: string, amount: number, taxYear: string, category: "40_5" | "40_8", workspaceId?: string, createdAt?: string) {
   try {
     const supabase = await createClient()
     const prefixTitle = `[${category}] ${title}`
@@ -92,6 +92,10 @@ export async function createExpense(title: string, amount: number, taxYear: stri
 
     if (workspaceId) {
       insertPayload.workspace_id = workspaceId
+    }
+
+    if (createdAt) {
+      insertPayload.created_at = createdAt
     }
 
     // พยายาม insert แบบมี category
@@ -116,6 +120,10 @@ export async function createExpense(title: string, amount: number, taxYear: stri
 
         if (workspaceId) {
           fallbackPayload.workspace_id = workspaceId
+        }
+
+        if (createdAt) {
+          fallbackPayload.created_at = createdAt
         }
 
         // ลอง insert อีกครั้งโดยไม่มีฟิลด์ category (ใช้ prefix ใน title เพื่อระบุประเภทแทน)
@@ -166,20 +174,26 @@ export async function createExpense(title: string, amount: number, taxYear: stri
 /**
  * แก้ไขค่าใช้จ่าย
  */
-export async function updateExpense(id: string, title: string, amount: number, taxYear: string, category: "40_5" | "40_8") {
+export async function updateExpense(id: string, title: string, amount: number, taxYear: string, category: "40_5" | "40_8", createdAt?: string) {
   try {
     const supabase = await createClient()
     const prefixTitle = `[${category}] ${title}`
 
+    const updatePayload: any = {
+      title: prefixTitle,
+      amount,
+      tax_year: taxYear,
+      category
+    }
+
+    if (createdAt) {
+      updatePayload.created_at = createdAt
+    }
+
     // พยายามอัปเดตแบบมี category
     const { data, error } = await supabase
       .from("expenses")
-      .update({
-        title: prefixTitle,
-        amount,
-        tax_year: taxYear,
-        category
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select()
 
@@ -190,14 +204,20 @@ export async function updateExpense(id: string, title: string, amount: number, t
         error.code === "42703"
 
       if (isMissingColumn) {
+        const fallbackPayload: any = {
+          title: prefixTitle,
+          amount,
+          tax_year: taxYear
+        }
+
+        if (createdAt) {
+          fallbackPayload.created_at = createdAt
+        }
+
         // อัปเดตแบบไม่มี category (ใช้ prefix ใน title)
         const { data: fallbackData, error: fallbackError } = await supabase
           .from("expenses")
-          .update({
-            title: prefixTitle,
-            amount,
-            tax_year: taxYear
-          })
+          .update(fallbackPayload)
           .eq("id", id)
           .select()
 

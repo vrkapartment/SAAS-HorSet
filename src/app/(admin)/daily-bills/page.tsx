@@ -108,6 +108,7 @@ export default function DailyBillsPage() {
   const [formTitle, setFormTitle] = useState("")
   const [formAmount, setFormAmount] = useState<number | string>("")
   const [formCategory, setFormCategory] = useState<"40_5" | "40_8">("40_5")
+  const [formDate, setFormDate] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -272,6 +273,13 @@ export default function DailyBillsPage() {
     setFormTitle("")
     setFormAmount("")
     setFormCategory("40_5")
+    
+    const today = new Date()
+    const yyyy = today.getFullYear()
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    setFormDate(`${yyyy}-${mm}-${dd}`)
+
     setFormError(null)
     setModalOpen(true)
   }
@@ -285,6 +293,17 @@ export default function DailyBillsPage() {
     setFormTitle(item.title)
     setFormAmount(item.amount)
     setFormCategory(item.category)
+    
+    if (item.created_at) {
+      const d = new Date(item.created_at)
+      const yyyy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      setFormDate(`${yyyy}-${mm}-${dd}`)
+    } else {
+      setFormDate("")
+    }
+
     setFormError(null)
     setModalOpen(true)
   }
@@ -326,10 +345,16 @@ export default function DailyBillsPage() {
         }
       }
 
+      let createdAtStr: string | undefined = undefined
+      if (formDate) {
+        const localDate = new Date(`${formDate}T12:00:00`)
+        createdAtStr = localDate.toISOString()
+      }
+
       if (editingExpense) {
-        res = await updateExpense(editingExpense.id, formTitle.trim(), amt, taxYear, formCategory)
+        res = await updateExpense(editingExpense.id, formTitle.trim(), amt, taxYear, formCategory, createdAtStr)
       } else {
-        res = await createExpense(formTitle.trim(), amt, taxYear, formCategory, wsId)
+        res = await createExpense(formTitle.trim(), amt, taxYear, formCategory, wsId, createdAtStr)
       }
 
       if (res.success) {
@@ -397,6 +422,13 @@ export default function DailyBillsPage() {
     setFormCategory(category)
     setEditingExpense(null)
     setFormAmount("")
+    
+    const today = new Date()
+    const yyyy = today.getFullYear()
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    setFormDate(`${yyyy}-${mm}-${dd}`)
+
     setFormError(null)
     setModalOpen(true)
     
@@ -972,6 +1004,20 @@ export default function DailyBillsPage() {
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 md:pr-3.5 pointer-events-none text-sm md:text-xs text-slate-400 dark:text-slate-500 font-medium">
                     บาท
                   </div>
+                </div>
+              </div>
+
+              {/* วันที่บันทึกบิล */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">วันที่บันทึกบิล <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    required
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 md:px-3.5 md:py-2 text-base md:text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all h-12 md:h-10 shadow-sm cursor-pointer"
+                  />
                 </div>
               </div>
 
