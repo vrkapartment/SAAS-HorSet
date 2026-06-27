@@ -702,58 +702,58 @@ export default function DailyBillsPage() {
               <>
                 {/* DESKTOP VIEW: HIGH-DENSITY DATA TABLE (visible on desktop, hidden on mobile) */}
                 <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse text-sm sm:text-base">
                     <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 pl-3">รายละเอียดรายการบิลจ่าย</th>
-                        <th className="py-3 text-center">ประเภทภาษี</th>
-                        <th className="py-3 text-right">จำนวนเงิน</th>
-                        <th className="py-3 text-center">วันที่บันทึก</th>
-                        <th className="py-3 text-center pr-3">การจัดการ</th>
+                      <tr className="border-b border-slate-100 dark:border-slate-800/80 text-xs sm:text-sm font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        <th className="py-3.5 pl-3">รายละเอียดรายการบิลจ่าย</th>
+                        <th className="py-3.5 text-center">ประเภทภาษี</th>
+                        <th className="py-3.5 text-right">จำนวนเงิน</th>
+                        <th className="py-3.5 text-center">วันที่บันทึก</th>
+                        <th className="py-3.5 text-center pr-3">การจัดการ</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-xs">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                       {filteredExpenses.map((item) => (
                         <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 group transition-all duration-150">
-                          <td className="py-3.5 pl-3 font-semibold text-slate-800 dark:text-slate-200">
+                          <td className="py-4 pl-3 font-semibold text-slate-800 dark:text-slate-200">
                             {item.title}
                           </td>
-                          <td className="py-3.5 text-center">
+                          <td className="py-4 text-center">
                             {item.category === "40_5" ? (
-                              <span className="inline-block text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100/40 dark:border-blue-900/30">
+                              <span className="inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100/40 dark:border-blue-900/30">
                                 40(5) ค่าเช่า
                               </span>
                             ) : (
-                              <span className="inline-block text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30">
+                              <span className="inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30">
                                 40(8) บริการ
                               </span>
                             )}
                           </td>
-                          <td className="py-3.5 text-right font-mono text-slate-800 dark:text-slate-200 font-extrabold">
+                          <td className="py-4 text-right font-mono text-slate-800 dark:text-slate-200 font-extrabold">
                             {item.amount.toLocaleString()} บาท
                           </td>
-                          <td className="py-3.5 text-center font-mono text-[10px] text-slate-400 dark:text-slate-500">
+                          <td className="py-4 text-center font-mono text-xs sm:text-sm text-slate-400 dark:text-slate-500">
                             {new Date(item.created_at).toLocaleDateString("th-TH", {
                               day: "2-digit",
                               month: "short",
                               year: "2-digit"
                             })}
                           </td>
-                          <td className="py-3.5 text-center">
+                          <td className="py-4 text-center">
                             <div className="flex items-center justify-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => handleOpenEditModal(item)}
                                 className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
                                 title="แก้ไขบิล"
                               >
-                                <Edit className="w-3.5 h-3.5" />
+                                <Edit className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteTrigger(item)}
                                 className="p-1.5 rounded-lg bg-slate-50 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/30 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors cursor-pointer"
                                 title="ลบบิล"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </td>

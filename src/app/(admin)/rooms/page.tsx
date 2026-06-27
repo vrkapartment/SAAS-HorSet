@@ -1627,14 +1627,14 @@ export default function RoomsPage() {
                 ) : (
                   /* CONDENSED TABLE VIEW: Elegant 5-Column layout to eliminate crowding */
                   <div className="overflow-x-auto rounded-2xl border border-slate-200/60 dark:border-slate-900/60 shadow-sm">
-                    <table className="w-full text-left text-xs sm:text-sm border-collapse">
+                    <table className="w-full text-left text-sm sm:text-base border-collapse">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200/60 dark:border-slate-900/60">
-                          <th className="p-4 w-36">ห้องและประเภท</th>
-                          <th className="p-4 w-44">สถานะและค่าเช่า</th>
+                        <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold text-xs sm:text-sm border-b border-slate-200/60 dark:border-slate-900/60">
+                          <th className="p-4 w-40">ห้องและประเภท</th>
+                          <th className="p-4 w-48">สถานะและค่าเช่า</th>
                           <th className="p-4">ผู้เช่าและสัญญา</th>
-                          <th className="p-4 w-64">การจัดการผู้เช่า</th>
-                          <th className="p-4 text-center w-24 border-l border-slate-100 dark:border-slate-900/50">ตั้งค่าห้อง</th>
+                          <th className="p-4 w-72">การจัดการผู้เช่า</th>
+                          <th className="p-4 text-center w-28 border-l border-slate-100 dark:border-slate-900/50">ตั้งค่าห้อง</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-900/50">
@@ -1647,11 +1647,11 @@ export default function RoomsPage() {
                                 <td className="p-4">
                                   <div className="flex flex-col gap-1.5">
                                     <div className="flex items-center gap-2">
-                                      <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm tracking-wide">ห้อง {room.roomNumber}</span>
-                                      <span className="inline-flex items-center text-[10px] text-slate-500 dark:text-slate-400 font-extrabold bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">ชั้น {room.floor || getFloorNumber(room)}</span>
+                                      <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm sm:text-base tracking-wide">ห้อง {room.roomNumber}</span>
+                                      <span className="inline-flex items-center text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">ชั้น {room.floor || getFloorNumber(room)}</span>
                                     </div>
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded w-max border border-indigo-200/30 dark:border-indigo-800/30">
-                                      <Tag className="w-2.5 h-2.5" /> {room.roomTypeName}
+                                    <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded w-max border border-indigo-200/30 dark:border-indigo-800/30">
+                                      <Tag className="w-3.5 h-3.5" /> {room.roomTypeName}
                                     </span>
                                   </div>
                                 </td>
@@ -1659,11 +1659,11 @@ export default function RoomsPage() {
                                 {/* 2. Status & Monthly Rent */}
                                 <td className="p-4">
                                   <div className="flex flex-col gap-1.5">
-                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider w-max ${statusDetails.badgeStyle}`}>
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs sm:text-sm font-extrabold uppercase tracking-wider w-max ${statusDetails.badgeStyle}`}>
                                       <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
                                       {statusDetails.label}
                                     </span>
-                                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-450">
+                                    <span className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-450">
                                       ค่าเช่า: {room.baseRent.toLocaleString()} บาท/ด.
                                     </span>
                                   </div>
@@ -1672,13 +1672,13 @@ export default function RoomsPage() {
                                 {/* 3. Tenant & Contract */}
                                 <td className="p-4">
                                   {room.tenantName ? (
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-1 text-xs text-slate-800 dark:text-slate-200 font-bold">
-                                        <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <div className="flex flex-col gap-1.5">
+                                      <div className="flex items-center gap-1.5 text-sm sm:text-base text-slate-800 dark:text-slate-200 font-bold">
+                                        <Users className="w-4 h-4 text-slate-400 shrink-0" />
                                         <span className="truncate max-w-[140px]" title={room.tenantName}>{room.tenantName}</span>
                                       </div>
                                       {room.tenantPhone && (
-                                        <div className="flex items-center gap-1 text-[11px] text-slate-550 dark:text-slate-400 font-mono">
+                                        <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-mono">
                                           <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                           <span>{room.tenantPhone}</span>
                                         </div>
@@ -1687,7 +1687,7 @@ export default function RoomsPage() {
                                         const status = getContractStatus(room.leaseStart, room.leaseEnd)
                                         if (status) {
                                           return (
-                                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] w-max mt-0.5 ${status.style}`}>
+                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs sm:text-sm w-max mt-0.5 ${status.style}`}>
                                               {status.label}
                                             </span>
                                           )
@@ -1707,9 +1707,9 @@ export default function RoomsPage() {
                                     {!room.tenantName && (
                                       <button
                                         onClick={() => handleOpenLineLinkModal(room)}
-                                        className="h-8 px-3 text-[11px] font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        className="h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                       >
-                                        <Share2 className="w-3.5 h-3.5 shrink-0" />
+                                        <Share2 className="w-4 h-4 shrink-0" />
                                         เจนลิงก์ LINE
                                       </button>
                                     )}
@@ -1719,16 +1719,16 @@ export default function RoomsPage() {
                                       <>
                                         <button
                                           onClick={() => handleOpenLineLinkModal(room)}
-                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="h-9 px-3 text-xs sm:text-sm tracking-tight font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/30 hover:bg-[#06C755] hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                         >
-                                          <Share2 className="w-3.5 h-3.5 shrink-0" />
+                                          <Share2 className="w-4 h-4 shrink-0" />
                                           เจนลิงก์ LINE
                                         </button>
                                         <button
                                           onClick={() => handleOpenDetailModal(room)}
-                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="h-9 px-3 text-xs sm:text-sm tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                         >
-                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                          <CheckCircle2 className="w-4 h-4 shrink-0" />
                                           ดูรายละเอียด/ย้ายออก
                                         </button>
                                       </>
@@ -1739,16 +1739,16 @@ export default function RoomsPage() {
                                       <>
                                         <button
                                           onClick={() => handleDisconnectLineTrigger(room)}
-                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="h-9 px-3 text-xs sm:text-sm tracking-tight font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                         >
-                                          <Unlink className="w-3.5 h-3.5 shrink-0" />
+                                          <Unlink className="w-4 h-4 shrink-0" />
                                           หยุดเชื่อมไลน์
                                         </button>
                                         <button
                                           onClick={() => handleOpenDetailModal(room)}
-                                          className="h-8 px-2 sm:px-2.5 text-[10px] sm:text-[11px] tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="h-9 px-3 text-xs sm:text-sm tracking-tight font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40 hover:bg-teal-600 hover:text-white dark:hover:text-white hover:border-transparent rounded-lg hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                         >
-                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                          <CheckCircle2 className="w-4 h-4 shrink-0" />
                                           ดูรายละเอียด/ย้ายออก
                                         </button>
                                       </>
@@ -1766,18 +1766,18 @@ export default function RoomsPage() {
                                           className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
                                           title="แก้ไขข้อมูลห้องพัก"
                                         >
-                                          <Edit className="w-3.5 h-3.5" />
+                                          <Edit className="w-4 h-4" />
                                         </button>
                                         <button
                                           onClick={() => handleDeleteRoomTrigger(room.id, room.roomNumber)}
                                           className="p-1.5 text-red-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition-colors cursor-pointer"
                                           title="ลบห้องพัก"
                                         >
-                                          <Trash2 className="w-3.5 h-3.5" />
+                                          <Trash2 className="w-4 h-4" />
                                         </button>
                                       </>
                                     ) : (
-                                      <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">ไม่มีสิทธิ์</span>
+                                      <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-medium">ไม่มีสิทธิ์</span>
                                     )}
                                   </div>
                                 </td>
@@ -1991,9 +1991,9 @@ export default function RoomsPage() {
 
             {activeCancelledContracts.length > 0 ? (
               <div className="overflow-x-auto rounded-xl border border-slate-200/50 dark:border-slate-800/80 bg-white dark:bg-slate-950/20">
-                <table className="w-full text-left text-xs border-collapse min-w-[600px]">
+                <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[600px]">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold text-[11px]">
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold text-xs sm:text-sm">
                       <th className="py-3 px-4">ห้องพัก / ผู้เช่า</th>
                       <th className="py-3 px-4 text-center">วันที่ยกเลิก</th>
                       <th className="py-3 px-4 text-right">เงินประกัน (บาท)</th>
@@ -2005,39 +2005,39 @@ export default function RoomsPage() {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
                     {activeCancelledContracts.map((c) => (
                       <tr key={c.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/5 transition-colors">
-                        <td className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">
+                        <td className="py-3.5 px-4 font-bold text-slate-700 dark:text-slate-300">
                           ห้อง {c.roomNumber} - {c.tenantName}
                         </td>
-                        <td className="py-3 px-4 text-center text-slate-500 dark:text-slate-400 font-semibold font-mono text-[11px]">
+                        <td className="py-3.5 px-4 text-center text-slate-500 dark:text-slate-400 font-semibold font-mono text-xs sm:text-sm">
                           {c.cancellationDate ? new Date(c.cancellationDate).toLocaleDateString("th-TH", {
                             year: "numeric",
                             month: "short",
                             day: "numeric",
                           }) : "-"}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
+                        <td className="py-3.5 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
                           {Number(c.depositAmount || 0).toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
+                        <td className="py-3.5 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
                           {Number((c.actualRefund ?? c.refundedAmount) ?? 0).toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-extrabold text-red-600 dark:text-red-400 bg-red-500/5">
+                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-red-600 dark:text-red-400 bg-red-500/5">
                           {Number(c.forfeitedAmount || 0).toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-3.5 px-4 text-center">
                           <button
                             onClick={() => handleDeleteCancellation(c.id)}
                             className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-red-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90"
                             title="ลบประวัติ"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="flex flex-col sm:flex-row justify-between items-center p-4 bg-slate-50/50 dark:bg-slate-900/5 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 gap-2 font-bold">
+                <div className="flex flex-col sm:flex-row justify-between items-center p-4 bg-slate-50/50 dark:bg-slate-900/5 border-t border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-500 dark:text-slate-400 gap-2 font-bold">
                   <span>จำนวนสัญญาที่ยกเลิกสะสมในระบบ: {activeCancelledContracts.length} รายการ</span>
                   <span className="text-red-600 dark:text-red-400 font-extrabold font-mono text-xs md:text-sm bg-red-50 dark:bg-red-950/20 px-3 py-1 rounded-xl border border-red-150 dark:border-red-900/30 shadow-sm shadow-red-500/5 flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4" />

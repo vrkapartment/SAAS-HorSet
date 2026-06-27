@@ -1693,16 +1693,16 @@ export default function UnifiedBillingPage() {
         }`}>
           {/* Desktop Summary Table */}
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-sm sm:text-base border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold bg-slate-50/50 dark:bg-slate-900/10">
-                  <th className="py-3 pl-3 w-20">เลขห้อง</th>
-                  <th className="py-3 text-center w-28">สถานะห้อง</th>
-                  <th className="py-3 text-right w-28">ค่าเช่าห้อง</th>
-                  <th className="py-3 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า</th>
-                  <th className="py-3 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ</th>
-                  <th className="py-3 text-right w-28">ค่าส่วนกลาง</th>
-                  <th className="py-3 text-right pr-4 w-44 font-bold">ยอดบิลรวม</th>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold bg-slate-50/50 dark:bg-slate-900/10 text-xs sm:text-sm">
+                  <th className="py-3.5 pl-3 w-20">เลขห้อง</th>
+                  <th className="py-3.5 text-center w-28">สถานะห้อง</th>
+                  <th className="py-3.5 text-right w-28">ค่าเช่าห้อง</th>
+                  <th className="py-3.5 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า</th>
+                  <th className="py-3.5 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ</th>
+                  <th className="py-3.5 text-right w-28">ค่าส่วนกลาง</th>
+                  <th className="py-3.5 text-right pr-4 w-44 font-bold">ยอดบิลรวม</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -1733,23 +1733,23 @@ export default function UnifiedBillingPage() {
 
                     return (
                       <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
-                        <td className={`py-4 pl-3 font-black text-sm ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
+                        <td className={`py-4 pl-3 font-black text-sm sm:text-base ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
                         
                         {/* สถานะห้อง */}
                         <td className="py-4 text-center">
                           {item.status === "occupied" ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs sm:text-sm font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                               มีผู้เช่า
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs sm:text-sm font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
                               ว่าง
                             </span>
                           )}
                         </td>
 
                         {/* ค่าเช่าห้อง */}
-                        <td className={`py-4 text-right font-mono text-sm ${isDark ? "text-slate-350" : "text-slate-600"}`}>
+                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-350" : "text-slate-600"}`}>
                           {item.tenantName ? `${item.baseRent.toLocaleString()}.-` : "-"}
                         </td>
 
@@ -1757,15 +1757,15 @@ export default function UnifiedBillingPage() {
                         <td className="py-4 text-center bg-blue-50/10 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-3">
                           {hasElecCurr ? (
                             <div className="flex flex-col items-center justify-center">
-                              <div className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
+                              <div className="text-sm sm:text-base font-black text-blue-600 dark:text-blue-400 font-mono">
                                 {elecCost.toLocaleString()}.-
                               </div>
-                              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                              <div className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
                                 {item.elecPrev} ➔ {item.elecCurr} (ใช้ไป {elecUnitsUsed} หน่วย)
                               </div>
                             </div>
                           ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
+                            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
                           )}
                         </td>
 
@@ -1773,20 +1773,20 @@ export default function UnifiedBillingPage() {
                         <td className="py-4 text-center bg-teal-50/10 dark:bg-teal-500/5 border-l border-r border-slate-200 dark:border-slate-800/40 px-3">
                           {hasWaterCurr ? (
                             <div className="flex flex-col items-center justify-center">
-                              <div className="text-sm font-black text-teal-600 dark:text-teal-400 font-mono">
+                              <div className="text-sm sm:text-base font-black text-teal-600 dark:text-teal-400 font-mono">
                                 {waterCost.toLocaleString()}.-
                               </div>
-                              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                              <div className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
                                 {item.waterPrev} ➔ {item.waterCurr} (ใช้ไป {waterUnitsUsed} หน่วย)
                               </div>
                             </div>
                           ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
+                            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
                           )}
                         </td>
 
                         {/* ค่าส่วนกลาง */}
-                        <td className={`py-4 text-right font-mono text-sm ${isDark ? "text-slate-350" : "text-slate-600"}`}>
+                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-350" : "text-slate-600"}`}>
                           {item.tenantName ? `${commonFee.toLocaleString()}.-` : "-"}
                         </td>
 
@@ -1794,15 +1794,15 @@ export default function UnifiedBillingPage() {
                         <td className="py-4 text-right pr-4 font-mono">
                           {item.tenantName ? (
                             <div className="flex flex-col items-end">
-                              <div className={`text-sm font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                              <div className={`text-sm sm:text-base font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
                                 {simplifiedTotal.toLocaleString()}.-
                               </div>
-                              <div className="text-[9px] text-slate-400 dark:text-slate-500">
+                              <div className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">
                                 {`${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`}
                               </div>
                             </div>
                           ) : (
-                            <div className={`text-sm font-bold ${isDark ? "text-slate-650" : "text-slate-400"}`}>-</div>
+                            <div className={`text-sm sm:text-base font-bold ${isDark ? "text-slate-650" : "text-slate-400"}`}>-</div>
                           )}
                         </td>
                       </tr>

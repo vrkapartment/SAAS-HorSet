@@ -608,9 +608,9 @@ export default function TenantsPage() {
         // Tab 1: Current Tenants List
         <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+            <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-450 font-bold uppercase tracking-wider text-[11px]">
+                <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider text-xs sm:text-sm">
                   <th className="py-3.5 px-5">ห้องพัก</th>
                   <th className="py-3.5 px-4">ชื่อผู้เช่า</th>
                   <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
@@ -622,7 +622,7 @@ export default function TenantsPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
                 {filteredCurrent.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
-                    <td className="py-4 px-5 font-black text-slate-900 dark:text-slate-100 text-sm">
+                    <td className="py-4 px-5 font-black text-slate-900 dark:text-slate-100 text-sm sm:text-base">
                       ห้อง {t.roomNumber}
                     </td>
                     <td className="py-4 px-4 font-extrabold text-slate-850 dark:text-slate-200">
@@ -630,20 +630,20 @@ export default function TenantsPage() {
                     </td>
                     <td className="py-4 px-4 font-semibold font-mono text-slate-600 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <Phone className="w-4 h-4 text-slate-400 shrink-0" />
                         {getMaskedPhone(t.phone)}
                       </div>
                     </td>
                     <td className="py-4 px-4 font-mono text-slate-500 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
-                        <MessageSquare className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                        <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
                         {getMaskedLine(t.lineUserId)}
                       </div>
                     </td>
                     <td className="py-4 px-4 font-semibold text-slate-550 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="font-mono text-[11px]">
+                        <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="font-mono text-xs sm:text-sm">
                           {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
                         </span>
                       </div>
@@ -653,7 +653,7 @@ export default function TenantsPage() {
                         const status = getContractStatus(t.contractStart, t.contractEnd)
                         if (!status) return "-"
                         return (
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] ${status.style}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${status.style}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
                             {status.label}
                           </span>
@@ -678,9 +678,9 @@ export default function TenantsPage() {
         // Tab 2: Archived Old Tenants List (VIEW ONLY OR DELETE ACCORDING TO USER PERMISSIONS)
         <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+            <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-450 font-bold uppercase tracking-wider text-[11px]">
+                <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider text-xs sm:text-sm">
                   <th className="py-3.5 px-5">ห้องสุดท้าย</th>
                   <th className="py-3.5 px-4">ชื่อผู้เช่าเก่า</th>
                   <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
@@ -692,7 +692,7 @@ export default function TenantsPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
                 {filteredOld.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
-                    <td className="py-4 px-5 font-black text-slate-700 dark:text-slate-300 text-sm">
+                    <td className="py-4 px-5 font-black text-slate-700 dark:text-slate-300 text-sm sm:text-base">
                       ห้อง {t.roomNumber}
                     </td>
                     <td className="py-4 px-4 font-extrabold text-slate-850 dark:text-slate-200">
