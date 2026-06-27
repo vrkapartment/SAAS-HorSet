@@ -37,6 +37,8 @@ import { generatePromptPayPayload } from "@/lib/promptpay"
 import { getTenantPortalData, getTenantPortalDataNoLoginAction } from "@/features/tenant/actions"
 import { updateBillStatus } from "@/features/billing/actions"
 import { createClient } from "@/lib/supabase/client"
+import PullToRefresh from "@/components/PullToRefresh"
+
 
 interface BillHistoryItem {
   cycle: string
@@ -495,9 +497,10 @@ export default function TenantPortal() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-12">
-      {/* Header สไตล์ Mobile Portal */}
-      <header className="glass-panel border-b border-slate-900/60 px-6 py-4 sticky top-0 z-20 flex justify-between items-center">
+    <PullToRefresh onRefresh={async () => { await loadPortalData(false) }}>
+      <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-12 w-full flex-1 flex flex-col">
+        {/* Header สไตล์ Mobile Portal */}
+        <header className="glass-panel border-b border-slate-900/60 px-6 py-4 sticky top-0 z-20 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-2">
           <Building className="w-5 h-5 text-blue-500" />
           <div>
@@ -812,6 +815,7 @@ export default function TenantPortal() {
         </div>
 
       </main>
-    </div>
+      </div>
+    </PullToRefresh>
   )
 }
