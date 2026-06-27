@@ -669,16 +669,27 @@ export default function MeterReadingTable({
                             </span>
                           )
                         ) : activeTab === "all" && (
-                          <span className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-                            !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
-                            item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border border-emerald-200") :
-                            item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
-                            item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
-                            (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-250")
-                          }`}>
+                          <span
+                            onClick={() => {
+                              if (item.billStatus === "pending") {
+                                setSelectedBill(item)
+                                setSlipModalOpen(true)
+                              }
+                            }}
+                            className={`inline-block text-[10px] font-extrabold px-2.5 py-1 rounded-full border ${
+                              item.billStatus === "pending" ? "cursor-pointer hover:scale-105 active:scale-95 transition-all" : ""
+                            } ${
+                              !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
+                              item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
+                              item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
+                              item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
+                              (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-250")
+                            }`}
+                            title={item.billStatus === "pending" ? "คลิกเพื่อตรวจสอบสลิปโอนเงิน" : undefined}
+                          >
                             {!item.tenantName ? "ห้องว่าง" :
                              item.billStatus === "paid" ? "ชำระเงินแล้ว" :
-                             item.billStatus === "pending" ? "รอตรวจสลิป" :
+                             item.billStatus === "pending" ? "รอตรวจสอบ" :
                              item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
                           </span>
                         )}
@@ -1530,16 +1541,27 @@ export default function MeterReadingTable({
 
                           {/* สถานะบิล */}
                           <td className="py-4 text-center">
-                            <span className={`inline-block text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-                              !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
-                              item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
-                              item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
-                              item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
-                              (isDark ? "bg-slate-900 text-slate-400 border-slate-800" : "bg-slate-100 text-slate-500 border-slate-250")
-                            }`}>
+                            <span
+                              onClick={() => {
+                                if (item.billStatus === "pending") {
+                                  setSelectedBill(item)
+                                  setSlipModalOpen(true)
+                                }
+                              }}
+                              className={`inline-block text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                                item.billStatus === "pending" ? "cursor-pointer hover:scale-105 active:scale-95 transition-all" : ""
+                              } ${
+                                !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border border-slate-700/30" : "bg-slate-100 text-slate-450 border border-slate-200") :
+                                item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
+                                item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
+                                item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
+                                (isDark ? "bg-slate-900 text-slate-400 border-slate-800" : "bg-slate-100 text-slate-500 border-slate-250")
+                              }`}
+                              title={item.billStatus === "pending" ? "คลิกเพื่อตรวจสอบสลิปโอนเงิน" : undefined}
+                            >
                               {!item.tenantName ? "ห้องว่าง" :
                                item.billStatus === "paid" ? "ชำระเงินแล้ว" :
-                               item.billStatus === "pending" ? "รอตรวจสลิป" :
+                               item.billStatus === "pending" ? "รอตรวจสอบ" :
                                item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
                             </span>
                           </td>

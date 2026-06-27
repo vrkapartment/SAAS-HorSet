@@ -10,6 +10,8 @@ interface SlipVerificationModalProps {
     tenantName: string | null
     billAmount: number
     slipUrl: string | null
+    otherServiceAmount?: number
+    penaltyAmount?: number
   } | null
   billingCycle: string
   onClose: () => void
@@ -67,26 +69,60 @@ export default function SlipVerificationModal({
               <CreditCard className={`w-4 h-4 ${isDark ? "text-blue-400" : "text-blue-500"}`} /> อนุมัติสลิปโอนและปิดบิล
             </h3>
 
-            <div className={`p-4 rounded-xl space-y-2.5 border text-xs ${
-              isDark ? "bg-slate-900/60 border-slate-900" : "bg-slate-50 border-slate-200"
+            <div className={`p-4 rounded-xl space-y-3 border text-xs ${
+              isDark ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
             }`}>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-200 dark:border-slate-800">
                 <span className={isDark ? "text-slate-400" : "text-slate-500"}>หมายเลขห้องพัก:</span>
-                <span className={`font-extrabold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{selectedBill.roomNumber}</span>
+                <span className={`font-extrabold text-sm ${isDark ? "text-slate-200" : "text-slate-800"}`}>{selectedBill.roomNumber}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-200 dark:border-slate-800">
                 <span className={isDark ? "text-slate-400" : "text-slate-500"}>ผู้จดเช่า:</span>
                 <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>{selectedBill.tenantName || "ไม่มีผู้เช่า"}</span>
               </div>
-              <div className="flex justify-between">
-                <span className={isDark ? "text-slate-400" : "text-slate-500"}>ยอดบิลทั้งหมด:</span>
-                <span className={`font-black text-sm ${isDark ? "text-teal-400" : "text-teal-600"}`}>
-                  {selectedBill.billAmount.toLocaleString()} บาท
-                </span>
-              </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-200 dark:border-slate-800">
                 <span className={isDark ? "text-slate-400" : "text-slate-500"}>รอบเดือนประจำบิล:</span>
                 <span className={`font-mono font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>{billingCycle}</span>
+              </div>
+
+              {/* รายละเอียดค่าใช้จ่ายเพิ่มเติม (ถ้ามี) */}
+              {((selectedBill.otherServiceAmount && selectedBill.otherServiceAmount > 0) || 
+                (selectedBill.penaltyAmount && selectedBill.penaltyAmount > 0)) && (
+                <div className="pt-1 pb-2 space-y-2">
+                  <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                    ค่าบริการ/ค่าปรับเพิ่มเติม
+                  </div>
+                  {selectedBill.otherServiceAmount && selectedBill.otherServiceAmount > 0 ? (
+                    <div className="flex justify-between items-center pl-2">
+                      <span className={`flex items-center gap-1.5 ${isDark ? "text-violet-400" : "text-violet-600"} font-medium`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                        ค่าบริการอื่น ๆ:
+                      </span>
+                      <span className={`font-bold ${isDark ? "text-violet-300" : "text-violet-700"}`}>
+                        +{selectedBill.otherServiceAmount.toLocaleString()} บาท
+                      </span>
+                    </div>
+                  ) : null}
+                  {selectedBill.penaltyAmount && selectedBill.penaltyAmount > 0 ? (
+                    <div className="flex justify-between items-center pl-2">
+                      <span className={`flex items-center gap-1.5 ${isDark ? "text-rose-400" : "text-rose-600"} font-medium`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        ค่าปรับล่าช้า:
+                      </span>
+                      <span className={`font-bold ${isDark ? "text-rose-300" : "text-rose-700"}`}>
+                        +{selectedBill.penaltyAmount.toLocaleString()} บาท
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {/* ยอดรวมบิลทั้งหมด */}
+              <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800">
+                <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>ยอดรวมบิลทั้งหมด:</span>
+                <span className={`font-black text-base ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                  {selectedBill.billAmount.toLocaleString()} บาท
+                </span>
               </div>
             </div>
 
