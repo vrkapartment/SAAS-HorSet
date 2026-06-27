@@ -780,9 +780,9 @@ export default function AdminDashboard() {
                 >
                   <div className="flex justify-between items-start">
                     <div className="space-y-2">
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">{stat.title}</span>
-                      <h3 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-1 leading-none">{stat.value}</h3>
-                      <span className={`inline-flex items-center text-[10px] md:text-xs font-bold tracking-wide mt-1.5 ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-rose-500 dark:text-rose-400"}`}>
+                      <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">{stat.title}</span>
+                      <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-1 leading-none">{stat.value}</h3>
+                      <span className={`inline-flex items-center text-xs sm:text-sm font-bold tracking-wide mt-1.5 ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-rose-500 dark:text-rose-400"}`}>
                         {stat.change}
                       </span>
                     </div>
@@ -809,20 +809,20 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-start">
                 <div className="space-y-3 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
+                    <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
                       รายรับเดือนนี้
                     </span>
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-extrabold">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-extrabold">
                       เงินที่เก็บได้แล้ว
                     </span>
                   </div>
-                  <h3 className="text-3xl md:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                    {financialStats.totalRevenue.toLocaleString()} <span className="text-xs font-bold text-emerald-500/80">บาท</span>
+                  <h3 className="text-3xl sm:text-4xl lg:text-5xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                    {financialStats.totalRevenue.toLocaleString()} <span className="text-xs sm:text-sm font-bold text-emerald-500/80">บาท</span>
                   </h3>
                   
                   {/* Progress Bar */}
                   <div className="space-y-1.5 pt-1 max-w-xs">
-                    <div className="flex justify-between text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <div className="flex justify-between text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400">
                       <span>เก็บเงินได้แล้ว</span>
                       <span>{financialStats.collectionsRate.toFixed(1)}%</span>
                     </div>
@@ -832,7 +832,7 @@ export default function AdminDashboard() {
                         style={{ width: `${financialStats.collectionsRate}%` }}
                       />
                     </div>
-                    <p className="text-[10px] text-emerald-500/85 font-bold mt-1">
+                    <p className="text-xs sm:text-sm text-emerald-500/85 font-bold mt-1">
                       ยอดเรียกเก็บทั้งหมด {financialStats.totalBilled.toLocaleString()} บาท
                     </p>
                   </div>
@@ -855,23 +855,23 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-start">
                 <div className="space-y-3 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
+                    <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
                       บิลค้างชำระ
                     </span>
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-extrabold">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-extrabold">
                       ที่ยังไม่จ่าย
                     </span>
                   </div>
-                  <h3 className="text-3xl md:text-4xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                    {financialStats.unpaidAmount.toLocaleString()} <span className="text-xs font-bold text-rose-500/80">บาท</span>
+                  <h3 className="text-3xl sm:text-4xl lg:text-5xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
+                    {financialStats.unpaidAmount.toLocaleString()} <span className="text-xs sm:text-sm font-bold text-rose-500/80">บาท</span>
                   </h3>
                   
                   <div className="space-y-2 pt-1 max-w-xs">
-                    <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-bold">
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm text-rose-600 dark:text-rose-400 font-bold">
                       <Clock className="w-3.5 h-3.5 animate-pulse" />
                       <span>ค้างชำระทั้งหมด {financialStats.unpaidBillsCount} รายการ</span>
                     </div>
-                    <p className="text-[10px] text-rose-500/85 font-bold mt-1">
+                    <p className="text-xs sm:text-sm text-rose-500/85 font-bold mt-1">
                       สามารถจัดส่งใบแจ้งเตือนทาง LINE OA เพื่อกระตุ้นยอดค้างจ่ายได้ทันที
                     </p>
                   </div>
@@ -942,8 +942,8 @@ export default function AdminDashboard() {
                       <Icon className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <h5 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{act.label}</h5>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">{act.desc}</p>
+                      <h5 className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{act.label}</h5>
+                      <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 truncate mt-0.5">{act.desc}</p>
                     </div>
                     <ArrowUpRight className="w-4 h-4 text-slate-3.5 dark:text-slate-650 ml-auto opacity-0 group-hover:opacity-100 transition-all shrink-0" />
                   </button>
@@ -988,12 +988,12 @@ export default function AdminDashboard() {
             {/* รายการโอนเงินและชำระบิลล่าสุด (2 ใน 3 คอลัมน์) */}
             <div className={`md:col-span-2 bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 md:p-6 flex flex-col shadow-sm ${activeTab === "transactions" ? "block" : "hidden md:flex"}`}>
               <div className="flex justify-between items-center mb-5 md:mb-6">
-                <h3 className="text-xs md:text-sm font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
+                <h3 className="text-xs sm:text-sm lg:text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
                   <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" /> สถานะบิลและการรับเงินล่าสุด
                 </h3>
                 <button 
                   onClick={() => router.push("/billing")}
-                  className="text-xs font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline cursor-pointer py-2 px-3"
+                  className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline cursor-pointer py-2 px-3"
                   style={{ minHeight: "36px" }}
                 >
                   ดูทั้งหมด
@@ -1002,7 +1002,7 @@ export default function AdminDashboard() {
 
               <div className="flex-1 overflow-x-auto">
                 {/* DESKTOP VIEW TABLE (hidden on mobile, strictly visible >= 768px) */}
-                <table className="hidden md:table w-full text-left text-xs border-collapse">
+                <table className="hidden md:table w-full text-left text-xs sm:text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider">
                       <th className="pb-3 pl-2">ห้องพัก</th>
@@ -1021,7 +1021,7 @@ export default function AdminDashboard() {
                         <td className="py-3.5 text-slate-500 dark:text-slate-400">{tx.type}</td>
                         <td className="py-3.5 text-right font-mono font-extrabold text-slate-800 dark:text-slate-200">{tx.amount}</td>
                         <td className="py-3.5 text-center">
-                          <span className={`inline-block text-[9px] font-bold px-2.5 py-0.5 rounded-full ${
+                          <span className={`inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full ${
                             tx.status === "สำเร็จ" ? "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30" :
                             tx.status === "รอยืนยัน" ? "bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 border border-amber-100/40 dark:border-amber-900/30" :
                             "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-100/40 dark:border-red-900/30"
@@ -1029,7 +1029,7 @@ export default function AdminDashboard() {
                             {tx.status}
                           </span>
                         </td>
-                        <td className="py-3.5 text-right pr-2 text-slate-400 dark:text-slate-500 font-mono text-[10px]">{tx.time}</td>
+                        <td className="py-3.5 text-right pr-2 text-slate-400 dark:text-slate-500 font-mono text-xs sm:text-sm">{tx.time}</td>
                       </tr>
                     ))}
                     {recentTransactions.length === 0 && (
@@ -1092,7 +1092,7 @@ export default function AdminDashboard() {
             {/* บันทึกกิจกรรมระบบ/พนักงาน (1 ใน 3 คอลัมน์) */}
             <div className={`bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 md:p-6 flex flex-col shadow-sm ${activeTab === "activities" ? "block" : "hidden md:flex"}`}>
               <div className="flex justify-between items-center mb-5 md:mb-6">
-                <h3 className="text-xs md:text-sm font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
+                <h3 className="text-xs sm:text-sm lg:text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
                   <TrendingUp className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> กิจกรรมล่าสุดในระบบ
                 </h3>
               </div>
@@ -1100,14 +1100,14 @@ export default function AdminDashboard() {
               {/* Timeline Feeds (gorgeous premium timeline list style) */}
               <div className="flex-1 relative pl-4 border-l border-slate-150 dark:border-slate-800 space-y-6">
                 {recentActivities.map((act, idx) => (
-                  <div key={idx} className="relative text-xs">
+                  <div key={idx} className="relative text-xs sm:text-sm">
                     {/* Timeline dot */}
                     <div className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 dark:bg-blue-400 ring-4 ring-white dark:ring-slate-850 shrink-0" />
                     <div className="space-y-1">
                       <p className="text-slate-700 dark:text-slate-250 leading-relaxed">
                         <span className="font-bold text-slate-900 dark:text-slate-100">{act.user}</span>: {act.action}
                       </p>
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 block">{act.time}</span>
+                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 block">{act.time}</span>
                     </div>
                   </div>
                 ))}

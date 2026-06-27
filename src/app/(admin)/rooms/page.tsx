@@ -1463,8 +1463,8 @@ export default function RoomsPage() {
                                   <div>
                                     <div className="flex items-start justify-between gap-2 mb-3">
                                       <div>
-                                        <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
-                                        <h4 className="text-base font-black text-slate-850 dark:text-slate-100 tracking-wide">
+                                        <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
+                                        <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
                                           ห้อง {room.roomNumber}
                                         </h4>
                                       </div>
@@ -1492,17 +1492,17 @@ export default function RoomsPage() {
 
                                     {/* Room Type & Base Rent */}
                                     <div className="flex items-center justify-between gap-2 mb-4">
-                                      <span className="inline-flex items-center gap-1 text-[9px] text-indigo-600 dark:text-indigo-400 font-extrabold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30 uppercase tracking-wide">
+                                      <span className="inline-flex items-center gap-1 text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-extrabold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30 uppercase tracking-wide">
                                         <Tag className="w-2.5 h-2.5" /> {room.roomTypeName}
                                       </span>
-                                      <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                                      <span className="text-sm sm:text-base font-extrabold text-slate-700 dark:text-slate-300">
                                         {room.baseRent.toLocaleString()} บ.
                                       </span>
                                     </div>
 
                                     {/* Status Badge */}
                                     <div className="mb-4">
-                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
                                         {statusDetails.label}
                                       </span>
@@ -1511,28 +1511,28 @@ export default function RoomsPage() {
                                     {/* Tenant Information block if occupied */}
                                     {hasTenant ? (
                                       <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2 mb-4">
-                                        <div className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center justify-between text-sm sm:text-base">
                                           <span className="text-slate-400 dark:text-slate-500 font-medium">ผู้เช่า:</span>
                                           <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 truncate max-w-[150px]" title={room.tenantName || ""}>
                                             <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                             {room.tenantName}
                                           </span>
                                         </div>
-                                        <div className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center justify-between text-sm sm:text-base">
                                           <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
                                           <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1 font-mono">
                                             <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                             {room.tenantPhone || "-"}
                                           </span>
                                         </div>
-                                        <div className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center justify-between text-sm sm:text-base">
                                           <span className="text-slate-400 dark:text-slate-500 font-medium">สถานะสัญญา:</span>
                                           <span>
                                             {(() => {
                                               const status = getContractStatus(room.leaseStart, room.leaseEnd)
                                               if (status) {
                                                 return (
-                                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] ${status.style}`}>
+                                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs sm:text-sm ${status.style}`}>
                                                     {status.label}
                                                   </span>
                                                 )
@@ -1543,7 +1543,7 @@ export default function RoomsPage() {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center h-20 text-slate-400 dark:text-slate-600 text-[11px] mb-4">
+                                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center h-20 text-slate-400 dark:text-slate-600 text-xs sm:text-sm mb-4">
                                         ไม่มีผู้เช่าปัจจุบัน (ห้องว่าง)
                                       </div>
                                     )}
@@ -1555,7 +1555,7 @@ export default function RoomsPage() {
                                     {!room.tenantName && (
                                       <button
                                         onClick={() => handleOpenLineLinkModal(room)}
-                                        className="w-full h-9 text-[11px] font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        className="w-full h-9 text-xs font-bold text-white bg-[#06C755] hover:bg-[#05b34c] rounded-xl hover:-translate-y-0.5 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
                                       >
                                         <Share2 className="w-3.5 h-3.5 shrink-0" />
                                         เจนลิงก์ LINE
@@ -1567,7 +1567,7 @@ export default function RoomsPage() {
                                       <div className="flex gap-1.5">
                                         <button
                                           onClick={() => handleOpenLineLinkModal(room)}
-                                          className="flex-[0.8] h-9 text-[10px] sm:text-[11px] tracking-tight font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/20 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                                          className="flex-[0.8] h-9 text-[11px] sm:text-xs tracking-tight font-bold text-[#05a33c] dark:text-[#06d65f] bg-[#06C755]/10 border border-[#06C755]/20 hover:bg-[#06C755] hover:text-white dark:hover:text-white hover:border-transparent rounded-xl hover:-translate-y-0.5 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
                                           title="เจนลิงก์ LINE"
                                         >
                                           <Share2 className="w-3.5 h-3.5 shrink-0" />
@@ -1627,7 +1627,7 @@ export default function RoomsPage() {
                 ) : (
                   /* CONDENSED TABLE VIEW: Elegant 5-Column layout to eliminate crowding */
                   <div className="overflow-x-auto rounded-2xl border border-slate-200/60 dark:border-slate-900/60 shadow-sm">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full text-left text-xs sm:text-sm border-collapse">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200/60 dark:border-slate-900/60">
                           <th className="p-4 w-36">ห้องและประเภท</th>

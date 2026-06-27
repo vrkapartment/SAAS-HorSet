@@ -1,14 +1,39 @@
 import type { Metadata, Viewport } from "next";
-import { Prompt } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider } from "@/lib/translations/LanguageProvider";
 import { WorkspaceDataProvider } from "@/context/WorkspaceDataContext";
 
-const promptFont = Prompt({
+const promptFont = localFont({
+  src: [
+    {
+      path: "../../Fonts/Prompt/Prompt-Light.ttf",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../../Fonts/Prompt/Prompt-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../Fonts/Prompt/Prompt-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../Fonts/Prompt/Prompt-SemiBold.ttf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../../Fonts/Prompt/Prompt-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-prompt",
-  subsets: ["thai", "latin"],
-  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
