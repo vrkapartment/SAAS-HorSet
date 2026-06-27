@@ -69,7 +69,14 @@ export default function AdminDashboard() {
   const [isDemo, setIsDemo] = useState(false)
   const [loading, setLoading] = useState(true)
   const [dbError, setDbError] = useState<string | null>(null)
-  const [stats, setStats] = useState<any[]>([])
+  const [roomStats, setRoomStats] = useState<any[]>([])
+  const [financialStats, setFinancialStats] = useState<any>({
+    totalRevenue: 0,
+    unpaidAmount: 0,
+    totalBilled: 0,
+    collectionsRate: 0,
+    unpaidBillsCount: 0
+  })
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
 
@@ -153,6 +160,7 @@ export default function AdminDashboard() {
     const paidBills = currentMonthBills.filter((b: any) => b.status === "paid")
     const unpaidBills = currentMonthBills.filter((b: any) => b.status === "unpaid" || b.status === "pending")
     const pendingBills = currentMonthBills.filter((b: any) => b.status === "pending")
+    const unpaidBillsCount = unpaidBills.length
 
     const totalRevenue = paidBills.reduce((sum, b) => sum + Number(b.amount), 0)
     const unpaidAmount = unpaidBills.reduce((sum, b) => sum + Number(b.amount), 0)
@@ -176,68 +184,56 @@ export default function AdminDashboard() {
     const thaiMonthObj = THAI_MONTHS.find(m => m.value === cycleMonth)
     const cycleLabel = thaiMonthObj ? `${thaiMonthObj.label} ${Number(cycleYear) + 543}` : cycle
 
-    setStats([
+    setRoomStats([
       {
-        title: "จำนวนห้องที่มีผู้เช่า",
-        value: `${occupiedRooms} / ${totalRooms} ห้อง`,
+        title: "ห้องทั้งหมด",
+        value: `${totalRooms} ห้อง`,
+        change: `ห้องพักหลักของอาคาร`,
+        isPositive: true,
+        icon: Home,
+        color: "text-blue-500 dark:text-blue-400",
+        bg: "bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/20",
+        path: "/tenants"
+      },
+      {
+        title: "ห้องว่าง",
+        value: `${availableRooms} ห้อง`,
+        change: `พร้อมต้อนรับผู้เช่าใหม่`,
+        isPositive: true,
+        icon: Home,
+        color: "text-emerald-500 dark:text-emerald-400",
+        bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/20",
+        path: "/tenants"
+      },
+      {
+        title: "มีผู้เช่า",
+        value: `${occupiedRooms} ห้อง`,
         change: `อัตราเข้าพัก ${(totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0).toFixed(1)}%`,
         isPositive: true,
         icon: Users,
         color: "text-teal-500 dark:text-teal-400",
-        bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/30",
+        bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/20",
         path: "/tenants"
       },
       {
-        title: "รายได้เก็บแล้ว",
-        value: `${totalRevenue.toLocaleString()} บาท`,
-        change: `ยอดแจ้งหนี้รวม ${totalBilled.toLocaleString()} บาท`,
-        isPositive: true,
-        icon: DollarSign,
-        color: "text-emerald-500 dark:text-emerald-400",
-        bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/30",
-        path: "/manage-bills"
-      },
-      {
-        title: "ค่าใช้จ่ายเดือนนี้",
-        value: `${totalExpenses.toLocaleString()} บาท`,
-        change: `บันทึกไว้ ${currentMonthExpenses.length} รายการ`,
+        title: "ค้างชำระ",
+        value: `${unpaidBillsCount} บิล`,
+        change: `ค้างบิลของรอบเดือนนี้`,
         isPositive: false,
-        icon: TrendingDown,
+        icon: Clock,
         color: "text-rose-500 dark:text-rose-400",
-        bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/30",
-        path: "/daily-bills"
-      },
-      {
-        title: "กำไรสุทธิคาดการณ์",
-        value: `${netProfit.toLocaleString()} บาท`,
-        change: netProfit >= 0 ? "ผลประกอบการเป็นบวก" : "ผลประกอบการติดลบ",
-        isPositive: netProfit >= 0,
-        icon: TrendingUp,
-        color: netProfit >= 0 ? "text-indigo-500 dark:text-indigo-400" : "text-amber-500 dark:text-amber-400",
-        bg: netProfit >= 0 ? "bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/30" : "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
-        path: "/daily-bills"
-      },
-      {
-        title: "อัตราการจ่ายล่าช้า",
-        value: `${latePaymentRate.toFixed(1)}%`,
-        change: `พบ ${lateBills.length} บิลที่จ่ายช้า/มีค่าปรับ`,
-        isPositive: latePaymentRate < 10,
-        icon: AlertTriangle,
-        color: "text-amber-500 dark:text-amber-400",
-        bg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
-        path: "/manage-bills"
-      },
-      {
-        title: "อัตราการเก็บเงิน",
-        value: `${collectionsRate.toFixed(1)}%`,
-        change: `ชำระแล้ว ${paidBills.length} / ${currentMonthBills.length} บิล`,
-        isPositive: collectionsRate >= 80,
-        icon: CheckCircle2,
-        color: "text-purple-500 dark:text-purple-400",
-        bg: "bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/30",
+        bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/20",
         path: "/manage-bills"
       }
     ])
+
+    setFinancialStats({
+      totalRevenue,
+      unpaidAmount,
+      totalBilled,
+      collectionsRate,
+      unpaidBillsCount
+    })
 
     const formattedTxs = currentMonthBills.slice(0, 4).map((b: any) => ({
       room: `ห้อง ${b.roomNumber}`,
@@ -481,69 +477,60 @@ export default function AdminDashboard() {
     const occupancyRate = (occupiedRooms / totalRooms) * 100
     const latePaymentRate = totalBillsCount > 0 ? (lateBillsCount / totalBillsCount) * 100 : 0
     const collectionsRate = totalBilled > 0 ? (totalRevenue / totalBilled) * 100 : 0
+    const availableRooms = totalRooms - occupiedRooms
+    const unpaidAmount = totalBilled - totalRevenue
+    const unpaidBillsCount = totalBillsCount - paidBillsCount
 
-    setStats([
+    setRoomStats([
       {
-        title: "จำนวนห้องที่มีผู้เช่า",
-        value: `${occupiedRooms} / ${totalRooms} ห้อง`,
+        title: "ห้องทั้งหมด",
+        value: `${totalRooms} ห้อง`,
+        change: `อสังหาริมทรัพย์รวมเดโม`,
+        isPositive: true,
+        icon: Home,
+        color: "text-blue-500 dark:text-blue-400",
+        bg: "bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/20",
+        path: "/tenants"
+      },
+      {
+        title: "ห้องว่าง",
+        value: `${availableRooms} ห้อง`,
+        change: `พร้อมต้อนรับผู้เช่าใหม่`,
+        isPositive: true,
+        icon: Home,
+        color: "text-emerald-500 dark:text-emerald-400",
+        bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/20",
+        path: "/tenants"
+      },
+      {
+        title: "มีผู้เช่า",
+        value: `${occupiedRooms} ห้อง`,
         change: `อัตราเข้าพัก ${occupancyRate.toFixed(1)}%`,
         isPositive: true,
         icon: Users,
         color: "text-teal-500 dark:text-teal-400",
-        bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/30",
+        bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/20",
         path: "/tenants"
       },
       {
-        title: "รายได้เก็บแล้ว",
-        value: `${totalRevenue.toLocaleString()} บาท`,
-        change: `ยอดแจ้งหนี้รวม ${totalBilled.toLocaleString()} บาท`,
-        isPositive: true,
-        icon: DollarSign,
-        color: "text-emerald-500 dark:text-emerald-400",
-        bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/30",
-        path: "/manage-bills"
-      },
-      {
-        title: "ค่าใช้จ่ายเดือนนี้",
-        value: `${totalExpenses.toLocaleString()} บาท`,
-        change: `รายการจำลองแบบเดโม`,
+        title: "ค้างชำระ",
+        value: `${unpaidBillsCount} บิล`,
+        change: `ค้างบิลของรอบเดือนนี้`,
         isPositive: false,
-        icon: TrendingDown,
+        icon: Clock,
         color: "text-rose-500 dark:text-rose-400",
-        bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/30",
-        path: "/daily-bills"
-      },
-      {
-        title: "กำไรสุทธิคาดการณ์",
-        value: `${netProfit.toLocaleString()} บาท`,
-        change: netProfit >= 0 ? "ผลประกอบการเป็นบวก" : "ผลประกอบการติดลบ",
-        isPositive: netProfit >= 0,
-        icon: TrendingUp,
-        color: netProfit >= 0 ? "text-indigo-500 dark:text-indigo-400" : "text-amber-500 dark:text-amber-400",
-        bg: netProfit >= 0 ? "bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/30" : "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
-        path: "/daily-bills"
-      },
-      {
-        title: "อัตราการจ่ายล่าช้า",
-        value: `${latePaymentRate.toFixed(1)}%`,
-        change: `พบ ${lateBillsCount} บิลที่จ่ายล่าช้าในเดโม`,
-        isPositive: latePaymentRate < 10,
-        icon: AlertTriangle,
-        color: "text-amber-500 dark:text-amber-400",
-        bg: "bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/30",
-        path: "/manage-bills"
-      },
-      {
-        title: "อัตราการเก็บเงิน",
-        value: `${collectionsRate.toFixed(1)}%`,
-        change: `ชำระแล้ว ${paidBillsCount} / ${totalBillsCount} บิล`,
-        isPositive: collectionsRate >= 80,
-        icon: CheckCircle2,
-        color: "text-purple-500 dark:text-purple-400",
-        bg: "bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/30",
+        bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/20",
         path: "/manage-bills"
       }
     ])
+
+    setFinancialStats({
+      totalRevenue,
+      unpaidAmount,
+      totalBilled,
+      collectionsRate,
+      unpaidBillsCount
+    })
 
     if (cycleMonth === "06") {
       setRecentTransactions([
@@ -591,8 +578,8 @@ export default function AdminDashboard() {
   const SkeletonLoader = () => (
     <div className="space-y-6">
       {/* Stats Cards Skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 animate-pulse">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-pulse">
+        {[1, 2, 3, 4].map((i) => (
           <div key={i} className="p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-28 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
@@ -600,6 +587,13 @@ export default function AdminDashboard() {
             </div>
             <div className="h-2.5 bg-slate-150 dark:bg-slate-700 rounded w-1/3" />
           </div>
+        ))}
+      </div>
+
+      {/* Financial Overview Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+        {[1, 2].map((i) => (
+          <div key={i} className="rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-36" />
         ))}
       </div>
 
@@ -692,6 +686,15 @@ export default function AdminDashboard() {
             </select>
           </div>
 
+          {/* ปุ่ม "ออกบิลเดือนนี้" มุมขวาบน */}
+          <button
+            onClick={() => router.push("/billing")}
+            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center gap-2 cursor-pointer shrink-0"
+          >
+            <Receipt className="w-4 h-4" />
+            <span>ออกบิลเดือนนี้</span>
+          </button>
+
           <div className="text-xs font-bold px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2.5 shadow-sm">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
@@ -702,29 +705,38 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* MOBILE View Selector (< 768px) */}
-      <div className="flex md:hidden items-center gap-2 mt-4 pb-2 border-b border-slate-100 dark:border-slate-800/50 w-full">
-        <span className="text-xs font-bold text-slate-400 shrink-0">เลือกช่วงเวลา:</span>
-        <div className="flex gap-2 flex-1">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
-          >
-            {THAI_MONTHS.map(m => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
-          </select>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
-          >
-            {YEARS.map(y => (
-              <option key={y.value} value={y.value}>พ.ศ. {y.label}</option>
-            ))}
-          </select>
+      {/* MOBILE View Selector & Shortcut Button (< 768px) */}
+      <div className="flex flex-col gap-3 md:hidden mt-4 pb-3 border-b border-slate-100 dark:border-slate-800/50 w-full">
+        <div className="flex items-center gap-2 w-full">
+          <span className="text-xs font-bold text-slate-400 shrink-0">เลือกช่วงเวลา:</span>
+          <div className="flex gap-2 flex-1">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
+            >
+              {THAI_MONTHS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
+            >
+              {YEARS.map(y => (
+                <option key={y.value} value={y.value}>พ.ศ. {y.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
+        <button
+          onClick={() => router.push("/billing")}
+          className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-98 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer animate-fade-in"
+        >
+          <Receipt className="w-4 h-4" />
+          <span>ออกบิลเดือนนี้</span>
+        </button>
       </div>
 
       {loading ? (
@@ -756,9 +768,9 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <>
-          {/* Grid การ์ดสถิติ (Stats Grid) - Fully Adaptive & Clickable with premium interactions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6 mt-6">
-            {stats.map((stat, idx) => {
+          {/* การ์ดบนสุด 4 ใบ: ห้องทั้งหมด / ห้องว่าง / มีผู้เช่า / ค้างชำระ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-6">
+            {roomStats.map((stat, idx) => {
               const Icon = stat.icon
               return (
                 <div 
@@ -769,13 +781,13 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-start">
                     <div className="space-y-2">
                       <span className="text-xs text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">{stat.title}</span>
-                      <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-1 leading-none">{stat.value}</h3>
-                      <span className={`inline-flex items-center text-[10px] md:text-xs font-bold tracking-wide mt-1.5 ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-450"}`}>
+                      <h3 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-1 leading-none">{stat.value}</h3>
+                      <span className={`inline-flex items-center text-[10px] md:text-xs font-bold tracking-wide mt-1.5 ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-rose-500 dark:text-rose-400"}`}>
                         {stat.change}
                       </span>
                     </div>
-                    <div className={`p-2 rounded-xl transition-transform duration-300 group-hover:scale-110 shrink-0 ${stat.bg} ${stat.color}`}>
-                      <Icon className="w-5 h-5" />
+                    <div className={`p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-110 shrink-0 ${stat.bg} ${stat.color}`}>
+                      <Icon className="w-5.5 h-5.5" />
                     </div>
                   </div>
                   {/* Subtle link arrow indicator */}
@@ -785,6 +797,94 @@ export default function AdminDashboard() {
                 </div>
               )
             })}
+          </div>
+
+          {/* ข้อมูลทางการเงินประจำเดือนเดือนนี้ */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-6">
+            {/* รายรับเดือนนี้ (เงินที่เก็บได้แล้ว) - ตัวเลขสีเขียว */}
+            <div 
+              onClick={() => router.push("/manage-bills")}
+              className="bg-emerald-50/20 dark:bg-emerald-950/10 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900/20 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-md cursor-pointer group active:scale-[0.99]"
+            >
+              <div className="flex justify-between items-start">
+                <div className="space-y-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
+                      รายรับเดือนนี้
+                    </span>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-extrabold">
+                      เงินที่เก็บได้แล้ว
+                    </span>
+                  </div>
+                  <h3 className="text-3xl md:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                    {financialStats.totalRevenue.toLocaleString()} <span className="text-xs font-bold text-emerald-500/80">บาท</span>
+                  </h3>
+                  
+                  {/* Progress Bar */}
+                  <div className="space-y-1.5 pt-1 max-w-xs">
+                    <div className="flex justify-between text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      <span>เก็บเงินได้แล้ว</span>
+                      <span>{financialStats.collectionsRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-emerald-200/40 dark:bg-emerald-900/30 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${financialStats.collectionsRate}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-emerald-500/85 font-bold mt-1">
+                      ยอดเรียกเก็บทั้งหมด {financialStats.totalBilled.toLocaleString()} บาท
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="p-3 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-all duration-300 shrink-0">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+              </div>
+              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+              </div>
+            </div>
+
+            {/* บิลค้างชำระ (ที่ยังไม่จ่าย) - ตัวเลขสีแดง */}
+            <div 
+              onClick={() => router.push("/manage-bills")}
+              className="bg-rose-50/20 dark:bg-rose-950/10 p-6 rounded-2xl border border-rose-100 dark:border-rose-900/20 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-md cursor-pointer group active:scale-[0.99]"
+            >
+              <div className="flex justify-between items-start">
+                <div className="space-y-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
+                      บิลค้างชำระ
+                    </span>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-extrabold">
+                      ที่ยังไม่จ่าย
+                    </span>
+                  </div>
+                  <h3 className="text-3xl md:text-4xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
+                    {financialStats.unpaidAmount.toLocaleString()} <span className="text-xs font-bold text-rose-500/80">บาท</span>
+                  </h3>
+                  
+                  <div className="space-y-2 pt-1 max-w-xs">
+                    <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-bold">
+                      <Clock className="w-3.5 h-3.5 animate-pulse" />
+                      <span>ค้างชำระทั้งหมด {financialStats.unpaidBillsCount} รายการ</span>
+                    </div>
+                    <p className="text-[10px] text-rose-500/85 font-bold mt-1">
+                      สามารถจัดส่งใบแจ้งเตือนทาง LINE OA เพื่อกระตุ้นยอดค้างจ่ายได้ทันที
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="p-3 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-all duration-300 shrink-0">
+                  <AlertTriangle className="w-8 h-8" />
+                </div>
+              </div>
+              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <ArrowUpRight className="w-4 h-4 text-rose-500" />
+              </div>
+            </div>
           </div>
 
           {/* แผงเมนูลัดจัดข้อมูลด่วน (Quick Actions Panel) - Adaptive Design System */}
