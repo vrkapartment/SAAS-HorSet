@@ -227,31 +227,31 @@ export default function RoomsPage() {
         }
       }
 
+      let loadedCancellations: any[] = []
       if (hasLocalCancellations && tempCancellations.length > 0) {
         // ย้ายข้อมูลไปยัง Supabase
-        migrateLocalStorageCancelledContracts(wsId, tempCancellations).then(async (migrated) => {
-          if (migrated.success) {
-            localStorage.removeItem(`cancelled_contracts_${wsId}`)
-            console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
-            const res = await getCancelledContracts(wsId)
-            if (res.success && res.data) {
-              setCancelledContracts(res.data)
-            }
-          } else if (migrated.error === "table_not_found") {
-            setCancelledContracts(tempCancellations)
-            console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
-          }
-        })
-      } else {
-        getCancelledContracts(wsId).then(res => {
+        const migrated = await migrateLocalStorageCancelledContracts(wsId, tempCancellations)
+        if (migrated.success) {
+          localStorage.removeItem(`cancelled_contracts_${wsId}`)
+          console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
+          const res = await getCancelledContracts(wsId)
           if (res.success && res.data) {
-            setCancelledContracts(res.data)
-          } else if (res.error === "table_not_found") {
-            console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
-            setCancelledContracts([])
+            loadedCancellations = res.data
           }
-        })
+        } else if (migrated.error === "table_not_found") {
+          loadedCancellations = tempCancellations
+          console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
+        }
+      } else {
+        const res = await getCancelledContracts(wsId)
+        if (res.success && res.data) {
+          loadedCancellations = res.data
+        } else if (res.error === "table_not_found") {
+          console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
+          loadedCancellations = []
+        }
       }
+      setCancelledContracts(loadedCancellations)
 
       // ดึงข้อมูลตั้งค่าการเงินและบัญชีรับเงิน (เพื่อใช้แสดงค่ามัดจำ/ค่าเช่าล่วงหน้าในโมดอลลิงก์)
       getFinanceSettings(wsId).then(res => {
@@ -268,27 +268,70 @@ export default function RoomsPage() {
       let cachedRooms = forceRefresh ? null : getCachedData(wsId, "rooms")
       let cachedTypes = forceRefresh ? null : getCachedData(wsId, "room_types")
 
+      let roomsData: RoomItem[] = []
+      let typesData: RoomTypeItem[] = []
+
       if (cachedRooms && cachedTypes) {
-        setRooms(cachedRooms)
-        setRoomTypes(cachedTypes)
-        setLoading(false)
-        return
+        roomsData = cachedRooms
+        typesData = cachedTypes
+        setRooms(roomsData)
+        setRoomTypes(typesData)
+      } else {
+        const [roomsRes, typesRes] = await Promise.all([getRooms(), getRoomTypes()])
+        
+        if (roomsRes.success && roomsRes.data) {
+          roomsData = roomsRes.data as RoomItem[]
+          setRooms(roomsData)
+          if (wsId) setCachedData(wsId, "rooms", roomsData)
+        } else {
+          setError(roomsRes.error || "ไม่สามารถโหลดข้อมูลห้องพักได้")
+        }
+        
+        if (typesRes.success && typesRes.data) {
+          typesData = typesRes.data as RoomTypeItem[]
+          setRoomTypes(typesData)
+          if (wsId) setCachedData(wsId, "room_types", typesData)
+        }
       }
 
-      const [roomsRes, typesRes] = await Promise.all([getRooms(), getRoomTypes()])
-      
-      if (roomsRes.success && roomsRes.data) {
-        const roomsData = roomsRes.data as RoomItem[]
-        setRooms(roomsData)
-        if (wsId) setCachedData(wsId, "rooms", roomsData)
-      } else {
-        setError(roomsRes.error || "ไม่สามารถโหลดข้อมูลห้องพักได้")
-      }
-      
-      if (typesRes.success && typesRes.data) {
-        const typesData = typesRes.data as RoomTypeItem[]
-        setRoomTypes(typesData)
-        if (wsId) setCachedData(wsId, "room_types", typesData)
+      // LAZY CLEANUP: ตรวจสอบและย้ายออกผู้เช่าที่แจ้งย้ายออกล่วงหน้าแล้วเลยกำหนด (cancellationDate <= today)
+      if (roomsData.length > 0 && loadedCancellations.length > 0) {
+        const d = new Date()
+        const year = d.getFullYear()
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const date = String(d.getDate()).padStart(2, '0')
+        const todayStr = `${year}-${month}-${date}`
+
+        const tenantsToCleanup = roomsData.filter(room => {
+          if (!room.tenantId) return false
+          const matchedCancel = loadedCancellations.find(c => c.tenantId === room.tenantId)
+          if (matchedCancel && matchedCancel.cancellationDate && matchedCancel.cancellationDate <= todayStr) {
+            return true
+          }
+          return false
+        })
+
+        if (tenantsToCleanup.length > 0) {
+          console.log(`Lazy cleanup: Found ${tenantsToCleanup.length} past-due checked out tenants. Cleaning up in database...`)
+          
+          const cleanupPromises = tenantsToCleanup.map(room => deleteTenant(room.tenantId!, room.roomNumber))
+          await Promise.all(cleanupPromises)
+          
+          if (wsId) {
+            clearWorkspaceCache(wsId)
+          }
+          const [roomsResNew, typesResNew] = await Promise.all([getRooms(), getRoomTypes()])
+          if (roomsResNew.success && roomsResNew.data) {
+            const finalRooms = roomsResNew.data as RoomItem[]
+            setRooms(finalRooms)
+            if (wsId) setCachedData(wsId, "rooms", finalRooms)
+          }
+          if (typesResNew.success && typesResNew.data) {
+            const finalTypes = typesResNew.data as RoomTypeItem[]
+            setRoomTypes(finalTypes)
+            if (wsId) setCachedData(wsId, "room_types", finalTypes)
+          }
+        }
       }
     } catch (err) {
       setError("เกิดข้อผิดพลาดในการโหลดข้อมูลระบบห้องพัก")
@@ -853,14 +896,43 @@ export default function RoomsPage() {
         return
       }
 
-      // 2. ย้ายออกผู้เช่าออกจากห้องพักใน Supabase
-      const res = await deleteTenant(selectedRoom.tenantId, selectedRoom.roomNumber)
-      if (res.success) {
-        showToast(`✓ ดำเนินการย้ายออกผู้เช่าห้อง ${selectedRoom.roomNumber} และบันทึกประวัติภาษีสัญญายกเลิกเรียบร้อยแล้ว`, "success")
-        setCheckoutModalOpen(false)
-        await loadData(true)
+      // ตรวจสอบว่าเป็นวันย้ายออกล่วงหน้าในอนาคตหรือไม่
+      const d = new Date()
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const date = String(d.getDate()).padStart(2, '0')
+      const todayStr = `${year}-${month}-${date}`
+
+      const isFutureCheckout = checkoutDate > todayStr
+
+      if (isFutureCheckout) {
+        // 2. ถ้าเป็นการย้ายออกล่วงหน้า ให้ปล่อยผู้เช่าค้างในห้องพักไปก่อน แต่เปลี่ยนวันสิ้นสุดสัญญา (lease_end) เป็นวันที่ย้ายออกจริง
+        const updateRes = await updateTenant(
+          selectedRoom.tenantId,
+          selectedRoom.roomNumber,
+          selectedRoom.tenantName || "",
+          selectedRoom.tenantPhone || "",
+          selectedRoom.lineUserId || null,
+          selectedRoom.leaseStart || "",
+          checkoutDate
+        )
+        if (updateRes.success) {
+          showToast(`✓ บันทึกการแจ้งย้ายออกล่วงหน้าของห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว (ผู้เช่าจะยังแสดงอยู่ในห้องพักจนถึงวันที่ย้ายออกจริง)`, "success")
+          setCheckoutModalOpen(false)
+          await loadData(true)
+        } else {
+          setCheckoutError(updateRes.error || "เกิดข้อผิดพลาดในการอัปเดตวันหมดสัญญาของผู้เช่า")
+        }
       } else {
-        setCheckoutError(res.error || "เกิดข้อผิดพลาดในการคืนห้องพัก")
+        // 2. ย้ายออกผู้เช่าออกจากห้องพักใน Supabase ทันที
+        const res = await deleteTenant(selectedRoom.tenantId, selectedRoom.roomNumber)
+        if (res.success) {
+          showToast(`✓ ดำเนินการย้ายออกผู้เช่าห้อง ${selectedRoom.roomNumber} และบันทึกประวัติภาษีสัญญายกเลิกเรียบร้อยแล้ว`, "success")
+          setCheckoutModalOpen(false)
+          await loadData(true)
+        } else {
+          setCheckoutError(res.error || "เกิดข้อผิดพลาดในการคืนห้องพัก")
+        }
       }
     } catch (err) {
       setCheckoutError("เกิดข้อผิดพลาดในการดำเนินการคืนห้องพัก")
@@ -1135,6 +1207,17 @@ export default function RoomsPage() {
       </div>
     </div>
   )
+
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const date = String(d.getDate()).padStart(2, '0')
+  const todayStr = `${year}-${month}-${date}`
+
+  const activeCancelledContracts = cancelledContracts.filter(c => {
+    if (!c.cancellationDate) return true
+    return c.cancellationDate <= todayStr
+  })
 
   return (
     <>
@@ -1906,7 +1989,7 @@ export default function RoomsPage() {
               </p>
             </div>
 
-            {cancelledContracts.length > 0 ? (
+            {activeCancelledContracts.length > 0 ? (
               <div className="overflow-x-auto rounded-xl border border-slate-200/50 dark:border-slate-800/80 bg-white dark:bg-slate-950/20">
                 <table className="w-full text-left text-xs border-collapse min-w-[600px]">
                   <thead>
@@ -1920,7 +2003,7 @@ export default function RoomsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
-                    {cancelledContracts.map((c) => (
+                    {activeCancelledContracts.map((c) => (
                       <tr key={c.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/5 transition-colors">
                         <td className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">
                           ห้อง {c.roomNumber} - {c.tenantName}
@@ -1955,10 +2038,10 @@ export default function RoomsPage() {
                   </tbody>
                 </table>
                 <div className="flex flex-col sm:flex-row justify-between items-center p-4 bg-slate-50/50 dark:bg-slate-900/5 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 gap-2 font-bold">
-                  <span>จำนวนสัญญาที่ยกเลิกสะสมในระบบ: {cancelledContracts.length} รายการ</span>
+                  <span>จำนวนสัญญาที่ยกเลิกสะสมในระบบ: {activeCancelledContracts.length} รายการ</span>
                   <span className="text-red-600 dark:text-red-400 font-extrabold font-mono text-xs md:text-sm bg-red-50 dark:bg-red-950/20 px-3 py-1 rounded-xl border border-red-150 dark:border-red-900/30 shadow-sm shadow-red-500/5 flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4" />
-                    รวมยอดเงินริบสะสม: {cancelledContracts.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0).toLocaleString()} บาท
+                    รวมยอดเงินริบสะสม: {activeCancelledContracts.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0).toLocaleString()} บาท
                   </span>
                 </div>
               </div>

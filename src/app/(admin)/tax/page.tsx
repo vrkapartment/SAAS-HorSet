@@ -672,6 +672,15 @@ export default function TaxPage() {
   // 2. เงินประกันริบ (มาตรา 40(8)): เมื่อยกเลิกสัญญา คำนวณ [มัดจำ - เงินคืนจริง] = ยอดริบ และนำไปบวกเป็นรายได้ในปีที่ยกเลิกสัญญา
   const cancelledInYear = cancelledContracts.filter(c => {
     if (!c.cancellationDate) return false
+    
+    // ซ่อนสัญญายกเลิกที่ยังไม่ถึงกำหนด (ย้ายออกล่วงหน้าในอนาคต)
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const date = String(d.getDate()).padStart(2, '0')
+    const todayStr = `${year}-${month}-${date}`
+    if (c.cancellationDate > todayStr) return false
+
     const parts = c.cancellationDate.split("-")
     return parts[0] === taxYear
   })
