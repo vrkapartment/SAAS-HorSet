@@ -1239,7 +1239,7 @@ export default function RoomsPage() {
         </div>
       )}
 
-      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto pb-24 md:pb-6 relative">
+      <div className="p-4 md:p-6 space-y-6 max-w-none pb-24 md:pb-6 relative">
         {/* Ambient Decorative Background Glows */}
         <div className="absolute top-10 right-1/4 w-[300px] h-[300px] bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
         <div className="absolute bottom-10 left-10 w-[250px] h-[250px] bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
