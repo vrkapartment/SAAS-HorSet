@@ -183,9 +183,9 @@ function SettingsHubContent() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto pb-16">
+    <div className="p-0 sm:p-2 space-y-6 w-full pb-16">
       {/* Page Header */}
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center gap-3 mb-2 px-1">
         <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shadow-sm">
           <Settings className="w-6 h-6 animate-spin-slow" />
         </div>
@@ -199,51 +199,36 @@ function SettingsHubContent() {
         </div>
       </div>
 
-      {/* Main Settings Panel */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        
-        {/* Desktop Sidebar Tabs Selection */}
-        <div className="w-full lg:w-80 shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 p-4 rounded-3xl shadow-sm space-y-2 lg:sticky lg:top-24">
-          <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block px-2.5 pb-2 border-b border-slate-100 dark:border-slate-850/80 mb-2">
-            หมวดหมู่การตั้งค่า
-          </span>
-          
-          {/* Mobile Tab List (horizontal scrolling) & Desktop Menu */}
-          <div className="flex lg:flex-col overflow-x-auto lg:overflow-visible gap-2 pb-2 lg:pb-0 scrollbar-none font-bold">
-            {allowedTabs.map((tab) => {
-              const Icon = tab.icon
-              const isSelected = resolvedActiveTab === tab.id
+      {/* Horizontal Tabs Selection at Top */}
+      <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 p-3 rounded-3xl shadow-sm">
+        <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-none font-bold">
+          {allowedTabs.map((tab) => {
+            const Icon = tab.icon
+            const isSelected = resolvedActiveTab === tab.id
 
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`w-auto lg:w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl border text-xs sm:text-sm font-extrabold whitespace-nowrap lg:whitespace-normal text-left transition-all duration-200 cursor-pointer shrink-0 ${
-                    isSelected
-                      ? "bg-blue-600/10 dark:bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/[0.02]"
-                      : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-950 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 shrink-0 ${isSelected ? "text-blue-500" : "text-slate-400"}`} />
-                  <div className="flex flex-col min-w-0">
-                    <span className="truncate">{tab.name}</span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal hidden lg:block truncate mt-0.5 max-w-[200px]">
-                      {tab.description}
-                    </span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2.5 px-4.5 py-3 rounded-2xl border text-xs sm:text-sm font-extrabold whitespace-nowrap transition-all duration-200 cursor-pointer shrink-0 ${
+                  isSelected
+                    ? "bg-blue-600/10 dark:bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/[0.02]"
+                    : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-950 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                }`}
+              >
+                <Icon className={`w-5 h-5 shrink-0 ${isSelected ? "text-blue-500" : "text-slate-400"}`} />
+                <span className="truncate">{tab.name}</span>
+              </button>
+            )
+          })}
         </div>
+      </div>
 
-        {/* Content Area */}
-        <div className="flex-1 w-full min-w-0 bg-transparent">
-          <div className="animate-fade-in duration-300">
-            {renderActiveTabContent()}
-          </div>
+      {/* Content Area */}
+      <div className="w-full min-w-0 bg-transparent">
+        <div className="animate-fade-in duration-300">
+          {renderActiveTabContent()}
         </div>
-
       </div>
     </div>
   )

@@ -888,7 +888,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         </header>
 
         {/* ตัวเนื้อหาภายในหน้าเว็บ (Page Content Injection) */}
-        <main className={`flex-1 p-4 sm:p-6 md:p-8 ${pathname === "/rooms" ? "max-w-none" : "max-w-7xl"} w-full mx-auto space-y-6 overflow-x-hidden touch-pan-y overscroll-x-none`}>
+        <main className={`flex-1 p-4 sm:p-6 md:p-8 ${(pathname === "/rooms" || pathname === "/settings" || pathname?.startsWith("/settings")) ? "max-w-none" : "max-w-7xl"} w-full mx-auto space-y-6 overflow-x-hidden touch-pan-y overscroll-x-none`}>
           <div className="w-full max-w-full overflow-hidden">
             <PullToRefresh>
               {isPathAllowed() ? (
