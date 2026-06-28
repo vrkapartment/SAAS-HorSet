@@ -193,7 +193,7 @@ export default function AdminDashboard() {
         icon: Home,
         color: "text-blue-500 dark:text-blue-400",
         bg: "bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/20",
-        path: "/tenants"
+        path: "/rooms"
       },
       {
         title: "ห้องว่าง",
@@ -203,7 +203,7 @@ export default function AdminDashboard() {
         icon: Home,
         color: "text-emerald-500 dark:text-emerald-400",
         bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/20",
-        path: "/tenants"
+        path: "/rooms?filter=available"
       },
       {
         title: "มีผู้เช่า",
@@ -213,7 +213,7 @@ export default function AdminDashboard() {
         icon: Users,
         color: "text-teal-500 dark:text-teal-400",
         bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/20",
-        path: "/tenants"
+        path: "/rooms?filter=has_tenant"
       },
       {
         title: "ค้างชำระ",
@@ -223,7 +223,7 @@ export default function AdminDashboard() {
         icon: Clock,
         color: "text-rose-500 dark:text-rose-400",
         bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/20",
-        path: "/manage-bills"
+        path: "/manage-bills?filter=unpaid"
       }
     ])
 
@@ -490,7 +490,7 @@ export default function AdminDashboard() {
         icon: Home,
         color: "text-blue-500 dark:text-blue-400",
         bg: "bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/20",
-        path: "/tenants"
+        path: "/rooms"
       },
       {
         title: "ห้องว่าง",
@@ -500,7 +500,7 @@ export default function AdminDashboard() {
         icon: Home,
         color: "text-emerald-500 dark:text-emerald-400",
         bg: "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/20",
-        path: "/tenants"
+        path: "/rooms?filter=available"
       },
       {
         title: "มีผู้เช่า",
@@ -510,7 +510,7 @@ export default function AdminDashboard() {
         icon: Users,
         color: "text-teal-500 dark:text-teal-400",
         bg: "bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/20",
-        path: "/tenants"
+        path: "/rooms?filter=has_tenant"
       },
       {
         title: "ค้างชำระ",
@@ -520,7 +520,7 @@ export default function AdminDashboard() {
         icon: Clock,
         color: "text-rose-500 dark:text-rose-400",
         bg: "bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/20",
-        path: "/manage-bills"
+        path: "/manage-bills?filter=unpaid"
       }
     ])
 
@@ -731,7 +731,7 @@ export default function AdminDashboard() {
           </div>
         </div>
         <button
-          onClick={() => router.push("/billing")}
+          onClick={() => router.push("/manage-bills")}
           className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-98 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer animate-fade-in"
         >
           <Receipt className="w-4 h-4" />
@@ -803,8 +803,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-6">
             {/* รายรับเดือนนี้ (เงินที่เก็บได้แล้ว) - ตัวเลขสีเขียว */}
             <div 
-              onClick={() => router.push("/manage-bills")}
-              className="bg-emerald-50/20 dark:bg-emerald-950/10 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900/20 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-md cursor-pointer group active:scale-[0.99]"
+              className="bg-emerald-50/20 dark:bg-emerald-950/10 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900/20 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out"
             >
               <div className="flex justify-between items-start">
                 <div className="space-y-3 flex-1">
@@ -838,19 +837,15 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <div className="p-3 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-all duration-300 shrink-0">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-all duration-300 shrink-0">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
-              </div>
-              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <ArrowUpRight className="w-4 h-4 text-emerald-500" />
               </div>
             </div>
 
             {/* บิลค้างชำระ (ที่ยังไม่จ่าย) - ตัวเลขสีแดง */}
             <div 
-              onClick={() => router.push("/manage-bills")}
-              className="bg-rose-50/20 dark:bg-rose-950/10 p-6 rounded-2xl border border-rose-100 dark:border-rose-900/20 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-md cursor-pointer group active:scale-[0.99]"
+              className="bg-rose-50/20 dark:bg-rose-950/10 p-6 rounded-2xl border border-rose-100 dark:border-rose-900/20 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out"
             >
               <div className="flex justify-between items-start">
                 <div className="space-y-3 flex-1">
@@ -877,12 +872,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <div className="p-3 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-all duration-300 shrink-0">
+                <div className="p-3 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-all duration-300 shrink-0">
                   <AlertTriangle className="w-8 h-8" />
                 </div>
-              </div>
-              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <ArrowUpRight className="w-4 h-4 text-rose-500" />
               </div>
             </div>
           </div>
@@ -900,7 +892,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 gap-3.5 md:hidden">
               {[
                 { label: "จดมิเตอร์น้ำไฟ", sub: "Utility Meter", path: "/billing", icon: Receipt, bg: "from-blue-500/10 to-blue-500/5 text-blue-500 border-blue-500/20 dark:border-blue-500/30" },
-                { label: "ออกบิลค่าเช่า", sub: "New Month Bill", path: "/billing", icon: Plus, bg: "from-teal-500/10 to-teal-500/5 text-teal-500 border-teal-500/20 dark:border-teal-500/30" },
+                { label: "ออกบิลค่าเช่า", sub: "New Month Bill", path: "/manage-bills", icon: Plus, bg: "from-teal-500/10 to-teal-500/5 text-teal-500 border-teal-500/20 dark:border-teal-500/30" },
                 { label: "จัดการผู้เช่า", sub: "Manage Tenants", path: "/tenants", icon: Users, bg: "from-indigo-500/10 to-indigo-500/5 text-indigo-500 border-indigo-500/20 dark:border-indigo-500/30" },
                 { label: "รายจ่ายรายวัน", sub: "Daily Expense", path: "/daily-bills", icon: Coins, bg: "from-amber-500/10 to-amber-500/5 text-amber-500 border-amber-500/20 dark:border-amber-500/30" }
               ].map((act, idx) => {
@@ -927,7 +919,7 @@ export default function AdminDashboard() {
             <div className="hidden md:grid grid-cols-4 gap-4">
               {[
                 { label: "จดมิเตอร์น้ำไฟ", desc: "บันทึกและคำนวณมิเตอร์ไฟฟ้าน้ำประปา", path: "/billing", icon: Receipt, color: "text-blue-500", bg: "bg-blue-500/10" },
-                { label: "ออกบิลค่าเช่าประจำเดือน", desc: "สร้างและจัดส่งใบแจ้งหนี้ไปยัง LINE OA", path: "/billing", icon: Plus, color: "text-teal-500", bg: "bg-teal-500/10" },
+                { label: "ออกบิลค่าเช่าประจำเดือน", desc: "สร้างและจัดส่งใบแจ้งหนี้ไปยัง LINE OA", path: "/manage-bills", icon: Plus, color: "text-teal-500", bg: "bg-teal-500/10" },
                 { label: "จัดการสัญญาเช่า & ผู้เช่า", desc: "เพิ่มสัญญา ปรับปรุงข้อมูล จัดการห้องพัก", path: "/tenants", icon: Users, color: "text-indigo-500", bg: "bg-indigo-500/10" },
                 { label: "บันทึกรายจ่ายรายวัน", desc: "จดบันทึกรายจ่ายจิปาถะของหอพัก", path: "/daily-bills", icon: Coins, color: "text-amber-500", bg: "bg-amber-500/10" }
               ].map((act, idx) => {
@@ -992,7 +984,7 @@ export default function AdminDashboard() {
                   <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" /> สถานะบิลและการรับเงินล่าสุด
                 </h3>
                 <button 
-                  onClick={() => router.push("/billing")}
+                  onClick={() => router.push("/manage-bills")}
                   className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline cursor-pointer py-2 px-3"
                   style={{ minHeight: "36px" }}
                 >

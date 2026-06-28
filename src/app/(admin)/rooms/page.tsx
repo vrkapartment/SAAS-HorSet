@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { 
   Home, 
   Plus, 
@@ -90,6 +91,19 @@ interface RoomTypeItem {
 }
 
 export default function RoomsPage() {
+  return (
+    <Suspense fallback={
+      <div className="py-32 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center min-h-[60vh]">
+        <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+        <span>กำลังเปิดหน้าจัดการห้องพักและผู้เช่า...</span>
+      </div>
+    }>
+      <RoomsContent />
+    </Suspense>
+  )
+}
+
+function RoomsContent() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeItem[]>([])
@@ -127,7 +141,23 @@ export default function RoomsPage() {
   }, [])
   
   const [search, setSearch] = useState("")
-  const [filter, setFilter] = useState<"all" | "available" | "waiting" | "occupied">("all")
+  const searchParams = useSearchParams()
+  const initialFilter = searchParams.get("filter")
+  const [filter, setFilter] = useState<"all" | "available" | "waiting" | "occupied" | "has_tenant">(
+    initialFilter === "available" || initialFilter === "waiting" || initialFilter === "occupied" || initialFilter === "has_tenant"
+      ? initialFilter
+      : "all"
+  )
+
+  useEffect(() => {
+    const f = searchParams.get("filter")
+    if (f === "available" || f === "waiting" || f === "occupied" || f === "has_tenant") {
+      setFilter(f)
+    } else if (f === "all") {
+      setFilter("all")
+    }
+  }, [searchParams])
+
   const [viewMode, setViewMode] = useState<"floor" | "table">("floor")
   
   // Modals Control
@@ -1103,7 +1133,14 @@ export default function RoomsPage() {
       (room.tenantPhone && room.tenantPhone.includes(search))
 
     const details = getRoomStatusDetails(room)
-    const matchesFilter = filter === "all" || details.code === filter
+    let matchesFilter = false
+    if (filter === "all") {
+      matchesFilter = true
+    } else if (filter === "has_tenant") {
+      matchesFilter = details.code === "waiting" || details.code === "occupied"
+    } else {
+      matchesFilter = details.code === filter
+    }
     
     return matchesSearch && matchesFilter
   })
@@ -1376,6 +1413,7 @@ export default function RoomsPage() {
               {[
                 { id: "all", label: "ทั้งหมด" },
                 { id: "available", label: "เฉพาะห้องว่าง" },
+                { id: "has_tenant", label: "มีผู้เช่า" },
                 { id: "waiting", label: "มีผู้เช่า (รอ LINE)" },
                 { id: "occupied", label: "มีผู้เช่า (เชื่อม LINE)" }
               ].map(tab => (

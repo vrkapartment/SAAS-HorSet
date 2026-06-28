@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useTheme } from "next-themes"
+import { useSearchParams } from "next/navigation"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import {
   Receipt,
@@ -138,8 +139,38 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
 }
 
 export default function ManageBillsPage() {
+  return (
+    <Suspense fallback={
+      <div className="py-32 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center min-h-[60vh]">
+        <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+        <span>กำลังเปิดหน้าจัดการใบแจ้งหนี้...</span>
+      </div>
+    }>
+      <ManageBillsContent />
+    </Suspense>
+  )
+}
+
+function ManageBillsContent() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
+  const searchParams = useSearchParams()
+  const initialFilter = searchParams.get("filter")
+  const [statusFilter, setStatusFilter] = useState<"all" | "unpaid" | "pending" | "paid">(
+    initialFilter === "unpaid" || initialFilter === "pending" || initialFilter === "paid"
+      ? initialFilter
+      : "all"
+  )
+
+  useEffect(() => {
+    const f = searchParams.get("filter")
+    if (f === "unpaid" || f === "pending" || f === "paid") {
+      setStatusFilter(f)
+    } else if (f === "all") {
+      setStatusFilter("all")
+    }
+  }, [searchParams])
+
   const [mounted, setMounted] = useState(false)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [userPermissions, setUserPermissions] = useState<StaffPermissions>(ADMIN_DEFAULT_PERMISSIONS)
@@ -1434,6 +1465,20 @@ export default function ManageBillsPage() {
   const pendingCount = unifiedItems.filter(item => item.billStatus === "pending").length
   const unpaidCount = unifiedItems.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length
 
+  const filteredUnifiedItems = unifiedItems.filter(item => {
+    if (statusFilter === "all") return true
+    if (statusFilter === "unpaid") {
+      return item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")
+    }
+    if (statusFilter === "pending") {
+      return item.billStatus === "pending"
+    }
+    if (statusFilter === "paid") {
+      return item.billStatus === "paid"
+    }
+    return true
+  })
+
   return (
     <>
       {/* Toast แจ้งเตือน */}
@@ -1524,13 +1569,49 @@ export default function ManageBillsPage() {
         unpaidCount={unpaidCount}
       />
 
+      {/* Filter Tabs Row */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-6 mb-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`text-xs font-bold uppercase tracking-wider mr-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+            ตัวกรองบิล:
+          </span>
+          {[
+            { id: "all", label: "ทั้งหมด", count: unifiedItems.length },
+            { id: "unpaid", label: "ค้างชำระเงิน", count: unpaidCount },
+            { id: "pending", label: "รอตรวจสอบสลิป", count: pendingCount },
+            { id: "paid", label: "ชำระเงินแล้ว", count: paidCount }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id as any)}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 shadow-sm ${
+                statusFilter === tab.id
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
+                  : isDark
+                    ? "bg-slate-900/30 border border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                    : "bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                statusFilter === tab.id
+                  ? "bg-white/20 text-white dark:bg-black/10 dark:text-slate-900"
+                  : isDark ? "bg-slate-800 text-slate-350" : "bg-slate-100 text-slate-600"
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Main Billing Table */}
       <MeterReadingTable
         isDark={isDark}
         loading={loading}
         userPermissions={userPermissions}
         hasEditPermission={userPermissions.manage_bills_edit}
-        unifiedItems={unifiedItems}
+        unifiedItems={filteredUnifiedItems}
         commonFee={commonFee}
         electricMinChecked={electricMinChecked}
         electricMinUnit={electricMinUnit}
