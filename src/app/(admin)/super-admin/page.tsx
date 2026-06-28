@@ -389,13 +389,44 @@ export default function SuperAdminPage() {
       const supabase = createClient()
       const trimmedToken = tokenInput.trim()
       
-      const { error } = await supabase
+      // Check if the row with id = 1 exists in the table
+      const { data: existingRow, error: checkError } = await supabase
         .from("line_quota_cache")
-        .upsert({
-          id: 1,
-          channel_access_token: trimmedToken || null,
-          updated_at: new Date().toISOString()
-        }, { onConflict: "id" })
+        .select("id")
+        .eq("id", 1)
+        .maybeSingle()
+
+      if (checkError) {
+        throw checkError
+      }
+
+      let error = null
+      if (existingRow) {
+        // If row exists, perform an UPDATE which only changes channel_access_token and updated_at
+        // This is 100% safe and completely avoids touching other columns/NOT NULL constraints
+        const { error: updateError } = await supabase
+          .from("line_quota_cache")
+          .update({
+            channel_access_token: trimmedToken || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", 1)
+        error = updateError
+      } else {
+        // If row does not exist, perform an INSERT with full defaults to satisfy NOT NULL constraints
+        const { error: insertError } = await supabase
+          .from("line_quota_cache")
+          .insert({
+            id: 1,
+            channel_access_token: trimmedToken || null,
+            limit_count: 1000,
+            consumed_count: 0,
+            remaining_count: 1000,
+            percentage_used: 0,
+            updated_at: new Date().toISOString()
+          })
+        error = insertError
+      }
 
       if (error) {
         throw error
@@ -1061,13 +1092,44 @@ export default function SuperAdminPage() {
                               setTokenSuccess(null)
                               try {
                                 const supabase = createClient()
-                                const { error } = await supabase
+                                
+                                // Check if the row with id = 1 exists in the table
+                                const { data: existingRow, error: checkError } = await supabase
                                   .from("line_quota_cache")
-                                  .upsert({
-                                    id: 1,
-                                    channel_access_token: null,
-                                    updated_at: new Date().toISOString()
-                                  }, { onConflict: "id" })
+                                  .select("id")
+                                  .eq("id", 1)
+                                  .maybeSingle()
+
+                                if (checkError) {
+                                  throw checkError
+                                }
+
+                                let error = null
+                                if (existingRow) {
+                                  // If row exists, UPDATE only channel_access_token to null and updated_at
+                                  const { error: updateError } = await supabase
+                                    .from("line_quota_cache")
+                                    .update({
+                                      channel_access_token: null,
+                                      updated_at: new Date().toISOString()
+                                    })
+                                    .eq("id", 1)
+                                  error = updateError
+                                } else {
+                                  // If row does not exist, INSERT a new row with null token and defaults
+                                  const { error: insertError } = await supabase
+                                    .from("line_quota_cache")
+                                    .insert({
+                                      id: 1,
+                                      channel_access_token: null,
+                                      limit_count: 1000,
+                                      consumed_count: 0,
+                                      remaining_count: 1000,
+                                      percentage_used: 0,
+                                      updated_at: new Date().toISOString()
+                                    })
+                                  error = insertError
+                                }
                                 
                                 if (error) throw error
                                 setIsTokenConfigured(false)

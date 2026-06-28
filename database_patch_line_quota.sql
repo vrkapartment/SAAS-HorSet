@@ -16,6 +16,12 @@ CREATE TABLE IF NOT EXISTS public.line_quota_cache (
 -- Add column if table already existed from previous version
 ALTER TABLE public.line_quota_cache ADD COLUMN IF NOT EXISTS channel_access_token text;
 
+-- Add defaults to existing columns if table already existed without defaults
+ALTER TABLE public.line_quota_cache ALTER COLUMN limit_count SET DEFAULT 1000;
+ALTER TABLE public.line_quota_cache ALTER COLUMN consumed_count SET DEFAULT 0;
+ALTER TABLE public.line_quota_cache ALTER COLUMN remaining_count SET DEFAULT 1000;
+ALTER TABLE public.line_quota_cache ALTER COLUMN percentage_used SET DEFAULT 0;
+
 -- 2. Enable Row Level Security (RLS)
 ALTER TABLE public.line_quota_cache ENABLE ROW LEVEL SECURITY;
 
