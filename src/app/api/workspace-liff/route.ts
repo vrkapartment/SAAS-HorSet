@@ -22,7 +22,22 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const supabase = await createClient()
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    let supabase
+    if (url && serviceKey && !serviceKey.includes("placeholder")) {
+      const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+      supabase = createSupabaseClient(url, serviceKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      })
+    } else {
+      supabase = await createClient()
+    }
+
     const { data, error } = await supabase
       .from("workspace_line_settings")
       .select("liff_id, channel_access_token")
