@@ -1255,7 +1255,7 @@ export default function ManageBillsPage() {
         amount: item.billAmount || (() => {
           const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
           const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
-          return item.baseRent + elecCost + waterCost + commonFee
+          return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0)
         })(),
         waiveElectricMin: item.waiveElectricMin,
         waiveWaterMin: item.waiveWaterMin,
@@ -1268,6 +1268,7 @@ export default function ManageBillsPage() {
         penaltyAmount: item.penaltyAmount || 0,
         lateDays: item.lateDays || 0,
         latePenaltyRate: latePenaltyRate,
+        otherServiceAmount: item.otherServiceAmount || 0,
         invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`
       })
 
@@ -1332,7 +1333,7 @@ export default function ManageBillsPage() {
           amount: item.billAmount || (() => {
             const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
             const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
-            return item.baseRent + elecCost + waterCost + commonFee
+            return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0)
           })(),
           waiveElectricMin: item.waiveElectricMin,
           waiveWaterMin: item.waiveWaterMin,
@@ -1345,6 +1346,7 @@ export default function ManageBillsPage() {
           penaltyAmount: item.penaltyAmount || 0,
           lateDays: item.lateDays || 0,
           latePenaltyRate: latePenaltyRate,
+          otherServiceAmount: item.otherServiceAmount || 0,
           invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`
         })
 

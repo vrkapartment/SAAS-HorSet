@@ -701,7 +701,16 @@ export default function MeterReadingTable({
                       )}
                       {mode !== "meters" && activeTab === "all" && (
                         <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.- | ส่วนกลาง ${commonFee}.-` : "ห้องว่าง"}
+                          {item.tenantName ? (
+                            <>
+                              ค่าเช่า {item.baseRent.toLocaleString()}.- | ส่วนกลาง {commonFee}.-
+                              {Number(item.otherServiceAmount || 0) > 0 && (
+                                <span className="text-teal-600 dark:text-teal-400 font-bold">
+                                  {" "}| ค่าบริการอื่นๆ {Number(item.otherServiceAmount).toLocaleString()}.-
+                                </span>
+                              )}
+                            </>
+                          ) : "ห้องว่าง"}
                         </div>
                       )}
                     </div>
@@ -1390,7 +1399,16 @@ export default function MeterReadingTable({
                               {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                             </div>
                             <div className={`text-xs sm:text-sm font-mono mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                              {item.tenantName ? `ค่าเช่า ${item.baseRent.toLocaleString()}.-` : "ห้องว่าง"}
+                              {item.tenantName ? (
+                                <>
+                                  ค่าเช่า {item.baseRent.toLocaleString()}.-
+                                  {Number(item.otherServiceAmount || 0) > 0 && (
+                                    <div className="text-[10px] text-teal-600 dark:text-teal-400 font-bold mt-0.5">
+                                      ค่าบริการอื่นๆ +{Number(item.otherServiceAmount).toLocaleString()}.-
+                                    </div>
+                                  )}
+                                </>
+                              ) : "ห้องว่าง"}
                             </div>
                           </>
                         )}
