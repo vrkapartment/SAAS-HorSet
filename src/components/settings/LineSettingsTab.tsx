@@ -25,6 +25,7 @@ export default function LineSettingsTab() {
   
   // Settings Inputs
   const [tokenInput, setTokenInput] = useState("")
+  const [liffInput, setLiffInput] = useState("")
   
   // Password Visibility
   const [showToken, setShowToken] = useState(false)
@@ -72,6 +73,7 @@ export default function LineSettingsTab() {
             console.warn("Could not query workspace_line_settings, it may need creation:", error.message)
           } else if (data) {
             setTokenInput(data.channel_access_token || "")
+            setLiffInput(data.liff_id || "")
             setIsConfigured(!!data.channel_access_token)
             
             // Set initial quota display from cache row
@@ -91,6 +93,7 @@ export default function LineSettingsTab() {
           // Demo Mode
           setWorkspaceId("d290f1ee-6c54-4b01-90e6-d701748f0851")
           setTokenInput("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo_token_apartment_owner")
+          setLiffInput("2010442620-H4josaDy")
           setIsConfigured(true)
           setQuotaData({
             limit: 1000,
@@ -172,6 +175,7 @@ export default function LineSettingsTab() {
     setSettingsSuccess(null)
 
     const trimmedToken = tokenInput.trim()
+    const trimmedLiff = liffInput.trim()
 
     if (isDemo) {
       await new Promise((resolve) => setTimeout(resolve, 600))
@@ -199,6 +203,7 @@ export default function LineSettingsTab() {
           .from("workspace_line_settings")
           .update({
             channel_access_token: trimmedToken || null,
+            liff_id: trimmedLiff || null,
             updated_at: new Date().toISOString()
           })
           .eq("workspace_id", workspaceId)
@@ -209,6 +214,7 @@ export default function LineSettingsTab() {
           .insert({
             workspace_id: workspaceId,
             channel_access_token: trimmedToken || null,
+            liff_id: trimmedLiff || null,
             limit_count: 1000,
             consumed_count: 0,
             remaining_count: 1000,
@@ -246,6 +252,7 @@ export default function LineSettingsTab() {
     if (isDemo) {
       await new Promise((resolve) => setTimeout(resolve, 500))
       setTokenInput("")
+      setLiffInput("")
       setIsConfigured(false)
       setQuotaData(null)
       setSettingsSuccess("ลบข้อมูลเชื่อมต่อจำลองเรียบร้อยแล้ว")
@@ -267,6 +274,7 @@ export default function LineSettingsTab() {
       if (error) throw error
 
       setTokenInput("")
+      setLiffInput("")
       setIsConfigured(false)
       setQuotaData(null)
       setSettingsSuccess("ลบการเชื่อมต่อ LINE OA ของคุณเรียบร้อยแล้ว")
@@ -347,6 +355,26 @@ export default function LineSettingsTab() {
                     {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+
+              {/* LIFF ID Input */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider block">
+                    LINE LIFF ID
+                  </label>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+                    * จำเป็นเพื่อเชื่อมโยงผู้ใช้ให้ตรงกับ Provider ของคุณ
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="2010442620-H4josaDy"
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-xs font-mono transition-colors"
+                  value={liffInput}
+                  onChange={(e) => setLiffInput(e.target.value)}
+                  required
+                />
               </div>
 
               {/* Status Alert */}
@@ -526,9 +554,9 @@ export default function LineSettingsTab() {
                 <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-[10px] font-black border border-blue-500/20">
                   3
                 </div>
-                <h4 className="font-extrabold text-slate-800 dark:text-slate-200">เสร็จสิ้น! เริ่มต้นใช้งานได้ทันที</h4>
+                <h4 className="font-extrabold text-slate-800 dark:text-slate-200">สร้าง LINE Login & LIFF App</h4>
                 <p className="text-[11px] text-slate-400">
-                  ลูกบ้านจะสามารถกดลงทะเบียนผู้เช่าและเริ่มรับบิล Flex Message ผ่านทางห้องแชท LINE OA ของหอพักคุณได้ทันที โดยไม่มีขั้นตอนตั้งค่า LINE Login หรือสร้าง LIFF App เพิ่มเติมให้ยุ่งยาก เนื่องจากระบบของเราจะจัดการเชื่อมโยงรหัสผู้ใช้ (UID) และบริการรับส่งบิลให้แบบอัตโนมัติอย่างราบรื่นครับ!
+                  เพื่อป้องกันปัญหา UID ไม่เข้าคู่กัน ใน **Provider เดียวกัน** ให้กด **Create New Channel** เลือก **LINE Login** ➡️ แท็บ **LIFF** กด **Add LIFF** ➡️ ตั้งชื่อ, ขนาด Full, และตั้งค่า Endpoint URL เป็น <span className="text-blue-500 font-mono select-all">https://{typeof window !== "undefined" ? window.location.hostname : "yourdomain.com"}/tenant-register</span> ➡️ คัดลอก **LIFF ID** มาใส่ในช่องด้านซ้าย แล้วกดบันทึกเป็นอันเสร็จสมบูรณ์ครับ!
                 </p>
               </div>
 

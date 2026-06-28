@@ -33,19 +33,36 @@ USING (
 );
 
 -- 4. Seed initial records from line_quota_cache if it exists and workspace exists
--- Let's populate the default workspace with the existing token from line_quota_cache if any
-INSERT INTO public.workspace_line_settings (workspace_id, channel_access_token, limit_count, consumed_count, remaining_count, percentage_used, updated_at)
-SELECT 
-  'd290f1ee-6c54-4b01-90e6-d701748f0851'::uuid, 
-  channel_access_token, 
-  limit_count, 
-  consumed_count, 
-  remaining_count, 
-  percentage_used, 
-  updated_at 
-FROM public.line_quota_cache 
-WHERE id = 1
-ON CONFLICT (workspace_id) DO NOTHING;
+-- Let's dynamically populate the first available workspace (if any exist) with the existing token from line_quota_cache if any
+DO $$
+DECLARE
+  first_ws_id uuid;
+BEGIN
+  SELECT id INTO first_ws_id FROM public.workspaces LIMIT 1;
+  
+  IF first_ws_id IS NOT NULL THEN
+    INSERT INTO public.workspace_line_settings (
+      workspace_id, 
+      channel_access_token, 
+      limit_count, 
+      consumed_count, 
+      remaining_count, 
+      percentage_used, 
+      updated_at
+    )
+    SELECT 
+      first_ws_id, 
+      channel_access_token, 
+      limit_count, 
+      consumed_count, 
+      remaining_count, 
+      percentage_used, 
+      updated_at 
+    FROM public.line_quota_cache 
+    WHERE id = 1
+    ON CONFLICT (workspace_id) DO NOTHING;
+  END IF;
+END $$;
 
 -- Comment to describe the table
 COMMENT ON TABLE public.workspace_line_settings IS 'Stores the cached LINE OA Messaging API settings and quota data per workspace (multi-tenant).';
