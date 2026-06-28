@@ -32,6 +32,10 @@ serve(async (req) => {
     const now = Date.now()
     const tenMinutes = 10 * 60 * 1000
 
+    // Parse query parameters to check if cache bypass is requested
+    const requestUrl = new URL(req.url)
+    const bypassCache = requestUrl.searchParams.get("bypass_cache") === "true"
+
     // 2. Query the database cache and token together (combines DB roundtrips)
     let dbCacheSuccess = false
     let cachedData = null
@@ -53,7 +57,8 @@ serve(async (req) => {
             dbToken = data.channel_access_token
           }
           const cacheAge = now - new Date(data.updated_at).getTime()
-          if (cacheAge < tenMinutes && data.limit_count !== null && data.consumed_count !== null) {
+          // Only use database cache if bypassCache is FALSE
+          if (!bypassCache && cacheAge < tenMinutes && data.limit_count !== null && data.consumed_count !== null) {
             cachedData = {
               limit: data.limit_count,
               consumed: data.consumed_count,
@@ -81,7 +86,7 @@ serve(async (req) => {
     }
 
     // 4. Check in-memory fallback cache if database cache wasn't found or failed
-    if (!cachedData && memoryCache) {
+    if (!bypassCache && !cachedData && memoryCache) {
       const cacheAge = now - memoryCache.updatedAt
       if (cacheAge < tenMinutes) {
         cachedData = {

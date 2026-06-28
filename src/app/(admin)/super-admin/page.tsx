@@ -289,7 +289,7 @@ export default function SuperAdminPage() {
     setRegistrationCodes(mockCodes)
   }
 
-  const loadLineQuota = async () => {
+  const loadLineQuota = async (forceRefresh: boolean = false) => {
     setFetchingQuota(true)
     setQuotaError(null)
 
@@ -311,9 +311,12 @@ export default function SuperAdminPage() {
 
     try {
       const supabase = createClient()
-      const { data, error: funcErr } = await supabase.functions.invoke("get-line-quota", {
-        method: "GET"
-      })
+      const { data, error: funcErr } = await supabase.functions.invoke(
+        `get-line-quota${forceRefresh ? "?bypass_cache=true" : ""}`,
+        {
+          method: "GET"
+        }
+      )
 
       if (funcErr) {
         throw funcErr
@@ -436,7 +439,7 @@ export default function SuperAdminPage() {
       setTokenSuccess(trimmedToken ? "บันทึก LINE Channel Access Token สำเร็จ!" : "ลบ LINE Channel Access Token เรียบร้อยแล้ว")
       
       // Refresh quota display with the new token
-      loadLineQuota()
+      loadLineQuota(true)
     } catch (err: any) {
       console.error("Error saving token:", err)
       setTokenError(err.message || "เกิดข้อผิดพลาดในการบันทึก Token")
@@ -914,7 +917,7 @@ export default function SuperAdminPage() {
 
                 <button
                   type="button"
-                  onClick={() => loadLineQuota()}
+                  onClick={() => loadLineQuota(true)}
                   disabled={fetchingQuota}
                   className="p-2.5 px-4 bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all rounded-xl cursor-pointer flex items-center justify-center gap-1.5 text-xs font-semibold self-start sm:self-center"
                 >
@@ -1010,7 +1013,7 @@ export default function SuperAdminPage() {
                   <span>ไม่มีข้อมูลโควตา LINE OA กรุณากดปุ่มเพื่อดึงข้อมูล</span>
                   <button
                     type="button"
-                    onClick={() => loadLineQuota()}
+                    onClick={() => loadLineQuota(true)}
                     className="px-3 py-1 bg-slate-900 border border-slate-850 hover:bg-slate-800 text-slate-300 rounded-lg text-[11px] font-semibold cursor-pointer"
                   >
                     โหลดข้อมูลโควตา
@@ -1135,7 +1138,7 @@ export default function SuperAdminPage() {
                                 setIsTokenConfigured(false)
                                 setTokenSuccess("ลบ LINE Channel Access Token เรียบร้อยแล้ว")
                                 setTokenInput("")
-                                loadLineQuota()
+                                loadLineQuota(true)
                               } catch (err: any) {
                                 setTokenError(err.message || "เกิดข้อผิดพลาด")
                               } finally {
