@@ -300,7 +300,20 @@ export default function LineSettingsTab() {
   return (
     <div className="space-y-6">
       
-      {/* 1. Header Information Alert */}
+      {/* 1. Page Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 p-6 rounded-3xl border border-blue-500/20 shadow-sm backdrop-blur-md">
+        <div>
+          <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5 font-sans">
+            <MessageSquare className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+            <span>เชื่อมต่อ LINE OA (Personal LINE OA Integration)</span>
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed font-sans">
+            เชื่อมต่อเซิร์ฟเวอร์ LINE Developers และเปิดใช้งาน Messaging API เพื่อส่งบิลแจ้งหนี้ในรูปแบบ Flex Message สุดพรีเมียมให้ลูกบ้านโดยตรงภายใต้แบรนด์หอพักคุณเอง
+          </p>
+        </div>
+      </div>
+
+      {/* 2. Header Information Alert */}
       <div className="p-4 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl flex gap-3 text-blue-600 dark:text-blue-400">
         <Info className="w-5 h-5 shrink-0 mt-0.5" />
         <div className="text-xs space-y-1 font-bold">
@@ -311,10 +324,10 @@ export default function LineSettingsTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         
-        {/* 2. Left side: Forms & Settings */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Left side: Forms & Settings */}
+        <div className="space-y-6">
           
           {/* Card: Configuration Settings */}
           <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5">
@@ -510,8 +523,8 @@ export default function LineSettingsTab() {
 
         </div>
 
-        {/* 3. Right side: Owner Setup Tutorial Manual */}
-        <div className="lg:col-span-5 space-y-6">
+        {/* Right side: Owner Setup Tutorial Manual */}
+        <div className="space-y-6">
           <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
