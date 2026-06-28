@@ -1595,7 +1595,7 @@ export default function UnifiedBillingPage() {
         <div>
           <div className="flex items-center gap-2.5">
             <Gauge className="w-6 h-6 text-blue-500" />
-            <h2 className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดเลขมิเตอร์ & สรุปบิลค่าเช่า</h2>
+            <h2 className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดมิเตอร์ และดูบิล</h2>
           </div>
           <p className={`text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             ระบบบันทึกจดเลขมิเตอร์ไฟฟ้า มิเตอร์น้ำประปา และตรวจสอบสรุปยอดบิลอย่างง่ายประจำหอพัก

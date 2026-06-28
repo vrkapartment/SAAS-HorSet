@@ -290,7 +290,7 @@ WHERE role IN ('admin', 'super_admin');`
       {
         key: "manage_meters_bills",
         editKey: "manage_meters_bills_edit",
-        name: "จดเลขมิเตอร์ & สรุปบิลค่าเช่า",
+        name: "จดมิเตอร์ และดูบิล",
         description: "เข้าดูมิเตอร์น้ำ/ไฟ และดูรายงานคำนวณสรุปค่าใช้จ่ายประจำเดือน",
         editDescription: "กรอกเลขอัตรามิเตอร์ และสร้างสรุปบิลเก็บเงินผู้เช่า",
         icon: Scroll,
@@ -306,7 +306,7 @@ WHERE role IN ('admin', 'super_admin');`
       {
         key: "manage_finance_expenses",
         editKey: "manage_finance_expenses_edit",
-        name: "จัดการบิล รายจ่ายรายวัน",
+        name: "บันทึกบิลค่าใช้จ่าย",
         description: "เข้าดูประวัติบันทึกค่าใช้จ่าย และบิลเงินออกประจำหอพัก",
         editDescription: "บันทึกเพิ่มรายการรายจ่ายรายวัน หรือแก้ไขบิลรายจ่าย",
         icon: Coins,

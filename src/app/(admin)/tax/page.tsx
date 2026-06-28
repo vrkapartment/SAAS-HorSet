@@ -873,7 +873,7 @@ export default function TaxPage() {
           <p className="text-xs font-bold text-amber-800 dark:text-amber-450 tracking-wide flex items-center gap-1.5">
             ข้อสงวนสิทธิ์ทางกฎหมาย (Legal Disclaimer)
           </p>
-          <p className="text-slate-600 dark:text-slate-350 text-[11px] leading-relaxed max-w-5xl">
+          <p className="text-slate-600 dark:text-slate-350 text-xs sm:text-sm leading-relaxed max-w-5xl">
             ข้อมูลการคำนวณและรายงานตัวเลขรายได้ในหน้านี้ จัดทำขึ้นเพื่อใช้เป็นข้อมูลอ้างอิงเบื้องต้นในการคำนวณภาษีเท่านั้น ผู้ใช้งานต้องนำส่งแบบฟอร์มภาษีและตรวจสอบเอกสารความถูกต้องด้วยตนเองผ่านช่องทางระบบอย่างเป็นทางการของกรมสรรพากรอีกครั้ง
           </p>
         </div>
@@ -893,7 +893,7 @@ export default function TaxPage() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">แหล่งข้อมูลรายได้ภาษี</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">เลือกรูปแบบการประมวลผลยอดเงินรับพึงประเมิน</p>
+                <p className="text-xs text-slate-400 mt-0.5">เลือกรูปแบบการประมวลผลยอดเงินรับพึงประเมิน</p>
               </div>
             </div>
             
@@ -902,7 +902,7 @@ export default function TaxPage() {
                 <button
                   type="button"
                   onClick={() => handleDataSourceChange("system")}
-                  className={`flex-1 py-3 px-4 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`flex-1 py-3 px-4 text-sm font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
                     dataSource === "system"
                       ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 dark:shadow-blue-500/10 font-bold scale-[1.01]"
                       : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -913,7 +913,7 @@ export default function TaxPage() {
                 <button
                   type="button"
                   onClick={() => handleDataSourceChange("manual")}
-                  className={`flex-1 py-3 px-4 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`flex-1 py-3 px-4 text-sm font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
                     dataSource === "manual"
                       ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 dark:shadow-blue-500/10 font-bold scale-[1.01]"
                       : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -924,20 +924,20 @@ export default function TaxPage() {
               </div>
 
               {dataSource === "system" ? (
-                <div className="p-4 bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl border border-slate-200/50 dark:border-slate-900/80 text-xs space-y-3 shadow-inner">
+                <div className="p-4 bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl border border-slate-200/50 dark:border-slate-900/80 text-sm space-y-3 shadow-inner">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-900/80 pb-2.5">
                     <span className="text-slate-500 dark:text-slate-400 font-medium">สถานะดึงข้อมูลบิล:</span>
                     {hasPaidBills ? (
-                      <span className="inline-flex items-center gap-1.5 text-teal-700 dark:text-teal-400 font-bold bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border border-emerald-500/20 px-3 py-1 rounded-full text-[10px]">
+                      <span className="inline-flex items-center gap-1.5 text-teal-700 dark:text-teal-400 font-bold bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border border-emerald-500/20 px-3 py-1 rounded-full text-xs">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> ดึงข้อมูลจริงสำเร็จ ({paidBillsInYear.length} บิล)
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/20 px-3 py-1 rounded-full text-[10px]">
+                      <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/20 px-3 py-1 rounded-full text-xs">
                         <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> ไม่พบประวัติบิลชำระในปีภาษีนี้
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-450 leading-relaxed">
+                  <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed">
                     {hasPaidBills 
                       ? `ระบบประมวลผลรวบรวมรายได้จากบิลค่าเช่าในระบบที่เปลี่ยนสถานะเป็น "ชำระแล้ว" ในปี ${taxYear} โดยคัดแยกสัดส่วนค่าเช่าห้องพัก (มาตรา 40(5)) ค่าน้ำประปา/ค่าไฟฟ้า/ค่าส่วนกลาง (มาตรา 40(8)) และรายได้อื่นๆ ให้โดยอัตโนมัติตามหลักเกณฑ์ของกรมสรรพากร`
                       : `ไม่พบประวัติบิลที่ชำระเงินในปี ${taxYear} ระบบจึงแสดงยอดรายได้พึงประเมินเป็น 0 บาท ท่านสามารถบันทึกบิลชำระเงินในระบบเพื่ออัปเดตยอดจริง หรือเปลี่ยนเป็นโหมด "กำหนดตัวเลขเอง" ด้านบน`
@@ -996,7 +996,7 @@ export default function TaxPage() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">การคำนวณหักค่าใช้จ่ายทางภาษี</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">เลือกใช้นโยบายลดหย่อนค่าใช้จ่ายตามเกณฑ์สรรพากร</p>
+                <p className="text-xs text-slate-400 mt-0.5">เลือกใช้นโยบายลดหย่อนค่าใช้จ่ายตามเกณฑ์สรรพากร</p>
               </div>
             </div>
             
@@ -1005,7 +1005,7 @@ export default function TaxPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">รูปแบบการหักรายจ่ายของ ค่าเช่า 40(5)</label>
-                  <span className="inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10">มาตรา 40(5)</span>
+                  <span className="inline-flex text-xs font-bold px-2 py-0.5 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10">มาตรา 40(5)</span>
                 </div>
                 <div className="flex gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-900/80">
                   {(["เหมา 30%", "ตามจริง"] as const).map(method => (
@@ -1026,7 +1026,7 @@ export default function TaxPage() {
                 
                 {deductionMethod405 === "ตามจริง" && (
                   <div className="space-y-1.5 pt-1.5 animate-fade-in">
-                    <label className="text-[10px] text-slate-500 dark:text-slate-450 font-semibold tracking-wide">ค่าใช้จ่ายจริงในการดำเนินงานเช่าหอพักสะสมต่อปี (บาท)</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-450 font-semibold tracking-wide">ค่าใช้จ่ายจริงในการดำเนินงานเช่าหอพักสะสมต่อปี (บาท)</label>
                     <div className="relative flex items-center">
                       <input
                         type="number"
@@ -1039,14 +1039,14 @@ export default function TaxPage() {
                         type="button"
                         onClick={() => loadExpensesData(taxYear, undefined, true)}
                         disabled={loadingExpenses}
-                        className="absolute right-2.5 inline-flex items-center gap-1 text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+                        className="absolute right-2.5 inline-flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
                         title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
                       >
                         <RefreshCw className={`w-3 h-3 ${loadingExpenses ? "animate-spin" : ""}`} />
                         ดึงอัตโนมัติ
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-450 leading-relaxed">
+                    <p className="text-xs text-slate-400 dark:text-slate-450 leading-relaxed">
                       * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
                     </p>
                   </div>
@@ -1057,7 +1057,7 @@ export default function TaxPage() {
               <div className="space-y-2 border-t border-slate-100 dark:border-slate-900/80 pt-4">
                 <div className="flex justify-between items-center">
                   <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">รูปแบบการหักรายจ่ายของ ค่าน้ำไฟ/บริการ 40(8)</label>
-                  <span className="inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10">มาตรา 40(8)</span>
+                  <span className="inline-flex text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10">มาตรา 40(8)</span>
                 </div>
                 <div className="flex gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-900/80">
                   {(["เหมา 60%", "ตามจริง"] as const).map(method => (
@@ -1078,7 +1078,7 @@ export default function TaxPage() {
                 
                 {deductionMethod408 === "ตามจริง" && (
                   <div className="space-y-1.5 pt-1.5 animate-fade-in">
-                    <label className="text-[10px] text-slate-500 dark:text-slate-450 font-semibold tracking-wide">ค่าใช้จ่ายจริงที่เกิดขึ้นของค่าน้ำไฟ/บริการ 40(8) ทั้งปี (บาท)</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-450 font-semibold tracking-wide">ค่าใช้จ่ายจริงที่เกิดขึ้นของค่าน้ำไฟ/บริการ 40(8) ทั้งปี (บาท)</label>
                     <div className="relative flex items-center">
                       <input
                         type="number"
@@ -1091,20 +1091,20 @@ export default function TaxPage() {
                         type="button"
                         onClick={() => loadExpensesData(taxYear, undefined, true)}
                         disabled={loadingExpenses}
-                        className="absolute right-2.5 inline-flex items-center gap-1 text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+                        className="absolute right-2.5 inline-flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
                         title="คลิกเพื่อดึงข้อมูลจากตารางบันทึกค่าใช้จ่ายล่าสุด"
                       >
                         <RefreshCw className={`w-3 h-3 ${loadingExpenses ? "animate-spin" : ""}`} />
                         ดึงอัตโนมัติ
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-450 leading-relaxed">
+                    <p className="text-xs text-slate-400 dark:text-slate-450 leading-relaxed">
                       * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
                     </p>
                   </div>
                 )}
                 {deductionMethod408 === "เหมา 60%" && (
-                  <p className="text-[10px] text-slate-400 dark:text-slate-455 leading-relaxed">
+                  <p className="text-xs text-slate-400 dark:text-slate-455 leading-relaxed">
                     * ระบบคำนวณหักค่าใช้จ่ายแบบเหมาในอัตราร้อยละ 60 ของยอดเงินได้รวมมาตรา 40(8) จากงานบริการส่วนกลาง ค่าน้ำประปา และไฟฟ้าตามหลักกฎหมายผู้เสียภาษี
                   </p>
                 )}
@@ -1123,7 +1123,7 @@ export default function TaxPage() {
           
           <div className="space-y-5">
             <div className="flex justify-between items-start">
-              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10 tracking-wider">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10 tracking-wider">
                 มาตรา 40(5)
               </span>
               <div className="p-2.5 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
@@ -1132,8 +1132,8 @@ export default function TaxPage() {
             </div>
             
             <div className="space-y-1 relative z-10">
-              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้ค่าเช่าห้องพัก</h4>
-              <p className="text-[10px] text-slate-400 leading-none">รายได้เฉพาะส่วนที่เป็นค่าเช่าห้องพักสุทธิ</p>
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้ค่าเช่าห้องพัก</h4>
+              <p className="text-xs text-slate-400 leading-none">รายได้เฉพาะส่วนที่เป็นค่าเช่าห้องพักสุทธิ</p>
               <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300">
                 {formatMoney(rent405Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
               </p>
@@ -1141,9 +1141,9 @@ export default function TaxPage() {
           </div>
           
           <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
             <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">หักลดหย่อนแบบ {deductionMethod405}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">หักลดหย่อนแบบ {deductionMethod405}</span>
               <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">
                 {formatMoney(deductionRent405Full)} บาท
               </span>
@@ -1157,7 +1157,7 @@ export default function TaxPage() {
           
           <div className="space-y-5">
             <div className="flex justify-between items-start">
-              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-teal-500/[0.08] dark:bg-teal-500/[0.12] text-teal-600 dark:text-teal-400 border border-teal-500/10 tracking-wider">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-teal-500/[0.08] dark:bg-teal-500/[0.12] text-teal-600 dark:text-teal-400 border border-teal-500/10 tracking-wider">
                 มาตรา 40(8)
               </span>
               <div className="p-2.5 bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-teal-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
@@ -1166,8 +1166,8 @@ export default function TaxPage() {
             </div>
             
             <div className="space-y-1 relative z-10">
-              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ค่าน้ำไฟและบริการ</h4>
-              <p className="text-[10px] text-slate-400 leading-none">ค่ายูนิตสาธารณูปโภคและส่วนกลาง</p>
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ค่าน้ำไฟและบริการ</h4>
+              <p className="text-xs text-slate-400 leading-none">ค่ายูนิตสาธารณูปโภคและส่วนกลาง</p>
               <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-emerald-500 to-green-600 dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
                 {formatMoney(utilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
               </p>
@@ -1175,9 +1175,9 @@ export default function TaxPage() {
           </div>
           
           <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
             <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">หักลดหย่อนแบบ {deductionMethod408}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">หักลดหย่อนแบบ {deductionMethod408}</span>
               <span className="text-xs font-extrabold text-teal-600 dark:text-teal-400 tracking-tight">
                 {formatMoney(deductionUtilities408Full)} บาท
               </span>
@@ -1191,7 +1191,7 @@ export default function TaxPage() {
           
           <div className="space-y-5">
             <div className="flex justify-between items-start">
-              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10 tracking-wider">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10 tracking-wider">
                 ม. 40(8) อื่นๆ
               </span>
               <div className="p-2.5 bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
@@ -1200,8 +1200,8 @@ export default function TaxPage() {
             </div>
             
             <div className="space-y-1 relative z-10">
-              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้อื่น (ปรับ/ริบมัดจำ)</h4>
-              <p className="text-[10px] text-slate-400 leading-none">เงินปรับชำระล่าช้าหรือเงินริบมัดจำทำสัญญา</p>
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้อื่น (ปรับ/ริบมัดจำ)</h4>
+              <p className="text-xs text-slate-400 leading-none">เงินปรับชำระล่าช้าหรือเงินริบมัดจำทำสัญญา</p>
               <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-amber-600 via-orange-500 to-rose-650 dark:from-amber-400 dark:via-orange-400 dark:to-rose-450">
                 {formatMoney(other408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
               </p>
@@ -1209,9 +1209,9 @@ export default function TaxPage() {
           </div>
           
           <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">สิทธิ์หักค่าใช้จ่ายที่เลือก:</p>
             <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">กฎหมายไม่ให้สิทธิ์หักแบบเหมา</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">กฎหมายไม่ให้สิทธิ์หักแบบเหมา</span>
               <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
                 {deductionMethod408 === "เหมา 60%" ? (
                   "หักเหมา = 0.00 บาท"
@@ -1229,7 +1229,7 @@ export default function TaxPage() {
           
           <div className="space-y-5">
             <div className="flex justify-between items-start">
-              <span className="inline-flex text-[9px] font-bold px-2.5 py-1 rounded-full bg-purple-500/[0.08] dark:bg-purple-500/[0.12] text-purple-600 dark:text-purple-450 border border-purple-500/10 tracking-wider">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/[0.08] dark:bg-purple-500/[0.12] text-purple-600 dark:text-purple-450 border border-purple-500/10 tracking-wider">
                 รวมยอดลดหย่อน
               </span>
               <div className="p-2.5 bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
@@ -1238,8 +1238,8 @@ export default function TaxPage() {
             </div>
             
             <div className="space-y-1 relative z-10">
-              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายจ่ายลดหย่อนรวมทั้งสิ้น</h4>
-              <p className="text-[10px] text-slate-400 leading-none">รวมค่าลดหย่อนหักเหมาหรือลดจริงทุกประเภท</p>
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายจ่ายลดหย่อนรวมทั้งสิ้น</h4>
+              <p className="text-xs text-slate-400 leading-none">รวมค่าลดหย่อนหักเหมาหรือลดจริงทุกประเภท</p>
               <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-650 dark:from-purple-400 dark:via-fuchsia-400 dark:to-pink-450">
                 {formatMoney(deductionRent405Full + deductionUtilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
               </p>
@@ -1247,8 +1247,8 @@ export default function TaxPage() {
           </div>
           
           <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">รายละเอียดองค์ประกอบ:</p>
-            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 text-[10px] text-slate-500 dark:text-slate-400 space-y-1">
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">รายละเอียดองค์ประกอบ:</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 text-xs text-slate-500 dark:text-slate-400 space-y-1">
               <div className="flex justify-between font-medium">
                 <span>ค่าเช่า ม.40(5):</span>
                 <span className="text-slate-700 dark:text-slate-300 font-bold">{formatMoney(deductionRent405Full)} บ.</span>
@@ -1274,13 +1274,13 @@ export default function TaxPage() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">คู่มือแนะนำ: การเลือกประเภทรายจ่ายตามหลักสรรพากร</h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">เลือกประเภทค่าใช้จ่ายอย่างถูกต้อง เพื่อลดหย่อนภาษีสูงสุดและป้องกันการตรวจสอบย้อนหลัง</p>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">เลือกประเภทค่าใช้จ่ายอย่างถูกต้อง เพื่อลดหย่อนภาษีสูงสุดและป้องกันการตรวจสอบย้อนหลัง</p>
               </div>
             </div>
             
             <button
               onClick={() => setShowGuide(!showGuide)}
-              className="px-4 py-2 bg-slate-100 dark:bg-slate-900/40 hover:bg-slate-200 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-250 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-transparent hover:border-slate-200/30 active:scale-95"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-900/40 hover:bg-slate-200 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-250 text-slate-600 dark:text-slate-400 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-transparent hover:border-slate-200/30 active:scale-95"
             >
               {showGuide ? (
                 <>ซ่อนคู่มือ <ChevronUp className="w-4 h-4" /></>
@@ -1301,40 +1301,40 @@ export default function TaxPage() {
                   </div>
                   มาตรา 40(5) (ค่าเช่าอาคารสิ่งปลูกสร้าง)
                 </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
                   เป็นรายจ่ายที่เกี่ยวเนื่องโดยตรงกับ <strong className="text-slate-700 dark:text-slate-300">ตัวโครงสร้างอาคารและสิทธิ์ในการจัดหาอพาร์ทเมนท์</strong> เหมาะสำหรับธุรกิจเช่าห้องพักที่เลือกหักค่าใช้จ่ายในรูปแบบ "ตามจริง"
                 </p>
                 
                 <div className="space-y-3 pt-3 border-t border-slate-250/30 dark:border-slate-800/80">
-                  <div className="text-[11px] font-extrabold text-slate-700 dark:text-slate-250 flex items-center gap-1.5">
+                  <div className="text-xs sm:text-sm font-extrabold text-slate-700 dark:text-slate-250 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> รายการที่หักภาษีได้:
                   </div>
                   <ul className="space-y-2.5 pl-1">
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ค่าซ่อมแซมใหญ่โครงสร้าง:</strong> เช่น งานทาสีอาคารภายนอกใหม่ทั้งหมด, การเปลี่ยนแผ่นกระเบื้องหลังคาอาคารหลักเพื่อป้องกันน้ำรั่วซึม, งานเทปูนฐานรากตึก
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ดอกเบี้ยกู้ยืม:</strong> อัตราดอกเบี้ยจ่ายจากทางธนาคารสำหรับการกู้ยืมเงินเพื่อนำมาซื้อที่ดินหรือก่อสร้างตึกอพาร์ทเมนท์
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ภาษีที่เกี่ยวข้อง:</strong> ยอดชำระภาษีที่ดินและสิ่งปลูกสร้างที่ผู้ประกอบการชำระให้แก่องค์กรปกครองส่วนท้องถิ่นประจำปี
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">เบี้ยประกันภัย:</strong> ค่าเบี้ยประกันอัคคีภัย ประกันวินาศภัย หรือประกันภัยพิบัติที่ครอบคลุมตัวสิ่งปลูกสร้างอาคาร
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-blue-500/80 dark:text-blue-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ค่าเสื่อมราคาอาคาร:</strong> การคิดค่าเสื่อมราคาสินทรัพย์ประประเภทตึกหรือสิ่งก่อสร้างเป็นรายปีทางบัญชีเพื่อหักลดหย่อน
@@ -1343,7 +1343,7 @@ export default function TaxPage() {
                   </ul>
                 </div>
                 
-                <div className="p-3 bg-blue-500/[0.04] dark:bg-blue-500/[0.08] border border-blue-500/10 rounded-xl text-[10px] text-blue-800 dark:text-blue-300 flex gap-2 items-start shadow-inner">
+                <div className="p-3 bg-blue-500/[0.04] dark:bg-blue-500/[0.08] border border-blue-500/10 rounded-xl text-xs text-blue-800 dark:text-blue-300 flex gap-2 items-start shadow-inner">
                   <Info className="w-4 h-4 shrink-0 text-blue-500" />
                   <span className="leading-relaxed"><strong>คำแนะนำ:</strong> บันทึกเป็นรายจ่ายข้อนี้ เมื่อเกิดการใช้จ่ายกับตัวอาคารหรืองานระบบวิศวกรรมอาคารถาวร โดยต้องมีใบเสร็จรับเงินหรือใบกำกับภาษีเต็มรูปแบบในชื่อของกิจการอย่างชัดเจน</span>
                 </div>
@@ -1357,40 +1357,40 @@ export default function TaxPage() {
                   </div>
                   มาตรา 40(8) (งานบริการสาธารณูปโภคและส่วนกลาง)
                 </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
                   เป็นรายจ่ายหมุนเวียนเกี่ยวกับ <strong className="text-slate-700 dark:text-slate-300">การให้บริการ น้ำประปา ไฟฟ้า และการบำรุงดูแลความสะดวกสบาย</strong> ให้กับผู้เช่าที่ลงทะเบียนในโครงการหอพัก
                 </p>
                 
                 <div className="space-y-3 pt-3 border-t border-slate-250/30 dark:border-slate-800/80">
-                  <div className="text-[11px] font-extrabold text-slate-700 dark:text-slate-250 flex items-center gap-1.5">
+                  <div className="text-xs sm:text-sm font-extrabold text-slate-700 dark:text-slate-250 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span> รายการที่หักภาษีได้:
                   </div>
                   <ul className="space-y-2.5 pl-1">
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ค่าน้ำประปาและไฟฟ้าหลวง:</strong> ยอดจ่ายจริงตามบิลบิลของการไฟฟ้าและการประปานครหลวง/ภูมิภาคในส่วนมิเตอร์หลักของตึก
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ค่าซ่อมบำรุงระบบอำนวยความสะดวก:</strong> งานเปลี่ยนมิเตอร์น้ำไฟย่อยในห้องชำรุด, เดินสายอินเทอร์เน็ต, ซ่อมแซมระบบปั๊มน้ำขึ้นดาดฟ้า
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ค่าจ้างแรงงานและบริการภายนอก:</strong> ค่าจ้างแม่บ้านทำความสะอาดส่วนกลางรายเดือน, ช่างประจำตึกรายวัน หรือพนักงานจดมิเตอร์
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">ค่าอินเทอร์เน็ต / ดิจิทัล:</strong> บิลค่าเชื่อมโยงเครือข่ายความเร็วสูงรายเดือนสำหรับบริการแชร์ไวไฟให้แก่ผู้เช่าพักอาศัย
                       </div>
                     </li>
-                    <li className="flex items-start gap-2.5 text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed">
+                    <li className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-650 dark:text-slate-400 leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-teal-500/80 dark:text-teal-400 shrink-0 mt-0.5" />
                       <div>
                         <strong className="text-slate-800 dark:text-slate-300">อุปกรณ์อำนวยความสะดวก:</strong> จัดซื้อหลอดไฟทางเดินเปลี่ยนใหม่, ซื้อถังกรองสารเคมีน้ำประปา, น้ำยาถูพื้นทำความสะอาดส่วนกลาง
@@ -1399,7 +1399,7 @@ export default function TaxPage() {
                   </ul>
                 </div>
                 
-                <div className="p-3 bg-teal-500/[0.04] dark:bg-teal-500/[0.08] border border-teal-500/10 rounded-xl text-[10px] text-teal-800 dark:text-teal-300 flex gap-2 items-start shadow-inner">
+                <div className="p-3 bg-teal-500/[0.04] dark:bg-teal-500/[0.08] border border-teal-500/10 rounded-xl text-xs text-teal-800 dark:text-teal-300 flex gap-2 items-start shadow-inner">
                   <Info className="w-4 h-4 shrink-0 text-teal-500" />
                   <span className="leading-relaxed"><strong>คำแนะนำ:</strong> บันทึกค่าใช้จ่ายในข้อนี้ เมื่อเป็นการจ่ายตรงเพื่อระบบสาธารณูปโภคหรือการดูแลรักษาความสะอาด ซึ่งเป็นค่าใช้จ่ายดำเนินการทั่วไปที่มีการจ่ายซ้ำๆ หรือจ่ายหมุนเวียน</span>
                 </div>
@@ -1417,14 +1417,14 @@ export default function TaxPage() {
               <h3 className="text-base font-bold text-slate-850 dark:text-slate-50 flex items-center gap-2.5">
                 <Coins className="w-5 h-5 text-amber-500" /> สมุดบันทึกรายจ่ายจริงประจำปีภาษี {taxYear}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                 บันทึกค่าใช้จ่ายสะสมเพื่อนำไปหักลดหย่อนภาษีตามจริงโดยอิงหลักฐานเอกสาร (เลือกยื่นหักค่าใช้จ่ายตามจริงได้เมื่อยอดรายจ่ายสูงกว่าแบบเหมา)
               </p>
             </div>
             
             <button
               onClick={handleOpenAddExpense}
-              className={`glow-btn bg-teal-600 text-white font-semibold py-2.5 px-5 rounded-2xl flex items-center gap-2 text-xs shadow-lg shadow-teal-600/10 transition-all ${
+              className={`glow-btn bg-teal-600 text-white font-semibold py-2.5 px-5 rounded-2xl flex items-center gap-2 text-sm shadow-lg shadow-teal-600/10 transition-all ${
                 !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 active:scale-95 hover:shadow-teal-600/25 cursor-pointer"
               }`}
             >
@@ -1505,7 +1505,7 @@ export default function TaxPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-5 border-t border-slate-200/80 dark:border-slate-800 text-[11.5px] text-slate-500 dark:text-slate-400 font-medium">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-5 border-t border-slate-200/80 dark:border-slate-800 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
                 <div>
                   * แสดงผลลัพธ์รายจ่ายของปีภาษี {taxYear} ทั้งหมดจำนวน <span className="font-bold text-slate-700 dark:text-slate-300">{expenses.length}</span> รายการ
                 </div>
@@ -1513,12 +1513,12 @@ export default function TaxPage() {
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                     <span>ยอดรวม 40(5) สะสม:</span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400 font-mono text-[12px]">{formatMoney(dbActualExpense405)} บ.</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400 font-mono text-sm">{formatMoney(dbActualExpense405)} บ.</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-teal-500"></span>
                     <span>ยอดรวม 40(8) สะสม:</span>
-                    <span className="font-bold text-teal-600 dark:text-teal-400 font-mono text-[12px]">{formatMoney(dbActualExpense408)} บ.</span>
+                    <span className="font-bold text-teal-600 dark:text-teal-400 font-mono text-sm">{formatMoney(dbActualExpense408)} บ.</span>
                   </div>
                 </div>
               </div>
@@ -1527,10 +1527,10 @@ export default function TaxPage() {
             <div className="py-16 text-center rounded-2xl bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 text-slate-500 text-xs space-y-3 shadow-inner">
               <Coins className="w-10 h-10 text-slate-400/80 dark:text-slate-700 mx-auto animate-pulse" />
               <p className="font-semibold text-slate-750 dark:text-slate-300">ยังไม่มีบันทึกค่าใช้จ่ายจริงในปีภาษี {taxYear}</p>
-              <p className="text-[10px] text-slate-400 max-w-sm mx-auto">เริ่มบันทึกค่าใช้จ่ายเกี่ยวกับการดูแลและดำเนินการหอพัก เช่น ค่าซ่อมแซม ค่าน้ำไฟส่วนกลาง เพื่อใช้อ้างอิงการยื่นลดหย่อนแบบตามจริง</p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">เริ่มบันทึกค่าใช้จ่ายเกี่ยวกับการดูแลและดำเนินการหอพัก เช่น ค่าซ่อมแซม ค่าน้ำไฟส่วนกลาง เพื่อใช้อ้างอิงการยื่นลดหย่อนแบบตามจริง</p>
               <button
                 onClick={handleOpenAddExpense}
-                className={`inline-flex items-center gap-1.5 text-[11px] font-bold underline underline-offset-4 transition-all ${
+                className={`inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold underline underline-offset-4 transition-all ${
                   !hasEditPermission ? "opacity-50 cursor-not-allowed" : "text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 cursor-pointer"
                 }`}
               >
@@ -1550,7 +1550,7 @@ export default function TaxPage() {
             <h3 className="text-base font-bold text-slate-850 dark:text-slate-50">
               ตารางสรุปรายได้สะสมรายเดือน ({taxYear})
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               สรุปฐานรายได้ที่รับจริงแยกตามประเภทภาษีเพื่อตรวจสอบความครบถ้วนของยอดประเมินรายเดือน
             </p>
           </div>
@@ -1707,7 +1707,7 @@ export default function TaxPage() {
             <h3 className="text-base font-bold text-slate-850 dark:text-slate-50 flex items-center gap-2.5">
               <Landmark className="w-5 h-5 text-blue-500" /> ค่าเช่าล่วงหน้าสะสม มาตรา 40(5)
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
               สัญญาเช่าที่เริ่มต้นในปีภาษี {taxYear} จะนำยอดค่าเช่าล่วงหน้าไปบันทึกเป็นรายได้มาตรา 40(5) เพื่อรับรู้รายได้ทางภาษีในปีเริ่มต้นสัญญาทันทีตามกฎหมายสรรพากร
             </p>
           </div>
@@ -1767,7 +1767,7 @@ export default function TaxPage() {
           ) : (
             <div className="py-12 text-center rounded-2xl bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 text-slate-500 text-xs">
               <p className="font-semibold text-slate-700 dark:text-slate-300">ไม่มีสัญญาใหม่ที่เริ่มเช่าในรอบปีภาษี {taxYear}</p>
-              <p className="text-[10px] text-slate-400 mt-1 max-w-xs mx-auto">เมื่อมีการเพิ่มผู้เช่าใหม่และระบุวันที่เริ่มสัญญาตรงกับรอบปีภาษี ระบบจะนำค่าเช่าล่วงหน้าสะสมมาแสดงที่นี่โดยอัตโนมัติ</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">เมื่อมีการเพิ่มผู้เช่าใหม่และระบุวันที่เริ่มสัญญาตรงกับรอบปีภาษี ระบบจะนำค่าเช่าล่วงหน้าสะสมมาแสดงที่นี่โดยอัตโนมัติ</p>
             </div>
           )}
         </div>
@@ -1782,7 +1782,7 @@ export default function TaxPage() {
             <FileCheck className="w-4 h-4 text-blue-500" /> 1. แบบยื่นภาษีเงินได้ครึ่งปี (ภ.ง.ด. 94)
           </h3>
           
-          <div className="space-y-2 text-xs">
+          <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>รายได้ครึ่งปีแรก (ม.ค. - มิ.ย.):</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(halfTotalRevenue)} บาท</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่าย ({deductionMethod405}) ของค่าเช่าห้อง:</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionRent405Half)} บาท</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่ายจริงของค่าน้ำไฟ (ครึ่งปี):</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionUtilities408Half)} บาท</span></div>
@@ -1790,14 +1790,14 @@ export default function TaxPage() {
             <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>เงินได้สุทธิประเมินครึ่งปี:</span><span className="text-blue-600 dark:text-blue-400">{formatMoney(netIncomeHalf)} บาท</span></div>
           </div>
           
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-[10px] text-slate-550 dark:text-slate-400 leading-relaxed">
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-xs text-slate-550 dark:text-slate-400 leading-relaxed">
             <span className="font-bold text-slate-700 dark:text-slate-300">ระยะเวลาการยื่นแบบ:</span> ปกติยื่นระหว่างเดือนกรกฎาคม ถึง กันยายนของปีนั้นๆ เป็นการเสียภาษีล่วงหน้าสำหรับรายได้ในช่วงครึ่งปีแรก
           </div>
 
           <button
             onClick={() => handleDownloadPdf("94")}
             disabled={loadingPdf !== null}
-            className={`w-full py-2.5 bg-blue-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-600/10 transition-colors ${
+            className={`w-full py-2.5 bg-blue-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-600/10 transition-colors ${
               !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-blue-500 cursor-pointer"
             }`}
           >
@@ -1817,7 +1817,7 @@ export default function TaxPage() {
             <FileCheck className="w-4 h-4 text-teal-500" /> 2. แบบยื่นภาษีเงินได้ปลายปี (ภ.ง.ด. 90)
           </h3>
 
-          <div className="space-y-2 text-xs">
+          <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>รายได้เต็มปีสะสม (12 เดือน):</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(fullTotalRevenue)} บาท</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่าย ({deductionMethod405}) ของค่าเช่าห้อง:</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionRent405Full)} บาท</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>หักค่าใช้จ่ายจริงค่าน้ำไฟ (หักตามจริงเต็มปี):</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionUtilities408Full)} บาท</span></div>
@@ -1825,14 +1825,14 @@ export default function TaxPage() {
             <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>เงินได้สุทธิประเมินเต็มปี:</span><span className="text-teal-600 dark:text-teal-400">{formatMoney(netIncomeFull)} บาท</span></div>
           </div>
 
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-[10px] text-slate-550 dark:text-slate-400 leading-relaxed">
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-xs text-slate-550 dark:text-slate-400 leading-relaxed">
             <span className="font-bold text-slate-700 dark:text-slate-300">ระยะเวลาการยื่นแบบ:</span> ยื่นระหว่างเดือนมกราคม ถึง มีนาคมของปีถัดไป โดยสามารถนำตัวเลขที่จ่ายภาษี ภ.ง.ด. 94 ไปหักลดหย่อนภาษีที่ชำระไว้แล้วครึ่งปีได้
           </div>
 
           <button
             onClick={() => handleDownloadPdf("90")}
             disabled={loadingPdf !== null}
-            className={`w-full py-2.5 bg-teal-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-teal-600/10 transition-colors ${
+            className={`w-full py-2.5 bg-teal-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-600/10 transition-colors ${
               !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 cursor-pointer"
             }`}
           >
@@ -1861,7 +1861,7 @@ export default function TaxPage() {
                   <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-base">
                     {editingExpense ? "แก้ไขรายการค่าใช้จ่าย" : "บันทึกค่าใช้จ่ายใหม่"}
                   </h3>
-                  <p className="text-[10px] text-slate-550 dark:text-slate-400">ปีภาษี {taxYear}</p>
+                  <p className="text-sm text-slate-550 dark:text-slate-400">ปีภาษี {taxYear}</p>
                 </div>
               </div>
               <button
@@ -1890,7 +1890,7 @@ export default function TaxPage() {
                   placeholder="เช่น ค่าทาสีห้องพัก, ค่าน้ำประปาที่จ่ายหลวง"
                   value={expenseTitle}
                   onChange={(e) => setExpenseTitle(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all"
                 />
               </div>
 
@@ -1906,9 +1906,9 @@ export default function TaxPage() {
                     placeholder="0.00"
                     value={expenseAmount}
                     onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-3.5 pr-12 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-3.5 pr-12 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-sm text-slate-500 dark:text-slate-400 font-medium">
                     บาท
                   </div>
                 </div>
@@ -1930,15 +1930,15 @@ export default function TaxPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 font-mono">มาตรา 40(5)</span>
+                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">มาตรา 40(5)</span>
                       <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
                         expenseCategory === "40_5" ? "border-blue-500 bg-blue-500" : "border-slate-300 dark:border-slate-600"
                       }`}>
                         {expenseCategory === "40_5" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </div>
                     </div>
-                    <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-200">ค่าเช่าอสังหาริมทรัพย์</span>
-                    <span className="text-[9px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">เกี่ยวกับตัวตึก อาคาร และสิ่งปลูกสร้างหลัก</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">ค่าเช่าอสังหาริมทรัพย์</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">เกี่ยวกับตัวตึก อาคาร และสิ่งปลูกสร้างหลัก</span>
                   </button>
 
                   {/* 40(8) */}
@@ -1952,28 +1952,28 @@ export default function TaxPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-xs font-bold text-teal-600 dark:text-teal-400 font-mono">มาตรา 40(8)</span>
+                      <span className="text-sm font-bold text-teal-600 dark:text-teal-400 font-mono">มาตรา 40(8)</span>
                       <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
                         expenseCategory === "40_8" ? "border-teal-500 bg-teal-500" : "border-slate-300 dark:border-slate-600"
                       }`}>
                         {expenseCategory === "40_8" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </div>
                     </div>
-                    <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-200">บริการและสาธารณูปโภค</span>
-                    <span className="text-[9px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">เกี่ยวกับงานบริการ ค่าน้ำ ค่าไฟ และดูแลส่วนกลาง</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">บริการและสาธารณูปโภค</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">เกี่ยวกับงานบริการ ค่าน้ำ ค่าไฟ และดูแลส่วนกลาง</span>
                   </button>
                 </div>
               </div>
 
               {/* Dynamic Guidance / Recommendation Tooltip */}
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200">
                   <Info className={`w-4 h-4 ${expenseCategory === "40_5" ? "text-blue-600 dark:text-blue-400" : "text-teal-600 dark:text-teal-400"}`} />
                   <span>คำแนะนำการเลือกรายการประเภทนี้</span>
                 </div>
                 
                 {expenseCategory === "40_5" ? (
-                  <div className="text-[10px] text-slate-650 dark:text-slate-400 space-y-1.5 leading-relaxed">
+                  <div className="text-xs sm:text-sm text-slate-650 dark:text-slate-400 space-y-1.5 leading-relaxed">
                     <p className="text-slate-700 dark:text-slate-300 font-medium">รายการที่หักเป็นค่าใช้จ่ายตามจริงของ <span className="text-blue-600 dark:text-blue-400 font-bold">40(5) - ค่าเช่า</span> ได้:</p>
                     <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-450">
                       <li><strong className="text-slate-700 dark:text-slate-300">ค่าซ่อมแซมบำรุงโครงสร้าง</strong> ทาสีตึกภายนอก, ซ่อมหลังคา, ซ่อมลิฟต์, ซ่อมฐานราก</li>
@@ -1981,12 +1981,12 @@ export default function TaxPage() {
                       <li><strong className="text-slate-700 dark:text-slate-300">ภาษีที่ดินและสิ่งปลูกสร้าง</strong> และค่าธรรมเนียมราชการอื่นเกี่ยวกับทรัพย์สินเช่า</li>
                       <li><strong className="text-slate-700 dark:text-slate-300">เบี้ยประกันภัยทรัพย์สิน</strong> เบี้ยประกันอัคคีภัย/วินาศภัยของตึก</li>
                     </ul>
-                    <p className="text-[9px] text-amber-750 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/5 p-1.5 rounded border border-amber-200 dark:border-amber-500/10 mt-1">
+                    <p className="text-xs text-amber-750 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/5 p-1.5 rounded border border-amber-200 dark:border-amber-500/10 mt-1">
                       💡 สรรพากรเปิดช่องให้เลือกหักเหมา 30% ได้ หากจ่ายจริงรวมทั้งปีไม่ถึง 30% แนะนำให้ยื่นหักแบบเหมาเพื่อประหยัดภาษีสูงสุด
                     </p>
                   </div>
                 ) : (
-                  <div className="text-[10px] text-slate-650 dark:text-slate-400 space-y-1.5 leading-relaxed">
+                  <div className="text-xs sm:text-sm text-slate-650 dark:text-slate-400 space-y-1.5 leading-relaxed">
                     <p className="text-slate-700 dark:text-slate-300 font-medium">รายการที่หักเป็นค่าใช้จ่ายตามจริงของ <span className="text-teal-600 dark:text-teal-400 font-bold">40(8) - บริการ</span> ได้:</p>
                     <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-450">
                       <li><strong className="text-slate-700 dark:text-slate-300">ค่าน้ำไฟฟ้าจ่ายหลวง</strong> บิลจ่ายตรงให้การไฟฟ้า/ประปา (ไม่รวมบิลที่เราเก็บจากผู้เช่า)</li>
@@ -1994,7 +1994,7 @@ export default function TaxPage() {
                       <li><strong className="text-slate-700 dark:text-slate-300">วัสดุอุปกรณ์สิ้นเปลือง</strong> หลอดไฟทางเดิน, น้ำยาล้างพื้น, อะไหล่สวิตช์, สายยาง</li>
                       <li><strong className="text-slate-700 dark:text-slate-300">อินเทอร์เน็ต, น้ำมันเครื่องปั่นไฟ</strong> และค่าบำบัดน้ำเสียส่วนกลาง</li>
                     </ul>
-                    <p className="text-[9px] text-amber-750 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/5 p-1.5 rounded border border-amber-200 dark:border-amber-500/10 mt-1">
+                    <p className="text-xs text-amber-750 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/5 p-1.5 rounded border border-amber-200 dark:border-amber-500/10 mt-1">
                       💡 สรรพากรเปิดช่องให้เลือกหักเหมา 60% ได้ หากจ่ายจริงรวมทั้งปีไม่ถึง 60% แนะนำให้ยื่นหักแบบเหมาเพื่อประหยัดภาษีสูงสุด
                     </p>
                   </div>
@@ -2007,7 +2007,7 @@ export default function TaxPage() {
               <button
                 type="button"
                 onClick={() => setExpenseModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 rounded-xl text-xs font-semibold transition-colors"
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 rounded-xl text-sm font-semibold transition-colors"
               >
                 ยกเลิก
               </button>
@@ -2015,7 +2015,7 @@ export default function TaxPage() {
                 type="button"
                 onClick={handleSubmitExpense}
                 disabled={expenseSubmitting}
-                className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-teal-500/10 hover:shadow-teal-500/20 active:scale-[0.98] transition-all"
+                className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-lg shadow-teal-500/10 hover:shadow-teal-500/20 active:scale-[0.98] transition-all"
               >
                 {expenseSubmitting ? (
                   <>
