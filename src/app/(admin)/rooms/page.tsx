@@ -143,6 +143,7 @@ export default function RoomsPage() {
   const [disconnectSubmitting, setDisconnectSubmitting] = useState(false)
   
   const [selectedRoom, setSelectedRoom] = useState<RoomItem | null>(null)
+  const [workspaceLiffId, setWorkspaceLiffId] = useState("2010442620-H4josaDy")
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
     type: "room" | "type" | "tenant"
@@ -211,6 +212,16 @@ export default function RoomsPage() {
     setError(null)
     try {
       const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      
+      // ดึงข้อมูล LIFF ID ไดนามิกของ Workspace นี้
+      fetch(`/api/workspace-liff?workspace_id=${wsId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.liffId) {
+            setWorkspaceLiffId(data.liffId)
+          }
+        })
+        .catch(err => console.error("Failed to load workspace LIFF ID:", err))
       
       // โหลดข้อมูลประวัติยกเลิกสัญญาจาก Supabase และย้ายข้อมูลจาก localStorage หากมีอยู่
       let tempCancellations: any[] = []
@@ -692,7 +703,7 @@ export default function RoomsPage() {
 
   const getLiffRegistrationLink = (roomNum: string) => {
     const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
-    return `https://liff.line.me/2010442620-H4josaDy?workspace_id=${wsId}&room_number=${roomNum}`
+    return `https://liff.line.me/${workspaceLiffId}?workspace_id=${wsId}&room_number=${roomNum}`
   }
 
   const handleCopyLinkToClipboard = (roomNum: string) => {
