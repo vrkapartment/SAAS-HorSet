@@ -13,7 +13,10 @@ import {
   Info, 
   Check, 
   Settings,
-  HelpCircle
+  HelpCircle,
+  Copy,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -40,6 +43,14 @@ export default function LineSettingsTab() {
   const [fetchingQuota, setFetchingQuota] = useState(false)
   const [quotaData, setQuotaData] = useState<any>(null)
   const [quotaError, setQuotaError] = useState<string | null>(null)
+  
+  // Interactive Manual & Utility states
+  const [showManual, setShowManual] = useState(true)
+  const [copiedEndpoint, setCopiedEndpoint] = useState(false)
+  const [openStep1, setOpenStep1] = useState(true)
+  const [openStep2, setOpenStep2] = useState(true)
+  const [openStep3, setOpenStep3] = useState(true)
+  const [openWarnings, setOpenWarnings] = useState(true)
 
   const isDemo = !process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL.includes("localhost") && !process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -286,6 +297,15 @@ export default function LineSettingsTab() {
     }
   }
 
+  const handleCopyEndpoint = () => {
+    if (typeof window !== "undefined") {
+      const endpoint = "https://saas-horset.vercel.app/tenant-register"
+      navigator.clipboard.writeText(endpoint)
+      setCopiedEndpoint(true)
+      setTimeout(() => setCopiedEndpoint(false), 2000)
+    }
+  }
+
   if (profileLoading) {
     return (
       <div className="py-24 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center">
@@ -302,15 +322,31 @@ export default function LineSettingsTab() {
       
       {/* 1. Page Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 p-6 rounded-3xl border border-blue-500/20 shadow-sm backdrop-blur-md">
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5 font-sans">
             <MessageSquare className="w-6 h-6 text-blue-500 dark:text-blue-400" />
             <span>เชื่อมต่อ LINE OA (Personal LINE OA Integration)</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed font-sans">
+          <p className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 mt-2 leading-relaxed font-sans font-semibold">
             เชื่อมต่อเซิร์ฟเวอร์ LINE Developers และเปิดใช้งาน Messaging API เพื่อส่งบิลแจ้งหนี้ในรูปแบบ Flex Message สุดพรีเมียมให้ลูกบ้านโดยตรงภายใต้แบรนด์หอพักคุณเอง
           </p>
         </div>
+        <button
+          onClick={() => setShowManual(!showManual)}
+          className="shrink-0 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-2xl text-xs sm:text-sm font-black flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+        >
+          {showManual ? (
+            <>
+              <EyeOff className="w-4 h-4" />
+              <span>ซ่อนคู่มือการตั้งค่า</span>
+            </>
+          ) : (
+            <>
+              <Eye className="w-4 h-4" />
+              <span>แสดงคู่มือการตั้งค่า</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* 2. Header Information Alert */}
@@ -324,7 +360,7 @@ export default function LineSettingsTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className={`grid grid-cols-1 ${showManual ? "lg:grid-cols-2" : "lg:grid-cols-1"} gap-6 items-start transition-all duration-300`}>
         
         {/* Left side: Forms & Settings */}
         <div className="space-y-6">
@@ -336,7 +372,7 @@ export default function LineSettingsTab() {
                 <Settings className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-200">
+                <h3 className="text-lg md:text-xl font-black text-slate-850 dark:text-slate-100">
                   ตั้งค่าเชื่อมต่อ LINE Messaging API
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
@@ -376,7 +412,7 @@ export default function LineSettingsTab() {
                   <label className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                     LINE LIFF ID
                   </label>
-                  <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">
+                  <span className="text-xs text-slate-400 dark:text-slate-505 font-bold">
                     * จำเป็นเพื่อเชื่อมโยงผู้ใช้ให้ตรงกับ Provider ของคุณ
                   </span>
                 </div>
@@ -429,41 +465,32 @@ export default function LineSettingsTab() {
             </form>
           </div>
 
-          {/* Card: Quota Check */}
+          {/* Card: Quota Information */}
           {isConfigured && (
-            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-green-500/10 text-green-500 rounded-xl">
-                    <MessageSquare className="w-5 h-5" />
+                  <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
+                    <Key className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-200">
+                    <h3 className="text-lg md:text-xl font-black text-slate-850 dark:text-slate-100">
                       ตรวจสอบโควตา LINE OA ของหอพัก
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
-                      แสดงสถานะการส่งข้อความผ่าน LINE Messaging API ในเดือนนี้
+                      โควตาสำหรับส่งข้อความ Flex Message รายเดือนของคุณ
                     </p>
                   </div>
                 </div>
-
                 <button
                   type="button"
                   onClick={() => loadLineQuota(true)}
                   disabled={fetchingQuota}
-                  className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-xl text-sm font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${fetchingQuota ? "animate-spin text-green-500" : ""}`} />
-                  <span>รีเฟรชค่าสด</span>
+                  <RefreshCw className={`w-4 h-4 ${fetchingQuota ? "animate-spin" : ""}`} />
                 </button>
               </div>
-
-              {quotaError && (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl text-sm font-bold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{quotaError}</span>
-                </div>
-              )}
 
               {quotaData ? (
                 <div className="space-y-4 pt-2">
@@ -476,12 +503,12 @@ export default function LineSettingsTab() {
                     <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850/60 rounded-2xl flex flex-col justify-between">
                       <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">คงเหลือ</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.remaining.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-550 font-semibold block mt-0.5">ข้อความ</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850/60 rounded-2xl flex flex-col justify-between">
                       <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">โควตารวม</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.limit.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-505 font-semibold block mt-0.5">ข้อความ</span>
                     </div>
                   </div>
 
@@ -524,109 +551,287 @@ export default function LineSettingsTab() {
         </div>
 
         {/* Right side: Owner Setup Tutorial Manual */}
-        <div className="space-y-6">
-          <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
-                <HelpCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-200">
-                  คู่มือเชื่อมต่อระบบ LINE OA ส่วนตัว
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
-                  ขั้นตอนรับสิทธิ์ส่งบิลและลงทะเบียนผู้เช่าแบบแยกหอพักอิสระ
-                </p>
-              </div>
-            </div>
-
-            {/* Instruction Steps List */}
-            <div className="space-y-6 text-sm font-semibold leading-relaxed text-slate-700 dark:text-slate-200">
-              
-              <div className="relative pl-8 space-y-1.5">
-                <div className="absolute left-0 top-0.5 w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-xs font-black border border-blue-500/20">
-                  1
+        {showManual && (
+          <div className="space-y-6">
+            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
+                    <HelpCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
+                      คู่มือเชื่อมต่อระบบ LINE OA ส่วนตัว
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
+                      ขั้นตอนรับสิทธิ์ส่งบิลและลงทะเบียนผู้เช่าแบบแยกหอพักอิสระ
+                    </p>
+                  </div>
                 </div>
-                <h4 className="text-sm sm:text-md font-extrabold text-slate-850 dark:text-slate-100">สร้าง Provider สำหรับหอพัก</h4>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                  เข้าสู่เว็บ <a href="https://developers.line.biz" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline inline-flex items-center gap-0.5 font-bold">LINE Developers Console <ExternalLink className="w-3 h-3" /></a> สมัครบัญชีผู้พัฒนา ➡️ กดปุ่ม **Create Provider** (ตั้งชื่อโฟลเดอร์เป็นชื่อหอพักของคุณ เพื่อความเป็นสัดส่วน)
-                </p>
+                
+                {/* Master expand/collapse button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allOpen = openStep1 && openStep2 && openStep3 && openWarnings;
+                    setOpenStep1(!allOpen);
+                    setOpenStep2(!allOpen);
+                    setOpenStep3(!allOpen);
+                    setOpenWarnings(!allOpen);
+                  }}
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0"
+                >
+                  {openStep1 && openStep2 && openStep3 && openWarnings ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
+                </button>
               </div>
 
-              <div className="relative pl-8 space-y-1.5">
-                <div className="absolute left-0 top-0.5 w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-xs font-black border border-blue-500/20">
-                  2
-                </div>
-                <h4 className="text-sm sm:text-md font-extrabold text-slate-850 dark:text-slate-100">สร้างบอทรับแจ้งเตือน (Messaging API)</h4>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                  ภายใต้ Provider เดิม กดสร้าง Channel ใหม่ เลือกหัวข้อ **Messaging API** ➡️ กรอกข้อมูลของบอทหอพักคุณให้เสร็จ ➡️ เลื่อนแถบไปที่หัวข้อด้านบนชื่อ **Messaging API** ➡️ เลื่อนลงไปด้านล่างสุดหัวข้อ **Channel access token (long-lived)** ➡️ กดปุ่ม **Issue** คัดลอกรหัสความปลอดภัยยาว ๆ มากรอกในช่องด้านซ้ายของหน้านี้
-                </p>
-              </div>
-
-              <div className="relative pl-8 space-y-1.5">
-                <div className="absolute left-0 top-0.5 w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-xs font-black border border-blue-500/20">
-                  3
-                </div>
-                <h4 className="text-sm sm:text-md font-extrabold text-slate-850 dark:text-slate-100">สร้างหน้ายืนยันสิทธิ์ (LINE Login & LIFF)</h4>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium space-y-2">
-                  <span>เพื่อป้องกันปัญหาจำสิทธิ์ผู้เช่าสลับกัน **ต้องสร้างใน Provider เดียวกันกับบอทข้อ 2** ➡️ กด **Create New Channel** เลือก **LINE Login**</span><br />
-                  <span>➡️ ไปที่แท็บด้านบนชื่อ **LIFF** กด **Add LIFF** ➡️ ตั้งชื่อ LIFF, ขนาดจอแนะนำแบบ **Full**</span><br />
-                  <span>➡️ ในช่อง **Endpoint URL** ให้คัดลอกค่าด้านล่างนี้ไปวาง:</span>
-                  <span className="block mt-1 p-2.5 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-blue-500 font-mono text-xs sm:text-sm select-all break-all">
-                    https://{typeof window !== "undefined" ? window.location.hostname : "saas-horset.vercel.app"}/tenant-register
-                  </span>
-                  <span>➡️ คัดลอกรหัส **LIFF ID** มากรอกในช่องด้านซ้าย แล้วกดปุ่มบันทึกการตั้งค่า</span>
-                </p>
-              </div>
-
-              {/* Crucial Pitfalls & Warnings Section */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                <h5 className="text-xs sm:text-sm uppercase tracking-wider text-rose-500 dark:text-rose-400 font-extrabold flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4" /> 
-                  ข้อควรระวังสำคัญที่สุด (ป้องกันระบบทำงานล้มเหลว)
-                </h5>
-
-                <div className="p-5 rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/25 space-y-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium">
+              {/* Instruction Steps List */}
+              <div className="space-y-4 text-sm font-semibold leading-relaxed text-slate-700 dark:text-slate-200">
+                
+                {/* Step 1 Accordion */}
+                <div className="border border-slate-150 dark:border-slate-850 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenStep1(!openStep1)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
+                        1
+                      </span>
+                      <span className="font-extrabold text-slate-855 dark:text-slate-100 text-sm md:text-base">➡️ สร้าง Provider สำหรับหอพัก</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep1 ? "rotate-180" : ""}`} />
+                  </button>
                   
-                  {/* Warning 1 */}
-                  <div className="space-y-1">
-                    <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                      1. ต้องเผยแพร่สถานะ LINE Login เสมอ (เปลี่ยนเป็น "Published")
-                    </strong>
-                    <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                      เมื่อเริ่มสร้าง LINE Login ระบบจะตั้งสถานะเริ่มต้นเป็น <strong className="text-slate-700 dark:text-slate-300 font-bold">Developing (สีเทา)</strong> ทำให้เฉพาะตัวแอดมินเท่านั้นที่ใช้งานลิงก์ได้ แต่ผู้เช่าทั่วไปจะเจอปัญหากดสมัครไม่ได้หรือหน้าจอลูปหมุนวนไม่หยุด <strong className="text-emerald-500 dark:text-emerald-400 font-extrabold">วิธีแก้:</strong> คลิกที่แถบสถานะกลม ๆ สีเทามุมขวาบนของหน้า LINE Login ให้เปลี่ยนเป็นสถานะ <strong className="text-emerald-500 dark:text-emerald-400 font-extrabold">Published (สีเขียว)</strong> ก่อนใช้งานจริง
-                    </p>
-                  </div>
-
-                  {/* Warning 2 */}
-                  <div className="space-y-1">
-                    <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                      2. Endpoint URL ของ LIFF ต้องมีสแลช "/tenant-register" เสมอ
-                    </strong>
-                    <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                      ตรวจสอบว่าในช่อง Endpoint URL ตอนลงทะเบียน LIFF มีค่าต่อท้ายครบถ้วน ไม่เป็นเพียงชื่อโดเมนเปล่า ๆ มิฉะนั้นผู้เช่าที่กดลิงก์มาจะหาข้อมูลห้องพักไม่เจอและจะขึ้นแจ้งเตือน <strong className="text-rose-500 font-bold">"ไม่ระบุข้อมูลห้องพัก"</strong> ป้องกันการยืนยันข้อมูล
-                    </p>
-                  </div>
-
-                  {/* Warning 3 */}
-                  <div className="space-y-1">
-                    <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                      3. วิธีส่งต่อลิงก์ลงทะเบียนที่ถูกต้อง
-                    </strong>
-                    <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                      เมื่อแอดมินคลิกปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"เจนลิงก์ LINE"</strong> ให้ทำการกดปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"คัดลอกลิงก์"</strong> แล้วส่งให้ผู้เช่าตรง ๆ ทางแชททันที <strong className="text-rose-500 font-bold">ห้ามแอดมินกดเปิดลิงก์ทดสอบก่อนแล้วไปก๊อปปี้ URL บนเว็บเบราว์เซอร์ส่งให้ผู้เช่าเด็ดขาด</strong> เพราะข้อมูลตัวตนของหอพักและหมายเลขห้องพักจะสูญหายทันที
-                    </p>
-                  </div>
-
+                  {openStep1 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-850/60 text-xs sm:text-sm text-slate-600 dark:text-slate-350 font-medium space-y-3.5 animate-fadeIn">
+                      <p className="leading-relaxed">
+                        เข้าสู่เว็บ <span className="font-bold text-slate-850 dark:text-slate-100">LINE Developers Console</span> สมัครบัญชีผู้พัฒนา
+                      </p>
+                      <div className="py-1">
+                        <a 
+                          href="https://developers.line.biz" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-500/10"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>เข้าสู่ LINE Developers Console 🌐</span>
+                        </a>
+                      </div>
+                      <p className="leading-relaxed">
+                        กดปุ่ม <strong className="font-extrabold text-slate-800 dark:text-slate-200">Create Provider</strong> (ตั้งชื่อโฟลเดอร์เป็นชื่อหอพักของคุณ เพื่อความเป็นสัดส่วน)
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
 
+                {/* Step 2 Accordion */}
+                <div className="border border-slate-150 dark:border-slate-850 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenStep2(!openStep2)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
+                        2
+                      </span>
+                      <span className="font-extrabold text-slate-855 dark:text-slate-100 text-sm md:text-base">➡️ สร้างระบบส่งแจ้งเตือน (Messaging API)</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep2 ? "rotate-180" : ""}`} />
+                  </button>
+                  
+                  {openStep2 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-850/60 text-xs sm:text-sm text-slate-600 dark:text-slate-350 font-medium space-y-3.5 animate-fadeIn">
+                      <p className="leading-relaxed">
+                        กดเข้า Provider ที่พึ่งสร้าง กดสร้าง Channel ใหม่ เลือกหัวข้อ <strong className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</strong>
+                      </p>
+                      <p className="leading-relaxed">
+                        กรอกข้อมูลของบอทหอพักคุณให้เสร็จ
+                      </p>
+                      
+                      <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-3.5 my-2.5 shadow-inner">
+                        <p className="font-extrabold text-emerald-650 dark:text-emerald-400 text-xs sm:text-sm leading-normal">
+                          💡 หากท่านมี Line OA ที่ใช้งานอยู่แล้ว เริ่มที่ขั้นตอนนี้ได้เลย:
+                        </p>
+                        <div className="py-1">
+                          <a 
+                            href="https://manager.line.biz" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-emerald-500/10"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>เข้าสู่ LINE Official Account Manager 🟢</span>
+                          </a>
+                        </div>
+                        <div className="text-xs leading-relaxed text-slate-600 dark:text-slate-300 space-y-2.5 font-medium pl-1">
+                          <div>• เข้าสู่ระบบและเลือก <span className="font-extrabold text-slate-800 dark:text-slate-200">Line OA ของท่าน</span></div>
+                          <div>• เลื่อนแถบด้านบนฝั่งขวาชื่อ <span className="font-extrabold text-slate-800 dark:text-slate-200">"ตั้งค่า"</span></div>
+                          <div>• ไปที่หัวข้อด้านบนชื่อ <span className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</span></div>
+                          <div>• กดปุ่ม <span className="font-extrabold text-slate-850 dark:text-slate-100">"ใช้ Messaging API"</span></div>
+                          <div>• เลือก Provider ของท่าน และกดยอมรับ</div>
+                          <div>• กลับมาที่หน้า LINE Developers Console อีกรอบ เลือก Provider ของท่าน</div>
+                          <div>• จะมี Messaging API พร้อมชื่อ Line OA ของท่านแสดงขึ้นมา <span className="font-extrabold text-slate-800 dark:text-slate-200">กดเข้าไปที่ชื่อ Line OA ของท่าน</span></div>
+                        </div>
+                      </div>
+
+                      <p className="leading-relaxed">
+                        เลื่อนแถบไปที่หัวข้อด้านบนชื่อ <strong className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</strong>
+                      </p>
+                      <p className="leading-relaxed">
+                        เลื่อนลงไปด้านล่างสุดหัวข้อ <strong className="font-extrabold text-slate-800 dark:text-slate-200">Channel access token (long-lived)</strong>
+                      </p>
+                      <p className="leading-relaxed">
+                        กดปุ่ม <strong className="font-extrabold text-slate-800 dark:text-slate-200">Issue</strong> คัดลอกรหัสความปลอดภัยยาว ๆ มากรอกในช่องด้านซ้ายของหน้านี้
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 3 Accordion */}
+                <div className="border border-slate-150 dark:border-slate-850 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenStep3(!openStep3)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
+                        3
+                      </span>
+                      <span className="font-extrabold text-slate-855 dark:text-slate-100 text-sm md:text-base">➡️ สร้างหน้ายืนยันสิทธิ์ (LINE Login & LIFF)</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep3 ? "rotate-180" : ""}`} />
+                  </button>
+                  
+                  {openStep3 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-850/60 text-xs sm:text-sm text-slate-600 dark:text-slate-350 font-medium space-y-3.5 animate-fadeIn">
+                      <p className="leading-relaxed">
+                        กดเข้า Provider ที่พึ่งสร้าง กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">Create New Channel</strong> เลือกหัวข้อ <strong className="font-extrabold text-slate-850 dark:text-slate-100">LINE Login</strong>
+                      </p>
+                      <p className="leading-relaxed">
+                        ตั้งค่าตามที่กำหนด:
+                      </p>
+                      
+                      <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-750 dark:text-slate-300">
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Region to provide the service</span> = Thailand</div>
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Company or owner's country or region</span> = Thailand</div>
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Channel name</span> = สามารถตั้งชื่อได้ตามที่ท่านต้องการ</div>
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Channel description</span> = สามารถระบุได้ตามที่ท่านต้องการ</div>
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">App types</span> = Web app</div>
+                      </div>
+
+                      <p className="leading-relaxed">
+                        กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">I agree to the LINE Developers Agreement.</strong>
+                      </p>
+                      <p className="leading-relaxed">
+                        กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">I have read and acknowledge LY Corporation Privacy Policy.</strong> และกด <strong className="font-extrabold text-slate-850 dark:text-slate-100">Create</strong>
+                      </p>
+                      <p className="leading-relaxed">
+                        ไปที่แท็บด้านบนชื่อ <strong className="font-extrabold text-slate-850 dark:text-slate-100">LIFF</strong> กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">Add</strong>
+                      </p>
+                      <p className="leading-relaxed">
+                        ตั้งค่าตามที่กำหนด:
+                      </p>
+
+                      <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-755 dark:text-slate-300">
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">LIFF app name</span> = สามารถตั้งชื่อได้ตามที่ท่านต้องการ</div>
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Size</span> = full</div>
+                        <div className="space-y-2 border-y border-slate-200/50 dark:border-slate-800/60 py-2.5 my-1">
+                          <div className="flex items-center gap-1.5 font-semibold">• <span className="text-blue-600 dark:text-blue-400 font-bold">Endpoint URL</span> = https://saas-horset.vercel.app/tenant-register</div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
+                            <span className="flex-1 p-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-blue-600 dark:text-blue-400 text-[11px] select-all break-all leading-normal font-mono">
+                              https://saas-horset.vercel.app/tenant-register
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleCopyEndpoint}
+                              className={`shrink-0 px-3.5 py-2 rounded-xl border text-[11px] font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                copiedEndpoint 
+                                  ? "bg-green-500/10 text-green-500 border-green-500/20 shadow-sm" 
+                                  : "bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-450 border-blue-500/15 shadow-sm"
+                              }`}
+                            >
+                              {copiedEndpoint ? <Check className="w-3.5 h-3.5 animate-bounce" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedEndpoint ? "คัดลอกแล้ว!" : "คัดลอกลิงก์"}</span>
+                            </button>
+                          </div>
+                        </div>
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Scopes</span> = profile</div>
+                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Add friend option</span> = Off</div>
+                      </div>
+
+                      <p className="leading-relaxed">
+                        กดปุ่ม <strong className="font-extrabold text-slate-850 dark:text-slate-100">Add</strong> ด้านล่างสุด
+                      </p>
+                      <p className="leading-relaxed">
+                        คัดลอกรหัส <strong className="font-extrabold text-slate-850 dark:text-slate-100">LIFF ID</strong> มากรอกในช่องด้านซ้าย แล้วกดปุ่มบันทึกการตั้งค่า
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Crucial Warnings Accordion */}
+                <div className="border border-rose-250 dark:border-rose-900/40 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-rose-500/[0.01] dark:bg-rose-950/[0.04]">
+                  <button
+                    type="button"
+                    onClick={() => setOpenWarnings(!openWarnings)}
+                    className="w-full flex items-center justify-between p-4 bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-500/5 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+                      <span className="font-extrabold text-rose-700 dark:text-rose-400 text-sm md:text-base">ข้อควรระวังสำคัญที่สุด (ป้องกันระบบทำงานล้มเหลว)</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-rose-400 transition-transform duration-300 ${openWarnings ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {openWarnings && (
+                    <div className="p-5 bg-transparent border-t border-rose-200/30 dark:border-rose-900/20 space-y-4 text-xs sm:text-sm text-slate-650 dark:text-slate-300 font-medium animate-fadeIn">
+                      
+                      {/* Warning 1 */}
+                      <div className="space-y-1">
+                        <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          1. ต้องเผยแพร่สถานะ LINE Login เสมอ (เปลี่ยนเป็น "Published")
+                        </strong>
+                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-medium">
+                          เมื่อเริ่มสร้าง LINE Login ระบบจะตั้งสถานะเริ่มต้นเป็น <strong className="text-slate-700 dark:text-slate-300 font-bold">Developing (สีเทา)</strong> ทำให้เฉพาะตัวแอดมินเท่านั้นที่ใช้งานลิงก์ได้ แต่ผู้เช่าทั่วไปจะเจอปัญหากดสมัครไม่ได้หรือหน้าจอลูปหมุนวนไม่หยุด <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">วิธีแก้:</strong> คลิกที่แถบสถานะกลม ๆ สีเทามุมขวาบนของหน้า LINE Login ให้เปลี่ยนเป็นสถานะ <strong className="text-emerald-650 dark:text-emerald-400 font-extrabold">Published (สีเขียว)</strong> ก่อนใช้งานจริง
+                        </p>
+                      </div>
+
+                      {/* Warning 2 */}
+                      <div className="space-y-1">
+                        <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          2. Endpoint URL ของ LIFF ต้องมีสแลช "/tenant-register" เสมอ
+                        </strong>
+                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-medium">
+                          ตรวจสอบว่าในช่อง Endpoint URL ตอนลงทะเบียน LIFF มีค่าต่อท้ายครบถ้วน ไม่เป็นเพียงชื่อโดเมนเปล่า ๆ มิฉะนั้นผู้เช่าที่กดลิงก์มาจะหาข้อมูลห้องพักไม่เจอและจะขึ้นแจ้งเตือน <strong className="text-rose-500 font-bold">"ไม่ระบุข้อมูลห้องพัก"</strong> ป้องกันการยืนยันข้อมูล
+                        </p>
+                      </div>
+
+                      {/* Warning 3 */}
+                      <div className="space-y-1">
+                        <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          3. วิธีส่งต่อลิงก์ลงทะเบียนที่ถูกต้อง
+                        </strong>
+                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-medium">
+                          เมื่อแอดมินคลิกปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"เจนลิงก์ LINE"</strong> ให้ทำการกดปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"คัดลอกลิงก์"</strong> แล้วส่งให้ผู้เช่าตรง ๆ ทางแชททันที <strong className="text-rose-500 font-bold">ห้ามแอดมินกดเปิดลิงก์ทดสอบก่อนแล้วไปก๊อปปี้ URL บนเว็บเบราว์เซอร์ส่งให้ผู้เช่าเด็ดขาด</strong> เพราะข้อมูลตัวตนของหอพักและหมายเลขห้องพักจะสูญหายทันที
+                        </p>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
       </div>
 
