@@ -1454,7 +1454,7 @@ export default function TaxPage() {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
                       {expenses.map((exp) => (
                         <tr key={exp.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors duration-200">
-                          <td className="py-4 px-5 pl-5 font-semibold text-slate-800 dark:text-slate-150">{exp.title}</td>
+                          <td className="py-4 px-5 pl-5 font-semibold text-slate-800 dark:text-slate-200">{exp.title}</td>
                           <td className="py-4 px-4">
                             {exp.category === "40_5" ? (
                               <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold bg-blue-50/80 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-lg border border-blue-200/60 dark:border-blue-500/10 shadow-sm">
