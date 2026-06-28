@@ -71,7 +71,28 @@ function TenantRegisterContent() {
       const liff = (window as any).liff
       if (!liff) return
 
-      await liff.init({ liffId: "2010442620-H4josaDy" })
+      // ดักจับค่าและเซ็ตพารามิเตอร์ที่ส่งมาจากลิงก์แอดมินก่อน เพื่อหา liff_id ไดนามิก
+      const wsId = getUrlParam("workspace_id")
+      setWorkspaceId(wsId)
+
+      const rNum = getUrlParam("room_number")
+      setRoomNumber(rNum)
+
+      // เรียกดึง LIFF ID ที่ถูกต้องจากตารางฐานข้อมูลแยกราย Workspace
+      let activeLiffId = "2010442620-H4josaDy" // default fallback
+      if (wsId) {
+        try {
+          const liffRes = await fetch(`/api/workspace-liff?workspace_id=${wsId}`)
+          const liffData = await liffRes.json()
+          if (liffData.success && liffData.liffId) {
+            activeLiffId = liffData.liffId
+          }
+        } catch (fetchErr) {
+          console.error("Failed to fetch dynamic liffId, using fallback:", fetchErr)
+        }
+      }
+
+      await liff.init({ liffId: activeLiffId })
       setLiffLoaded(true)
 
       if (!liff.isLoggedIn()) {
@@ -82,13 +103,6 @@ function TenantRegisterContent() {
       const userProfile = await liff.getProfile()
       setProfile(userProfile)
       setLineUserId(userProfile.userId)
-
-      // ดักจับค่าและเซ็ตพารามิเตอร์ที่ส่งมาจากลิงก์แอดมิน
-      const wsId = getUrlParam("workspace_id")
-      setWorkspaceId(wsId)
-
-      const rNum = getUrlParam("room_number")
-      setRoomNumber(rNum)
 
       // ตรวจสอบว่าลิงก์นี้เปิดลงทะเบียนได้อีกหรือไม่ (สมัครได้ครั้งเดียวเท่านั้น)
       if (wsId && rNum) {

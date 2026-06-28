@@ -7,15 +7,14 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 }
 
-// In-memory fallback cache in case the database table is not yet created
-// Deno Edge Functions can be ephemeral, but they can persist state across some invocations
-let memoryCache: {
+// In-memory fallback cache
+let memoryCache: { [key: string]: {
   limit: number;
   consumed: number;
   remaining: number;
   percentage_used: number;
   updatedAt: number;
-} | null = null;
+} } = {};
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -24,7 +23,7 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Initialize Supabase client first
+    // 1. Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -32,21 +31,23 @@ serve(async (req) => {
     const now = Date.now()
     const tenMinutes = 10 * 60 * 1000
 
-    // Parse query parameters to check if cache bypass is requested
+    // Parse query parameters
     const requestUrl = new URL(req.url)
     const bypassCache = requestUrl.searchParams.get("bypass_cache") === "true"
+    const workspaceId = requestUrl.searchParams.get("workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
 
-    // 2. Query the database cache and token together (combines DB roundtrips)
+    // 2. Query the database cache and token together
     let dbCacheSuccess = false
     let cachedData = null
     let dbToken: string | null = null
     let dbRowData: any = null
 
     try {
+      // First try workspace_line_settings (multi-tenant)
       const { data, error } = await supabase
-        .from("line_quota_cache")
+        .from("workspace_line_settings")
         .select("*")
-        .eq("id", 1)
+        .eq("workspace_id", workspaceId)
         .maybeSingle()
 
       if (!error) {
@@ -71,32 +72,57 @@ serve(async (req) => {
           }
         }
       } else {
-        console.warn("Database cache check failed or table not found, falling back to memory/API:", error.message)
+        // Fallback to legacy single-tenant line_quota_cache table
+        console.warn("workspace_line_settings query failed, trying legacy line_quota_cache:", error.message)
+        const { data: legacyData, error: legacyErr } = await supabase
+          .from("line_quota_cache")
+          .select("*")
+          .eq("id", 1)
+          .maybeSingle()
+
+        if (!legacyErr && legacyData) {
+          dbCacheSuccess = true // Mark success if legacy table exists
+          dbRowData = legacyData
+          dbRowData.isLegacy = true // Flag to identify legacy row
+          if (legacyData.channel_access_token) {
+            dbToken = legacyData.channel_access_token
+          }
+          const cacheAge = now - new Date(legacyData.updated_at).getTime()
+          if (!bypassCache && cacheAge < tenMinutes && legacyData.limit_count !== null && legacyData.consumed_count !== null) {
+            cachedData = {
+              limit: legacyData.limit_count,
+              consumed: legacyData.consumed_count,
+              remaining: legacyData.remaining_count,
+              percentage_used: legacyData.percentage_used,
+              cached: true,
+              source: "database_legacy",
+              updated_at: legacyData.updated_at
+            }
+          }
+        }
       }
     } catch (dbErr) {
-      console.warn("Database cache query error (table probably doesn't exist yet):", dbErr)
+      console.warn("Database cache query error:", dbErr)
     }
 
-    // 3. Resolve the Active LINE Channel Access Token
-    // Priority 1: Secure Token configured in the Database Settings UI
-    // Priority 2: Token from Environment Variables
+    // 3. Resolve Active LINE Channel Access Token
     const lineAccessToken = dbToken || Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN")
     if (!lineAccessToken) {
-      throw new Error("LINE Channel Access Token is not configured. Please set it in Super Admin Settings UI.")
+      throw new Error(`LINE Channel Access Token is not configured for workspace ${workspaceId}. Please set it in Settings.`)
     }
 
-    // 4. Check in-memory fallback cache if database cache wasn't found or failed
-    if (!bypassCache && !cachedData && memoryCache) {
-      const cacheAge = now - memoryCache.updatedAt
+    // 4. Check in-memory fallback cache
+    if (!bypassCache && !cachedData && memoryCache[workspaceId]) {
+      const cacheAge = now - memoryCache[workspaceId].updatedAt
       if (cacheAge < tenMinutes) {
         cachedData = {
-          limit: memoryCache.limit,
-          consumed: memoryCache.consumed,
-          remaining: memoryCache.remaining,
-          percentage_used: memoryCache.percentage_used,
+          limit: memoryCache[workspaceId].limit,
+          consumed: memoryCache[workspaceId].consumed,
+          remaining: memoryCache[workspaceId].remaining,
+          percentage_used: memoryCache[workspaceId].percentage_used,
           cached: true,
           source: "memory",
-          updated_at: new Date(memoryCache.updatedAt).toISOString()
+          updated_at: new Date(memoryCache[workspaceId].updatedAt).toISOString()
         }
       }
     }
@@ -116,8 +142,6 @@ serve(async (req) => {
     }
 
     // 5. Fetch fresh data from LINE Messaging API concurrently
-    // GET https://api.line.me/v2/bot/message/quota (To see the limit)
-    // GET https://api.line.me/v2/bot/message/quota/consumption (To see consumption)
     const quotaPromise = fetch("https://api.line.me/v2/bot/message/quota", {
       method: "GET",
       headers: {
@@ -147,10 +171,7 @@ serve(async (req) => {
     const quotaJson = await quotaRes.json()
     const consumptionJson = await consumptionRes.json()
 
-    // quotaJson structure: { type: "none" | "limited", value: number }
-    // consumptionJson structure: { totalUsage: number }
     const limitType = quotaJson.type
-    // If type is "none" (unlimited), use a default high number or 0 to represent unlimited
     const limit = limitType === "none" ? 100000 : (quotaJson.value || 1000)
     const consumed = consumptionJson.totalUsage || 0
     const remaining = limitType === "none" ? 100000 - consumed : Math.max(0, limit - consumed)
@@ -168,7 +189,7 @@ serve(async (req) => {
     }
 
     // 6. Update in-memory fallback cache
-    memoryCache = {
+    memoryCache[workspaceId] = {
       limit,
       consumed,
       remaining,
@@ -176,11 +197,23 @@ serve(async (req) => {
       updatedAt: now
     }
 
-    // 7. Safe database update to avoid overwriting the channel_access_token with null
+    // 7. Safe database update
     if (dbCacheSuccess) {
       try {
-        if (dbRowData) {
-          // Row exists: perform partial update, keeping existing channel_access_token safe!
+        if (dbRowData && !dbRowData.isLegacy) {
+          // Row exists in workspace_line_settings
+          await supabase
+            .from("workspace_line_settings")
+            .update({
+              limit_count: limit,
+              consumed_count: consumed,
+              remaining_count: remaining,
+              percentage_used,
+              updated_at: responsePayload.updated_at
+            })
+            .eq("workspace_id", workspaceId)
+        } else if (dbRowData && dbRowData.isLegacy) {
+          // Fallback legacy row update
           await supabase
             .from("line_quota_cache")
             .update({
@@ -192,11 +225,11 @@ serve(async (req) => {
             })
             .eq("id", 1)
         } else {
-          // Row doesn't exist: insert initial row with id=1
+          // Row doesn't exist: insert new workspace settings
           await supabase
-            .from("line_quota_cache")
+            .from("workspace_line_settings")
             .insert({
-              id: 1,
+              workspace_id: workspaceId,
               limit_count: limit,
               consumed_count: consumed,
               remaining_count: remaining,
@@ -226,7 +259,7 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200, // Return 200 with success: false to let UI handle the error parsing smoothly
+        status: 200,
       }
     )
   }

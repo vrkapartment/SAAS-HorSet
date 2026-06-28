@@ -53,13 +53,37 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       workspaceId,
     } = payload
 
-    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
+    const supabase = await createClient()
+    let channelAccessToken = ""
+
+    // 1. Try to fetch token from workspace_line_settings table first if workspaceId is provided
+    if (workspaceId) {
+      try {
+        const { data: wsSettings, error: wsError } = await supabase
+          .from("workspace_line_settings")
+          .select("channel_access_token")
+          .eq("workspace_id", workspaceId)
+          .maybeSingle()
+
+        if (!wsError && wsSettings && wsSettings.channel_access_token) {
+          channelAccessToken = wsSettings.channel_access_token
+        }
+      } catch (wsErr) {
+        console.warn("Failed to fetch workspace-specific LINE token, falling back to ENV:", wsErr)
+      }
+    }
+
+    // 2. Fallback to process.env.LINE_CHANNEL_ACCESS_TOKEN
+    if (!channelAccessToken) {
+      channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || ""
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
     if (!channelAccessToken || channelAccessToken === "placeholder" || !channelAccessToken.trim()) {
       return {
         success: false,
-        error: "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN ของจริงในระบบหลังบ้าน (.env)"
+        error: "ยังไม่ได้ตั้งค่า LINE Channel Access Token สำหรับหอพักนี้ กรุณาตั้งค่าในระบบหลังบ้านหรือหน้าจอตั้งค่าก่อน"
       }
     }
 

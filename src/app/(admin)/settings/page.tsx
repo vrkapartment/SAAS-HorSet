@@ -10,7 +10,8 @@ import {
   User, 
   Settings, 
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from "lucide-react"
 
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -22,6 +23,7 @@ import FinanceSettingsTab from "@/components/settings/FinanceSettingsTab"
 import PermissionsTab from "@/components/settings/PermissionsTab"
 import TestConnectionTab from "@/components/settings/TestConnectionTab"
 import ProfileTab from "@/components/settings/ProfileTab"
+import LineSettingsTab from "@/components/settings/LineSettingsTab"
 
 function SettingsHubContent() {
   const router = useRouter()
@@ -151,6 +153,13 @@ function SettingsHubContent() {
       allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin" || !!userPermissions?.manage_staff_permissions
     },
     {
+      id: "line-oa",
+      name: "เชื่อมต่อ LINE OA",
+      icon: MessageSquare,
+      description: "ตั้งค่า LINE Channel Access Token และ LINE LIFF ID ประจำหอพักของคุณ",
+      allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
+    },
+    {
       id: "supabase",
       name: "ตรวจสอบเชื่อมต่อ Supabase",
       icon: Network,
@@ -177,6 +186,8 @@ function SettingsHubContent() {
         return <PermissionsTab />
       case "supabase":
         return <TestConnectionTab />
+      case "line-oa":
+        return <LineSettingsTab />
       default:
         return <ProfileTab />
     }
