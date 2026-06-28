@@ -28,7 +28,8 @@ import {
   RefreshCw,
   ChevronDown,
   Coins,
-  Scroll
+  Scroll,
+  Settings
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
@@ -98,6 +99,18 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       }
     }
   }, [])
+
+  // ซิงค์ชื่อโปรไฟล์แถบเมนู/หัวกระดาษเมื่อมีการแก้ไขใน ProfileTab
+  useEffect(() => {
+    const handleProfileUpdate = (e: any) => {
+      if (e.detail?.name) {
+        setFullName(e.detail.name)
+      }
+    }
+    window.addEventListener("profile-updated", handleProfileUpdate)
+    return () => window.removeEventListener("profile-updated", handleProfileUpdate)
+  }, [])
+
 
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
 
@@ -637,28 +650,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "super_admin"]
     },
     {
-      name: t("nav.finance") || "ตั้งค่าการเงิน",
-      path: "/finance-settings",
-      icon: Landmark,
-      roles: ["admin", "super_admin"]
-    },
-    {
-      name: t("nav.property_settings") || "ตั้งค่าหอพัก",
-      path: "/property-settings",
-      icon: Building,
-      roles: ["admin", "super_admin"]
-    },
-    {
-      name: "จัดการสิทธิ์ & Staff",
-      path: "/permissions",
-      icon: Users,
-      roles: ["admin", "super_admin"]
-    },
-    {
-      name: t("nav.test_connection") || "เช็คการเชื่อมต่อ Supabase",
-      path: "/test-connection",
-      icon: Database,
-      roles: ["admin", "super_admin"]
+      name: "ตั้งค่าระบบ",
+      path: "/settings",
+      icon: Settings,
+      roles: ["admin", "staff", "super_admin"]
     },
     {
       name: t("nav.super_admin") || "แผงควบคุม Super Admin",
@@ -668,21 +663,16 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     },
     {
       name: t("nav.profile") || "แก้ไขโปรไฟล์ & รหัสผ่าน",
-      path: "#profile",
+      path: "/settings?tab=profile",
       icon: KeyRound,
-      roles: ["admin", "staff", "super_admin"],
-      onClick: () => {
-        setProfileError(null)
-        setProfileSuccess(null)
-        setShowProfileModal(true)
-      }
+      roles: ["admin", "staff", "super_admin"]
     }
   ]
 
   const hasPermissionForPath = (path: string) => {
     // ถ้าโปรไฟล์ยังโหลดไม่เสร็จ ให้คืนค่า false สำหรับเมนูทั่วไป เพื่อป้องกันแถบเมนูกระพริบขึ้นมาทั้งหมดตอน Refresh
     if (!isProfileLoaded) {
-      if (path === "#profile" || path === "/login") {
+      if (path === "#profile" || path === "/login" || path === "/settings" || path.startsWith("/settings")) {
         return true
       }
       return false
@@ -691,7 +681,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     // Super Admin เข้าได้หมดทุกอย่าง เฉพาะเมื่อได้รับอนุมัติสิทธิ์ Support ใน Workspace นั้นแล้ว เท่านั้น
     if (userRole === "super_admin") {
       if (supportStatus !== "approved") {
-        return path === "/super-admin" || path === "#profile" || path === "/login"
+        return path === "/super-admin" || path === "#profile" || path === "/login" || path === "/settings" || path.startsWith("/settings")
       }
       return true
     }
@@ -700,7 +690,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       return false
     }
 
-    if (path === "#profile" || path === "/login") {
+    if (path === "#profile" || path === "/login" || path === "/settings" || path.startsWith("/settings")) {
       return true
     }
 
@@ -837,6 +827,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   {pathname === "/finance-settings" && (t("nav.finance") || "ตั้งค่าการเงินและบัญชีรับเงิน")}
                   {pathname === "/property-settings" && (t("nav.property_settings") || "ตั้งค่าข้อมูลหอพัก")}
                   {pathname === "/test-connection" && (t("nav.test_connection") || "เช็คระบบตรวจสอบการเชื่อมต่อ Supabase")}
+                  {pathname && pathname.startsWith("/settings") && "ตั้งค่าระบบ"}
                 </span>
                 
                 {userRole === "super_admin" && (
@@ -961,26 +952,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         onDecide={handleDecideSupport}
       />
 
-       {/* ========================================== */}
-      {/* POP-UP MODAL สำหรับแก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน */}
-      {/* ========================================== */}
-      <ProfileModal
-        isOpen={showProfileModal}
-        isDark={isDark}
-        profileLoading={profileLoading}
-        onClose={() => setShowProfileModal(false)}
-        profileName={profileName}
-        setProfileName={setProfileName}
-        profilePhone={profilePhone}
-        setProfilePhone={setProfilePhone}
-        profilePassword={profilePassword}
-        setProfilePassword={setProfilePassword}
-        profileConfirmPassword={profileConfirmPassword}
-        setProfileConfirmPassword={setProfileConfirmPassword}
-        profileError={profileError}
-        profileSuccess={profileSuccess}
-        onSubmit={handleUpdateProfileSubmit}
-      />
+
 
     
 
