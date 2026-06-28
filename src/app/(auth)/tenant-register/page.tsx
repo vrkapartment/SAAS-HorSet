@@ -17,6 +17,8 @@ function TenantRegisterContent() {
   const [error, setError] = useState("")
   const [alreadyRegistered, setAlreadyRegistered] = useState(false)
   const [pageInitializing, setPageInitializing] = useState(true)
+  const [botBasicId, setBotBasicId] = useState("@423xmlwo")
+  const [botDisplayName, setBotDisplayName] = useState("แชทบิลอัตโนมัติ")
 
   // ฟังก์ชันล้างเบอร์โทรศัพท์ให้อยู่ในฟอร์แมตตัวเลข 10 หลัก
   const handlePhoneChange = (val: string) => {
@@ -84,8 +86,16 @@ function TenantRegisterContent() {
         try {
           const liffRes = await fetch(`/api/workspace-liff?workspace_id=${wsId}`)
           const liffData = await liffRes.json()
-          if (liffData.success && liffData.liffId) {
-            activeLiffId = liffData.liffId
+          if (liffData.success) {
+            if (liffData.liffId) {
+              activeLiffId = liffData.liffId
+            }
+            if (liffData.botBasicId) {
+              setBotBasicId(liffData.botBasicId)
+            }
+            if (liffData.botDisplayName) {
+              setBotDisplayName(liffData.botDisplayName)
+            }
           }
         } catch (fetchErr) {
           console.error("Failed to fetch dynamic liffId, using fallback:", fetchErr)
@@ -191,7 +201,8 @@ function TenantRegisterContent() {
       // พาลูกค้าเปิดหน้าแอดไลน์แชทบิลอัตโนมัติทันทีหลังจากลงทะเบียนเสร็จ 1.5 วินาที ป้องกันการไม่แอดเพื่อน
       setTimeout(() => {
         if (typeof window !== "undefined") {
-          window.location.href = "https://line.me/R/ti/p/%40423xmlwo"
+          const cleanBasicId = botBasicId.startsWith("@") ? botBasicId.substring(1) : botBasicId
+          window.location.href = `https://line.me/R/ti/p/%40${cleanBasicId}`
         }
       }, 1500)
 
@@ -312,7 +323,7 @@ function TenantRegisterContent() {
                   <div className="flex gap-2.5 items-start">
                     <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold mt-0.5 shrink-0">1</span>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      กดปุ่ม <strong className="text-emerald-400">"เพิ่มเพื่อน LINE OA"</strong> ด้านล่างเพื่อเชื่อมต่อช่องทางรับแจ้งบิล ค่าน้ำ-ค่าไฟ และใบเสร็จรับเงิน (LINE ID: <strong className="text-emerald-400">@423xmlwo</strong>)
+                      กดปุ่ม <strong className="text-emerald-400">"เพิ่มเพื่อน LINE OA"</strong> ด้านล่างเพื่อเชื่อมต่อช่องทางรับแจ้งบิล ค่าน้ำ-ค่าไฟ และใบเสร็จรับเงิน (LINE ID: <strong className="text-emerald-400 font-bold">{botBasicId}</strong>)
                     </p>
                   </div>
                   <div className="flex gap-2.5 items-start">
@@ -325,11 +336,11 @@ function TenantRegisterContent() {
 
                 <div className="space-y-3 pt-2">
                   <a
-                    href="https://line.me/R/ti/p/%40423xmlwo"
+                    href={`https://line.me/R/ti/p/%40${botBasicId.startsWith("@") ? botBasicId.substring(1) : botBasicId}`}
                     className="w-full py-3.5 px-6 bg-[#06C755] hover:bg-[#05b04c] text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm transition-all transform active:scale-95 shadow-lg shadow-[#06C755]/15"
                   >
                     <MessageSquare className="w-4 h-4 fill-current" />
-                    เพิ่มเพื่อน LINE OA (@423xmlwo)
+                    เพิ่มเพื่อน {botDisplayName} ({botBasicId})
                   </a>
 
                   <button
