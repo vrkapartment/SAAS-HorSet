@@ -24,13 +24,7 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Get LINE_CHANNEL_ACCESS_TOKEN from Environment Variable
-    const lineAccessToken = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN")
-    if (!lineAccessToken) {
-      throw new Error("LINE_CHANNEL_ACCESS_TOKEN Environment Variable is not configured in Supabase.")
-    }
-
-    // 2. Initialize Supabase client
+    // 1. Initialize Supabase client first
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -38,9 +32,11 @@ serve(async (req) => {
     const now = Date.now()
     const tenMinutes = 10 * 60 * 1000
 
-    // 3. Try to check database cache first (if table exists)
+    // 2. Query the database cache and token together (combines DB roundtrips)
     let dbCacheSuccess = false
     let cachedData = null
+    let dbToken: string | null = null
+    let dbRowData: any = null
 
     try {
       const { data, error } = await supabase
@@ -52,8 +48,12 @@ serve(async (req) => {
       if (!error) {
         dbCacheSuccess = true
         if (data) {
+          dbRowData = data
+          if (data.channel_access_token) {
+            dbToken = data.channel_access_token
+          }
           const cacheAge = now - new Date(data.updated_at).getTime()
-          if (cacheAge < tenMinutes) {
+          if (cacheAge < tenMinutes && data.limit_count !== null && data.consumed_count !== null) {
             cachedData = {
               limit: data.limit_count,
               consumed: data.consumed_count,
@@ -70,6 +70,14 @@ serve(async (req) => {
       }
     } catch (dbErr) {
       console.warn("Database cache query error (table probably doesn't exist yet):", dbErr)
+    }
+
+    // 3. Resolve the Active LINE Channel Access Token
+    // Priority 1: Secure Token configured in the Database Settings UI
+    // Priority 2: Token from Environment Variables
+    const lineAccessToken = dbToken || Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN")
+    if (!lineAccessToken) {
+      throw new Error("LINE Channel Access Token is not configured. Please set it in Super Admin Settings UI.")
     }
 
     // 4. Check in-memory fallback cache if database cache wasn't found or failed
@@ -163,19 +171,34 @@ serve(async (req) => {
       updatedAt: now
     }
 
-    // 7. Update database cache table if it exists
+    // 7. Safe database update to avoid overwriting the channel_access_token with null
     if (dbCacheSuccess) {
       try {
-        await supabase
-          .from("line_quota_cache")
-          .upsert({
-            id: 1,
-            limit_count: limit,
-            consumed_count: consumed,
-            remaining_count: remaining,
-            percentage_used,
-            updated_at: responsePayload.updated_at
-          }, { onConflict: "id" })
+        if (dbRowData) {
+          // Row exists: perform partial update, keeping existing channel_access_token safe!
+          await supabase
+            .from("line_quota_cache")
+            .update({
+              limit_count: limit,
+              consumed_count: consumed,
+              remaining_count: remaining,
+              percentage_used,
+              updated_at: responsePayload.updated_at
+            })
+            .eq("id", 1)
+        } else {
+          // Row doesn't exist: insert initial row with id=1
+          await supabase
+            .from("line_quota_cache")
+            .insert({
+              id: 1,
+              limit_count: limit,
+              consumed_count: consumed,
+              remaining_count: remaining,
+              percentage_used,
+              updated_at: responsePayload.updated_at
+            })
+        }
       } catch (dbUpsertErr) {
         console.error("Failed to update database cache table:", dbUpsertErr)
       }

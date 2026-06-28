@@ -101,6 +101,15 @@ export default function SuperAdminPage() {
   const [fetchingQuota, setFetchingQuota] = useState(false)
   const [quotaError, setQuotaError] = useState<string | null>(null)
 
+  // LINE Channel Access Token Settings States
+  const [tokenInput, setTokenInput] = useState("")
+  const [showToken, setShowToken] = useState(false)
+  const [savingToken, setSavingToken] = useState(false)
+  const [tokenSuccess, setTokenSuccess] = useState<string | null>(null)
+  const [tokenError, setTokenError] = useState<string | null>(null)
+  const [isTokenConfigured, setIsTokenConfigured] = useState(false)
+  const [showTokenSettings, setShowTokenSettings] = useState(false)
+
   // ข้อมูลจากฐานข้อมูล
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [profiles, setProfiles] = useState<ProfileItem[]>([])
@@ -331,9 +340,84 @@ export default function SuperAdminPage() {
     }
   }
 
+  const loadTokenSettings = async () => {
+    if (isDemo) {
+      setTokenInput("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo_channel_access_token")
+      setIsTokenConfigured(true)
+      return
+    }
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("line_quota_cache")
+        .select("channel_access_token")
+        .eq("id", 1)
+        .maybeSingle()
+
+      if (error) {
+        console.warn("Could not load token settings:", error.message)
+        return
+      }
+
+      if (data && data.channel_access_token) {
+        setTokenInput(data.channel_access_token)
+        setIsTokenConfigured(true)
+      } else {
+        setTokenInput("")
+        setIsTokenConfigured(false)
+      }
+    } catch (err) {
+      console.error("Error loading token settings:", err)
+    }
+  }
+
+  const handleSaveToken = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingToken(true)
+    setTokenError(null)
+    setTokenSuccess(null)
+
+    if (isDemo) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      setIsTokenConfigured(!!tokenInput.trim())
+      setTokenSuccess(tokenInput.trim() ? "บันทึกข้อมูลจำลองสำเร็จ!" : "ลบ Token จำลองสำเร็จ!")
+      setSavingToken(false)
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const trimmedToken = tokenInput.trim()
+      
+      const { error } = await supabase
+        .from("line_quota_cache")
+        .upsert({
+          id: 1,
+          channel_access_token: trimmedToken || null,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "id" })
+
+      if (error) {
+        throw error
+      }
+
+      setIsTokenConfigured(!!trimmedToken)
+      setTokenSuccess(trimmedToken ? "บันทึก LINE Channel Access Token สำเร็จ!" : "ลบ LINE Channel Access Token เรียบร้อยแล้ว")
+      
+      // Refresh quota display with the new token
+      loadLineQuota()
+    } catch (err: any) {
+      console.error("Error saving token:", err)
+      setTokenError(err.message || "เกิดข้อผิดพลาดในการบันทึก Token")
+    } finally {
+      setSavingToken(false)
+    }
+  }
+
   useEffect(() => {
     loadData()
     loadLineQuota()
+    loadTokenSettings()
   }, [])
 
   // ฟังก์ชันเพิ่ม Workspace ใหม่
@@ -902,6 +986,127 @@ export default function SuperAdminPage() {
                   </button>
                 </div>
               )}
+
+              {/* Settings Divider */}
+              <div className="border-t border-slate-800/60 pt-4" />
+
+              {/* Expandable Settings Section */}
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setShowTokenSettings(!showTokenSettings)}
+                  className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer select-none"
+                >
+                  <Key className={`w-3.5 h-3.5 transition-transform duration-300 ${showTokenSettings ? "rotate-45 text-green-400" : ""}`} />
+                  <span>{showTokenSettings ? "ซ่อนการตั้งค่า API Token" : "ตั้งค่า LINE Channel Access Token"}</span>
+                  {isTokenConfigured && !showTokenSettings && (
+                    <span className="ml-2 text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full border border-green-500/20 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                      เชื่อมต่อแล้ว
+                    </span>
+                  )}
+                </button>
+
+                {showTokenSettings && (
+                  <form onSubmit={handleSaveToken} className="space-y-4 p-4 bg-slate-950/40 rounded-2xl border border-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-250">
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        LINE Channel Access Token
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showToken ? "text" : "password"}
+                          placeholder={isTokenConfigured ? "••••••••••••••••••••••••••••••••" : "ใส่ LINE Channel Access Token ที่นี่..."}
+                          className="w-full pl-3 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-green-500 text-slate-200 text-xs font-mono transition-colors"
+                          value={tokenInput}
+                          onChange={(e) => setTokenInput(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowToken(!showToken)}
+                          className="absolute right-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                        >
+                          {showToken ? <Lock className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        * Token จะถูกบันทึกอย่างปลอดภัยในระบบฐานข้อมูลด้วย Row Level Security (RLS) เฉพาะบัญชี Super Admin เท่านั้นที่มีสิทธิ์เข้าถึง
+                      </p>
+                    </div>
+
+                    {tokenError && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[11px] flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{tokenError}</span>
+                      </div>
+                    )}
+
+                    {tokenSuccess && (
+                      <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-xl text-[11px] flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>{tokenSuccess}</span>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 justify-end">
+                      {isTokenConfigured && (
+                        <button
+                          type="button"
+                          disabled={savingToken}
+                          onClick={async () => {
+                            if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบ Token นี้ออกจากระบบ?")) {
+                              setTokenInput("")
+                              setSavingToken(true)
+                              setTokenError(null)
+                              setTokenSuccess(null)
+                              try {
+                                const supabase = createClient()
+                                const { error } = await supabase
+                                  .from("line_quota_cache")
+                                  .upsert({
+                                    id: 1,
+                                    channel_access_token: null,
+                                    updated_at: new Date().toISOString()
+                                  }, { onConflict: "id" })
+                                
+                                if (error) throw error
+                                setIsTokenConfigured(false)
+                                setTokenSuccess("ลบ LINE Channel Access Token เรียบร้อยแล้ว")
+                                setTokenInput("")
+                                loadLineQuota()
+                              } catch (err: any) {
+                                setTokenError(err.message || "เกิดข้อผิดพลาด")
+                              } finally {
+                                setSavingToken(false)
+                              }
+                            }
+                          }}
+                          className="px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 transition-colors text-xs font-semibold rounded-xl cursor-pointer"
+                        >
+                          ลบ Token
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={savingToken}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-slate-800 disabled:text-slate-500 text-white transition-colors text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-lg shadow-green-600/10"
+                      >
+                        {savingToken ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>กำลังบันทึก...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>บันทึกตั้งค่า</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
