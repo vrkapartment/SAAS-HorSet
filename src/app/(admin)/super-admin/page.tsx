@@ -21,7 +21,8 @@ import {
   Lock,
   Edit,
   X,
-  Key
+  Key,
+  MessageSquare
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { 
@@ -86,6 +87,19 @@ export default function SuperAdminPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setResultSuccess] = useState<string | null>(null)
+
+  // LINE OA Message Quota States
+  const [lineQuota, setLineQuota] = useState<{
+    limit: number
+    consumed: number
+    remaining: number
+    percentage_used: number
+    source?: string
+    cached?: boolean
+    updated_at?: string
+  } | null>(null)
+  const [fetchingQuota, setFetchingQuota] = useState(false)
+  const [quotaError, setQuotaError] = useState<string | null>(null)
 
   // ข้อมูลจากฐานข้อมูล
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -266,8 +280,60 @@ export default function SuperAdminPage() {
     setRegistrationCodes(mockCodes)
   }
 
+  const loadLineQuota = async () => {
+    setFetchingQuota(true)
+    setQuotaError(null)
+
+    if (isDemo) {
+      // Simulate real response with minor variance or exactly 1000/850/150/85%
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      setLineQuota({
+        limit: 1000,
+        consumed: 850,
+        remaining: 150,
+        percentage_used: 85,
+        source: "demo",
+        cached: false,
+        updated_at: new Date().toISOString()
+      })
+      setFetchingQuota(false)
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error: funcErr } = await supabase.functions.invoke("get-line-quota", {
+        method: "GET"
+      })
+
+      if (funcErr) {
+        throw funcErr
+      }
+
+      if (data && data.success) {
+        setLineQuota({
+          limit: data.limit,
+          consumed: data.consumed,
+          remaining: data.remaining,
+          percentage_used: data.percentage_used,
+          source: data.source,
+          cached: data.cached,
+          updated_at: data.updated_at
+        })
+      } else {
+        throw new Error(data?.error || "ไม่สามารถดึงข้อมูลโควตาได้")
+      }
+    } catch (err: any) {
+      console.error("Error loading LINE quota:", err)
+      setQuotaError(err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ Edge Function")
+    } finally {
+      setFetchingQuota(false)
+    }
+  }
+
   useEffect(() => {
     loadData()
+    loadLineQuota()
   }, [])
 
   // ฟังก์ชันเพิ่ม Workspace ใหม่
@@ -705,7 +771,140 @@ export default function SuperAdminPage() {
         )}
 
         {activeTab === "workspaces" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* LINE OA Message Quota Card Widget */}
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6 relative overflow-hidden">
+              {/* Decorative gradient blur in background */}
+              <div className="absolute top-0 right-0 w-[250px] h-[150px] bg-green-500/5 rounded-full blur-[60px] pointer-events-none" />
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-green-500/10 text-green-400 rounded-xl border border-green-500/20">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                      โควตาข้อความ LINE OA (Message Limit)
+                      {lineQuota?.cached && (
+                        <span className="text-[10px] bg-slate-850 text-slate-400 font-normal px-2 py-0.5 rounded-md border border-slate-800">
+                          Cached
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-[11px] text-slate-500">
+                      แสดงสถานะการส่งข้อความผ่าน LINE Messaging API ของระบบในเดือนนี้
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadLineQuota()}
+                  disabled={fetchingQuota}
+                  className="p-2.5 px-4 bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all rounded-xl cursor-pointer flex items-center justify-center gap-1.5 text-xs font-semibold self-start sm:self-center"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${fetchingQuota ? "animate-spin text-green-400" : ""}`} />
+                  <span>รีเฟรชโควตา</span>
+                </button>
+              </div>
+
+              {fetchingQuota ? (
+                <div className="py-6 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 border-2 border-green-500/30 border-t-green-400 rounded-full animate-spin" />
+                  <span className="text-xs text-slate-400 font-medium">กำลังโหลดข้อมูลโควตา LINE OA...</span>
+                </div>
+              ) : quotaError ? (
+                <div className="p-4 bg-red-500/10 border border-red-500/25 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-red-400">เกิดข้อผิดพลาดในการดึงข้อมูลโควตา</h4>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-xl">{quotaError}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Fallback to fake data for demoing if the user forces it or API is down
+                      setLineQuota({
+                        limit: 1000,
+                        consumed: 850,
+                        remaining: 150,
+                        percentage_used: 85,
+                        source: "fallback-demo",
+                        cached: false,
+                        updated_at: new Date().toISOString()
+                      })
+                      setQuotaError(null)
+                    }}
+                    className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 text-xs font-semibold rounded-lg shrink-0 transition-all cursor-pointer"
+                  >
+                    ใช้ข้อมูลจำลอง (Demo)
+                  </button>
+                </div>
+              ) : lineQuota ? (
+                <div className="space-y-4">
+                  {/* Summary Text */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-slate-300 font-medium">
+                    <span className="text-xs sm:text-sm">
+                      ใช้งานไปแล้ว <strong className="text-white text-base font-bold font-mono">{lineQuota.consumed.toLocaleString()}</strong> ข้อความ
+                      <span className="mx-2 text-slate-600">|</span>
+                      คงเหลือ <strong className="text-white text-base font-bold font-mono">{lineQuota.remaining.toLocaleString()}</strong> ข้อความ
+                    </span>
+                    <span className="text-xs text-slate-400 sm:text-right">
+                      (จากทั้งหมด {lineQuota.limit === 100000 ? "ไม่จำกัด" : `${lineQuota.limit.toLocaleString()} ข้อความ`})
+                    </span>
+                  </div>
+
+                  {/* Progress Bar Container */}
+                  <div className="space-y-2">
+                    <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-900 flex">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          lineQuota.percentage_used <= 70
+                            ? "bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
+                            : lineQuota.percentage_used <= 89
+                            ? "bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+                            : "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+                        }`}
+                        style={{ width: `${Math.min(100, lineQuota.percentage_used)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 text-[11px] text-slate-500">
+                      <span>ระบบจะรีเซ็ตโควตาทุกวันที่ 1 ของเดือน</span>
+                      <div className="flex items-center gap-4">
+                        {lineQuota.updated_at && (
+                          <span>อัปเดตล่าสุด: {new Date(lineQuota.updated_at).toLocaleTimeString("th-TH")} น.</span>
+                        )}
+                        <span className={`font-mono font-bold ${
+                          lineQuota.percentage_used <= 70
+                            ? "text-green-400"
+                            : lineQuota.percentage_used <= 89
+                            ? "text-amber-400"
+                            : "text-red-400 animate-pulse"
+                        }`}>
+                          {lineQuota.percentage_used}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 flex flex-col items-center justify-center text-slate-500 text-xs gap-2">
+                  <span>ไม่มีข้อมูลโควตา LINE OA กรุณากดปุ่มเพื่อดึงข้อมูล</span>
+                  <button
+                    type="button"
+                    onClick={() => loadLineQuota()}
+                    className="px-3 py-1 bg-slate-900 border border-slate-850 hover:bg-slate-800 text-slate-300 rounded-lg text-[11px] font-semibold cursor-pointer"
+                  >
+                    โหลดข้อมูลโควตา
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* คอลัมน์ซ้าย: จัดการพื้นที่ทำงาน (Workspace Management) */}
             <div className="lg:col-span-7 space-y-8">
               <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
@@ -847,9 +1046,10 @@ export default function SuperAdminPage() {
                     </button>
                   </div>
                 </form>
-              </div>
             </div>
           </div>
+        </div>
+      </div>
         )}
 
         {activeTab === "users" && (
