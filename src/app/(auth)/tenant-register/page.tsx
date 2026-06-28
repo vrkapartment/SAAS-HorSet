@@ -35,43 +35,67 @@ function TenantRegisterContent() {
     let val = searchParams.get(name)
     if (val) return val
 
-    // 2. ดักจับกรณีพิเศษของ LINE LIFF ที่ย้ายพารามิเตอร์ไปซ่อนไว้หลัง liff.state ใน Hash
-    const hash = window.location.hash
-    if (hash) {
-      const liffStateMatch = hash.match(/liff\.state=([^&]+)/)
-      if (liffStateMatch) {
-        try {
-          const decodedState = decodeURIComponent(liffStateMatch[1])
-          if (decodedState.includes(`${name}=`)) {
-            const stateParams = new URLSearchParams(decodedState)
-            const stateVal = stateParams.get(name)
-            if (stateVal) return stateVal
-          } else {
-            // กรณีเป็น JSON String
-            const parsed = JSON.parse(decodedState)
-            if (parsed[name]) return String(parsed[name])
-          }
-        } catch (e) {
-          console.error(`Error parsing liff.state for ${name}:`, e)
+    // 2. ดึงค่า liff.state จาก URL Search หรือ Hash
+    let liffState = searchParams.get("liff.state")
+    if (!liffState) {
+      const hash = window.location.hash
+      if (hash) {
+        // ค้นหา liff.state= ใน hash เช่น #liff.state=... หรือ #/path?liff.state=...
+        const stateMatch = hash.match(/liff\.state=([^&]+)/)
+        if (stateMatch) {
+          liffState = stateMatch[1]
         }
       }
+    }
 
-      // ดักจับเพิ่มเติมหากมี ? ปนใน hash ทั่วไป
-      if (hash.includes("?")) {
-        const hashQuery = hash.substring(hash.indexOf("?"))
-        const hashParams = new URLSearchParams(hashQuery)
-        const hashVal = hashParams.get(name)
-        if (hashVal) return hashVal
+    // 3. ถ้าเจอ liff.state ให้ทำการแกะพารามิเตอร์ข้างใน
+    if (liffState) {
+      try {
+        const decodedState = decodeURIComponent(liffState)
+        // กรณีเป็น query string เช่น /tenant-register?workspace_id=...&room_number=...
+        if (decodedState.includes("?")) {
+          const innerQuery = decodedState.substring(decodedState.indexOf("?"))
+          const innerParams = new URLSearchParams(innerQuery)
+          const innerVal = innerParams.get(name)
+          if (innerVal) return innerVal
+        } else if (decodedState.includes(`${name}=`)) {
+          // เผื่อไม่มีเครื่องหมายคำถามแต่มีคีย์-ค่า คั่นด้วย &
+          const innerParams = new URLSearchParams(decodedState)
+          const innerVal = innerParams.get(name)
+          if (innerVal) return innerVal
+        } else {
+          // กรณีเป็น JSON String
+          const parsed = JSON.parse(decodedState)
+          if (parsed[name]) return String(parsed[name])
+        }
+      } catch (e) {
+        console.error(`Error parsing liff.state for ${name}:`, e)
       }
+    }
+
+    // 4. ดักจับเพิ่มเติมหากมี ? ปนใน hash ทั่วไป
+    const hash = window.location.hash
+    if (hash && hash.includes("?")) {
+      const hashQuery = hash.substring(hash.indexOf("?"))
+      const hashParams = new URLSearchParams(hashQuery)
+      const hashVal = hashParams.get(name)
+      if (hashVal) return hashVal
     }
 
     return ""
   }
 
   const initLiff = async () => {
+    if (liffLoaded) return
+    if ((window as any).__liffInitializing) return
+    (window as any).__liffInitializing = true
+
     try {
       const liff = (window as any).liff
-      if (!liff) return
+      if (!liff) {
+        (window as any).__liffInitializing = false
+        return
+      }
 
       // ดักจับค่าและเซ็ตพารามิเตอร์ที่ส่งมาจากลิงก์แอดมินก่อน เพื่อหา liff_id ไดนามิก
       const wsId = getUrlParam("workspace_id")
@@ -81,7 +105,9 @@ function TenantRegisterContent() {
       setRoomNumber(rNum)
 
       // เรียกดึง LIFF ID ที่ถูกต้องจากตารางฐานข้อมูลแยกราย Workspace
-      let activeLiffId = "2010442620-H4josaDy" // default fallback
+      const defaultLiffId = "2010442620-H4josaDy"
+      let activeLiffId = defaultLiffId // default fallback
+      
       if (wsId) {
         try {
           const liffRes = await fetch(`/api/workspace-liff?workspace_id=${wsId}`)
@@ -102,7 +128,22 @@ function TenantRegisterContent() {
         }
       }
 
-      await liff.init({ liffId: activeLiffId })
+      // พยายาม Initialize LIFF ด้วย ID ที่ตั้งค่าไว้
+      try {
+        console.log(`Initializing LIFF with ID: ${activeLiffId}`)
+        await liff.init({ liffId: activeLiffId })
+      } catch (initErr) {
+        console.error(`Failed to init LIFF with custom ID ${activeLiffId}:`, initErr)
+        
+        // หากล้มเหลวและไม่ได้ใช้ ID หลักอยู่แล้ว ให้ถอยกลับมาใช้ ID หลัก (Self-Healing)
+        if (activeLiffId !== defaultLiffId) {
+          console.log(`Self-Healing: Retrying LIFF init with default fallback ID: ${defaultLiffId}`)
+          await liff.init({ liffId: defaultLiffId })
+        } else {
+          throw initErr // ถ้าขนาด ID หลักยังพัง ให้โยนข้ามไปตัวนอกสุด
+        }
+      }
+
       setLiffLoaded(true)
 
       if (!liff.isLoggedIn()) {
@@ -133,12 +174,13 @@ function TenantRegisterContent() {
       }
     } catch (err: any) {
       console.error("LIFF Init Error:", err)
-      setError("ไม่สามารถเชื่อมต่อบริการ LINE ได้ กรุณาแชร์ลิงก์เปิดทางห้องแชท LINE")
+      setError("ไม่สามารถเชื่อมต่อบริการ LINE ได้ กรุณาแชร์ลิงก์เปิดทางห้องแชท LINE หรือลองล็อกอินใหม่อีกครั้ง")
     } finally {
       const liff = (window as any).liff
       if (liff) {
         setPageInitializing(false)
       }
+      (window as any).__liffInitializing = false
     }
   }
 
@@ -271,225 +313,275 @@ function TenantRegisterContent() {
             {/* การ์ดแก้วพรีเมียม (Glassmorphism Card) */}
             <div className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-2xl shadow-emerald-950/5 relative">
               
-              {/* ตรวจสอบว่าลิงก์ถูกใช้งานไปแล้วหรือไม่ */}
-              {alreadyRegistered ? (
-              <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                <div className="inline-flex items-center justify-center p-4 bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 shadow-lg shadow-amber-500/5">
-                  <AlertCircle className="w-14 h-14" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-black text-slate-100">ลิงก์ลงทะเบียนถูกใช้งานแล้ว</h2>
-                  <p className="text-slate-400 text-sm font-medium">
-                    ห้องพักหมายเลข <strong className="text-amber-400 font-mono">{roomNumber || "ไม่ระบุ"}</strong> ได้ลงทะเบียนผูก LINE เรียบร้อยแล้ว
-                  </p>
-                </div>
-
-                <div className="bg-slate-950/50 border border-slate-900/80 rounded-2xl p-5 text-left space-y-4">
-                  <p className="text-xs text-slate-300 leading-relaxed text-center">
-                    ลิงก์ลงทะเบียนห้องกับบัญชี LINE สามารถใช้สมัครได้เพียง <strong>ครั้งเดียวเท่านั้น</strong> เพื่อความปลอดภัยสูงสุดของข้อมูลผู้เช่า
-                  </p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed text-center">
-                    หากคุณเพิ่งย้ายเข้าใหม่ หรือต้องการเปลี่ยนบัญชี LINE ที่ใช้รับบิลค่าเช่า กรุณาติดต่อผู้ดูแลหอพักเพื่อตรวจสอบข้อมูลหรือขอรับลิงก์ลงทะเบียนชุดใหม่
-                  </p>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    onClick={() => {
-                      const liff = (window as any).liff
-                      if (liff) {
-                        liff.closeWindow()
-                      }
-                    }}
-                    className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 font-semibold rounded-2xl flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer"
-                  >
-                    เสร็จสิ้นและปิดหน้านี้
-                  </button>
-                </div>
-              </div>
-            ) : success ? (
-              <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                <div className="inline-flex items-center justify-center p-4 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
-                  <CheckCircle2 className="w-14 h-14" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-black text-slate-100">ลงทะเบียนสำเร็จ!</h2>
-                  <p className="text-slate-400 text-sm font-medium">
-                    ยินดีต้อนรับคุณ <strong className="text-emerald-400">{tenantName}</strong> เข้าสู่ระบบ
-                  </p>
-                </div>
-
-                <div className="bg-slate-950/50 border border-slate-900/80 rounded-2xl p-5 text-left space-y-4">
-                  <div className="flex gap-2.5 items-start">
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold mt-0.5 shrink-0">1</span>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      กดปุ่ม <strong className="text-emerald-400">"เพิ่มเพื่อน LINE OA"</strong> ด้านล่างเพื่อเชื่อมต่อช่องทางรับแจ้งบิล ค่าน้ำ-ค่าไฟ และใบเสร็จรับเงิน (LINE ID: <strong className="text-emerald-400 font-bold">{botBasicId}</strong>)
+              {/* ตรวจสอบพารามิเตอร์ URL ว่าครบถ้วนหรือไม่ */}
+              {!workspaceId || !roomNumber ? (
+                <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="inline-flex items-center justify-center p-4 bg-rose-500/10 text-rose-400 rounded-full border border-rose-500/20 shadow-lg shadow-rose-500/5 animate-pulse">
+                    <AlertCircle className="w-14 h-14" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-black text-slate-100">ลิงก์ลงทะเบียนไม่สมบูรณ์</h2>
+                    <p className="text-rose-400 text-sm font-medium">
+                      ไม่พบข้อมูล "ห้องพัก" หรือ "รหัสอาคาร"
                     </p>
                   </div>
-                  <div className="flex gap-2.5 items-start">
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold mt-0.5 shrink-0">2</span>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      หลังจากแอดไลน์เรียบร้อยแล้ว ท่านสามารถกดปุ่ม <strong className="text-slate-500">"เสร็จสิ้นและปิดหน้านี้"</strong> เพื่อทำรายการอื่น ๆ ต่อได้ทันที
+
+                  <div className="bg-slate-950/50 border border-slate-900/80 rounded-2xl p-5 text-left space-y-4">
+                    <p className="text-xs text-slate-300 leading-relaxed text-center">
+                      ลิงก์ LINE LIFF ของท่านอาจถูกคัดลอกมาไม่ครบถ้วน หรือไม่มีการระบุหมายเลขห้องพักอย่างปลอดภัย
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed text-center">
+                      กรุณาติดต่อผู้ดูแลหอพักหรือผู้ให้เช่า เพื่อให้ผู้ดูแลส่งลิงก์ลงทะเบียน LINE สำหรับห้องพักของคุณใหม่อีกครั้ง
                     </p>
                   </div>
-                </div>
 
-                <div className="space-y-3 pt-2">
-                  <a
-                    href={`https://line.me/R/ti/p/%40${botBasicId.startsWith("@") ? botBasicId.substring(1) : botBasicId}`}
-                    className="w-full py-3.5 px-6 bg-[#06C755] hover:bg-[#05b04c] text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm transition-all transform active:scale-95 shadow-lg shadow-[#06C755]/15"
-                  >
-                    <MessageSquare className="w-4 h-4 fill-current" />
-                    เพิ่มเพื่อน {botDisplayName} ({botBasicId})
-                  </a>
-
-                  <button
-                    onClick={() => {
-                      const liff = (window as any).liff
-                      if (liff) {
-                        liff.closeWindow()
-                      }
-                    }}
-                    className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 font-semibold rounded-2xl flex items-center justify-center gap-1.5 text-xs transition-colors"
-                  >
-                    เสร็จสิ้นและปิดหน้านี้
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                
-                {/* ส่วนหัวของฟอร์ม (Header) */}
-                <div className="text-center space-y-4">
-                  <div className="relative inline-block">
-                    {profile ? (
-                      <div className="relative">
-                        <img
-                          src={profile.pictureUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=60"}
-                          alt="LINE Avatar"
-                          className="w-20 h-20 rounded-full border border-emerald-500/30 object-cover ring-4 ring-emerald-500/10 shadow-xl"
-                        />
-                        <span className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 rounded-full border-2 border-slate-900 flex items-center justify-center">
-                          <MessageSquare className="w-3 h-3 text-white fill-current" />
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="w-20 h-20 rounded-full bg-slate-800 border border-slate-700 animate-pulse flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
-                      </div>
-                    )}
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        const liff = (window as any).liff
+                        if (liff) {
+                          liff.closeWindow()
+                        }
+                      }}
+                      className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 font-semibold rounded-2xl flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer"
+                    >
+                      เสร็จสิ้นและปิดหน้านี้
+                    </button>
                   </div>
-
-                  <div className="space-y-1">
-                    <h1 className="text-xl font-black text-slate-100 flex items-center justify-center gap-1.5">
-                      {profile ? `สวัสดีคุณ ${profile.displayName}` : "กำลังยืนยันบัญชี LINE..."}
-                      <Sparkles className="w-4 h-4 text-emerald-400" />
-                    </h1>
-                    <p className="text-slate-400 text-xs font-semibold leading-relaxed">
-                      กรุณากรอกข้อมูลส่วนบุคคลเพื่อบันทึกสัญญาเช่าและรับบริการบิลใน LINE
+                </div>
+              ) : alreadyRegistered ? (
+                <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="inline-flex items-center justify-center p-4 bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 shadow-lg shadow-amber-500/5">
+                    <AlertCircle className="w-14 h-14" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-black text-slate-100">ลิงก์ลงทะเบียนถูกใช้งานแล้ว</h2>
+                    <p className="text-slate-400 text-sm font-medium">
+                      ห้องพักหมายเลข <strong className="text-amber-400 font-mono">{roomNumber || "ไม่ระบุ"}</strong> ได้ลงทะเบียนผูก LINE เรียบร้อยแล้ว
                     </p>
                   </div>
-                </div>
 
-                <div className="h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent" />
-
-                {/* ข้อความแจ้งเตือนข้อผิดพลาด */}
-                {error && (
-                  <div className="p-3.5 bg-rose-500/10 border border-rose-500/25 rounded-2xl flex items-center gap-2.5 text-rose-400 text-xs font-semibold animate-shake">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{error}</span>
+                  <div className="bg-slate-950/50 border border-slate-900/80 rounded-2xl p-5 text-left space-y-4">
+                    <p className="text-xs text-slate-300 leading-relaxed text-center">
+                      ลิงก์ลงทะเบียนห้องกับบัญชี LINE สามารถใช้สมัครได้เพียง <strong>ครั้งเดียวเท่านั้น</strong> เพื่อความปลอดภัยสูงสุดของข้อมูลผู้เช่า
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed text-center">
+                      หากคุณเพิ่งย้ายเข้าใหม่ หรือต้องการเปลี่ยนบัญชี LINE ที่ใช้รับบิลค่าเช่า กรุณาติดต่อผู้ดูแลหอพักเพื่อตรวจสอบข้อมูลหรือขอรับลิงก์ลงทะเบียนชุดใหม่
+                    </p>
                   </div>
-                )}
 
-                {/* ฟิลด์อินพุต */}
-                <div className="space-y-4">
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        const liff = (window as any).liff
+                        if (liff) {
+                          liff.closeWindow()
+                        }
+                      }}
+                      className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 font-semibold rounded-2xl flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer"
+                    >
+                      เสร็จสิ้นและปิดหน้านี้
+                    </button>
+                  </div>
+                </div>
+              ) : success ? (
+                <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="inline-flex items-center justify-center p-4 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
+                    <CheckCircle2 className="w-14 h-14" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-black text-slate-100">ลงทะเบียนสำเร็จ!</h2>
+                    <p className="text-slate-400 text-sm font-medium">
+                      ยินดีต้อนรับคุณ <strong className="text-emerald-400">{tenantName}</strong> เข้าสู่ระบบ
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950/50 border border-slate-900/80 rounded-2xl p-5 text-left space-y-4">
+                    <div className="flex gap-2.5 items-start">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold mt-0.5 shrink-0">1</span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        กดปุ่ม <strong className="text-emerald-400">"เพิ่มเพื่อน LINE OA"</strong> ด้านล่างเพื่อเชื่อมต่อช่องทางรับแจ้งบิล ค่าน้ำ-ค่าไฟ และใบเสร็จรับเงิน (LINE ID: <strong className="text-emerald-400 font-bold">{botBasicId}</strong>)
+                      </p>
+                    </div>
+                    <div className="flex gap-2.5 items-start">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold mt-0.5 shrink-0">2</span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        หลังจากแอดไลน์เรียบร้อยแล้ว ท่านสามารถกดปุ่ม <strong className="text-slate-500">"เสร็จสิ้นและปิดหน้านี้"</strong> เพื่อทำรายการอื่น ๆ ต่อได้ทันที
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <a
+                      href={`https://line.me/R/ti/p/%40${botBasicId.startsWith("@") ? botBasicId.substring(1) : botBasicId}`}
+                      className="w-full py-3.5 px-6 bg-[#06C755] hover:bg-[#05b04c] text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm transition-all transform active:scale-95 shadow-lg shadow-[#06C755]/15"
+                    >
+                      <MessageSquare className="w-4 h-4 fill-current" />
+                      เพิ่มเพื่อน {botDisplayName} ({botBasicId})
+                    </a>
+
+                    <button
+                      onClick={() => {
+                        const liff = (window as any).liff
+                        if (liff) {
+                          liff.closeWindow()
+                        }
+                      }}
+                      className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 font-semibold rounded-2xl flex items-center justify-center gap-1.5 text-xs transition-colors"
+                    >
+                      เสร็จสิ้นและปิดหน้านี้
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-6">
                   
-                  {/* ฟิลด์หมายเลขห้อง (แบบล็อคค่า - Read Only) */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                      หมายเลขห้องพัก (ลงทะเบียนพิเศษ)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full h-12 pl-11 pr-4 bg-slate-950/40 border border-slate-900 text-slate-500 rounded-2xl font-bold font-mono focus:outline-none cursor-not-allowed transition-all"
-                        value={roomNumber || "ไม่ระบุข้อมูลห้องพัก"}
-                        readOnly
-                        disabled
-                      />
-                      <Home className="w-4 h-4 text-slate-600 absolute left-4 top-1/2 -translate-y-1/2" />
+                  {/* ส่วนหัวของฟอร์ม (Header) */}
+                  <div className="text-center space-y-4">
+                    <div className="relative inline-block">
+                      {profile ? (
+                        <div className="relative">
+                          <img
+                            src={profile.pictureUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=60"}
+                            alt="LINE Avatar"
+                            className="w-20 h-20 rounded-full border border-emerald-500/30 object-cover ring-4 ring-emerald-500/10 shadow-xl"
+                          />
+                          <span className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 rounded-full border-2 border-slate-900 flex items-center justify-center">
+                            <MessageSquare className="w-3 h-3 text-white fill-current" />
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-slate-800 border border-slate-700 animate-pulse flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <h1 className="text-xl font-black text-slate-100 flex items-center justify-center gap-1.5">
+                        {profile ? `สวัสดีคุณ ${profile.displayName}` : "กำลังยืนยันบัญชี LINE..."}
+                        <Sparkles className="w-4 h-4 text-emerald-400" />
+                      </h1>
+                      <p className="text-slate-400 text-xs font-semibold leading-relaxed">
+                        กรุณากรอกข้อมูลส่วนบุคคลเพื่อบันทึกสัญญาเช่าและรับบริการบิลใน LINE
+                      </p>
                     </div>
                   </div>
 
-                  {/* ฟิลด์กรอก ชื่อ-นามสกุล (ผู้เช่ากรอกเอง) */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                      ชื่อ - นามสกุลผู้เช่า
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="ระบุชื่อจริง และนามสกุลจริงของคุณ"
-                        className="w-full h-12 pl-11 pr-4 bg-slate-950/60 border border-slate-800 rounded-2xl font-semibold text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-500/20 focus:bg-slate-950 transition-all"
-                        value={tenantName}
-                        onChange={(e) => setTenantName(e.target.value)}
-                        disabled={loading}
-                      />
-                      <User className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <div className="h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent" />
+
+                  {/* ข้อความแจ้งเตือนข้อผิดพลาด */}
+                  {error && (
+                    <div className="p-4 bg-rose-500/10 border border-rose-500/25 rounded-2xl space-y-3 animate-shake">
+                      <div className="flex items-center gap-2.5 text-rose-400 text-xs font-semibold">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{error}</span>
+                      </div>
+                      {!liffLoaded && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setError("")
+                            setPageInitializing(true)
+                            initLiff()
+                          }}
+                          className="w-full py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                        >
+                          ลองโหลดใหม่อีกครั้ง
+                        </button>
+                      )}
                     </div>
-                  </div>
-
-                  {/* ฟิลด์เบอร์โทรศัพท์ */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                      เบอร์โทรศัพท์มือถือ
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        placeholder="ระบุเบอร์โทรศัพท์ 10 หลัก"
-                        className="w-full h-12 pl-11 pr-4 bg-slate-950/60 border border-slate-800 rounded-2xl font-semibold text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-500/20 focus:bg-slate-950 transition-all font-mono"
-                        value={phone}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
-                        disabled={loading}
-                      />
-                      <Phone className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* ค่าที่ซ่อนไว้สำหรับแบคเอนด์ (Hidden Inputs) */}
-                <input type="hidden" name="lineUserId" value={lineUserId} />
-                <input type="hidden" name="workspaceId" value={workspaceId} />
-
-                {/* ปุ่มกดยืนยัน */}
-                <button
-                  type="submit"
-                  disabled={loading || !liffLoaded}
-                  className="w-full h-12.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-xl shadow-emerald-950/20 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-500/20"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>กำลังส่งข้อมูลลงทะเบียน...</span>
-                    </>
-                  ) : (
-                    <span>ยืนยันข้อมูลและเริ่มใช้งาน</span>
                   )}
-                </button>
 
-              </form>
-            )}
+                  {/* ฟิลด์อินพุต */}
+                  <div className="space-y-4">
+                    
+                    {/* ฟิลด์หมายเลขห้อง (แบบล็อคค่า - Read Only) */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                        หมายเลขห้องพัก (ลงทะเบียนพิเศษ)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          className="w-full h-12 pl-11 pr-4 bg-slate-950/40 border border-slate-900 text-slate-500 rounded-2xl font-bold font-mono focus:outline-none cursor-not-allowed transition-all"
+                          value={roomNumber || "ไม่ระบุข้อมูลห้องพัก"}
+                          readOnly
+                          disabled
+                        />
+                        <Home className="w-4 h-4 text-slate-600 absolute left-4 top-1/2 -translate-y-1/2" />
+                      </div>
+                    </div>
 
+                    {/* ฟิลด์กรอก ชื่อ-นามสกุล (ผู้เช่ากรอกเอง) */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                        ชื่อ - นามสกุลผู้เช่า
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="ระบุชื่อจริง และนามสกุลจริงของคุณ"
+                          className="w-full h-12 pl-11 pr-4 bg-slate-950/60 border border-slate-800 rounded-2xl font-semibold text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-500/20 focus:bg-slate-950 transition-all"
+                          value={tenantName}
+                          onChange={(e) => setTenantName(e.target.value)}
+                          disabled={loading}
+                        />
+                        <User className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                      </div>
+                    </div>
+
+                    {/* ฟิลด์เบอร์โทรศัพท์ */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                        เบอร์โทรศัพท์มือถือ
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          placeholder="ระบุเบอร์โทรศัพท์ 10 หลัก"
+                          className="w-full h-12 pl-11 pr-4 bg-slate-950/60 border border-slate-800 rounded-2xl font-semibold text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-500/20 focus:bg-slate-950 transition-all font-mono"
+                          value={phone}
+                          onChange={(e) => handlePhoneChange(e.target.value)}
+                          disabled={loading}
+                        />
+                        <Phone className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* ค่าที่ซ่อนไว้สำหรับแบคเอนด์ (Hidden Inputs) */}
+                  <input type="hidden" name="lineUserId" value={lineUserId} />
+                  <input type="hidden" name="workspaceId" value={workspaceId} />
+
+                  {/* ปุ่มกดยืนยัน */}
+                  <button
+                    type="submit"
+                    disabled={loading || !liffLoaded}
+                    className="w-full h-12.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-xl shadow-emerald-950/20 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-500/20"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>กำลังส่งข้อมูลลงทะเบียน...</span>
+                      </>
+                    ) : (
+                      <span>ยืนยันข้อมูลและเริ่มใช้งาน</span>
+                    )}
+                  </button>
+
+                </form>
+              )}
+
+            </div>
+
+            <p className="text-center text-slate-600 text-[10px] font-semibold">
+              หากข้อมูลห้องพักไม่ถูกต้อง กรุณาแจ้งผู้ดูแลอาคารเพื่อขอรับลิงก์สำหรับลงทะเบียนใหม่
+            </p>
           </div>
-
-          <p className="text-center text-slate-600 text-[10px] font-semibold">
-            หากข้อมูลห้องพักไม่ถูกต้อง กรุณาแจ้งผู้ดูแลอาคารเพื่อขอรับลิงก์สำหรับลงทะเบียนใหม่
-          </p>
         </div>
-      </div>
       )}
     </>
   )
