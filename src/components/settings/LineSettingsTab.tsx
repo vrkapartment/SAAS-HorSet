@@ -519,24 +519,24 @@ export default function LineSettingsTab() {
               </div>
               <div>
                 <h3 className="text-md font-extrabold text-slate-800 dark:text-slate-200">
-                  คู่มือเชื่อมต่อระบบ LINE OA หอพัก
+                  คู่มือเชื่อมต่อระบบ LINE OA ส่วนตัว
                 </h3>
                 <p className="text-[11px] text-slate-400 font-bold mt-0.5">
-                  ขั้นตอนรับสิทธิ์ส่งบิลและลงทะเบียนแบบแยกอิสระ
+                  ขั้นตอนรับสิทธิ์ส่งบิลและลงทะเบียนผู้เช่าแบบแยกหอพักอิสระ
                 </p>
               </div>
             </div>
 
             {/* Instruction Steps List */}
-            <div className="space-y-4.5 text-xs font-bold leading-relaxed text-slate-600 dark:text-slate-300">
+            <div className="space-y-5 text-xs font-bold leading-relaxed text-slate-600 dark:text-slate-300">
               
               <div className="relative pl-7 space-y-1.5">
                 <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-[10px] font-black border border-blue-500/20">
                   1
                 </div>
-                <h4 className="font-extrabold text-slate-800 dark:text-slate-200">สร้าง LINE Messaging API</h4>
-                <p className="text-[11px] text-slate-400">
-                  เข้าเว็บ <a href="https://developers.line.biz" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline inline-flex items-center gap-0.5 font-bold">LINE Developers <ExternalLink className="w-3 h-3" /></a> สมัครบัญชี คอนโซล ➡️ กด **Create Provider** (ใช้ชื่อหอพักคุณ) ➡️ จากนั้นกดสร้าง Channel ใหม่ เลือกหัวข้อ **Messaging API**
+                <h4 className="font-extrabold text-slate-850 dark:text-slate-100">สร้าง Provider สำหรับหอพัก</h4>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  เข้าสู่เว็บ <a href="https://developers.line.biz" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline inline-flex items-center gap-0.5 font-bold">LINE Developers Console <ExternalLink className="w-3 h-3" /></a> สมัครบัญชีผู้พัฒนา ➡️ กดปุ่ม **Create Provider** (ตั้งชื่อโฟลเดอร์เป็นชื่อหอพักของคุณ เพื่อความเป็นสัดส่วน)
                 </p>
               </div>
 
@@ -544,9 +544,9 @@ export default function LineSettingsTab() {
                 <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-[10px] font-black border border-blue-500/20">
                   2
                 </div>
-                <h4 className="font-extrabold text-slate-800 dark:text-slate-200">คัดลอก Channel Access Token</h4>
-                <p className="text-[11px] text-slate-400">
-                  เข้าไปที่ Channel Messaging API ที่สร้างเสร็จ ➡️ กดแถบด้านบนชื่อ **Messaging API** ➡️ เลื่อนลงไปหัวข้อล่างสุด **Channel access token (long-lived)** ➡️ กดปุ่ม **Issue** แล้วคัดลอกรหัสที่ได้มาใส่ในฟอร์มด้านซ้าย
+                <h4 className="font-extrabold text-slate-850 dark:text-slate-100">สร้างบอทรับแจ้งเตือน (Messaging API)</h4>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  ภายใต้ Provider เดิม กดสร้าง Channel ใหม่ เลือกหัวข้อ **Messaging API** ➡️ กรอกข้อมูลของบอทหอพักคุณให้เสร็จ ➡️ เลื่อนแถบไปที่หัวข้อด้านบนชื่อ **Messaging API** ➡️ เลื่อนลงไปด้านล่างสุดหัวข้อ **Channel access token (long-lived)** ➡️ กดปุ่ม **Issue** คัดลอกรหัสความปลอดภัยยาว ๆ มากรอกในช่องด้านซ้ายของหน้านี้
                 </p>
               </div>
 
@@ -554,10 +554,61 @@ export default function LineSettingsTab() {
                 <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-[10px] font-black border border-blue-500/20">
                   3
                 </div>
-                <h4 className="font-extrabold text-slate-800 dark:text-slate-200">สร้าง LINE Login & LIFF App</h4>
-                <p className="text-[11px] text-slate-400">
-                  เพื่อป้องกันปัญหา UID ไม่เข้าคู่กัน ใน **Provider เดียวกัน** ให้กด **Create New Channel** เลือก **LINE Login** ➡️ แท็บ **LIFF** กด **Add LIFF** ➡️ ตั้งชื่อ, ขนาด Full, และตั้งค่า Endpoint URL เป็น <span className="text-blue-500 font-mono select-all">https://{typeof window !== "undefined" ? window.location.hostname : "yourdomain.com"}/tenant-register</span> ➡️ คัดลอก **LIFF ID** มาใส่ในช่องด้านซ้าย แล้วกดบันทึกเป็นอันเสร็จสมบูรณ์ครับ!
+                <h4 className="font-extrabold text-slate-850 dark:text-slate-100">สร้างหน้ายืนยันสิทธิ์ (LINE Login & LIFF)</h4>
+                <p className="text-[11px] text-slate-400 font-medium space-y-1">
+                  <span>เพื่อป้องกันปัญหาจำสิทธิ์ผู้เช่าสลับกัน **ต้องสร้างใน Provider เดียวกันกับบอทข้อ 2** ➡️ กด **Create New Channel** เลือก **LINE Login**</span><br />
+                  <span>➡️ ไปที่แท็บด้านบนชื่อ **LIFF** กด **Add LIFF** ➡️ ตั้งชื่อ LIFF, ขนาดจอแนะนำแบบ **Full**</span><br />
+                  <span>➡️ ในช่อง **Endpoint URL** ให้คัดลอกค่าด้านล่างนี้ไปวาง:</span>
+                  <span className="block mt-1 p-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-blue-500 font-mono text-[10.5px] select-all break-all">
+                    https://{typeof window !== "undefined" ? window.location.hostname : "saas-horset.vercel.app"}/tenant-register
+                  </span>
+                  <span>➡️ คัดลอกรหัส **LIFF ID** มากรอกในช่องด้านซ้าย แล้วกดปุ่มบันทึกการตั้งค่า</span>
                 </p>
+              </div>
+
+              {/* Crucial Pitfalls & Warnings Section */}
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <h5 className="text-[11px] uppercase tracking-wider text-rose-500 dark:text-rose-400 font-extrabold flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" /> 
+                  ข้อควรระวังสำคัญที่สุด (ป้องกันระบบทำงานล้มเหลว)
+                </h5>
+
+                <div className="p-4.5 rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/15 dark:border-rose-500/25 space-y-3 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  
+                  {/* Warning 1 */}
+                  <div className="space-y-1">
+                    <strong className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5 font-extrabold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      1. ต้องเผยแพร่สถานะ LINE Login เสมอ (เปลี่ยนเป็น "Published")
+                    </strong>
+                    <p className="pl-3 leading-relaxed">
+                      เมื่อเริ่มสร้าง LINE Login ระบบจะตั้งสถานะเริ่มต้นเป็น <strong className="text-slate-700 dark:text-slate-300 font-bold">Developing (สีเทา)</strong> ทำให้เฉพาะตัวแอดมินเท่านั้นที่ใช้งานลิงก์ได้ แต่ผู้เช่าทั่วไปจะเจอปัญหากดสมัครไม่ได้หรือหน้าจอลูปหมุนวนไม่หยุด <strong className="text-emerald-500 dark:text-emerald-400 font-extrabold">วิธีแก้:</strong> คลิกที่แถบสถานะกลม ๆ สีเทามุมขวาบนของหน้า LINE Login ให้เปลี่ยนเป็นสถานะ <strong className="text-emerald-500 dark:text-emerald-400 font-extrabold">Published (สีเขียว)</strong> ก่อนใช้งานจริง
+                    </p>
+                  </div>
+
+                  {/* Warning 2 */}
+                  <div className="space-y-1">
+                    <strong className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5 font-extrabold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      2. Endpoint URL ของ LIFF ต้องมีสแลช "/tenant-register" เสมอ
+                    </strong>
+                    <p className="pl-3 leading-relaxed">
+                      ตรวจสอบว่าในช่อง Endpoint URL ตอนลงทะเบียน LIFF มีค่าต่อท้ายครบถ้วน ไม่เป็นเพียงชื่อโดเมนเปล่า ๆ มิฉะนั้นผู้เช่าที่กดลิงก์มาจะหาข้อมูลห้องพักไม่เจอและจะขึ้นแจ้งเตือน <strong className="text-rose-500 font-bold">"ไม่ระบุข้อมูลห้องพัก"</strong> ป้องกันการยืนยันข้อมูล
+                    </p>
+                  </div>
+
+                  {/* Warning 3 */}
+                  <div className="space-y-1">
+                    <strong className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5 font-extrabold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      3. วิธีส่งต่อลิงก์ลงทะเบียนที่ถูกต้อง
+                    </strong>
+                    <p className="pl-3 leading-relaxed">
+                      เมื่อแอดมินคลิกปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"เจนลิงก์ LINE"</strong> ให้ทำการกดปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"คัดลอกลิงก์"</strong> แล้วส่งให้ผู้เช่าตรง ๆ ทางแชททันที <strong className="text-rose-500 font-bold">ห้ามแอดมินกดเปิดลิงก์ทดสอบก่อนแล้วไปก๊อปปี้ URL บนเว็บเบราว์เซอร์ส่งให้ผู้เช่าเด็ดขาด</strong> เพราะข้อมูลตัวตนของหอพักและหมายเลขห้องพักจะสูญหายทันที
+                    </p>
+                  </div>
+
+                </div>
               </div>
 
             </div>
