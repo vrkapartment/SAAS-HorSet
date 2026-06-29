@@ -181,13 +181,23 @@ export default function SlipVerificationModal({
             {/* ปุ่มกดอนุมัติ/ปฏิเสธ */}
             <div className="space-y-2 pt-4 md:pt-6">
               <button
-                onClick={() => selectedBill.billId && onApprove(selectedBill.billId)}
+                onClick={() => {
+                  if (selectedBill.billId) {
+                    onApprove(selectedBill.billId)
+                    onClose()
+                  }
+                }}
                 className="w-full h-11 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg shadow-teal-600/10 transition-all hover:-translate-y-0.5 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4" /> อนุมัติยอดและปิดบัญชีบิล
               </button>
               <button
-                onClick={() => selectedBill.billId && onReject(selectedBill.billId)}
+                onClick={() => {
+                  if (selectedBill.billId) {
+                    onReject(selectedBill.billId)
+                    onClose()
+                  }
+                }}
                 className={`w-full h-11 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                   isDark 
                     ? "bg-rose-950/20 hover:bg-rose-600 text-rose-400 hover:text-white border-rose-900/40 hover:border-rose-600" 
