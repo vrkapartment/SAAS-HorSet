@@ -419,7 +419,7 @@ export interface AppNotification {
   roomNumber?: string
 }
 
-export async function getNotificationsAction() {
+export async function getNotificationsAction(selectedWorkspaceId?: string) {
   try {
     const supabase = await createClient()
     
@@ -429,18 +429,22 @@ export async function getNotificationsAction() {
       return { success: false, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
     }
 
-    // 2. Get current profile to identify workspace
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("workspace_id")
-      .eq("id", user.id)
-      .maybeSingle()
+    let workspaceId = selectedWorkspaceId
 
-    if (profileError || !profile || !profile.workspace_id) {
-      return { success: false, error: "ไม่พบรหัสหอพักของผู้ใช้งาน" }
+    if (!workspaceId) {
+      // 2. Get current profile to identify workspace as a fallback
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("workspace_id")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (profileError || !profile || !profile.workspace_id) {
+        return { success: false, error: "ไม่พบรหัสหอพักของผู้ใช้งาน" }
+      }
+      workspaceId = profile.workspace_id
     }
 
-    const workspaceId = profile.workspace_id
     const notifications: AppNotification[] = []
 
     // 2. Query Bills pending verification (Slips waiting)

@@ -224,7 +224,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "billing" | "system">("all")
 
-  const fetchNotifications = async (silent = false) => {
+  const fetchNotifications = async (silent = false, workspaceId?: string) => {
     if (isDemo) {
       setNotifications([
         {
@@ -259,7 +259,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
     if (!silent) setNotificationsLoading(true)
     try {
-      const res = await getNotificationsAction()
+      const targetWorkspaceId = workspaceId || currentWorkspace?.id || undefined
+      const res = await getNotificationsAction(targetWorkspaceId)
       if (res.success && res.data) {
         setNotifications(res.data)
       }
@@ -284,7 +285,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
   }, [])
 
-  // โหลดรายการที่ละเว้นและเปิดระบบอัปเดตแจ้งเตือนเรียลไทม์ (Polling ทุก 15 วิ + Focus Sync) เมื่อเปลี่ยน Workspace
+  // โหลดรายการที่ละเว้นและเปิดระบบอัปเดตแจ้งเตือนเรียลไทม์ (Polling ทุก 15 วิ + Focus Sync + Supabase Realtime Channels) เมื่อเปลี่ยน Workspace
   useEffect(() => {
     if (typeof window !== "undefined" && currentWorkspace.id) {
       const savedDismissed = localStorage.getItem(`horset_dismissed_notifications_${currentWorkspace.id}`)
@@ -299,22 +300,70 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       }
 
       // ดึงข้อมูลแจ้งเตือนทันที
-      fetchNotifications(false)
+      fetchNotifications(false, currentWorkspace.id)
 
       // ตั้งเวลา Polling ดึงข้อมูลใหม่ทุกๆ 15 วินาทีเพื่ออัปเดตแจ้งเตือนทันทีโดยไม่ต้องกดรีเฟรช (ทำงานเงียบๆ ในพื้นหลัง)
       const intervalId = setInterval(() => {
-        fetchNotifications(true)
+        fetchNotifications(true, currentWorkspace.id)
       }, 15000)
 
       // ดึงข้อมูลทันทีเมื่อเปิดแท็บหรือหน้าจอเบราว์เซอร์กลับมาโฟกัสอีกครั้ง (ทำงานเงียบๆ ในพื้นหลัง)
       const handleWindowFocus = () => {
-        fetchNotifications(true)
+        fetchNotifications(true, currentWorkspace.id)
       }
       window.addEventListener("focus", handleWindowFocus)
+
+      // เชื่อมต่อการแจ้งเตือน Real-time ด้วย Supabase Realtime Channels
+      const supabase = createClient()
+      const channel = supabase
+        .channel(`realtime_notifications_${currentWorkspace.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "bills",
+            filter: `workspace_id=eq.${currentWorkspace.id}`
+          },
+          (payload) => {
+            console.log("Real-time notification: bills table changed.", payload)
+            fetchNotifications(true, currentWorkspace.id)
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "workspace_line_settings",
+            filter: `workspace_id=eq.${currentWorkspace.id}`
+          },
+          (payload) => {
+            console.log("Real-time notification: workspace_line_settings table changed.", payload)
+            fetchNotifications(true, currentWorkspace.id)
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "tenants",
+            filter: `workspace_id=eq.${currentWorkspace.id}`
+          },
+          (payload) => {
+            console.log("Real-time notification: tenants table changed.", payload)
+            fetchNotifications(true, currentWorkspace.id)
+          }
+        )
+        .subscribe((status) => {
+          console.log(`Real-time subscription status for workspace ${currentWorkspace.id}:`, status)
+        })
 
       return () => {
         clearInterval(intervalId)
         window.removeEventListener("focus", handleWindowFocus)
+        supabase.removeChannel(channel)
       }
     }
   }, [currentWorkspace.id])
@@ -1207,7 +1256,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-900/60 bg-slate-50/30 dark:bg-slate-900/10 flex justify-between items-center text-[9px] text-slate-400">
                     <span>อัปเดตเรียลไทม์</span>
                     <button
-                      onClick={() => fetchNotifications(false)}
+                      onClick={() => fetchNotifications(false, currentWorkspace?.id || undefined)}
                       className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer"
                     >
                       <RefreshCw className={`w-2.5 h-2.5 ${notificationsLoading ? "animate-spin" : ""}`} />
