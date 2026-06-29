@@ -423,10 +423,17 @@ export async function getNotificationsAction() {
   try {
     const supabase = await createClient()
     
-    // 1. Get current profile to identify workspace
+    // 1. Get current authenticated user to identify workspace
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
+    }
+
+    // 2. Get current profile to identify workspace
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("workspace_id")
+      .eq("id", user.id)
       .maybeSingle()
 
     if (profileError || !profile || !profile.workspace_id) {
