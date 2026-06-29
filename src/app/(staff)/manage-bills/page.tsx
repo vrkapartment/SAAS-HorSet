@@ -155,6 +155,8 @@ function ManageBillsContent() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const searchParams = useSearchParams()
+  const verifyBillId = searchParams.get("verify_bill_id")
+  const targetCycle = searchParams.get("cycle")
   const initialFilter = searchParams.get("filter")
   const [statusFilter, setStatusFilter] = useState<"all" | "unpaid" | "pending" | "paid">(
     initialFilter === "unpaid" || initialFilter === "pending" || initialFilter === "paid"
@@ -225,6 +227,26 @@ function ManageBillsContent() {
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
   const [createBillModalOpen, setCreateBillModalOpen] = useState(false)
+
+  // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ
+  useEffect(() => {
+    if (targetCycle && targetCycle !== billingCycle) {
+      setBillingCycle(targetCycle)
+    }
+  }, [targetCycle, billingCycle])
+
+  // เคลียร์/เปิดโมดอลสลิปตาม Query Parameter verify_bill_id อัตโนมัติ
+  useEffect(() => {
+    if (verifyBillId && unifiedItems.length > 0 && !loading) {
+      const targetItem = unifiedItems.find(item => item.billId === verifyBillId)
+      if (targetItem) {
+        setSelectedBill(targetItem)
+        setSlipModalOpen(true)
+      } else {
+        console.warn(`[Deep-Link] ไม่พบบิลที่มีรหัส ${verifyBillId} ในรอบบิล ${billingCycle}`)
+      }
+    }
+  }, [verifyBillId, unifiedItems, loading, billingCycle])
 
   // ข้อมูลสำหรับโมดอลสร้างบิลด้วยมือ (กรณีฉุกเฉิน)
   const [newRoomNumber, setNewRoomNumber] = useState("105")

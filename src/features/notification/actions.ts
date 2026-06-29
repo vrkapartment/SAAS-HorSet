@@ -457,7 +457,7 @@ export async function getNotificationsAction() {
           type: "slip",
           title: "มีสลิปโอนเงินใหม่",
           message: `ห้อง ${b.room_number} ได้อัปโหลดสลิปสำหรับรอบบิล ${b.billing_cycle} แล้ว กรุณาตรวจสอบความถูกต้อง`,
-          link: `/billing?verify_bill_id=${b.id}&cycle=${b.billing_cycle}`,
+          link: `/manage-bills?verify_bill_id=${b.id}&cycle=${b.billing_cycle}`,
           timestamp: b.created_at ? new Date(b.created_at).getTime() : Date.now(),
           roomNumber: b.room_number
         })
