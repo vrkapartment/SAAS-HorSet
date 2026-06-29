@@ -911,8 +911,16 @@ function ManageBillsContent() {
     setSelectedBill(null)
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href)
+      let urlChanged = false
       if (url.searchParams.has("verify_bill_id")) {
         url.searchParams.delete("verify_bill_id")
+        urlChanged = true
+      }
+      if (url.searchParams.has("cycle")) {
+        url.searchParams.delete("cycle")
+        urlChanged = true
+      }
+      if (urlChanged) {
         window.history.replaceState(null, "", url.pathname + url.search)
       }
     }
