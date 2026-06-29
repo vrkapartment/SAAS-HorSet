@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { generatePortalToken } from "@/features/tenant/actions"
+import { calculateLateDays } from "@/features/billing/utils"
 
 /**
  * ฟังก์ชันจำลองสำหรับระบบส่งข้อความแจ้งเตือนผ่าน LINE Messaging API (เก็บไว้เพื่อความเสถียรของระบบเก่า)
@@ -407,4 +408,151 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
     return { success: false, error: errorMessage }
   }
 }
+
+export interface AppNotification {
+  id: string
+  type: "slip" | "overdue" | "line_oa" | "lease"
+  title: string
+  message: string
+  link: string
+  timestamp: number
+  roomNumber?: string
+}
+
+export async function getNotificationsAction() {
+  try {
+    const supabase = await createClient()
+    
+    // 1. Get current profile to identify workspace
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("workspace_id")
+      .maybeSingle()
+
+    if (profileError || !profile || !profile.workspace_id) {
+      return { success: false, error: "ไม่พบรหัสหอพักของผู้ใช้งาน" }
+    }
+
+    const workspaceId = profile.workspace_id
+    const notifications: AppNotification[] = []
+
+    // 2. Query Bills pending verification (Slips waiting)
+    const { data: pendingBills, error: billsError } = await supabase
+      .from("bills")
+      .select("id, room_number, billing_cycle, slip_url, updated_at")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "pending")
+
+    if (!billsError && pendingBills) {
+      pendingBills.forEach((b: any) => {
+        notifications.push({
+          id: `slip_${b.id}`,
+          type: "slip",
+          title: "มีสลิปโอนเงินใหม่",
+          message: `ห้อง ${b.room_number} ได้อัปโหลดสลิปสำหรับรอบบิล ${b.billing_cycle} แล้ว กรุณาตรวจสอบความถูกต้อง`,
+          link: "/billing",
+          timestamp: b.updated_at ? new Date(b.updated_at).getTime() : Date.now(),
+          roomNumber: b.room_number
+        })
+      })
+    }
+
+    // 3. Query Overdue Unpaid Bills
+    const { data: unpaidBills, error: unpaidError } = await supabase
+      .from("bills")
+      .select("id, room_number, billing_cycle, updated_at")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "unpaid")
+
+    if (!unpaidError && unpaidBills) {
+      unpaidBills.forEach((b: any) => {
+        const lateDays = calculateLateDays(b.billing_cycle)
+        if (lateDays > 0) {
+          notifications.push({
+            id: `overdue_${b.id}`,
+            type: "overdue",
+            title: "บิลค้างชำระเกินกำหนด",
+            message: `ห้อง ${b.room_number} ค้างชำระค่าเช่ารอบ ${b.billing_cycle} เกินกำหนดส่งมาแล้ว ${lateDays} วัน`,
+            link: "/billing",
+            timestamp: b.updated_at ? new Date(b.updated_at).getTime() : Date.now(),
+            roomNumber: b.room_number
+          })
+        }
+      })
+    }
+
+    // 4. Query LINE OA Settings
+    const { data: lineSettings, error: lineError } = await supabase
+      .from("workspace_line_settings")
+      .select("channel_access_token")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    const isLineOADisconnected = !lineSettings || !lineSettings.channel_access_token || lineSettings.channel_access_token === "placeholder" || !lineSettings.channel_access_token.trim()
+
+    if (isLineOADisconnected) {
+      notifications.push({
+        id: "line_oa_disconnected",
+        type: "line_oa",
+        title: "การเชื่อมต่อ LINE OA ขัดข้อง",
+        message: "หอพักนี้ยังไม่ได้เชื่อมต่อหรือเปิดใช้งานโทเค็น LINE Messaging API กรุณาเข้าไปตั้งค่ารหัสสิทธิ์เพื่อให้ผู้เช่ารับข้อความบิลแจ้งเตือนได้",
+        link: "/settings",
+        timestamp: Date.now()
+      })
+    }
+
+    // 5. Query Lease Expiration (Check lease expiry action)
+    const { data: workspace, error: wsError } = await supabase
+      .from("workspaces")
+      .select("lease_expiry_action")
+      .eq("id", workspaceId)
+      .maybeSingle()
+
+    const leaseExpiryAction = workspace?.lease_expiry_action || "renew"
+
+    if (leaseExpiryAction !== "original") {
+      // Query tenants near lease end date (ends within next 60 days)
+      const { data: tenants, error: tenantsError } = await supabase
+        .from("tenants")
+        .select("id, name, room_number, lease_end")
+        .eq("workspace_id", workspaceId)
+        .not("lease_end", "is", null)
+
+      if (!tenantsError && tenants) {
+        const now = new Date()
+        now.setHours(0, 0, 0, 0)
+
+        tenants.forEach((t: any) => {
+          if (!t.lease_end) return
+
+          const leaseEnd = new Date(t.lease_end)
+          leaseEnd.setHours(0, 0, 0, 0)
+          
+          const diffTime = leaseEnd.getTime() - now.getTime()
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+          if (diffDays >= 0 && diffDays <= 60) {
+            notifications.push({
+              id: `lease_${t.id}`,
+              type: "lease",
+              title: "สัญญาเช่าใกล้หมดอายุ",
+              message: `ผู้เช่าคุณ ${t.name} (ห้อง ${t.room_number || "ไม่ระบุ"}) สัญญาเช่าจะหมดในวันที่ ${t.lease_end} (เหลืออีก ${diffDays} วัน)`,
+              link: "/rooms",
+              timestamp: Date.now() - (60 - diffDays) * 60000
+            })
+          }
+        })
+      }
+    }
+
+    // Sort notifications by timestamp descending (newest first)
+    notifications.sort((a, b) => b.timestamp - a.timestamp)
+
+    return { success: true, data: notifications }
+  } catch (error) {
+    console.error("getNotificationsAction Exception:", error)
+    return { success: false, error: "เกิดข้อผิดพลาดในการโหลดข้อมูลการแจ้งเตือน" }
+  }
+}
+
 

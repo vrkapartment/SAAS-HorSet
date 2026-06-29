@@ -29,7 +29,10 @@ import {
   ChevronDown,
   Coins,
   Scroll,
-  Settings
+  Settings,
+  CheckCheck,
+  Trash2,
+  AlertTriangle
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
@@ -47,6 +50,7 @@ import { getFinanceSettings } from "@/features/finance/actions"
 import { getBills } from "@/features/billing/actions"
 import { getExpenses } from "@/features/expenses/actions"
 import PullToRefresh from "./PullToRefresh"
+import { getNotificationsAction, type AppNotification } from "@/features/notification/actions"
 
 
 interface DashboardLayoutProps {
@@ -209,6 +213,163 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     handleDecideSupport,
     handleExitSupport
   } = useSupportAccess(currentWorkspace, userRole, isDemo)
+
+  // ==========================================
+  // ระบบการแจ้งเตือน (Notifications System)
+  // ==========================================
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [readNotifications, setReadNotifications] = useState<string[]>([])
+  const [dismissedIds, setDismissedIds] = useState<string[]>([])
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<"all" | "billing" | "system">("all")
+
+  const fetchNotifications = async () => {
+    if (isDemo) {
+      setNotifications([
+        {
+          id: "slip_demo_1",
+          type: "slip",
+          title: "มีสลิปโอนเงินใหม่",
+          message: "ห้อง 102 ได้อัปโหลดสลิปสำหรับรอบบิล 2026-06 แล้ว กรุณาตรวจสอบความถูกต้อง",
+          link: "/billing",
+          timestamp: Date.now() - 1000 * 60 * 15,
+          roomNumber: "102"
+        },
+        {
+          id: "overdue_demo_2",
+          type: "overdue",
+          title: "บิลค้างชำระเกินกำหนด",
+          message: "ห้อง 304 ค้างชำระค่าเช่ารอบ 2026-05 เกินกำหนดส่งมาแล้ว 24 วัน",
+          link: "/billing",
+          timestamp: Date.now() - 1000 * 60 * 60 * 3,
+          roomNumber: "304"
+        },
+        {
+          id: "line_oa_disconnected",
+          type: "line_oa",
+          title: "การเชื่อมต่อ LINE OA ขัดข้อง",
+          message: "หอพักนี้ยังไม่ได้เชื่อมต่อหรือเปิดใช้งานโทเค็น LINE Messaging API กรุณาเข้าไปตั้งค่ารหัสสิทธิ์เพื่อให้ผู้เช่ารับข้อความบิลแจ้งเตือนได้",
+          link: "/settings",
+          timestamp: Date.now() - 1000 * 60 * 60 * 24
+        }
+      ])
+      return
+    }
+
+    setNotificationsLoading(true)
+    try {
+      const res = await getNotificationsAction()
+      if (res.success && res.data) {
+        setNotifications(res.data)
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err)
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }
+
+  // โหลดรายการแจ้งเตือนที่อ่านแล้วจาก localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedRead = localStorage.getItem("horset_read_notifications")
+      if (savedRead) {
+        try {
+          setReadNotifications(JSON.parse(savedRead))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+  }, [])
+
+  // โหลดรายการที่ละเว้นและเรียกฟังก์ชันดึงข้อมูลเมื่อเปลี่ยน Workspace
+  useEffect(() => {
+    if (typeof window !== "undefined" && currentWorkspace.id) {
+      const savedDismissed = localStorage.getItem(`horset_dismissed_notifications_${currentWorkspace.id}`)
+      if (savedDismissed) {
+        try {
+          setDismissedIds(JSON.parse(savedDismissed))
+        } catch (e) {
+          console.error(e)
+        }
+      } else {
+        setDismissedIds([])
+      }
+      fetchNotifications()
+    }
+  }, [currentWorkspace.id])
+
+  // คลิกข้างนอกเพื่อปิดดรอปดาวน์แจ้งเตือน
+  useEffect(() => {
+    if (!isNotificationsOpen) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest("#notifications-wrapper")) {
+        setIsNotificationsOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isNotificationsOpen])
+
+  const markAsRead = (id: string) => {
+    const updated = [...readNotifications]
+    if (!updated.includes(id)) {
+      updated.push(id)
+      setReadNotifications(updated)
+      localStorage.setItem("horset_read_notifications", JSON.stringify(updated))
+    }
+  }
+
+  const markAllAsRead = () => {
+    const updated = [...readNotifications]
+    notifications.forEach(n => {
+      if (!updated.includes(n.id)) {
+        updated.push(n.id)
+      }
+    })
+    setReadNotifications(updated)
+    localStorage.setItem("horset_read_notifications", JSON.stringify(updated))
+  }
+
+  const dismissNotification = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updated = [...dismissedIds, id]
+    setDismissedIds(updated)
+    localStorage.setItem(`horset_dismissed_notifications_${currentWorkspace.id}`, JSON.stringify(updated))
+  }
+
+  const formatNotificationTime = (timestamp: number) => {
+    const diff = Date.now() - timestamp
+    if (diff < 60000) return "เมื่อสักครู่"
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins} นาทีที่แล้ว`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return `${days} วันที่แล้ว`
+    return new Date(timestamp).toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
+      year: "2-digit"
+    })
+  }
+
+  const activeNotifications = notifications.filter(n => !dismissedIds.includes(n.id))
+  const unreadCount = activeNotifications.filter(n => !readNotifications.includes(n.id)).length
+
+  const filteredNotifications = activeNotifications.filter(n => {
+    if (activeTab === "all") return true
+    if (activeTab === "billing") return n.type === "slip" || n.type === "overdue"
+    if (activeTab === "system") return n.type === "line_oa" || n.type === "lease"
+    return true
+  })
 
   // โหลดสิทธิ์, ข้อมูลผู้ใช้, รายการ Workspace และสิทธิ์การช่วยเหลือระบบทั้งหมดในรอบเดียวเพื่อความเสถียรและเร็วสูงสุด
   useEffect(() => {
@@ -858,10 +1019,186 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             <LanguageToggle />
             <ThemeToggle />
 
-            <button className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50 transition-colors">
-              <BellRing className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            </button>
+            {/* Notifications Dropdown */}
+            <div id="notifications-wrapper" className="relative">
+              <button
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50 transition-all duration-200 active:scale-95 cursor-pointer"
+                aria-label="การแจ้งเตือน"
+              >
+                <BellRing className={`w-4 h-4 ${unreadCount > 0 ? "animate-bounce" : ""}`} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse shadow-md shadow-red-500/20">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationsOpen && (
+                <div className="absolute right-0 mt-2 w-[340px] sm:w-[380px] max-h-[500px] overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl shadow-2xl z-50 transition-all duration-300 transform scale-100 origin-top-right flex flex-col">
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-900/80 bg-slate-50/50 dark:bg-slate-900/30">
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-bold text-xs text-slate-800 dark:text-slate-200">การแจ้งเตือน</h2>
+                      {unreadCount > 0 && (
+                        <span className="bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          ใหม่ {unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {activeNotifications.length > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="p-1 px-2 text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg flex items-center gap-1 transition-all font-semibold cursor-pointer"
+                          title="อ่านทั้งหมด"
+                        >
+                          <CheckCheck className="w-3 h-3" />
+                          <span>อ่านทั้งหมด</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsNotificationsOpen(false)}
+                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="flex gap-1 p-2 bg-slate-50/30 dark:bg-slate-900/10 border-b border-slate-100 dark:border-slate-900/60">
+                    {[
+                      { id: "all", label: "ทั้งหมด" },
+                      { id: "billing", label: "บิล/เงินโอน" },
+                      { id: "system", label: "ผู้เช่า/ระบบ" }
+                    ].map(tab => {
+                      const isActive = activeTab === tab.id
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id as any)}
+                          className={`flex-1 py-1 rounded-lg text-[11px] font-semibold transition-all duration-200 cursor-pointer ${
+                            isActive
+                              ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/10"
+                              : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-900/40"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Notification List */}
+                  <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-900/60 max-h-[300px]">
+                    {notificationsLoading ? (
+                      <div className="flex flex-col items-center justify-center py-10 gap-2">
+                        <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
+                        <span className="text-[11px] text-slate-500">กำลังโหลดการแจ้งเตือน...</span>
+                      </div>
+                    ) : filteredNotifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                        <div className="w-10 h-12 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-center mb-2.5">
+                          <BellRing className="w-4 h-4 text-slate-400" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">ไม่มีการแจ้งเตือนใหม่</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">เมื่อมีความเคลื่อนไหวของหอพัก ระบบจะแจ้งคุณที่นี่</p>
+                      </div>
+                    ) : (
+                      filteredNotifications.map(notification => {
+                        const isUnread = !readNotifications.includes(notification.id)
+                        
+                        let IconComponent = AlertCircle
+                        let iconColorClass = ""
+                        let bgColorClass = ""
+                        let borderLeftClass = ""
+
+                        if (notification.type === "slip") {
+                          IconComponent = Scroll
+                          iconColorClass = "text-emerald-500"
+                          bgColorClass = "bg-emerald-500/10 dark:bg-emerald-500/20"
+                          borderLeftClass = "border-l-4 border-l-emerald-500"
+                        } else if (notification.type === "overdue") {
+                          IconComponent = AlertTriangle
+                          iconColorClass = "text-rose-500"
+                          bgColorClass = "bg-rose-500/10 dark:bg-rose-500/20"
+                          borderLeftClass = "border-l-4 border-l-rose-500"
+                        } else if (notification.type === "line_oa") {
+                          IconComponent = Settings
+                          iconColorClass = "text-amber-500"
+                          bgColorClass = "bg-amber-500/10 dark:bg-amber-500/20"
+                          borderLeftClass = "border-l-4 border-l-amber-500"
+                        } else if (notification.type === "lease") {
+                          IconComponent = Users
+                          iconColorClass = "text-blue-500"
+                          bgColorClass = "bg-blue-500/10 dark:bg-blue-500/20"
+                          borderLeftClass = "border-l-4 border-l-blue-500"
+                        }
+
+                        return (
+                          <div
+                            key={notification.id}
+                            onClick={() => {
+                              markAsRead(notification.id)
+                              setIsNotificationsOpen(false)
+                              safeNavigate(notification.link)
+                            }}
+                            className={`flex gap-2.5 p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-all cursor-pointer relative group items-start ${borderLeftClass} ${
+                              isUnread ? "bg-indigo-50/20 dark:bg-indigo-500/5" : ""
+                            }`}
+                          >
+                            <div className={`p-1.5 rounded-lg shrink-0 ${bgColorClass} mt-0.5`}>
+                              <IconComponent className={`w-3.5 h-3.5 ${iconColorClass}`} />
+                            </div>
+                            
+                            <div className="flex-1 min-w-0 pr-4">
+                              <div className="flex items-baseline justify-between gap-1">
+                                <p className={`text-[11px] font-bold truncate ${isUnread ? "text-slate-800 dark:text-slate-200" : "text-slate-600 dark:text-slate-400"}`}>
+                                  {notification.title}
+                                </p>
+                                <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                                  {formatNotificationTime(notification.timestamp)}
+                                </span>
+                              </div>
+                              <p className={`text-[10px] mt-0.5 leading-normal ${isUnread ? "text-slate-600 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-400"}`}>
+                                {notification.message}
+                              </p>
+                            </div>
+
+                            {/* Unread indicator dot */}
+                            {isUnread && (
+                              <span className="absolute top-3.5 right-3 w-1.5 h-1.5 bg-indigo-600 rounded-full" />
+                            )}
+
+                            {/* Dismiss button on hover */}
+                            <button
+                              onClick={(e) => dismissNotification(notification.id, e)}
+                              className="absolute bottom-1 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 rounded transition-all duration-200 cursor-pointer"
+                              title="ละเว้นแจ้งเตือน"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                  
+                  {/* Footer */}
+                  <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-900/60 bg-slate-50/30 dark:bg-slate-900/10 flex justify-between items-center text-[9px] text-slate-400">
+                    <span>อัปเดตเรียลไทม์</span>
+                    <button
+                      onClick={fetchNotifications}
+                      className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${notificationsLoading ? "animate-spin" : ""}`} />
+                      โหลดใหม่
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             
             <div className="h-6 w-px bg-slate-200 dark:bg-slate-900" />
             
