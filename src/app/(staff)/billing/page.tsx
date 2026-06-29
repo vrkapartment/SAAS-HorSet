@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import {
@@ -141,7 +142,11 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
   return options
 }
 
-export default function UnifiedBillingPage() {
+function UnifiedBillingContent() {
+  const searchParams = useSearchParams()
+  const verifyBillId = searchParams.get("verify_bill_id")
+  const targetCycle = searchParams.get("cycle")
+
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -199,6 +204,26 @@ export default function UnifiedBillingPage() {
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
   const [createBillModalOpen, setCreateBillModalOpen] = useState(false)
+
+  // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ
+  useEffect(() => {
+    if (targetCycle && targetCycle !== billingCycle) {
+      setBillingCycle(targetCycle)
+    }
+  }, [targetCycle, billingCycle])
+
+  // เคลียร์/เปิดโมดอลสลิปตาม Query Parameter verify_bill_id อัตโนมัติ
+  useEffect(() => {
+    if (verifyBillId && unifiedItems.length > 0 && !loading) {
+      const targetItem = unifiedItems.find(item => item.billId === verifyBillId)
+      if (targetItem) {
+        setSelectedBill(targetItem)
+        setSlipModalOpen(true)
+      } else {
+        console.warn(`[Deep-Link] ไม่พบบิลที่มีรหัส ${verifyBillId} ในรอบบิล ${billingCycle}`)
+      }
+    }
+  }, [verifyBillId, unifiedItems, loading, billingCycle])
 
   // ข้อมูลสำหรับโมดอลสร้างบิลด้วยมือ (กรณีฉุกเฉิน)
   const [newRoomNumber, setNewRoomNumber] = useState("105")
@@ -2008,5 +2033,18 @@ export default function UnifiedBillingPage() {
         savingProgress={savingProgress}
       />
     </>
+  )
+}
+
+export default function UnifiedBillingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+        <span className="text-sm font-semibold text-slate-500">กำลังเปิดหน้าจดมิเตอร์และบิล...</span>
+      </div>
+    }>
+      <UnifiedBillingContent />
+    </Suspense>
   )
 }
