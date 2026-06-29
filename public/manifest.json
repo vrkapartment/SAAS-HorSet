@@ -2,7 +2,7 @@
   "name": "HorSet (หอเสร็จ) - บริหารหอพักครบวงจร",
   "short_name": "HorSet",
   "description": "SaaS บริหารจัดการหอพัก อพาร์ทเมนท์ จดมิเตอร์ ออกบิล แจ้งเตือนผ่าน LINE และคำนวณภาษี",
-  "start_url": "/",
+  "start_url": "https://saas-horset.vercel.app/dashboard",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0f172a",
