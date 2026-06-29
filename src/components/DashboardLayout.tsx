@@ -224,7 +224,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "billing" | "system">("all")
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (silent = false) => {
     if (isDemo) {
       setNotifications([
         {
@@ -257,7 +257,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       return
     }
 
-    setNotificationsLoading(true)
+    if (!silent) setNotificationsLoading(true)
     try {
       const res = await getNotificationsAction()
       if (res.success && res.data) {
@@ -266,7 +266,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     } catch (err) {
       console.error("Failed to fetch notifications:", err)
     } finally {
-      setNotificationsLoading(false)
+      if (!silent) setNotificationsLoading(false)
     }
   }
 
@@ -284,7 +284,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     }
   }, [])
 
-  // โหลดรายการที่ละเว้นและเรียกฟังก์ชันดึงข้อมูลเมื่อเปลี่ยน Workspace
+  // โหลดรายการที่ละเว้นและเปิดระบบอัปเดตแจ้งเตือนเรียลไทม์ (Polling ทุก 15 วิ + Focus Sync) เมื่อเปลี่ยน Workspace
   useEffect(() => {
     if (typeof window !== "undefined" && currentWorkspace.id) {
       const savedDismissed = localStorage.getItem(`horset_dismissed_notifications_${currentWorkspace.id}`)
@@ -297,7 +297,25 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       } else {
         setDismissedIds([])
       }
-      fetchNotifications()
+
+      // ดึงข้อมูลแจ้งเตือนทันที
+      fetchNotifications(false)
+
+      // ตั้งเวลา Polling ดึงข้อมูลใหม่ทุกๆ 15 วินาทีเพื่ออัปเดตแจ้งเตือนทันทีโดยไม่ต้องกดรีเฟรช (ทำงานเงียบๆ ในพื้นหลัง)
+      const intervalId = setInterval(() => {
+        fetchNotifications(true)
+      }, 15000)
+
+      // ดึงข้อมูลทันทีเมื่อเปิดแท็บหรือหน้าจอเบราว์เซอร์กลับมาโฟกัสอีกครั้ง (ทำงานเงียบๆ ในพื้นหลัง)
+      const handleWindowFocus = () => {
+        fetchNotifications(true)
+      }
+      window.addEventListener("focus", handleWindowFocus)
+
+      return () => {
+        clearInterval(intervalId)
+        window.removeEventListener("focus", handleWindowFocus)
+      }
     }
   }, [currentWorkspace.id])
 
@@ -1035,7 +1053,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               </button>
 
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-[340px] sm:w-[380px] max-h-[500px] overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl shadow-2xl z-50 transition-all duration-300 transform scale-100 origin-top-right flex flex-col">
+                <div className="fixed inset-x-3 top-[68px] md:absolute md:inset-x-auto md:right-0 md:top-auto md:mt-2 w-auto md:w-[385px] max-h-[calc(100vh-100px)] md:max-h-[500px] overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl shadow-2xl z-50 transition-all duration-300 transform scale-100 origin-top-right flex flex-col">
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-900/80 bg-slate-50/50 dark:bg-slate-900/30">
                     <div className="flex items-center gap-2">
@@ -1091,7 +1109,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   </div>
 
                   {/* Notification List */}
-                  <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-900/60 max-h-[300px]">
+                  <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-900/60 custom-scrollbar">
                     {notificationsLoading ? (
                       <div className="flex flex-col items-center justify-center py-10 gap-2">
                         <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
@@ -1189,7 +1207,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-900/60 bg-slate-50/30 dark:bg-slate-900/10 flex justify-between items-center text-[9px] text-slate-400">
                     <span>อัปเดตเรียลไทม์</span>
                     <button
-                      onClick={fetchNotifications}
+                      onClick={() => fetchNotifications(false)}
                       className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer"
                     >
                       <RefreshCw className={`w-2.5 h-2.5 ${notificationsLoading ? "animate-spin" : ""}`} />
