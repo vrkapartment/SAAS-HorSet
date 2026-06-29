@@ -40,6 +40,9 @@ export const metadata: Metadata = {
   title: "HorSet (หอเสร็จ) - ระบบบริหารจัดการหอพักครบวงจร",
   description: "SaaS บริหารจัดการหอพัก อพาร์ทเมนท์ จดมิเตอร์ ออกบิล แจ้งเตือนผ่าน LINE และคำนวณภาษี ภ.ง.ด. 90/94",
   manifest: "/manifest.json",
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -66,6 +69,9 @@ export default function RootLayout({
       className={`${promptFont.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body className="min-h-full flex flex-col font-sans antialiased">
         <ThemeProvider>
           <LanguageProvider>
