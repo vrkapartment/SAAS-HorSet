@@ -906,6 +906,18 @@ function ManageBillsContent() {
     }
   }
 
+  const closeSlipModal = () => {
+    setSlipModalOpen(false)
+    setSelectedBill(null)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has("verify_bill_id")) {
+        url.searchParams.delete("verify_bill_id")
+        window.history.replaceState(null, "", url.pathname + url.search)
+      }
+    }
+  }
+
   const handleApproveSlip = async (id: string) => {
     if (!userPermissions.manage_bills_edit) {
       showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
@@ -920,8 +932,7 @@ function ManageBillsContent() {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
     }
-    setSlipModalOpen(false)
-    setSelectedBill(null)
+    closeSlipModal()
   }
 
   const handleRejectSlip = async (id: string) => {
@@ -938,8 +949,7 @@ function ManageBillsContent() {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
     }
-    setSlipModalOpen(false)
-    setSelectedBill(null)
+    closeSlipModal()
   }
 
   const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
@@ -1687,10 +1697,7 @@ function ManageBillsContent() {
         slipModalOpen={slipModalOpen}
         selectedBill={selectedBill}
         billingCycle={billingCycle}
-        onClose={() => {
-          setSlipModalOpen(false)
-          setSelectedBill(null)
-        }}
+        onClose={closeSlipModal}
         onApprove={handleApproveSlip}
         onReject={handleRejectSlip}
       />

@@ -920,6 +920,18 @@ function UnifiedBillingContent() {
     }
   }
 
+  const closeSlipModal = () => {
+    setSlipModalOpen(false)
+    setSelectedBill(null)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has("verify_bill_id")) {
+        url.searchParams.delete("verify_bill_id")
+        window.history.replaceState(null, "", url.pathname + url.search)
+      }
+    }
+  }
+
   // อนุมัติสลิปโอนเงิน
   const handleApproveSlip = async (id: string) => {
     if (currentUserRole === "staff") {
@@ -935,8 +947,7 @@ function UnifiedBillingContent() {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
     }
-    setSlipModalOpen(false)
-    setSelectedBill(null)
+    closeSlipModal()
   }
 
   // ปฏิเสธสลิปโอนเงิน
@@ -954,8 +965,7 @@ function UnifiedBillingContent() {
       alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
       return
     }
-    setSlipModalOpen(false)
-    setSelectedBill(null)
+    closeSlipModal()
   }
 
   // เปลี่ยนสถานะเป็นชำระเงินแล้วโดยตรง (สำหรับกรณีแอดมินรับเงินสด/โอนตรง)
@@ -2003,10 +2013,7 @@ function UnifiedBillingContent() {
         slipModalOpen={slipModalOpen}
         selectedBill={selectedBill}
         billingCycle={billingCycle}
-        onClose={() => {
-          setSlipModalOpen(false)
-          setSelectedBill(null)
-        }}
+        onClose={closeSlipModal}
         onApprove={handleApproveSlip}
         onReject={handleRejectSlip}
       />
