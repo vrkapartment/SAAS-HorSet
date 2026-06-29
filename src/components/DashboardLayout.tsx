@@ -971,7 +971,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden touch-pan-y overscroll-x-none">
         
         {/* Header แถบด้านบน */}
-        <header className="flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-200/80 dark:border-slate-900/60 shrink-0">
+        <header className="relative z-30 flex items-center justify-between px-3 py-3 md:px-6 md:py-4 glass-panel border-b border-slate-200/80 dark:border-slate-900/60 shrink-0">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => {
