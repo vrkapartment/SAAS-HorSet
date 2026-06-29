@@ -439,7 +439,7 @@ export async function getNotificationsAction() {
     // 2. Query Bills pending verification (Slips waiting)
     const { data: pendingBills, error: billsError } = await supabase
       .from("bills")
-      .select("id, room_number, billing_cycle, slip_url, updated_at")
+      .select("id, room_number, billing_cycle, slip_url, created_at")
       .eq("workspace_id", workspaceId)
       .eq("status", "pending")
 
@@ -451,7 +451,7 @@ export async function getNotificationsAction() {
           title: "มีสลิปโอนเงินใหม่",
           message: `ห้อง ${b.room_number} ได้อัปโหลดสลิปสำหรับรอบบิล ${b.billing_cycle} แล้ว กรุณาตรวจสอบความถูกต้อง`,
           link: "/billing",
-          timestamp: b.updated_at ? new Date(b.updated_at).getTime() : Date.now(),
+          timestamp: b.created_at ? new Date(b.created_at).getTime() : Date.now(),
           roomNumber: b.room_number
         })
       })
@@ -460,7 +460,7 @@ export async function getNotificationsAction() {
     // 3. Query Overdue Unpaid Bills
     const { data: unpaidBills, error: unpaidError } = await supabase
       .from("bills")
-      .select("id, room_number, billing_cycle, updated_at")
+      .select("id, room_number, billing_cycle, created_at")
       .eq("workspace_id", workspaceId)
       .eq("status", "unpaid")
 
@@ -474,7 +474,7 @@ export async function getNotificationsAction() {
             title: "บิลค้างชำระเกินกำหนด",
             message: `ห้อง ${b.room_number} ค้างชำระค่าเช่ารอบ ${b.billing_cycle} เกินกำหนดส่งมาแล้ว ${lateDays} วัน`,
             link: "/billing",
-            timestamp: b.updated_at ? new Date(b.updated_at).getTime() : Date.now(),
+            timestamp: b.created_at ? new Date(b.created_at).getTime() : Date.now(),
             roomNumber: b.room_number
           })
         }
