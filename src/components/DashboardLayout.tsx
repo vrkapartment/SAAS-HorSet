@@ -1145,7 +1145,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                         <button
                           key={tab.id}
                           onClick={() => setActiveTab(tab.id as any)}
-                          className={`flex-1 py-1 rounded-lg text-[11px] font-semibold transition-all duration-200 cursor-pointer ${
+                          className={`flex-1 py-1 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
                             isActive
                               ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/10"
                               : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-900/40"
@@ -1162,7 +1162,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     {notificationsLoading ? (
                       <div className="flex flex-col items-center justify-center py-10 gap-2">
                         <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
-                        <span className="text-[11px] text-slate-500">กำลังโหลดการแจ้งเตือน...</span>
+                        <span className="text-xs text-slate-500">กำลังโหลดการแจ้งเตือน...</span>
                       </div>
                     ) : filteredNotifications.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
@@ -1170,7 +1170,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                           <BellRing className="w-4 h-4 text-slate-400" />
                         </div>
                         <p className="text-xs font-bold text-slate-700 dark:text-slate-300">ไม่มีการแจ้งเตือนใหม่</p>
-                        <p className="text-[10px] text-slate-500 mt-0.5">เมื่อมีความเคลื่อนไหวของหอพัก ระบบจะแจ้งคุณที่นี่</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">เมื่อมีความเคลื่อนไหวของหอพัก ระบบจะแจ้งคุณที่นี่</p>
                       </div>
                     ) : (
                       filteredNotifications.map(notification => {
@@ -1221,14 +1221,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                             
                             <div className="flex-1 min-w-0 pr-4">
                               <div className="flex items-baseline justify-between gap-1">
-                                <p className={`text-[11px] font-bold truncate ${isUnread ? "text-slate-800 dark:text-slate-200" : "text-slate-600 dark:text-slate-400"}`}>
+                                <p className={`text-[13px] font-bold truncate ${isUnread ? "text-slate-800 dark:text-slate-200" : "text-slate-600 dark:text-slate-400"}`}>
                                   {notification.title}
                                 </p>
-                                <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                                <span className="text-[10px] text-slate-400 whitespace-nowrap">
                                   {formatNotificationTime(notification.timestamp)}
                                 </span>
                               </div>
-                              <p className={`text-[10px] mt-0.5 leading-normal ${isUnread ? "text-slate-600 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-400"}`}>
+                              <p className={`text-[12px] mt-0.5 leading-normal ${isUnread ? "text-slate-600 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-400"}`}>
                                 {notification.message}
                               </p>
                             </div>

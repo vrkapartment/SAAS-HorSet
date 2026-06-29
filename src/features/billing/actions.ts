@@ -313,14 +313,43 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
       }
     }
 
-    const { data, error } = await activeClient
-      .from("bills")
-      .update(updateData)
-      .eq("id", id)
-      .select()
+    // ลองอัปเดตฟิลด์ updated_at ไปด้วยเพื่อบันทึกเวลาอัปโหลดสลิปแบบ Real-time (ต้องรันสคริปต์ SQL Patch ก่อน)
+    // โดยใช้ระบบ Fallback หากเกิด error (เช่น ยังไม่มีคอลัมน์ updated_at ในตาราง) ให้ถอยไปอัปเดตปกติเพื่อไม่ให้ระบบสะดุด
+    let finalData = null;
+    try {
+      const updateDataWithTime = { ...updateData, updated_at: new Date().toISOString() };
+      const { data: dataWithTime, error: errorWithTime } = await activeClient
+        .from("bills")
+        .update(updateDataWithTime)
+        .eq("id", id)
+        .select();
 
-    if (error) throw error
-    return { success: true, data: data[0] }
+      if (!errorWithTime && dataWithTime && dataWithTime.length > 0) {
+        finalData = dataWithTime[0];
+      } else {
+        const { data: dataFallback, error: errorFallback } = await activeClient
+          .from("bills")
+          .update(updateData)
+          .eq("id", id)
+          .select();
+        if (errorFallback) throw errorFallback;
+        if (dataFallback && dataFallback.length > 0) {
+          finalData = dataFallback[0];
+        }
+      }
+    } catch (e) {
+      const { data: dataFallback, error: errorFallback } = await activeClient
+        .from("bills")
+        .update(updateData)
+        .eq("id", id)
+        .select();
+      if (errorFallback) throw errorFallback;
+      if (dataFallback && dataFallback.length > 0) {
+        finalData = dataFallback[0];
+      }
+    }
+
+    return { success: true, data: finalData }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล"
     return { success: false, error: errorMessage }

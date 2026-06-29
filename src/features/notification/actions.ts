@@ -448,21 +448,41 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
     const notifications: AppNotification[] = []
 
     // 2. Query Bills pending verification (Slips waiting)
-    const { data: pendingBills, error: billsError } = await supabase
+    // ใช้ Try-Catch / Fallback เผื่อไว้กรณีผู้ใช้ยังไม่ได้รัน SQL Patch เพิ่มคอลัมน์ updated_at
+    let pendingBillsResult = await supabase
       .from("bills")
-      .select("id, room_number, billing_cycle, slip_url, created_at")
+      .select("id, room_number, billing_cycle, slip_url, created_at, updated_at")
       .eq("workspace_id", workspaceId)
       .eq("status", "pending")
 
+    let pendingBills: any[] | null = pendingBillsResult.data
+    let billsError = pendingBillsResult.error
+
+    if (billsError) {
+      // Fallback: ถ้าหากดึง updated_at แล้ว error (เช่น ตารางยังไม่มีคอลัมน์นี้) ให้ดึงเฉพาะฟิลด์มาตรฐานเดิม
+      const fallbackResult = await supabase
+        .from("bills")
+        .select("id, room_number, billing_cycle, slip_url, created_at")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "pending")
+      pendingBills = fallbackResult.data as any[] | null
+      billsError = fallbackResult.error
+    }
+
     if (!billsError && pendingBills) {
       pendingBills.forEach((b: any) => {
+        // หากมี updated_at (เวลาผู้เช่าอัปโหลดสลิปเข้ามาล่าสุด) ให้ใช้เป็นลำดับแรกเพื่อให้เป็นแบบ Real-Time ตรงกับการโอนจริง
+        const timestamp = b.updated_at 
+          ? new Date(b.updated_at).getTime() 
+          : (b.created_at ? new Date(b.created_at).getTime() : Date.now())
+
         notifications.push({
           id: `slip_${b.id}`,
           type: "slip",
           title: "มีสลิปโอนเงินใหม่",
           message: `ห้อง ${b.room_number} ได้อัปโหลดสลิปสำหรับรอบบิล ${b.billing_cycle} แล้ว กรุณาตรวจสอบความถูกต้อง`,
           link: `/manage-bills?verify_bill_id=${b.id}&cycle=${b.billing_cycle}`,
-          timestamp: b.created_at ? new Date(b.created_at).getTime() : Date.now(),
+          timestamp: timestamp,
           roomNumber: b.room_number
         })
       })
