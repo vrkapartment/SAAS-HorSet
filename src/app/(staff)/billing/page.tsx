@@ -308,8 +308,8 @@ function UnifiedBillingContent() {
     return true
   }
 
-  const loadData = async (cycle = billingCycle, forceRefresh = false) => {
-    setLoading(true)
+  const loadData = async (cycle = billingCycle, forceRefresh = false, silent = false) => {
+    if (!silent) setLoading(true)
     
     try {
       // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
@@ -548,13 +548,25 @@ function UnifiedBillingContent() {
     } catch (err) {
       console.error("Failed to load billing unified items with cache:", err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
     loadData(billingCycle)
   }, [billingCycle])
+
+  useEffect(() => {
+    // Poll billing data every 8 seconds to automatically update when tenants upload slips
+    const interval = setInterval(() => {
+      const hasUnsaved = unifiedItems.some(item => item.isEdited)
+      if (!hasUnsaved && !slipModalOpen && !createBillModalOpen) {
+        loadData(billingCycle, true, true) // forceRefresh=true, silent=true
+      }
+    }, 8000)
+
+    return () => clearInterval(interval)
+  }, [billingCycle, unifiedItems, slipModalOpen, createBillModalOpen])
 
   useEffect(() => {
     const hasUnsaved = unifiedItems.some(item => item.isEdited)
