@@ -41,9 +41,9 @@ export const metadata: Metadata = {
   description: "SaaS บริหารจัดการหอพัก อพาร์ทเมนท์ จดมิเตอร์ ออกบิล แจ้งเตือนผ่าน LINE และคำนวณภาษี ภ.ง.ด. 90/94",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon-192x192.png",
-    shortcut: "/icon-192x192.png",
-    apple: "/apple-touch-icon.png",
+    icon: "/icon-192x192.png?v=3",
+    shortcut: "/icon-192x192.png?v=3",
+    apple: "/apple-touch-icon.png?v=3",
   },
   appleWebApp: {
     capable: true,
@@ -72,9 +72,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="icon" href="/icon-192x192.png" />
-        <link rel="shortcut icon" href="/icon-192x192.png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="icon" href="/icon-192x192.png?v=3" />
+        <link rel="shortcut icon" href="/icon-192x192.png?v=3" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
       </head>
       <body className="min-h-full flex flex-col font-sans antialiased">
         <ThemeProvider>
