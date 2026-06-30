@@ -2,6 +2,7 @@
 
 import React from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Building, ChevronDown, Check, RefreshCw, AlertCircle, LogOut, User, X } from "lucide-react"
 
 interface Workspace {
@@ -193,6 +194,34 @@ export default function Sidebar({
             filteredMenu.map((item) => {
               const Icon = item.icon
               const isActive = item.path !== "#profile" && pathname === item.path
+              const isLink = !item.onClick && !item.path.startsWith("#")
+
+              if (isLink) {
+                return (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    onClick={(e) => {
+                      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
+                        return
+                      }
+                      e.preventDefault()
+                      safeNavigate(item.path)
+                    }}
+                    onMouseEnter={() => handlePrefetchPage(item.path)}
+                    onTouchStart={() => handlePrefetchPage(item.path)}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-left cursor-pointer min-w-0 ${
+                      isActive
+                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-600 dark:to-indigo-500 text-white shadow-lg shadow-blue-500/20 translate-x-1.5 scale-[1.01]"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-900/40 hover:text-blue-600 dark:hover:text-blue-400 hover:translate-x-1.5"
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 transition-transform duration-300 shrink-0 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
+                    <span className="flex-1 [word-break:keep-all]">{item.name}</span>
+                  </Link>
+                )
+              }
+
               return (
                 <button
                   key={item.path}
@@ -376,6 +405,35 @@ export default function Sidebar({
                 filteredMenu.map((item) => {
                   const Icon = item.icon
                   const isActive = item.path !== "#profile" && pathname === item.path
+                  const isLink = !item.onClick && !item.path.startsWith("#")
+
+                  if (isLink) {
+                    return (
+                      <Link
+                        key={item.path}
+                        href={item.path}
+                        onClick={(e) => {
+                          if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
+                            return
+                          }
+                          e.preventDefault()
+                          safeNavigate(item.path)
+                          setMobileOpen(false)
+                        }}
+                        onMouseEnter={() => handlePrefetchPage(item.path)}
+                        onTouchStart={() => handlePrefetchPage(item.path)}
+                        className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-left cursor-pointer min-w-0 ${
+                          isActive
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-600 dark:to-indigo-500 text-white shadow-lg shadow-blue-500/20 translate-x-1.5 scale-[1.01]"
+                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-900/40 hover:text-blue-600 dark:hover:text-blue-400 hover:translate-x-1.5"
+                        }`}
+                      >
+                        <Icon className={`w-4 h-4 transition-transform duration-300 shrink-0 ${isActive ? "text-white scale-110" : "text-slate-500 dark:text-slate-400"}`} />
+                        <span className="flex-1 [word-break:keep-all]">{item.name}</span>
+                      </Link>
+                    )
+                  }
+
                   return (
                     <button
                       key={item.path}
