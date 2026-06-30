@@ -1552,27 +1552,30 @@ function ManageBillsContent() {
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+        <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 w-full md:w-auto">
           {/* ปุ่มดาวน์โหลด PDF บิลรวมทุกห้อง */}
           {userPermissions.billing_download_pdf && (
             <button
               onClick={handleDownloadAllBillsPdf}
               disabled={downloadingAllPdf}
-              className={`h-11 px-5 rounded-xl flex items-center justify-center gap-2 text-sm font-extrabold transition-all shadow-md active:scale-95 cursor-pointer ${
+              className={`h-11 px-3 sm:px-5 rounded-xl flex items-center justify-center gap-2 text-xs sm:text-sm font-extrabold transition-all shadow-md active:scale-95 cursor-pointer ${
                 downloadingAllPdf
                   ? "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
-                  : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/20"
+                  : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-50 hover:to-indigo-500 shadow-blue-500/20"
               }`}
             >
               {downloadingAllPdf ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>กำลังบีบอัด ZIP...</span>
+                  <span className="truncate">บีบอัด ZIP...</span>
                 </>
               ) : (
                 <>
-                  <Download className="w-4 h-4" />
-                  <span>ดาวน์โหลด PDF ทั้งหมด (.ZIP)</span>
+                  <Download className="w-4 h-4 shrink-0" />
+                  <span className="truncate">
+                    <span className="hidden sm:inline">ดาวน์โหลด PDF ทั้งหมด (.ZIP)</span>
+                    <span className="inline sm:hidden">ดาวน์โหลด PDF</span>
+                  </span>
                 </>
               )}
             </button>
@@ -1589,17 +1592,20 @@ function ManageBillsContent() {
                 }
                 setCreateBillModalOpen(true)
               }}
-              className="h-11 px-5 rounded-xl bg-slate-850 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 border border-slate-700/30 dark:border-slate-300 shadow-md text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              className="h-11 px-3 sm:px-5 rounded-xl bg-slate-850 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 border border-slate-700/30 dark:border-slate-300 shadow-md text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
-              <Plus className="w-4 h-4" />
-              <span>สร้างบิลด้วยตนเอง</span>
+              <Plus className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                <span className="hidden sm:inline">สร้างบิลด้วยตนเอง</span>
+                <span className="inline sm:hidden">สร้างบิลพิเศษ</span>
+              </span>
             </button>
           )}
 
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className={`w-full md:w-auto h-11 px-4 border rounded-xl focus:outline-none focus:border-blue-500 text-sm font-bold transition-all cursor-pointer ${
-              isDark ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
+            className={`col-span-2 w-full md:w-auto h-11 px-4 border rounded-xl focus:outline-none focus:border-blue-500 text-sm font-bold transition-all cursor-pointer ${
+              isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-850" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-50"
             }`}
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
