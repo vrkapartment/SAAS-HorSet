@@ -1093,8 +1093,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50 transition-all duration-200 active:scale-95 cursor-pointer"
                 aria-label="การแจ้งเตือน"
               >
-                <BellRing className={`w-4 h-4 ${unreadCount > 0 ? "animate-bounce" : ""}`} />
-                {unreadCount > 0 && (
+                <BellRing className={`w-4 h-4 ${mounted && unreadCount > 0 ? "animate-bounce" : ""}`} />
+                {mounted && unreadCount > 0 && (
                   <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse shadow-md shadow-red-500/20">
                     {unreadCount}
                   </span>

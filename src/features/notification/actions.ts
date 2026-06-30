@@ -477,7 +477,7 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
           : (b.created_at ? new Date(b.created_at).getTime() : Date.now())
 
         notifications.push({
-          id: `slip_${b.id}`,
+          id: `slip_${b.id}_${timestamp}`,
           type: "slip",
           title: "มีสลิปโอนเงินใหม่",
           message: `ห้อง ${b.room_number} ได้อัปโหลดสลิปสำหรับรอบบิล ${b.billing_cycle} แล้ว กรุณาตรวจสอบความถูกต้อง`,
