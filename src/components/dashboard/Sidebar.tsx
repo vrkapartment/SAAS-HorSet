@@ -81,14 +81,13 @@ export default function Sidebar({
           }}
         >
         <div className="flex items-center gap-3 mb-8 px-1 min-w-0">
-          <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-md shadow-blue-500/20 animate-pulse-subtle shrink-0">
-            <Building className="w-5 h-5 text-white" />
+          <div className="p-1 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-800/50 shrink-0">
+            <img src="/icon-192x192.png" className="w-8 h-8 object-contain" alt="HorSet Logo" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
+            <h2 className="text-xl md:text-2xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
               {t("common.app_name") || "HorSet หอเสร็จ"}
             </h2>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-wide truncate whitespace-nowrap">{t("dashboard.system_subtitle")}</p>
           </div>
         </div>
 
@@ -266,11 +265,11 @@ export default function Sidebar({
           <aside className="relative flex flex-col w-64 glass-panel h-full p-6 animate-slide-right overflow-x-hidden">
             <div className="flex items-center justify-between mb-8 px-1 min-w-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg shadow-md shadow-blue-500/15 shrink-0">
-                  <Building className="w-4.5 h-4.5 text-white" />
+                <div className="p-1 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200/50 dark:border-slate-800/50 shrink-0">
+                  <img src="/icon-192x192.png" className="w-7 h-7 object-contain" alt="HorSet Logo" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-md font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
+                  <h2 className="text-lg md:text-xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
                     {t("common.app_name") || "HorSet หอเสร็จ"}
                   </h2>
                 </div>

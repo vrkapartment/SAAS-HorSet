@@ -32,6 +32,7 @@ import { getBills } from "@/features/billing/actions"
 import { getExpenses } from "@/features/expenses/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { createClient } from "@/lib/supabase/client"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -87,6 +88,9 @@ export default function AdminDashboard() {
 
   // Dynamic Welcome Name
   const [welcomeName, setWelcomeName] = useState<string>("")
+
+  // Dynamic Workspace Name
+  const [workspaceName, setWorkspaceName] = useState<string>("แสนสุข แมนชั่น")
 
   // Cache raw data client-side for dynamic billing cycle filtering without database refetches
   const [rawRooms, setRawRooms] = useState<any[]>([])
@@ -304,6 +308,42 @@ export default function AdminDashboard() {
         } else {
           const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
           wsId = cookieWsId || userProfile.workspace_id || ""
+        }
+
+        // ดึงข้อมูลชื่อ Workspace แบบไดนามิก
+        let wsName = "แสนสุข แมนชั่น"
+        if (wsId) {
+          const demoWorkspaces = [
+            { id: "d290f1ee-6c54-4b01-90e6-d701748f0851", name: "แสนสุข แมนชั่น" },
+            { id: "e390f1ee-6c54-4b01-90e6-d701748f0852", name: "ร่มรื่น เรสซิเดนท์" }
+          ]
+          const matchedDemo = demoWorkspaces.find(dw => dw.id === wsId)
+          if (matchedDemo) {
+            wsName = matchedDemo.name
+            setWorkspaceName(wsName)
+          } else {
+            let cachedWsName = getCachedData(wsId, "workspace_name")
+            if (cachedWsName) {
+              wsName = cachedWsName
+              setWorkspaceName(wsName)
+            } else {
+              try {
+                const supabase = createClient()
+                const { data: wsData, error: wsError } = await supabase
+                  .from("workspaces")
+                  .select("name")
+                  .eq("id", wsId)
+                  .maybeSingle()
+                if (!wsError && wsData && wsData.name) {
+                  wsName = wsData.name
+                  setWorkspaceName(wsName)
+                  setCachedData(wsId, "workspace_name", wsData.name)
+                }
+              } catch (e) {
+                console.error("Failed to fetch workspace name:", e)
+              }
+            }
+          }
         }
 
         const name = userProfile.full_name || userProfile.email || "ผู้ดูแลระบบ"
@@ -657,7 +697,7 @@ export default function AdminDashboard() {
             )}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            ข้อมูลสรุปและสถานะภาพรวมของหอพัก แสนสุข แมนชั่น ประจำวันนี้ ติดตามความเคลื่อนไหวได้แบบเรียลไทม์
+            ข้อมูลสรุปและสถานะภาพรวมของหอพัก {workspaceName} ประจำวันนี้ ติดตามความเคลื่อนไหวได้แบบเรียลไทม์
           </p>
         </div>
         
