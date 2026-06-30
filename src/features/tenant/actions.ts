@@ -1104,13 +1104,74 @@ export async function createTenantsBatch(
       }
     }
 
+    // ฟังก์ชันช่วยสกัดและแปลงฟอร์แมตวันที่แบบยืดหยุ่น (เช่น 29/12/2025, 29-12-2025 ให้เป็น YYYY-MM-DD)
+    const normalizeDate = (rawDate: string): string => {
+      if (!rawDate) {
+        return new Date().toISOString().split("T")[0]
+      }
+      
+      const clean = rawDate.trim()
+      // ถ้าเป็น YYYY-MM-DD อยู่แล้ว ให้ผ่านได้เลย
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+        return clean
+      }
+      
+      // ตัวแปรแยกด้วย / หรือ -
+      const parts = clean.split(/[\/\-]/)
+      if (parts.length === 3) {
+        let day = parts[0]
+        let month = parts[1]
+        let year = parts[2]
+        
+        // ถ้ารูปแบบเป็นปีขึ้นก่อน (e.g. YYYY/MM/DD) ให้สลับ
+        if (day.length === 4) {
+          year = parts[0]
+          month = parts[1]
+          day = parts[2]
+        }
+        
+        day = day.padStart(2, '0')
+        month = month.padStart(2, '0')
+        
+        let yearNum = parseInt(year, 10)
+        // กรณีผู้ใช้กรอกปีเป็น พ.ศ. (พุทธศักราช > 2400) ให้หักออก 543 เพื่อให้เป็น ค.ศ.
+        if (yearNum > 2400) {
+          yearNum -= 543
+        }
+        
+        let yearStr = String(yearNum)
+        if (yearStr.length === 2) {
+          yearStr = "20" + yearStr
+        }
+        
+        const formatted = `${yearStr}-${month}-${day}`
+        const d = new Date(formatted)
+        if (!isNaN(d.getTime())) {
+          return formatted
+        }
+      }
+      
+      try {
+        const d = new Date(clean)
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear()
+          const m = String(d.getMonth() + 1).padStart(2, '0')
+          const r = String(d.getDate()).padStart(2, '0')
+          return `${y}-${m}-${r}`
+        }
+      } catch {}
+      
+      return new Date().toISOString().split("T")[0]
+    }
+
     // 3. ตรวจสอบข้อมูลทีละบรรทัดอย่างละเอียด
     for (const tenant of tenants) {
       const lineNum = tenant.line_number
       const rawRoomNum = tenant.room_number?.toString()?.trim() || ""
       const rawName = tenant.tenant_name?.trim() || ""
       let rawPhone = tenant.phone?.toString()?.trim() || ""
-      const leaseStart = tenant.lease_start?.trim() || new Date().toISOString().split("T")[0]
+      const rawLeaseStart = tenant.lease_start?.trim() || ""
+      const leaseStart = normalizeDate(rawLeaseStart)
 
       // ถ้าเว้นว่างทั้งแถว ให้ข้ามไปได้
       if (!rawRoomNum && !rawName && !rawPhone) {
