@@ -9,6 +9,7 @@ import {
   Edit, 
   Trash2, 
   AlertCircle, 
+  HelpCircle,
   RefreshCw, 
   X, 
   Tag, 
@@ -1579,6 +1580,17 @@ function RoomsContent() {
                 <Download className="w-4 h-4 text-blue-500" />
                 <span className="hidden sm:inline">ดาวน์โหลด CSV Template</span>
                 <span className="sm:hidden">เทมเพลต</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsRoomTemplateGuideModalOpen(true)}
+                title="เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของห้องพัก"
+                className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
+              >
+                <HelpCircle className="w-4 h-4 text-indigo-500" />
+                <span className="hidden sm:inline">คู่มือการใช้ CSV</span>
+                <span className="sm:hidden">คู่มือ CSV</span>
               </button>
               
               {hasEditPermission && (
