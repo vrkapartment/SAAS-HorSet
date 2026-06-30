@@ -219,6 +219,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   // ==========================================
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [readNotifications, setReadNotifications] = useState<string[]>([])
+  const [readNotificationsLoaded, setReadNotificationsLoaded] = useState(false)
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [notificationsLoading, setNotificationsLoading] = useState(false)
@@ -282,12 +283,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           console.error(e)
         }
       }
+      setReadNotificationsLoaded(true)
     }
   }, [])
 
   // โหลดรายการที่ละเว้นและเปิดระบบอัปเดตแจ้งเตือนเรียลไทม์ (Polling ทุก 15 วิ + Focus Sync + Supabase Realtime Channels) เมื่อเปลี่ยน Workspace
   useEffect(() => {
-    if (typeof window !== "undefined" && currentWorkspace.id) {
+    if (typeof window !== "undefined" && currentWorkspace.id && !workspaceLoading) {
       const savedDismissed = localStorage.getItem(`horset_dismissed_notifications_${currentWorkspace.id}`)
       if (savedDismissed) {
         try {
@@ -366,7 +368,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         supabase.removeChannel(channel)
       }
     }
-  }, [currentWorkspace.id])
+  }, [currentWorkspace.id, workspaceLoading])
 
   // คลิกข้างนอกเพื่อปิดดรอปดาวน์แจ้งเตือน
   useEffect(() => {
@@ -429,7 +431,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   }
 
   const activeNotifications = notifications.filter(n => !dismissedIds.includes(n.id))
-  const unreadCount = activeNotifications.filter(n => !readNotifications.includes(n.id)).length
+  const unreadCount = readNotificationsLoaded
+    ? activeNotifications.filter(n => !readNotifications.includes(n.id)).length
+    : 0
 
   const filteredNotifications = activeNotifications.filter(n => {
     if (activeTab === "all") return true
