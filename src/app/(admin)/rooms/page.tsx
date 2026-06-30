@@ -3422,16 +3422,16 @@ function RoomsContent() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
               {/* Header */}
-              <div className="flex justify-between items-start border-b border-slate-100 dark:border-slate-850/60 pb-4">
+              <div className="flex justify-between items-start border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex gap-4 items-center">
                   <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl shrink-0 text-indigo-600 dark:text-indigo-400">
-                    <Sparkles className="w-7 h-7" />
+                    <Sparkles className="w-8 h-8" />
                   </div>
                   <div>
-                    <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                    <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                       💡 คำแนะนำในการกรอกไฟล์เทมเพลตห้องพัก
                     </h3>
-                    <p className="text-xs md:text-sm text-slate-500 dark:text-slate-455 mt-0.5 font-medium">
+                    <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 mt-1 font-semibold">
                       โปรดอ่านคำแนะนำนี้เพื่อนำเข้าข้อมูลห้องพักได้อย่างราบรื่นและถูกต้องครับ
                     </p>
                   </div>
@@ -3440,53 +3440,53 @@ function RoomsContent() {
                   onClick={() => setIsRoomTemplateGuideModalOpen(false)}
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-650 dark:hover:text-white transition-all cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-6 h-6" />
                 </button>
               </div>
 
               {/* Content List */}
               <div className="flex-1 overflow-y-auto pr-1 space-y-5 py-2">
                 {/* Item 1 */}
-                <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
                   <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
-                    <CheckCircle2 className="w-5 h-5" />
+                    <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-150">
+                  <div className="space-y-1.5">
+                    <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
                       ชื่อประเภทห้องพัก (สะกดให้ตรงกับชื่อในระบบ)
                     </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                      คอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded-md">room_type_name</span> จะต้องสะกดตรงกับชื่อประเภทห้องพักที่มีในระบบ (เช่น <span className="font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md">{roomTypes[0]?.name || "แอร์"}</span>) เพื่อระบบจะได้ดึงข้อมูลค่าเช่ารายเดือนและเงินประกันมาตั้งค่าเริ่มต้นให้ได้อย่างถูกต้อง
+                    <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
+                      คอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md">room_type_name</span> จะต้องสะกดตรงกับชื่อประเภทห้องพักที่มีในระบบ (เช่น <span className="font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">{roomTypes[0]?.name || "แอร์"}</span>) เพื่อระบบจะได้ดึงข้อมูลค่าเช่ารายเดือนและเงินประกันมาตั้งค่าเริ่มต้นให้ได้อย่างถูกต้อง
                     </p>
                   </div>
                 </div>
 
                 {/* Item 2 */}
-                <div className="flex gap-4 items-start bg-amber-50/50 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/40">
+                <div className="flex gap-4 items-start bg-amber-50/50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/40">
                   <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-xl text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
-                    <AlertTriangle className="w-5 h-5" />
+                    <AlertTriangle className="w-6 h-6" />
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-amber-850 dark:text-amber-300">
+                  <div className="space-y-1.5">
+                    <h4 className="text-lg md:text-xl font-black text-amber-900 dark:text-amber-300">
                       หากประเภทห้องพักสะกดไม่ถูกต้อง
                     </h4>
-                    <p className="text-xs text-amber-700 dark:text-amber-400/90 leading-relaxed font-semibold">
+                    <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
                       กรณีที่ชื่อประเภทห้องพักในไฟล์สะกดไม่ถูกต้อง สะกดผิด เว้นวรรคเกิน หรือไม่มีอยู่ในระบบ ระบบจะแสดงหน้าต่างนำทางแบบอินเตอร์แอคทีฟ (Interactive Mapping) ให้เลือกแก้ไขและจับคู่วันอัปโหลดได้ทันทีโดยไม่ต้องไปนั่งแก้ไฟล์ใหม่ครับ!
                     </p>
                   </div>
                 </div>
 
                 {/* Item 3 */}
-                <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
                   <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
-                    <CheckCircle2 className="w-5 h-5" />
+                    <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-150">
+                  <div className="space-y-1.5">
+                    <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
                       ชั้นวางห้องพัก (กำหนดเองหรือเว้นว่างไว้)
                     </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                      คอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded-md">floor</span> (ชั้น) สามารถกำหนดได้เอง หรือหากเว้นว่างไว้ ระบบจะช่วยคาดเดาและจัดตำแหน่งชั้นให้อัตโนมัติโดยอิงจากหลักสิบหรือหลักร้อยของเลขห้องพักให้ครับ
+                    <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
+                      คอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md">floor</span> (ชั้น) สามารถกำหนดได้เอง หรือหากเว้นว่างไว้ ระบบจะช่วยคาดเดาและจัดตำแหน่งชั้นให้อัตโนมัติโดยอิงจากหลักสิบหรือหลักร้อยของเลขห้องพักให้ครับ
                     </p>
                   </div>
                 </div>
@@ -3497,7 +3497,7 @@ function RoomsContent() {
                 <button
                   type="button"
                   onClick={() => setIsRoomTemplateGuideModalOpen(false)}
-                  className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-black rounded-2xl shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer"
+                  className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-base md:text-lg font-black rounded-2xl shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer"
                 >
                   รับทราบและเข้าใจคำแนะนำ
                 </button>
