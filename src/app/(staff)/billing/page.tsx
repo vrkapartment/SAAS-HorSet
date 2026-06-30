@@ -1399,8 +1399,8 @@ function UnifiedBillingContent() {
       const elecUnitsUsed = item.elecCurr !== "" ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
       const waterUnitsUsed = item.waterCurr !== "" ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
 
-      const elecCost = electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-      const waterCost = waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+      const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
+      const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
 
       const { sendLineBillNotificationAction } = await import("@/features/notification/actions")
       const result = await sendLineBillNotificationAction({
@@ -1777,13 +1777,13 @@ function UnifiedBillingContent() {
                     const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
                     const elecUnitsUsed = hasElecCurr ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
                     const elecCost = hasElecCurr && elecUnitsUsed >= 0
-                      ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
+                      ? (!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                       : 0
 
                     const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
                     const waterUnitsUsed = hasWaterCurr ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
                     const waterCost = hasWaterCurr && waterUnitsUsed >= 0
-                      ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
+                      ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                       : 0
 
                     const simplifiedTotal = item.baseRent + elecCost + waterCost + commonFee
@@ -1888,13 +1888,13 @@ function UnifiedBillingContent() {
                 const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
                 const elecUnitsUsed = hasElecCurr ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
                 const elecCost = hasElecCurr && elecUnitsUsed >= 0
-                  ? (electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
+                  ? (!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                   : 0
 
                 const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
                 const waterUnitsUsed = hasWaterCurr ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
                 const waterCost = hasWaterCurr && waterUnitsUsed >= 0
-                  ? (waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
+                  ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                   : 0
 
                 const simplifiedTotal = item.baseRent + elecCost + waterCost + commonFee
