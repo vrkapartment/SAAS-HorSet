@@ -391,4 +391,46 @@ export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
   }
 }
 
+/**
+ * บันทึกรายการห้องพักแบบกลุ่ม (Batch) จากข้อมูลที่ถูก Mapping ประเภทห้องแล้วจากหน้าบ้าน
+ */
+export async function createRoomsBatch(rooms: {
+  room_number: string
+  room_type_id: string | null
+  base_rent: number
+  status: "available" | "occupied"
+  floor: string | null
+  workspace_id: string
+}[]) {
+  try {
+    const supabase = await createClient()
+
+    if (rooms.length === 0) {
+      return { success: false, error: "ไม่พบรายการห้องพักที่จะนำเข้า" }
+    }
+
+    const { data, error } = await supabase
+      .from("rooms")
+      .insert(rooms)
+      .select()
+
+    if (error) {
+      console.error("Database error in createRoomsBatch:", error)
+      let errorMsg = error.message
+      if (error.code === "23505") {
+        errorMsg = "มีหมายเลขห้องพักบางส่วนซ้ำซ้อนกับที่มีอยู่แล้วในระบบ กรุณาตรวจสอบและเปลี่ยนหมายเลขห้องให้ถูกต้องทั้งหมด"
+      }
+      return { 
+        success: false, 
+        error: `เกิดข้อผิดพลาดขณะนำเข้าฐานข้อมูล (รายการทั้งหมดถูกยกเลิกแล้ว): ${errorMsg}` 
+      }
+    }
+
+    return { success: true, count: rooms.length }
+  } catch (error: any) {
+    console.error("Critical error in createRoomsBatch:", error)
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดของระบบขณะบันทึกข้อมูล" }
+  }
+}
+
 

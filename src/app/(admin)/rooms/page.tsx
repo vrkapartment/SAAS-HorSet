@@ -44,7 +44,8 @@ import {
   updateRoomType,
   deleteRoomType,
   migrateRoomTypeDeposits,
-  importRoomsFromCSV
+  importRoomsFromCSV,
+  createRoomsBatch
 } from "@/features/room/actions"
 import { 
   createTenant, 
@@ -106,6 +107,14 @@ export default function RoomsPage() {
   )
 }
 
+interface CsvRoomItem {
+  roomNumber: string
+  floor: string
+  csvTypeName: string
+  roomTypeId: string
+  baseRent: number
+}
+
 function RoomsContent() {
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [rooms, setRooms] = useState<RoomItem[]>([])
@@ -116,6 +125,12 @@ function RoomsContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasEditPermission, setHasEditPermission] = useState(true)
+
+  // CSV Import States
+  const [csvRooms, setCsvRooms] = useState<CsvRoomItem[]>([])
+  const [isCsvMappingModalOpen, setIsCsvMappingModalOpen] = useState(false)
+  const [mappingError, setMappingError] = useState<string | null>(null)
+  const [mappingSubmitting, setMappingSubmitting] = useState(false)
   
   useEffect(() => {
     async function checkPermissions() {
@@ -241,8 +256,6 @@ function RoomsContent() {
 
   // CSV Import/Export States
   const [uploadingCsv, setUploadingCsv] = useState(false)
-  const [csvReportModalOpen, setCsvReportModalOpen] = useState(false)
-  const [skippedRoomsReport, setSkippedRoomsReport] = useState<{ roomNumber: string; reason: string }[]>([])
 
   // ฟังก์ชันดาวน์โหลด CSV Template พร้อมใส่ข้อมูลตัวอย่างจริงใน Workspace นำทาง
   const handleDownloadTemplate = () => {
@@ -283,7 +296,7 @@ function RoomsContent() {
     }
   }
 
-  // ฟังก์ชันอัปโหลดไฟล์ CSV และส่งไปยัง Server Action เพื่อบันทึกเข้าฐานข้อมูล
+  // ฟังก์ชันอัปโหลดไฟล์ CSV และอ่านข้อมูลนำทางมาจับคู่ที่หน้าบ้าน (Interactive Mapping)
   const handleUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -295,7 +308,7 @@ function RoomsContent() {
     }
 
     setUploadingCsv(true)
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    setMappingError(null)
 
     try {
       const reader = new FileReader()
@@ -307,21 +320,82 @@ function RoomsContent() {
           return
         }
 
-        const res = await importRoomsFromCSV(text, wsId)
-        if (res.success) {
-          showToast(`✓ นำเข้าห้องพักสำเร็จเรียบร้อยแล้วทั้งหมด ${res.insertedCount} ห้อง!`, "success")
-          if (res.skippedRooms && res.skippedRooms.length > 0) {
-            setSkippedRoomsReport(res.skippedRooms)
-            setCsvReportModalOpen(true)
-          }
-          await loadData(true) // เคลียร์แคชและโหลดตารางใหม่สดๆ
-        } else {
-          showToast(res.error || "เกิดข้อผิดพลาดในระว่างนำเข้าไฟล์ CSV", "error")
-          if (res.skippedRooms && res.skippedRooms.length > 0) {
-            setSkippedRoomsReport(res.skippedRooms)
-            setCsvReportModalOpen(true)
-          }
+        // แปลงไฟล์ CSV เป็นอาร์เรย์แถวแบบ Client-side
+        const lines = text.split(/\r?\n/)
+        const rows: string[][] = []
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const row = line.split(",").map(val => val.trim().replace(/^["']|["']$/g, ""))
+          rows.push(row)
         }
+
+        if (rows.length < 2) {
+          showToast("โครงสร้างไฟล์ CSV ไม่ถูกต้อง หรือไม่มีข้อมูลในไฟล์", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        const headers = rows[0].map(h => h.toLowerCase().trim())
+        const roomNumIdx = headers.indexOf("room_number")
+        const typeNameIdx = headers.indexOf("room_type_name")
+        const floorIdx = headers.indexOf("floor")
+
+        if (roomNumIdx === -1 || typeNameIdx === -1) {
+          showToast("หัวคอลัมน์ไม่ถูกต้อง ในไฟล์ CSV ต้องมีคอลัมน์ room_number และ room_type_name", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        const parsedRooms: CsvRoomItem[] = []
+        const typeMap = new Map<string, RoomTypeItem>()
+        roomTypes.forEach(rt => {
+          typeMap.set(rt.name.trim().toLowerCase(), rt)
+        })
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i]
+          if (row.length <= Math.max(roomNumIdx, typeNameIdx)) continue
+
+          const roomNumber = row[roomNumIdx]?.trim()
+          const csvTypeName = row[typeNameIdx]?.trim() || ""
+
+          if (!roomNumber) continue
+
+          // ตรวจสอบชั้น (floor) จากคอลัมน์ หรือเดาเลขชั้นโดยดูจากตัวเลขแรกของห้องพัก
+          let floor = ""
+          if (floorIdx !== -1 && row[floorIdx]?.trim()) {
+            floor = row[floorIdx].trim()
+          } else {
+            const numMatch = roomNumber.match(/^(\d+)/)
+            if (numMatch) {
+              const numStr = numMatch[1]
+              if (numStr.length === 3) {
+                floor = numStr.substring(0, 1)
+              } else if (numStr.length === 4) {
+                floor = numStr.substring(0, 2)
+              }
+            }
+          }
+
+          const matchedType = typeMap.get(csvTypeName.toLowerCase())
+
+          parsedRooms.push({
+            roomNumber,
+            floor,
+            csvTypeName,
+            roomTypeId: matchedType ? matchedType.id : "",
+            baseRent: matchedType ? Number(matchedType.default_rent || 0) : 0
+          })
+        }
+
+        if (parsedRooms.length === 0) {
+          showToast("ไม่พบรายการห้องพักใดๆ ในไฟล์ที่ระบุ", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        setCsvRooms(parsedRooms)
+        setIsCsvMappingModalOpen(true)
         setUploadingCsv(false)
       }
       reader.readAsText(file, "UTF-8")
@@ -330,6 +404,47 @@ function RoomsContent() {
       setUploadingCsv(false)
     } finally {
       e.target.value = ""
+    }
+  }
+
+  // ฟังก์ชันบันทึกข้อมูลนำเข้าหลังจากการจับคู่ประเภทห้องพักเรียบร้อยแล้ว
+  const handleConfirmImport = async () => {
+    setMappingSubmitting(true)
+    setMappingError(null)
+
+    // ตรวจสอบว่าทุกแถวมีการจับคู่ประเภทห้องพักแล้วหรือยัง
+    const unmappedRoom = csvRooms.find(r => !r.roomTypeId)
+    if (unmappedRoom) {
+      setMappingError(`กรุณาเลือกประเภทห้องพักสำหรับห้องเลขที่ ${unmappedRoom.roomNumber} ก่อนดำเนินการต่อ`)
+      setMappingSubmitting(false)
+      return
+    }
+
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+
+    const roomsPayload = csvRooms.map(r => ({
+      room_number: r.roomNumber,
+      room_type_id: r.roomTypeId,
+      base_rent: r.baseRent,
+      status: "available" as const,
+      floor: r.floor || null,
+      workspace_id: wsId
+    }))
+
+    try {
+      const res = await createRoomsBatch(roomsPayload)
+      if (res.success) {
+        showToast(`✓ นำเข้าข้อมูลห้องพักสำเร็จเรียบร้อยทั้งหมด ${res.count} ห้อง!`, "success")
+        setIsCsvMappingModalOpen(false)
+        setCsvRooms([])
+        await loadData(true) // โหลดข้อมูลห้องใหม่และล้างแคช
+      } else {
+        setMappingError(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล")
+      }
+    } catch (err: any) {
+      setMappingError(err?.message || "เกิดข้อผิดพลาดที่ไม่คาดคิดของระบบ")
+    } finally {
+      setMappingSubmitting(false)
     }
   }
 
@@ -3111,61 +3226,145 @@ function RoomsContent() {
         {/* ========================================================= */}
         {/* MODAL: CSV IMPORT REPORT MODAL */}
         {/* ========================================================= */}
-        {csvReportModalOpen && (
+        {/* ========================================================= */}
+        {/* MODAL: INTERACTIVE CSV MAPPING MODAL */}
+        {/* ========================================================= */}
+        {isCsvMappingModalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
-            <div className="w-full md:max-w-lg bg-white dark:bg-slate-850 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 relative overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom flex flex-col max-h-[85vh]">
+            <div className="w-full md:max-w-2xl bg-white dark:bg-slate-850 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 relative overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom flex flex-col max-h-[90vh]">
+              
+              {/* Header */}
               <div className="flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl border border-amber-500/20">
-                    <AlertTriangle className="w-5 h-5" />
+                  <div className="p-2 bg-blue-500/10 text-blue-500 rounded-xl border border-blue-500/20">
+                    <ClipboardCheck className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="text-sm md:text-base font-extrabold text-slate-900 dark:text-slate-100">
-                      รายงานผลการนำเข้าห้องพักผ่าน CSV
+                      ตรวจสอบและจับคู่ข้อมูลประเภทห้องพัก
                     </h3>
                     <p className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                      พบรายการแจ้งเตือนหรือข้อผิดพลาดบางแถวในไฟล์
+                      พบรายการห้องพักทั้งหมด {csvRooms.length} ห้องในไฟล์ CSV ของคุณ
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setCsvReportModalOpen(false)}
+                  onClick={() => setIsCsvMappingModalOpen(false)}
                   className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 transition-all cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
+              {/* Body */}
               <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 py-1">
                 <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                  แถวที่แสดงข้างล่างนี้ถูกข้ามและไม่ได้อัปโหลดเข้าสู่ระบบ เนื่องจากประเภทห้องพักไม่ถูกต้องหรือไม่ตรงในฐานข้อมูล กรุณาเพิ่มประเภทห้องพักนั้นๆ ในระบบก่อน หรือพิมพ์แก้ไขชื่อในไฟล์ให้ตรงสะกดตัวอักษรทุกประการ
+                  ระบบได้อ่านข้อมูลเลขห้องและชั้นจากไฟล์ CSV แล้ว กรุณาตรวจสอบหรือเปลี่ยนประเภทห้องพักให้ตรงตามความเป็นจริงในระบบ เพื่อนำเข้าข้อมูลห้องพักได้อย่างถูกต้อง
                 </p>
 
-                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60 bg-slate-50 dark:bg-slate-900">
-                  <div className="grid grid-cols-3 bg-slate-100 dark:bg-slate-850 p-2.5 text-xs font-bold text-slate-650 dark:text-slate-400">
-                    <div>หมายเลขห้อง</div>
-                    <div className="col-span-2">สาเหตุการข้าม</div>
+                {mappingError && (
+                  <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2.5 animate-pulse">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{mappingError}</span>
                   </div>
-                  {skippedRoomsReport.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-3 p-2.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100/40 dark:hover:bg-slate-850/40">
-                      <div className="font-mono font-bold text-slate-800 dark:text-slate-200">{item.roomNumber}</div>
-                      <div className="col-span-2 text-rose-500 dark:text-rose-400 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        {item.reason}
-                      </div>
-                    </div>
-                  ))}
+                )}
+
+                {/* Table list */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-900">
+                  <div className="grid grid-cols-4 bg-slate-100 dark:bg-slate-850 p-3 text-xs font-extrabold text-slate-650 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                    <div>หมายเลขห้อง</div>
+                    <div>ชั้น (Floor)</div>
+                    <div>ชื่อในไฟล์ CSV</div>
+                    <div>ประเภทห้องในระบบ</div>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800/40 overflow-y-auto max-h-[45vh]">
+                    {csvRooms.map((room, idx) => {
+                      const isUnmapped = !room.roomTypeId;
+                      return (
+                        <div key={idx} className={`grid grid-cols-4 items-center p-3 text-xs transition-colors hover:bg-slate-100/40 dark:hover:bg-slate-850/40 ${isUnmapped ? "bg-amber-500/5 dark:bg-amber-500/[0.02]" : ""}`}>
+                          {/* Room number */}
+                          <div className="font-mono font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5">
+                            <Home className="w-3.5 h-3.5 text-slate-400" />
+                            {room.roomNumber}
+                          </div>
+
+                          {/* Floor */}
+                          <div className="text-slate-500 dark:text-slate-400">
+                            {room.floor ? `ชั้น ${room.floor}` : "ไม่ได้ระบุ"}
+                          </div>
+
+                          {/* CSV Original type name */}
+                          <div className="truncate pr-2 font-semibold text-slate-600 dark:text-slate-300" title={room.csvTypeName}>
+                            {room.csvTypeName || <span className="text-slate-450 font-normal italic">(ไม่ได้ระบุ)</span>}
+                          </div>
+
+                          {/* Selected system Room type */}
+                          <div>
+                            <select
+                              value={room.roomTypeId}
+                              onChange={(e) => {
+                                const selectedId = e.target.value;
+                                const matchedType = roomTypes.find(rt => rt.id === selectedId);
+                                setCsvRooms(prev => prev.map((r, rIdx) => {
+                                  if (rIdx === idx) {
+                                    return {
+                                      ...r,
+                                      roomTypeId: selectedId,
+                                      baseRent: matchedType ? Number(matchedType.default_rent || 0) : 0
+                                    };
+                                  }
+                                  return r;
+                                }));
+                              }}
+                              className={`w-full p-2 text-[11px] font-bold rounded-lg border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all ${
+                                isUnmapped 
+                                  ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400 focus:border-amber-500" 
+                                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200"
+                              }`}
+                            >
+                              <option value="" className="text-slate-400 dark:text-slate-500">⚠️ เลือกประเภทห้อง...</option>
+                              {roomTypes.map(rt => (
+                                <option key={rt.id} value={rt.id}>{rt.name} (฿{rt.default_rent})</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-2 shrink-0">
+              {/* Footer */}
+              <div className="pt-3 border-t border-slate-150 dark:border-slate-800/80 flex flex-col sm:flex-row gap-2.5 shrink-0">
                 <button
-                  onClick={() => setCsvReportModalOpen(false)}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                  type="button"
+                  onClick={() => setIsCsvMappingModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer text-center"
                 >
-                  รับทราบและปิดหน้ารายงาน
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={mappingSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-xs font-extrabold shadow-lg shadow-blue-500/15 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                >
+                  {mappingSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      กำลังนำเข้าข้อมูล...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      ยืนยันนำเข้าทั้งหมด {csvRooms.length} ห้อง
+                    </>
+                  )}
                 </button>
               </div>
+
             </div>
           </div>
         )}
