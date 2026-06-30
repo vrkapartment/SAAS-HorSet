@@ -618,9 +618,9 @@ export default function AdminDashboard() {
   const SkeletonLoader = () => (
     <div className="space-y-6">
       {/* Stats Cards Skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-pulse">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-pulse">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-28 flex flex-col justify-between">
+          <div key={i} className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-28 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
               <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
@@ -809,25 +809,25 @@ export default function AdminDashboard() {
       ) : (
         <>
           {/* การ์ดบนสุด 4 ใบ: ห้องทั้งหมด / ห้องว่าง / มีผู้เช่า / ค้างชำระ */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-6">
             {roomStats.map((stat, idx) => {
               const Icon = stat.icon
               return (
                 <div 
                   key={idx} 
                   onClick={() => router.push(stat.path || "/")}
-                  className="bg-white dark:bg-slate-850 p-5 md:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-md cursor-pointer hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.98] group"
+                  className="bg-white dark:bg-slate-850 p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-md cursor-pointer hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.98] group"
                 >
                   <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">{stat.title}</span>
-                      <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-1 leading-none">{stat.value}</h3>
-                      <span className={`inline-flex items-center text-xs sm:text-sm font-bold tracking-wide mt-1.5 ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-rose-500 dark:text-rose-400"}`}>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">{stat.title}</span>
+                      <h3 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight pt-0.5 sm:pt-1 leading-none">{stat.value}</h3>
+                      <span className={`inline-flex items-center text-[10px] sm:text-xs font-bold tracking-wide mt-1 ${stat.isPositive ? "text-teal-600 dark:text-teal-400" : "text-rose-500 dark:text-rose-400"}`}>
                         {stat.change}
                       </span>
                     </div>
-                    <div className={`p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-110 shrink-0 ${stat.bg} ${stat.color}`}>
-                      <Icon className="w-5.5 h-5.5" />
+                    <div className={`p-2 sm:p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-110 shrink-0 ${stat.bg} ${stat.color}`}>
+                      <Icon className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                     </div>
                   </div>
                   {/* Subtle link arrow indicator */}
