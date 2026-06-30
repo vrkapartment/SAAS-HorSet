@@ -292,6 +292,7 @@ export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
     const headers = rows[0].map(h => h.toLowerCase().trim())
     const roomNumIdx = headers.indexOf("room_number")
     const typeNameIdx = headers.indexOf("room_type_name")
+    const floorIdx = headers.indexOf("floor")
 
     if (roomNumIdx === -1 || typeNameIdx === -1) {
       return { 
@@ -323,15 +324,19 @@ export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
         continue
       }
 
-      // เดาเลขชั้นโดยดูจากตัวเลขแรกของห้องพัก
+      // ตรวจสอบชั้น (floor) จากคอลัมน์ หรือเดาเลขชั้นโดยดูจากตัวเลขแรกของห้องพัก
       let floor = ""
-      const numMatch = roomNumber.match(/^(\d+)/)
-      if (numMatch) {
-        const numStr = numMatch[1]
-        if (numStr.length === 3) {
-          floor = numStr.substring(0, 1)
-        } else if (numStr.length === 4) {
-          floor = numStr.substring(0, 2)
+      if (floorIdx !== -1 && row[floorIdx]?.trim()) {
+        floor = row[floorIdx].trim()
+      } else {
+        const numMatch = roomNumber.match(/^(\d+)/)
+        if (numMatch) {
+          const numStr = numMatch[1]
+          if (numStr.length === 3) {
+            floor = numStr.substring(0, 1)
+          } else if (numStr.length === 4) {
+            floor = numStr.substring(0, 2)
+          }
         }
       }
 

@@ -248,12 +248,12 @@ function RoomsContent() {
   const handleDownloadTemplate = () => {
     try {
       const sampleTypeName = roomTypes[0]?.name || "แอร์"
-      const headers = "room_number,room_type_name"
+      const headers = "room_number,room_type_name,floor"
       const rows = [
-        `101,${sampleTypeName}`,
-        `102,${sampleTypeName}`,
-        `201,${sampleTypeName}`,
-        `202,${sampleTypeName}`
+        `101,${sampleTypeName},1`,
+        `102,${sampleTypeName},1`,
+        `201,${sampleTypeName},2`,
+        `202,${sampleTypeName},2`
       ]
       
       const csvContent = "\ufeff" + [headers, ...rows].join("\n") // มี BOM เพื่อให้เปิดใน Excel สระภาษาไทยแสดงถูกต้องไม่เพี้ยน
@@ -266,7 +266,18 @@ function RoomsContent() {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      
       showToast("✓ ดาวน์โหลดเทมเพลต CSV สำเร็จ", "success")
+      
+      // แสดงข้อความแจ้งเตือนคำแนะนำเรื่องการกรอก room_type_name เพื่อป้องกันข้อผิดพลาด
+      setTimeout(() => {
+        alert(
+          "⚠️ ข้อแนะนำที่สำคัญสำหรับการกรอกไฟล์ CSV:\n\n" +
+          "• คอลัมน์ [room_type_name] จะต้องสะกดตรงกับชื่อประเภทห้องพักที่มีในระบบ (เช่น " + sampleTypeName + ")\n" +
+          "• หากประเภทห้องพักในไฟล์สะกดไม่ถูกต้อง สะกดผิดเว้นวรรค หรือไม่มีอยู่จริง แถวดังกล่าวจะถูกข้ามโดยอัตโนมัติ\n" +
+          "• คอลัมน์ [floor] (ชั้น) สามารถกำหนดได้เอง หรือหากเว้นว่างไว้ ระบบจะคำนวณและเดาจากหลักสิบ/หลักร้อยของเลขห้องพักให้โดยอัตโนมัติครับ"
+        )
+      }, 500)
     } catch (err: any) {
       showToast("เกิดข้อผิดพลาดในการดาวน์โหลดเทมเพลต", "error")
     }
