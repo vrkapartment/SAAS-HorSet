@@ -155,11 +155,18 @@ body {
   color: var(--foreground);
   font-family: 'Prompt', var(--font-prompt), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Force Prompt font across all interactive and typographic elements to guarantee font consistency */
 html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2, h3, h4, h5, h6, a {
   font-family: 'Prompt', var(--font-prompt), var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.01em; /* เพิ่มช่องว่างระหว่างตัวอักษรเล็กน้อย ช่วยให้ตัวอักษรโปร่ง สบายตาขึ้นมากบนจอ standard 1080p */
 }
 
 /* Creamy smooth transitions for panels and text when toggling theme modes */
