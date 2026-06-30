@@ -93,6 +93,7 @@ export default function TenantsPage() {
   const [uploadingCsv, setUploadingCsv] = useState(false)
   const [csvErrors, setCsvErrors] = useState<string[] | null>(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
+  const [isTemplateGuideModalOpen, setIsTemplateGuideModalOpen] = useState(false)
 
   // Stats Counters
   const [stats, setStats] = useState({
@@ -163,13 +164,7 @@ export default function TenantsPage() {
       showToast("✓ ดาวน์โหลดเทมเพลตสำเร็จ พร้อมดึงข้อมูลห้องแล้ว", "success")
 
       setTimeout(() => {
-        alert(
-          "⚠️ คำแนะนำสำคัญในการกรอกไฟล์เทมเพลตผู้เช่า:\n\n" +
-          "• ระบบดึงเลขห้องทั้งหมดที่คุณมีในตึกมาใส่ในคอลัมน์ [room_number] ให้แล้วโดยอัตโนมัติ\n" +
-          "• เบอร์โทรศัพท์สามารถกรอกนำหน้าด้วยเลข 0 ได้ตามปกติ หากคุณบันทึกผ่าน Excel แล้วเลข 0 หายไป ระบบหลังบ้านอัจฉริยะของเราจะช่วยเติมเลข 0 นำหน้ากลับมาให้อัตโนมัติครับ\n" +
-          "• คอลัมน์ [lease_start] (วันเริ่มสัญญาเช่า) ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันให้เรียบร้อยแล้ว โดย**ห้ามลบเครื่องหมาย single quote (') ที่อยู่ด้านหน้าวันที่ออกเด็ดขาด** เพื่อให้ Excel แสดงผลในรูปแบบ DD/MM/YYYY (วัน/เดือน/ปี) ได้อย่างถูกต้อง หากต้องการแก้ไขวันที่ สามารถพิมพ์ตามหลังเครื่องหมาย (') ได้เลยครับ (เช่น '01/07/2026)\n" +
-          "• คุณไม่จำเป็นต้องกรอกวันหมดสัญญา (lease_end) อีกต่อไปแล้ว! ระบบหลังบ้านจะคำนวณวันหมดสัญญาให้อัตโนมัติโดยอิงจาก \"ระยะเวลาสัญญาเช่าเริ่มต้น\" (" + duration + " เดือน) ที่คุณตั้งค่าไว้ในระบบครับ"
-        )
+        setIsTemplateGuideModalOpen(true)
       }, 500)
     } catch (err) {
       showToast("เกิดข้อผิดพลาดในการสร้างไฟล์เทมเพลต", "error")
@@ -1071,6 +1066,114 @@ export default function TenantsPage() {
                 className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-xl cursor-pointer hover:shadow-lg transition-all active:scale-95"
               >
                 รับทราบและปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      {/* Template Download Guide Modal */}
+      {isTemplateGuideModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-slate-100 dark:border-slate-850/60 pb-4">
+              <div className="flex gap-4 items-center">
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl shrink-0 text-indigo-600 dark:text-indigo-400">
+                  <Sparkles className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                    💡 คำแนะนำสำคัญในการกรอกไฟล์เทมเพลต
+                  </h3>
+                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-455 mt-0.5 font-medium">
+                    กรุณาอ่านคำแนะนำนี้เพื่อป้องกันไม่ให้ข้อมูลสัญญารวนหรือเกิดข้อผิดพลาด
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTemplateGuideModalOpen(false)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-650 dark:hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content List */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-5 py-2">
+              {/* Item 1 */}
+              <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-150">
+                    ดึงเลขห้องให้พร้อมใช้งานโดยอัตโนมัติ
+                  </h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                    ระบบดึงเลขห้องพักที่มีอยู่จริงทั้งหมดในตึกของคุณ มากรอกในคอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded-md">room_number</span> ให้เรียบร้อยแล้วโดยอัตโนมัติ คุณไม่ต้องกรอกเลขห้องเอง
+                  </p>
+                </div>
+              </div>
+
+              {/* Item 2 */}
+              <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-150">
+                    เบอร์โทรศัพท์ (เริ่มต้นด้วยเลข 0 ได้อย่างปลอดภัย)
+                  </h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                    สามารถกรอกเบอร์โทรศัพท์ลงไปได้ตามปกติ หากบันทึกผ่าน Excel แล้วเลข 0 ตัวหน้าถูกตัดหายไป <span className="text-emerald-600 dark:text-emerald-450 font-bold">ระบบหลังบ้านของเราจะช่วยตรวจสอบและกู้คืนเลข 0 นำหน้ากลับมาให้โดยอัตโนมัติครับ</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Item 3 - Warning */}
+              <div className="flex gap-4 items-start bg-amber-50/50 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/40">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-xl text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="space-y-1.5">
+                  <h4 className="text-sm font-black text-amber-850 dark:text-amber-300">
+                    ⚠️ สำคัญมาก: ห้ามลบเครื่องหมาย Single Quote (&apos;) ด้านหน้าวันที่ออกเด็ดขาด!
+                  </h4>
+                  <p className="text-xs text-amber-750 dark:text-amber-400/90 leading-relaxed font-semibold">
+                    คอลัมน์ <span className="font-extrabold text-amber-850 dark:text-amber-300 bg-amber-100/50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-md">lease_start</span> ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันโดยมีเครื่องหมาย <span className="underline decoration-2 font-black text-red-600 dark:text-red-400">&apos; นำหน้า (เช่น &apos;01/07/2026)</span>
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400/90 leading-relaxed font-semibold">
+                    * ห้ามลบเครื่องหมายนี้เด็ดขาด เพื่อป้องกันไม่ให้โปรแกรม Excel แปลงวันที่เป็นรูปแบบสหรัฐอเมริกา (MM/DD/YYYY) และทำงานผิดพลาด
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400/90 leading-relaxed font-semibold">
+                    * หากต้องการแก้ไขวันที่เป็นวันอื่น ให้ลบตัวเลขด้านหลังแล้วแก้ไขโดยพิมพ์ต่อท้ายเครื่องหมาย &apos; เสมอครับ
+                  </p>
+                </div>
+              </div>
+
+              {/* Item 4 */}
+              <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-150">
+                    คำนวณวันสิ้นสุดสัญญาเช่าให้อัตโนมัติ
+                  </h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                    คุณไม่จำเป็นต้องมีคอลัมน์วันสิ้นสุดสัญญาเช่า (lease_end) อีกต่อไปแล้ว! <span className="text-indigo-600 dark:text-indigo-400 font-bold">ระบบหลังบ้านของเราจะคำนวณวันหมดสัญญาเช่าให้อัตโนมัติ</span> โดยอิงจากระยะเวลาสัญญาเช่าเริ่มต้นของคุณคือ <span className="font-black text-slate-900 dark:text-slate-100 bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded-md">{financeSettings?.lease_duration ?? 6} เดือน</span> ครับ
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsTemplateGuideModalOpen(false)}
+                className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-black rounded-2xl shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer"
+              >
+                รับทราบและเข้าใจคำแนะนำ
               </button>
             </div>
           </div>
