@@ -244,3 +244,146 @@ export async function migrateRoomTypeDeposits(workspaceId: string, depositsMap: 
   }
 }
 
+// Helper to parse CSV properly with support for simple quoted values
+function parseCSV(csvText: string) {
+  const lines = csvText.split(/\r?\n/)
+  const results: string[][] = []
+  for (const line of lines) {
+    if (!line.trim()) continue
+    // Splitting by comma, accounting for basic quotes and trim whitespace
+    const row = line.split(",").map(val => val.trim().replace(/^["']|["']$/g, ""))
+    results.push(row)
+  }
+  return results
+}
+
+/**
+ * นำเข้าข้อมูลห้องพักผ่านไฟล์ CSV แบบกลุ่ม (Batch Import) 
+ * รองรับการค้นหา room_type_id อัตโนมัติจากชื่อประเภทห้องพัก
+ * และใช้ Database transaction (ผ่าน single atomic batch insert ใน Supabase)
+ */
+export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
+  try {
+    const supabase = await createClient()
+
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัส Workspace (กรุณาลงชื่อเข้าใช้งานใหม่)" }
+    }
+
+    // 1. ดึงประเภทห้องพักทั้งหมดของ Workspace นี้มาไว้เป็นแมปสแกนชื่อ
+    const { data: roomTypes, error: rtError } = await supabase
+      .from("room_types")
+      .select("id, name, default_rent")
+      .eq("workspace_id", workspaceId)
+
+    if (rtError) throw rtError
+
+    const roomTypeMap = new Map<string, { id: string; defaultRent: number }>()
+    roomTypes.forEach(rt => {
+      roomTypeMap.set(rt.name.trim().toLowerCase(), { id: rt.id, defaultRent: Number(rt.default_rent || 0) })
+    })
+
+    // 2. แปลงไฟล์ CSV เป็นอาร์เรย์แถว
+    const rows = parseCSV(csvText)
+    if (rows.length < 2) {
+      return { success: false, error: "โครงสร้างไฟล์ CSV ไม่ถูกต้อง หรือไม่มีข้อมูลในไฟล์" }
+    }
+
+    const headers = rows[0].map(h => h.toLowerCase().trim())
+    const roomNumIdx = headers.indexOf("room_number")
+    const typeNameIdx = headers.indexOf("room_type_name")
+
+    if (roomNumIdx === -1 || typeNameIdx === -1) {
+      return { 
+        success: false, 
+        error: "หัวคอลัมน์ไม่ถูกต้อง ในไฟล์ CSV ต้องมีคอลัมน์ room_number และ room_type_name" 
+      }
+    }
+
+    const roomsToInsert: any[] = []
+    const skippedRooms: { roomNumber: string; reason: string }[] = []
+
+    // 3. วนลูปอ่านข้อมูลทีละแถว และแมปข้อมูล
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i]
+      if (row.length <= Math.max(roomNumIdx, typeNameIdx)) continue
+
+      const roomNumber = row[roomNumIdx]?.trim()
+      const typeName = row[typeNameIdx]?.trim()
+
+      if (!roomNumber) continue
+
+      const matchedType = typeName ? roomTypeMap.get(typeName.toLowerCase()) : null
+
+      if (!matchedType) {
+        skippedRooms.push({ 
+          roomNumber, 
+          reason: `ไม่พบประเภทห้อง "${typeName || "ไม่ได้ระบุ"}" ในระบบ` 
+        })
+        continue
+      }
+
+      // เดาเลขชั้นโดยดูจากตัวเลขแรกของห้องพัก
+      let floor = ""
+      const numMatch = roomNumber.match(/^(\d+)/)
+      if (numMatch) {
+        const numStr = numMatch[1]
+        if (numStr.length === 3) {
+          floor = numStr.substring(0, 1)
+        } else if (numStr.length === 4) {
+          floor = numStr.substring(0, 2)
+        }
+      }
+
+      roomsToInsert.push({
+        room_number: roomNumber,
+        room_type_id: matchedType.id,
+        base_rent: matchedType.defaultRent,
+        status: "available",
+        floor: floor || null,
+        workspace_id: workspaceId
+      })
+    }
+
+    if (roomsToInsert.length === 0) {
+      return {
+        success: false,
+        error: "ไม่พบรายการห้องพักที่สามารถนำเข้าได้จากไฟล์ที่เลือก",
+        skippedRooms
+      }
+    }
+
+    // 4. บันทึกข้อมูลแบบกลุ่ม (Single Statement Batch) ซึ่งเป็น Transaction ในตัวเองแบบอัตโนมัติ
+    const { data, error: insertError } = await supabase
+      .from("rooms")
+      .insert(roomsToInsert)
+      .select()
+
+    if (insertError) {
+      console.error("Database Insert Error during CSV import:", insertError)
+      let errorMsg = insertError.message
+      if (insertError.code === "23505") {
+        errorMsg = "มีหมายเลขห้องพักบางส่วนซ้ำซ้อนกับที่มีอยู่แล้วในระบบ กรุณาตรวจสอบและอัปโหลดไฟล์ที่มีเลขห้องใหม่ทั้งหมดอีกครั้ง"
+      }
+      return { 
+        success: false, 
+        error: `เกิดข้อผิดพลาดในการบันทึกข้อมูล (ระบบได้ยกเลิกและยกยอดกลับทั้งหมด): ${errorMsg}` 
+      }
+    }
+
+    return { 
+      success: true, 
+      insertedCount: roomsToInsert.length,
+      skippedRooms 
+    }
+
+  } catch (error: any) {
+    console.error("Critical error in importRoomsFromCSV server action:", error)
+    return { 
+      success: false, 
+      error: error?.message || "เกิดข้อผิดพลาดไม่คาดคิดขณะนำเข้าข้อมูลไฟล์ CSV" 
+    }
+  }
+}
+
+

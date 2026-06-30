@@ -30,7 +30,9 @@ import {
   AlertTriangle,
   LayoutGrid,
   List,
-  Unlink
+  Unlink,
+  Download,
+  Upload
 } from "lucide-react"
 import { 
   getRooms, 
@@ -41,7 +43,8 @@ import {
   createRoomType,
   updateRoomType,
   deleteRoomType,
-  migrateRoomTypeDeposits
+  migrateRoomTypeDeposits,
+  importRoomsFromCSV
 } from "@/features/room/actions"
 import { 
   createTenant, 
@@ -234,6 +237,89 @@ function RoomsContent() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }))
     }, 4000)
+  }
+
+  // CSV Import/Export States
+  const [uploadingCsv, setUploadingCsv] = useState(false)
+  const [csvReportModalOpen, setCsvReportModalOpen] = useState(false)
+  const [skippedRoomsReport, setSkippedRoomsReport] = useState<{ roomNumber: string; reason: string }[]>([])
+
+  // ฟังก์ชันดาวน์โหลด CSV Template พร้อมใส่ข้อมูลตัวอย่างจริงใน Workspace นำทาง
+  const handleDownloadTemplate = () => {
+    try {
+      const sampleTypeName = roomTypes[0]?.name || "แอร์"
+      const headers = "room_number,room_type_name"
+      const rows = [
+        `101,${sampleTypeName}`,
+        `102,${sampleTypeName}`,
+        `201,${sampleTypeName}`,
+        `202,${sampleTypeName}`
+      ]
+      
+      const csvContent = "\ufeff" + [headers, ...rows].join("\n") // มี BOM เพื่อให้เปิดใน Excel สระภาษาไทยแสดงถูกต้องไม่เพี้ยน
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.setAttribute("href", url)
+      link.setAttribute("download", "rooms_template.csv")
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      showToast("✓ ดาวน์โหลดเทมเพลต CSV สำเร็จ", "success")
+    } catch (err: any) {
+      showToast("เกิดข้อผิดพลาดในการดาวน์โหลดเทมเพลต", "error")
+    }
+  }
+
+  // ฟังก์ชันอัปโหลดไฟล์ CSV และส่งไปยัง Server Action เพื่อบันทึกเข้าฐานข้อมูล
+  const handleUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith(".csv")) {
+      showToast("กรุณาเลือกไฟล์ที่มีนามสกุล .csv เท่านั้น", "error")
+      e.target.value = ""
+      return
+    }
+
+    setUploadingCsv(true)
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+
+    try {
+      const reader = new FileReader()
+      reader.onload = async (event) => {
+        const text = event.target?.result as string
+        if (!text) {
+          showToast("ไม่สามารถเปิดอ่านข้อมูลในไฟล์ CSV นี้ได้", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        const res = await importRoomsFromCSV(text, wsId)
+        if (res.success) {
+          showToast(`✓ นำเข้าห้องพักสำเร็จเรียบร้อยแล้วทั้งหมด ${res.insertedCount} ห้อง!`, "success")
+          if (res.skippedRooms && res.skippedRooms.length > 0) {
+            setSkippedRoomsReport(res.skippedRooms)
+            setCsvReportModalOpen(true)
+          }
+          await loadData(true) // เคลียร์แคชและโหลดตารางใหม่สดๆ
+        } else {
+          showToast(res.error || "เกิดข้อผิดพลาดในระว่างนำเข้าไฟล์ CSV", "error")
+          if (res.skippedRooms && res.skippedRooms.length > 0) {
+            setSkippedRoomsReport(res.skippedRooms)
+            setCsvReportModalOpen(true)
+          }
+        }
+        setUploadingCsv(false)
+      }
+      reader.readAsText(file, "UTF-8")
+    } catch (err: any) {
+      showToast("ระบบขัดข้องขณะอ่านไฟล์ CSV", "error")
+      setUploadingCsv(false)
+    } finally {
+      e.target.value = ""
+    }
   }
 
   // โหลดข้อมูลทั้งหมดจาก Supabase ร่วมกับการใช้งาน Cache ความเร็วสูง
@@ -1306,7 +1392,7 @@ function RoomsContent() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="flex flex-wrap items-center gap-3 self-end md:self-auto">
             {/* Manage Types Config */}
             <button
               onClick={() => setTypesModalOpen(true)}
@@ -1315,6 +1401,41 @@ function RoomsContent() {
               <Settings className="w-4 h-4 text-indigo-500 animate-spin-hover" />
               {hasEditPermission ? "ตั้งค่าประเภทห้องพัก" : "ดูประเภทห้องพัก"}
             </button>
+
+            {/* CSV Actions Group */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                title="ดาวน์โหลดเทมเพลตไฟล์ CSV สำหรับเพิ่มห้องพัก"
+                className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-blue-500" />
+                <span className="hidden sm:inline">ดาวน์โหลด CSV Template</span>
+                <span className="sm:hidden">เทมเพลต</span>
+              </button>
+              
+              {hasEditPermission && (
+                <label className="relative">
+                  <span className={`px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${uploadingCsv ? "opacity-60 cursor-not-allowed" : ""}`}>
+                    {uploadingCsv ? (
+                      <RefreshCw className="w-4 h-4 text-emerald-500 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-emerald-500" />
+                    )}
+                    <span className="hidden sm:inline">{uploadingCsv ? "กำลังอัปโหลด..." : "อัปโหลดไฟล์ CSV"}</span>
+                    <span className="sm:hidden">{uploadingCsv ? "..." : "อัปโหลด"}</span>
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleUploadCSV}
+                    disabled={uploadingCsv}
+                    className="absolute inset-0 w-0 h-0 opacity-0 cursor-pointer"
+                  />
+                </label>
+              )}
+            </div>
 
             {/* Add Room Button (desktop only) */}
             {!hasEditPermission ? (
@@ -2970,6 +3091,68 @@ function RoomsContent() {
                   ) : (
                     "ยืนยันหยุดเชื่อมต่อ LINE"
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: CSV IMPORT REPORT MODAL */}
+        {/* ========================================================= */}
+        {csvReportModalOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+            <div className="w-full md:max-w-lg bg-white dark:bg-slate-850 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 relative overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom flex flex-col max-h-[85vh]">
+              <div className="flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl border border-amber-500/20">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm md:text-base font-extrabold text-slate-900 dark:text-slate-100">
+                      รายงานผลการนำเข้าห้องพักผ่าน CSV
+                    </h3>
+                    <p className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                      พบรายการแจ้งเตือนหรือข้อผิดพลาดบางแถวในไฟล์
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCsvReportModalOpen(false)}
+                  className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 py-1">
+                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                  แถวที่แสดงข้างล่างนี้ถูกข้ามและไม่ได้อัปโหลดเข้าสู่ระบบ เนื่องจากประเภทห้องพักไม่ถูกต้องหรือไม่ตรงในฐานข้อมูล กรุณาเพิ่มประเภทห้องพักนั้นๆ ในระบบก่อน หรือพิมพ์แก้ไขชื่อในไฟล์ให้ตรงสะกดตัวอักษรทุกประการ
+                </p>
+
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60 bg-slate-50 dark:bg-slate-900">
+                  <div className="grid grid-cols-3 bg-slate-100 dark:bg-slate-850 p-2.5 text-xs font-bold text-slate-650 dark:text-slate-400">
+                    <div>หมายเลขห้อง</div>
+                    <div className="col-span-2">สาเหตุการข้าม</div>
+                  </div>
+                  {skippedRoomsReport.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-3 p-2.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100/40 dark:hover:bg-slate-850/40">
+                      <div className="font-mono font-bold text-slate-800 dark:text-slate-200">{item.roomNumber}</div>
+                      <div className="col-span-2 text-rose-500 dark:text-rose-400 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        {item.reason}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 shrink-0">
+                <button
+                  onClick={() => setCsvReportModalOpen(false)}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  รับทราบและปิดหน้ารายงาน
                 </button>
               </div>
             </div>
