@@ -132,7 +132,12 @@ export default function TenantsPage() {
 
       const headers = "room_number,tenant_name,phone,lease_start"
       const duration = financeSettings?.lease_duration ?? 6
-      const todayStr = new Date().toISOString().split("T")[0]
+      
+      const todayDate = new Date()
+      const day = String(todayDate.getDate()).padStart(2, '0')
+      const month = String(todayDate.getMonth() + 1).padStart(2, '0')
+      const year = todayDate.getFullYear()
+      const todayStr = `${day}/${month}/${year}`
 
       const rows: string[] = []
       if (sortedRooms.length > 0) {
@@ -163,7 +168,7 @@ export default function TenantsPage() {
           "• ระบบดึงเลขห้องทั้งหมดที่คุณมีในตึกมาใส่ในคอลัมน์ [room_number] ให้แล้วโดยอัตโนมัติ\n" +
           "• คุณเพียงแค่กรอก [tenant_name] (ชื่อผู้เช่า) และ [phone] (เบอร์โทร) ลงไปตามเลขห้องได้ทันที\n" +
           "• เบอร์โทรศัพท์สามารถกรอกนำหน้าด้วยเลข 0 ได้ตามปกติ หากคุณบันทึกผ่าน Excel แล้วเลข 0 หายไป ระบบหลังบ้านอัจฉริยะของเราจะช่วยเติมเลข 0 นำหน้ากลับมาให้อัตโนมัติครับ\n" +
-          "• คอลัมน์ [lease_start] (วันเริ่มสัญญาเช่า) ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันให้เรียบร้อยแล้ว หากสัญญาเช่าของห้องนั้นแตกต่างออกไป สามารถแก้ไขวันที่ได้เองในรูปแบบ YYYY-MM-DD (เช่น 2026-07-01)\n" +
+          "• คอลัมน์ [lease_start] (วันเริ่มสัญญาเช่า) ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันให้เรียบร้อยแล้ว หากสัญญาเช่าของห้องนั้นแตกต่างออกไป สามารถแก้ไขวันที่ได้เองในรูปแบบ DD/MM/YYYY (เช่น 01/07/2026)\n" +
           "• คุณไม่จำเป็นต้องกรอกวันหมดสัญญา (lease_end) อีกต่อไปแล้ว! ระบบหลังบ้านจะคำนวณวันหมดสัญญาให้อัตโนมัติโดยอิงจาก \"ระยะเวลาสัญญาเช่าเริ่มต้น\" (" + duration + " เดือน) ที่คุณตั้งค่าไว้ในระบบครับ"
         )
       }, 500)
