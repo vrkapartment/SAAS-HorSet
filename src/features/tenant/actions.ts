@@ -1032,7 +1032,6 @@ export async function createTenantsBatch(
     tenant_name: string
     phone: string
     lease_start: string
-    lease_end: string
     line_number: number
   }[],
   workspaceId: string
@@ -1048,7 +1047,23 @@ export async function createTenantsBatch(
       return { success: false, error: "ไม่พบรายการข้อมูลผู้เช่าในไฟล์" }
     }
 
-    // 1. ดึงข้อมูลห้องพักทั้งหมดของ Workspace นี้มาเปรียบเทียบ
+    // 1. ดึงข้อมูลระยะเวลาสัญญาเริ่มต้นของ Workspace นี้
+    let leaseDuration = 6
+    try {
+      const { data: wsData, error: wsError } = await supabase
+        .from("workspaces")
+        .select("lease_duration")
+        .eq("id", workspaceId)
+        .single()
+      
+      if (!wsError && wsData && wsData.lease_duration !== null && wsData.lease_duration !== undefined) {
+        leaseDuration = Number(wsData.lease_duration)
+      }
+    } catch (e) {
+      console.warn("Could not query lease_duration from workspaces table. Defaulting to 6 months.", e)
+    }
+
+    // 2. ดึงข้อมูลห้องพักทั้งหมดของ Workspace นี้มาเปรียบเทียบ
     const { data: dbRooms, error: roomsError } = await supabase
       .from("rooms")
       .select("id, room_number")
@@ -1068,14 +1083,34 @@ export async function createTenantsBatch(
     const validTenantsToInsert: any[] = []
     const roomIdsToUpdate: string[] = []
 
-    // 2. ตรวจสอบข้อมูลทีละบรรทัดอย่างละเอียด
+    const addMonths = (dateStr: string, months: number) => {
+      try {
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) {
+          throw new Error()
+        }
+        d.setMonth(d.getMonth() + months)
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const r = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${r}`
+      } catch {
+        const d = new Date()
+        d.setMonth(d.getMonth() + months)
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const r = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${r}`
+      }
+    }
+
+    // 3. ตรวจสอบข้อมูลทีละบรรทัดอย่างละเอียด
     for (const tenant of tenants) {
       const lineNum = tenant.line_number
       const rawRoomNum = tenant.room_number?.toString()?.trim() || ""
       const rawName = tenant.tenant_name?.trim() || ""
-      const rawPhone = tenant.phone?.toString()?.trim() || ""
-      const leaseStart = tenant.lease_start?.trim() || ""
-      const leaseEnd = tenant.lease_end?.trim() || ""
+      let rawPhone = tenant.phone?.toString()?.trim() || ""
+      const leaseStart = tenant.lease_start?.trim() || new Date().toISOString().split("T")[0]
 
       // ถ้าเว้นว่างทั้งแถว ให้ข้ามไปได้
       if (!rawRoomNum && !rawName && !rawPhone) {
@@ -1092,25 +1127,36 @@ export async function createTenantsBatch(
         continue
       }
 
+      // กู้คืนเบอร์โทรศัพท์ที่โดน Excel ตัดเลข 0 ไปเพื่อความถูกต้องสูงสุด (2nd layer)
+      if (rawPhone) {
+        rawPhone = rawPhone.replace(/^="?|"?$|^'|^"/g, "").replace(/\D/g, "")
+        if (rawPhone.length === 9 && rawPhone[0] !== '0') {
+          rawPhone = '0' + rawPhone
+        }
+      }
+
       const roomId = roomMap.get(rawRoomNum.toLowerCase())
       if (!roomId) {
         errors.push(`แถวที่ ${lineNum}: ไม่พบห้องหมายเลข "${rawRoomNum}" ในระบบตึกนี้ กรุณาเพิ่มห้องนี้เข้าสู่ระบบก่อน`)
         continue
       }
 
+      // คำนวณวันสิ้นสุดสัญญาอัตโนมัติจาก lease_start + lease_duration ของ Workspace
+      const calculatedLeaseEnd = addMonths(leaseStart, leaseDuration)
+
       validTenantsToInsert.push({
         room_id: roomId,
         tenant_name: rawName,
         tenant_phone: rawPhone,
         line_user_id: null,
-        lease_start: leaseStart || new Date().toISOString().split("T")[0],
-        lease_end: leaseEnd || new Date().toISOString().split("T")[0],
+        lease_start: leaseStart,
+        lease_end: calculatedLeaseEnd,
         workspace_id: workspaceId
       })
       roomIdsToUpdate.push(roomId)
     }
 
-    // 3. หากมีข้อผิดพลาดแม้แต่จุดเดียว ให้ส่งรายการข้อผิดพลาดกลับไปชี้เป้าทันที (Atomic Transaction Safety)
+    // 4. หากมีข้อผิดพลาดแม้แต่จุดเดียว ให้ส่งรายการข้อผิดพลาดกลับไปชี้เป้าทันที (Atomic Transaction Safety)
     if (errors.length > 0) {
       return { success: false, errors }
     }
@@ -1119,7 +1165,7 @@ export async function createTenantsBatch(
       return { success: false, error: "ไม่มีข้อมูลผู้เช่าที่สามารถบันทึกได้" }
     }
 
-    // 4. บันทึกข้อมูลผู้เช่าลงตาราง Tenants
+    // 5. บันทึกข้อมูลผู้เช่าลงตาราง Tenants
     const { data: insertedTenants, error: insertError } = await supabase
       .from("tenants")
       .insert(validTenantsToInsert)
@@ -1130,7 +1176,7 @@ export async function createTenantsBatch(
       return { success: false, error: `เกิดข้อผิดพลาดในการบันทึกข้อมูลผู้เช่า: ${insertError.message}` }
     }
 
-    // 5. อัปเดตห้องพักที่เกี่ยวข้องทั้งหมดให้สถานะเป็นมีผู้เช่า (occupied)
+    // 6. อัปเดตห้องพักที่เกี่ยวข้องทั้งหมดให้สถานะเป็นมีผู้เช่า (occupied)
     const { error: updateRoomsError } = await supabase
       .from("rooms")
       .update({ status: "occupied" })

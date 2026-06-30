@@ -130,33 +130,18 @@ export default function TenantsPage() {
         )
       }
 
-      const headers = "room_number,tenant_name,phone,lease_start,lease_end"
+      const headers = "room_number,tenant_name,phone,lease_start"
       const duration = financeSettings?.lease_duration ?? 6
       const todayStr = new Date().toISOString().split("T")[0]
-      
-      const addMonths = (dateStr: string, months: number) => {
-        try {
-          const d = new Date(dateStr)
-          d.setMonth(d.getMonth() + months)
-          const y = d.getFullYear()
-          const m = String(d.getMonth() + 1).padStart(2, '0')
-          const r = String(d.getDate()).padStart(2, '0')
-          return `${y}-${m}-${r}`
-        } catch {
-          return dateStr
-        }
-      }
-      
-      const leaseEndStr = addMonths(todayStr, duration)
 
       const rows: string[] = []
       if (sortedRooms.length > 0) {
         sortedRooms.forEach(r => {
-          rows.push(`${r.roomNumber},,,${todayStr},${leaseEndStr}`)
+          rows.push(`${r.roomNumber},,,${todayStr}`)
         })
       } else {
-        rows.push(`101,สมชาย ใจดี,0812345678,${todayStr},${leaseEndStr}`)
-        rows.push(`102,สมหญิง รักดี,0898765432,${todayStr},${leaseEndStr}`)
+        rows.push(`101,สมชาย ใจดี,'0812345678,${todayStr}`)
+        rows.push(`102,สมหญิง รักดี,'0898765432,${todayStr}`)
       }
 
       const csvContent = "\ufeff" + [headers, ...rows].join("\n")
@@ -177,8 +162,9 @@ export default function TenantsPage() {
           "⚠️ คำแนะนำสำคัญในการกรอกไฟล์เทมเพลตผู้เช่า:\n\n" +
           "• ระบบดึงเลขห้องทั้งหมดที่คุณมีในตึกมาใส่ในคอลัมน์ [room_number] ให้แล้วโดยอัตโนมัติ\n" +
           "• คุณเพียงแค่กรอก [tenant_name] (ชื่อผู้เช่า) และ [phone] (เบอร์โทร) ลงไปตามเลขห้องได้ทันที\n" +
-          "• หากห้องใดไม่มีผู้เช่าเข้าอยู่ หรือต้องการเว้นว่างไว้ ให้ลบทั้งแถวนั้นออก หรือเว้นชื่อผู้เช่าไว้ว่างๆ ได้เลยครับ (ระบบจะข้ามแถวที่ชื่อผู้เช่าว่างให้โดยอัตโนมัติ)\n" +
-          "• คอลัมน์ [lease_start] และ [lease_end] ถูกคำนวณและตั้งค่าเริ่มต้นตามระยะสัญญา " + duration + " เดือนของระบบให้เรียบร้อยแล้ว หากสัญญาเช่าของห้องนั้นแตกต่างออกไป สามารถแก้ไขวันที่ได้เองในไฟล์ครับ"
+          "• เบอร์โทรศัพท์สามารถกรอกนำหน้าด้วยเลข 0 ได้ตามปกติ หากคุณบันทึกผ่าน Excel แล้วเลข 0 หายไป ระบบหลังบ้านอัจฉริยะของเราจะช่วยเติมเลข 0 นำหน้ากลับมาให้อัตโนมัติครับ\n" +
+          "• คอลัมน์ [lease_start] (วันเริ่มสัญญาเช่า) ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันให้เรียบร้อยแล้ว หากสัญญาเช่าของห้องนั้นแตกต่างออกไป สามารถแก้ไขวันที่ได้เองในรูปแบบ YYYY-MM-DD (เช่น 2026-07-01)\n" +
+          "• คุณไม่จำเป็นต้องกรอกวันหมดสัญญา (lease_end) อีกต่อไปแล้ว! ระบบหลังบ้านจะคำนวณวันหมดสัญญาให้อัตโนมัติโดยอิงจาก \"ระยะเวลาสัญญาเช่าเริ่มต้น\" (" + duration + " เดือน) ที่คุณตั้งค่าไว้ในระบบครับ"
         )
       }, 500)
     } catch (err) {
@@ -230,7 +216,6 @@ export default function TenantsPage() {
         const nameIdx = headers.indexOf("tenant_name")
         const phoneIdx = headers.indexOf("phone")
         const startIdx = headers.indexOf("lease_start")
-        const endIdx = headers.indexOf("lease_end")
 
         if (roomNumIdx === -1 || nameIdx === -1) {
           showToast("หัวคอลัมน์ไม่ถูกต้อง ในไฟล์ CSV ต้องมีคอลัมน์ room_number และ tenant_name", "error")
@@ -240,15 +225,27 @@ export default function TenantsPage() {
 
         const parsedTenants: any[] = []
 
+        // ฟังก์ชันช่วยทำความสะอาดเบอร์โทรและกู้คืนเลข 0 นำหน้าที่โดน Excel ตัดออก
+        const cleanAndRestorePhone = (rawPhone: string) => {
+          if (!rawPhone) return ""
+          let clean = rawPhone.trim().replace(/^="?|"?$|^'|^"/g, "")
+          clean = clean.replace(/\D/g, "")
+          if (clean.length === 9 && clean[0] !== '0') {
+            clean = '0' + clean
+          }
+          return clean
+        }
+
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i]
           if (row.length === 0 || (row.length === 1 && !row[0])) continue
 
           const roomNumber = row[roomNumIdx]?.trim() || ""
           const tenantName = row[nameIdx]?.trim() || ""
-          const phone = phoneIdx !== -1 ? row[phoneIdx]?.trim() || "" : ""
+          const rawPhone = phoneIdx !== -1 ? row[phoneIdx]?.trim() || "" : ""
           const leaseStart = startIdx !== -1 ? row[startIdx]?.trim() || "" : ""
-          const leaseEnd = endIdx !== -1 ? row[endIdx]?.trim() || "" : ""
+
+          const phone = cleanAndRestorePhone(rawPhone)
 
           // ข้ามบรรทัดที่ไม่มีข้อมูลอะไรเลย
           if (!roomNumber && !tenantName && !phone) continue
@@ -261,7 +258,6 @@ export default function TenantsPage() {
             tenant_name: tenantName,
             phone,
             lease_start: leaseStart,
-            lease_end: leaseEnd,
             line_number: i + 1
           })
         }
