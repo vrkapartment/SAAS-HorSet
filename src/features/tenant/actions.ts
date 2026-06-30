@@ -1022,6 +1022,132 @@ export async function disconnectLine(tenantId: string) {
   }
 }
 
+/**
+ * นำเข้าข้อมูลผู้เช่าและสัญญาแบบกลุ่ม (Batch) จากไฟล์ CSV
+ * รองรับการชี้เป้าความผิดพลาดรายบรรทัดอย่างแม่นยำ
+ */
+export async function createTenantsBatch(
+  tenants: {
+    room_number: string
+    tenant_name: string
+    phone: string
+    lease_start: string
+    lease_end: string
+    line_number: number
+  }[],
+  workspaceId: string
+) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    if (tenants.length === 0) {
+      return { success: false, error: "ไม่พบรายการข้อมูลผู้เช่าในไฟล์" }
+    }
+
+    // 1. ดึงข้อมูลห้องพักทั้งหมดของ Workspace นี้มาเปรียบเทียบ
+    const { data: dbRooms, error: roomsError } = await supabase
+      .from("rooms")
+      .select("id, room_number")
+      .eq("workspace_id", workspaceId)
+
+    if (roomsError) {
+      console.error("Error fetching rooms in createTenantsBatch:", roomsError)
+      return { success: false, error: "ไม่สามารถดึงข้อมูลห้องพักเพื่อตรวจสอบได้" }
+    }
+
+    const roomMap = new Map<string, string>()
+    dbRooms?.forEach(r => {
+      roomMap.set(r.room_number.trim().toLowerCase(), r.id)
+    })
+
+    const errors: string[] = []
+    const validTenantsToInsert: any[] = []
+    const roomIdsToUpdate: string[] = []
+
+    // 2. ตรวจสอบข้อมูลทีละบรรทัดอย่างละเอียด
+    for (const tenant of tenants) {
+      const lineNum = tenant.line_number
+      const rawRoomNum = tenant.room_number?.toString()?.trim() || ""
+      const rawName = tenant.tenant_name?.trim() || ""
+      const rawPhone = tenant.phone?.toString()?.trim() || ""
+      const leaseStart = tenant.lease_start?.trim() || ""
+      const leaseEnd = tenant.lease_end?.trim() || ""
+
+      // ถ้าเว้นว่างทั้งแถว ให้ข้ามไปได้
+      if (!rawRoomNum && !rawName && !rawPhone) {
+        continue
+      }
+
+      if (!rawRoomNum) {
+        errors.push(`แถวที่ ${lineNum}: ไม่ระบุหมายเลขห้องพัก`)
+        continue
+      }
+
+      if (!rawName) {
+        errors.push(`แถวที่ ${lineNum} (ห้อง ${rawRoomNum}): ไม่ระบุชื่อผู้เช่า`)
+        continue
+      }
+
+      const roomId = roomMap.get(rawRoomNum.toLowerCase())
+      if (!roomId) {
+        errors.push(`แถวที่ ${lineNum}: ไม่พบห้องหมายเลข "${rawRoomNum}" ในระบบตึกนี้ กรุณาเพิ่มห้องนี้เข้าสู่ระบบก่อน`)
+        continue
+      }
+
+      validTenantsToInsert.push({
+        room_id: roomId,
+        tenant_name: rawName,
+        tenant_phone: rawPhone,
+        line_user_id: null,
+        lease_start: leaseStart || new Date().toISOString().split("T")[0],
+        lease_end: leaseEnd || new Date().toISOString().split("T")[0],
+        workspace_id: workspaceId
+      })
+      roomIdsToUpdate.push(roomId)
+    }
+
+    // 3. หากมีข้อผิดพลาดแม้แต่จุดเดียว ให้ส่งรายการข้อผิดพลาดกลับไปชี้เป้าทันที (Atomic Transaction Safety)
+    if (errors.length > 0) {
+      return { success: false, errors }
+    }
+
+    if (validTenantsToInsert.length === 0) {
+      return { success: false, error: "ไม่มีข้อมูลผู้เช่าที่สามารถบันทึกได้" }
+    }
+
+    // 4. บันทึกข้อมูลผู้เช่าลงตาราง Tenants
+    const { data: insertedTenants, error: insertError } = await supabase
+      .from("tenants")
+      .insert(validTenantsToInsert)
+      .select()
+
+    if (insertError) {
+      console.error("Error inserting tenants batch:", insertError)
+      return { success: false, error: `เกิดข้อผิดพลาดในการบันทึกข้อมูลผู้เช่า: ${insertError.message}` }
+    }
+
+    // 5. อัปเดตห้องพักที่เกี่ยวข้องทั้งหมดให้สถานะเป็นมีผู้เช่า (occupied)
+    const { error: updateRoomsError } = await supabase
+      .from("rooms")
+      .update({ status: "occupied" })
+      .in("id", roomIdsToUpdate)
+
+    if (updateRoomsError) {
+      console.error("Error updating rooms status to occupied in batch:", updateRoomsError)
+    }
+
+    return { success: true, count: validTenantsToInsert.length }
+  } catch (error: any) {
+    console.error("Critical error in createTenantsBatch:", error)
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดไม่คาดคิดในการบันทึกข้อมูล" }
+  }
+}
+
+
 
 
 

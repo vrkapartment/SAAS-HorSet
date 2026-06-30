@@ -21,6 +21,8 @@ import {
   FileText,
   Lock,
   Download,
+  Upload,
+  X,
   CheckCircle2,
   XCircle,
   HelpCircle,
@@ -29,10 +31,11 @@ import {
   AlertCircle,
   Info
 } from "lucide-react"
-import { getTenants, getOldTenants, deleteOldTenant } from "@/features/tenant/actions"
+import { getTenants, getOldTenants, deleteOldTenant, createTenantsBatch } from "@/features/tenant/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
+import { getRooms } from "@/features/room/actions"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -86,6 +89,11 @@ export default function TenantsPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
+  // CSV Import States
+  const [uploadingCsv, setUploadingCsv] = useState(false)
+  const [csvErrors, setCsvErrors] = useState<string[] | null>(null)
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
+
   // Stats Counters
   const [stats, setStats] = useState({
     activeCount: 0,
@@ -107,6 +115,184 @@ export default function TenantsPage() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }))
     }, 4000)
+  }
+
+  // ฟังก์ชันดาวน์โหลดเทมเพลต CSV ผู้เช่า ดึงเลขห้องพักที่มีจริงใน Workspace
+  const handleDownloadTemplate = async () => {
+    try {
+      showToast("⏳ กำลังจัดเตรียมข้อมูลเทมเพลต...", "info")
+      const roomsRes = await getRooms()
+      let sortedRooms: any[] = []
+      
+      if (roomsRes.success && roomsRes.data) {
+        sortedRooms = (roomsRes.data as any[]).sort((a, b) =>
+          a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' })
+        )
+      }
+
+      const headers = "room_number,tenant_name,phone,lease_start,lease_end"
+      const duration = financeSettings?.lease_duration ?? 6
+      const todayStr = new Date().toISOString().split("T")[0]
+      
+      const addMonths = (dateStr: string, months: number) => {
+        try {
+          const d = new Date(dateStr)
+          d.setMonth(d.getMonth() + months)
+          const y = d.getFullYear()
+          const m = String(d.getMonth() + 1).padStart(2, '0')
+          const r = String(d.getDate()).padStart(2, '0')
+          return `${y}-${m}-${r}`
+        } catch {
+          return dateStr
+        }
+      }
+      
+      const leaseEndStr = addMonths(todayStr, duration)
+
+      const rows: string[] = []
+      if (sortedRooms.length > 0) {
+        sortedRooms.forEach(r => {
+          rows.push(`${r.roomNumber},,,${todayStr},${leaseEndStr}`)
+        })
+      } else {
+        rows.push(`101,สมชาย ใจดี,0812345678,${todayStr},${leaseEndStr}`)
+        rows.push(`102,สมหญิง รักดี,0898765432,${todayStr},${leaseEndStr}`)
+      }
+
+      const csvContent = "\ufeff" + [headers, ...rows].join("\n")
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.setAttribute("href", url)
+      link.setAttribute("download", "tenants_template.csv")
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      showToast("✓ ดาวน์โหลดเทมเพลตสำเร็จ พร้อมดึงข้อมูลห้องแล้ว", "success")
+
+      setTimeout(() => {
+        alert(
+          "⚠️ คำแนะนำสำคัญในการกรอกไฟล์เทมเพลตผู้เช่า:\n\n" +
+          "• ระบบดึงเลขห้องทั้งหมดที่คุณมีในตึกมาใส่ในคอลัมน์ [room_number] ให้แล้วโดยอัตโนมัติ\n" +
+          "• คุณเพียงแค่กรอก [tenant_name] (ชื่อผู้เช่า) และ [phone] (เบอร์โทร) ลงไปตามเลขห้องได้ทันที\n" +
+          "• หากห้องใดไม่มีผู้เช่าเข้าอยู่ หรือต้องการเว้นว่างไว้ ให้ลบทั้งแถวนั้นออก หรือเว้นชื่อผู้เช่าไว้ว่างๆ ได้เลยครับ (ระบบจะข้ามแถวที่ชื่อผู้เช่าว่างให้โดยอัตโนมัติ)\n" +
+          "• คอลัมน์ [lease_start] และ [lease_end] ถูกคำนวณและตั้งค่าเริ่มต้นตามระยะสัญญา " + duration + " เดือนของระบบให้เรียบร้อยแล้ว หากสัญญาเช่าของห้องนั้นแตกต่างออกไป สามารถแก้ไขวันที่ได้เองในไฟล์ครับ"
+        )
+      }, 500)
+    } catch (err) {
+      showToast("เกิดข้อผิดพลาดในการสร้างไฟล์เทมเพลต", "error")
+    }
+  }
+
+  // ฟังก์ชันอัปโหลดไฟล์ CSV และบันทึกข้อมูลผู้เช่า
+  const handleUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith(".csv")) {
+      showToast("กรุณาเลือกไฟล์ที่มีนามสกุล .csv เท่านั้น", "error")
+      e.target.value = ""
+      return
+    }
+
+    setUploadingCsv(true)
+    setCsvErrors(null)
+    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+
+    try {
+      const reader = new FileReader()
+      reader.onload = async (event) => {
+        const text = event.target?.result as string
+        if (!text) {
+          showToast("ไม่สามารถเปิดอ่านข้อมูลในไฟล์ CSV นี้ได้", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        const lines = text.split(/\r?\n/)
+        const rows: string[][] = []
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const row = line.split(",").map(val => val.trim().replace(/^["']|["']$/g, ""))
+          rows.push(row)
+        }
+
+        if (rows.length < 2) {
+          showToast("โครงสร้างไฟล์ CSV ไม่ถูกต้อง หรือไม่มีข้อมูลในไฟล์", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        const headers = rows[0].map(h => h.toLowerCase().trim())
+        const roomNumIdx = headers.indexOf("room_number")
+        const nameIdx = headers.indexOf("tenant_name")
+        const phoneIdx = headers.indexOf("phone")
+        const startIdx = headers.indexOf("lease_start")
+        const endIdx = headers.indexOf("lease_end")
+
+        if (roomNumIdx === -1 || nameIdx === -1) {
+          showToast("หัวคอลัมน์ไม่ถูกต้อง ในไฟล์ CSV ต้องมีคอลัมน์ room_number และ tenant_name", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        const parsedTenants: any[] = []
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i]
+          if (row.length === 0 || (row.length === 1 && !row[0])) continue
+
+          const roomNumber = row[roomNumIdx]?.trim() || ""
+          const tenantName = row[nameIdx]?.trim() || ""
+          const phone = phoneIdx !== -1 ? row[phoneIdx]?.trim() || "" : ""
+          const leaseStart = startIdx !== -1 ? row[startIdx]?.trim() || "" : ""
+          const leaseEnd = endIdx !== -1 ? row[endIdx]?.trim() || "" : ""
+
+          // ข้ามบรรทัดที่ไม่มีข้อมูลอะไรเลย
+          if (!roomNumber && !tenantName && !phone) continue
+
+          // ถ้ามีเลขห้องแต่ไม่มีผู้เช่า ข้ามได้ (ถือว่าไม่ได้เลือกกรอก)
+          if (roomNumber && !tenantName) continue
+
+          parsedTenants.push({
+            room_number: roomNumber,
+            tenant_name: tenantName,
+            phone,
+            lease_start: leaseStart,
+            lease_end: leaseEnd,
+            line_number: i + 1
+          })
+        }
+
+        if (parsedTenants.length === 0) {
+          showToast("ไม่พบข้อมูลผู้เช่าที่ระบุชื่อผู้เช่าถูกต้องในไฟล์ CSV", "error")
+          setUploadingCsv(false)
+          return
+        }
+
+        // ส่งไปบันทึกที่ Server Action
+        const res = await createTenantsBatch(parsedTenants, wsId)
+        if (res.success) {
+          showToast(`✓ นำเข้าข้อมูลผู้เช่าสำเร็จเรียบร้อย ${res.count} ห้องพัก!`, "success")
+          await loadData(true)
+        } else if (res.errors && res.errors.length > 0) {
+          setCsvErrors(res.errors)
+          setIsErrorModalOpen(true)
+          showToast("⚠️ ไม่สามารถนำเข้าข้อมูลได้เนื่องจากมีข้อผิดพลาดบางจุด", "error")
+        } else {
+          showToast(res.error || "เกิดข้อผิดพลาดในการนำเข้าข้อมูลผู้เช่า", "error")
+        }
+        setUploadingCsv(false)
+      }
+      reader.readAsText(file, "UTF-8")
+    } catch (err: any) {
+      showToast("เกิดข้อผิดพลาดในการอัปโหลดไฟล์", "error")
+      setUploadingCsv(false)
+    } finally {
+      e.target.value = ""
+    }
   }
 
   // คำนวณสถานะสัญญาเช่าผู้เช่า (สัญญาปกติ / เหลืออายุสัญญา X เดือน / สัญญาหมดอายุ / อยู่ครบสัญญา)
@@ -411,38 +597,75 @@ export default function TenantsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
-          {/* Sensitive data toggle */}
-          <button
-            onClick={() => setShowSensitiveData(!showSensitiveData)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold shadow-sm transition-all duration-300 cursor-pointer w-full md:w-auto justify-center ${
-              showSensitiveData
-                ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40 text-amber-750 dark:text-amber-400"
-                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-850"
-            }`}
-          >
-            {showSensitiveData ? (
-              <>
-                <EyeOff className="w-4 h-4 text-amber-500" />
-                ซ่อนข้อมูลส่วนตัว
-              </>
-            ) : (
-              <>
-                <Eye className="w-4 h-4 text-slate-400" />
-                แสดงข้อมูลส่วนตัว (PDPA)
-              </>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0 w-full md:w-auto">
+          {/* CSV Actions Group */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              title="ดาวน์โหลดเทมเพลตไฟล์ CSV สำหรับจัดการข้อมูลผู้เช่าและสัญญา"
+              className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
+            >
+              <Download className="w-4 h-4 text-blue-500" />
+              <span className="hidden sm:inline">ดาวน์โหลด CSV Template</span>
+              <span className="sm:hidden">เทมเพลต</span>
+            </button>
+            
+            {hasEditPermission && (
+              <label className="relative flex-1 sm:flex-initial">
+                <span className={`px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm w-full justify-center ${uploadingCsv ? "opacity-60 cursor-not-allowed" : ""}`}>
+                  {uploadingCsv ? (
+                    <RefreshCw className="w-4 h-4 text-emerald-500 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4 text-emerald-500" />
+                  )}
+                  <span className="hidden sm:inline">{uploadingCsv ? "กำลังอัปโหลด..." : "อัปโหลดไฟล์ CSV"}</span>
+                  <span className="sm:hidden">{uploadingCsv ? "..." : "อัปโหลด"}</span>
+                </span>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleUploadCSV}
+                  disabled={uploadingCsv}
+                  className="absolute inset-0 w-0 h-0 opacity-0 cursor-pointer"
+                />
+              </label>
             )}
-          </button>
+          </div>
 
-          {/* Refresh Button */}
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-850 active:scale-95 text-slate-500 dark:text-slate-350 transition-all cursor-pointer shadow-sm disabled:opacity-50"
-            title="รีเฟรชข้อมูล"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Sensitive data toggle */}
+            <button
+              onClick={() => setShowSensitiveData(!showSensitiveData)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold shadow-sm transition-all duration-300 cursor-pointer flex-1 sm:flex-initial justify-center ${
+                showSensitiveData
+                  ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40 text-amber-750 dark:text-amber-400"
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-850"
+              }`}
+            >
+              {showSensitiveData ? (
+                <>
+                  <EyeOff className="w-4 h-4 text-amber-500" />
+                  ซ่อนข้อมูลส่วนตัว
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4 text-slate-400" />
+                  แสดงข้อมูลส่วนตัว (PDPA)
+                </>
+              )}
+            </button>
+
+            {/* Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-850 active:scale-95 text-slate-500 dark:text-slate-350 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+              title="รีเฟรชข้อมูล"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -804,6 +1027,50 @@ export default function TenantsPage() {
                   <Trash2 className="w-3.5 h-3.5" />
                 )}
                 ยืนยันลบถาวร
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Error Report Modal */}
+      {isErrorModalOpen && csvErrors && csvErrors.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 max-w-lg w-full shadow-2xl space-y-4 flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-start">
+              <div className="flex gap-3 items-center text-red-600 dark:text-red-400">
+                <div className="p-2.5 bg-red-50 dark:bg-red-950/40 rounded-2xl shrink-0">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">พบข้อผิดพลาดในการตรวจสอบข้อมูล</h3>
+                  <p className="text-xs text-slate-550 dark:text-slate-400 mt-0.5">การบันทึกถูกระงับเพื่อความถูกต้องของข้อมูลทั้งหมด (Atomic Safety)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsErrorModalOpen(false)}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-650 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 max-h-[50vh] min-h-[150px] border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 bg-slate-50/50 dark:bg-slate-900/30">
+              {csvErrors.map((err, idx) => (
+                <div key={idx} className="flex gap-2.5 items-start text-xs text-slate-700 dark:text-slate-300 font-medium py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+                  <p className="leading-relaxed">{err}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setIsErrorModalOpen(false)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-xl cursor-pointer hover:shadow-lg transition-all active:scale-95"
+              >
+                รับทราบและปิดหน้าต่าง
               </button>
             </div>
           </div>
