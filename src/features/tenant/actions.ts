@@ -1110,7 +1110,7 @@ export async function createTenantsBatch(
         return new Date().toISOString().split("T")[0]
       }
       
-      const clean = rawDate.trim()
+      const clean = rawDate.trim().replace(/^["']|["']$/g, "")
       // ถ้าเป็น YYYY-MM-DD อยู่แล้ว ให้ผ่านได้เลย
       if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
         return clean

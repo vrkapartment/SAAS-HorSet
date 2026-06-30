@@ -137,7 +137,7 @@ export default function TenantsPage() {
       const day = String(todayDate.getDate()).padStart(2, '0')
       const month = String(todayDate.getMonth() + 1).padStart(2, '0')
       const year = todayDate.getFullYear()
-      const todayStr = `${day}/${month}/${year}`
+      const todayStr = `'${day}/${month}/${year}`
 
       const rows: string[] = []
       if (sortedRooms.length > 0) {
