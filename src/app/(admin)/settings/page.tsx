@@ -210,9 +210,9 @@ function SettingsHubContent() {
         </div>
       </div>
 
-      {/* Horizontal Tabs Selection at Top */}
+      {/* Tabs Selection at Top - Responsive Wrap */}
       <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 p-3 rounded-3xl shadow-sm">
-        <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-none font-bold">
+        <div className="flex flex-wrap gap-2 font-bold">
           {allowedTabs.map((tab) => {
             const Icon = tab.icon
             const isSelected = resolvedActiveTab === tab.id
