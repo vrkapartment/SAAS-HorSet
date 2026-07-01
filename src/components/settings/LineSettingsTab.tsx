@@ -506,6 +506,7 @@ export default function LineSettingsTab() {
 
                 {isConfigured && !isEditing ? (
                   <button
+                    key="edit-api-btn"
                     type="button"
                     onClick={() => {
                       setIsEditing(true)
@@ -519,6 +520,7 @@ export default function LineSettingsTab() {
                   </button>
                 ) : (
                   <button
+                    key="submit-api-btn"
                     type="submit"
                     disabled={savingSettings}
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-blue-500/10"

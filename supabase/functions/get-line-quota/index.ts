@@ -139,6 +139,44 @@ serve(async (req) => {
 
     // If cache is valid, return it immediately
     if (cachedData) {
+      // If the cache contains default bot info, perform a lightweight check to fetch real details
+      if (!cachedData.displayName || cachedData.displayName === "LINE OA ของหอพัก") {
+        try {
+          const infoRes = await fetch("https://api.line.me/v2/bot/info", {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${lineAccessToken}`
+            }
+          })
+          if (infoRes.ok) {
+            const infoJson = await infoRes.json()
+            if (infoJson.displayName) {
+              cachedData.displayName = infoJson.displayName
+              // Update memory cache
+              if (!memoryCache[workspaceId]) {
+                memoryCache[workspaceId] = {
+                  limit: cachedData.limit,
+                  consumed: cachedData.consumed,
+                  remaining: cachedData.remaining,
+                  percentage_used: cachedData.percentage_used,
+                  displayName: infoJson.displayName,
+                  basicId: infoJson.basicId || cachedData.basicId,
+                  updatedAt: Date.now()
+                }
+              } else {
+                memoryCache[workspaceId].displayName = infoJson.displayName
+                if (infoJson.basicId) memoryCache[workspaceId].basicId = infoJson.basicId
+              }
+            }
+            if (infoJson.basicId) {
+              cachedData.basicId = infoJson.basicId
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to fetch bot info on cache hit:", e)
+        }
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
