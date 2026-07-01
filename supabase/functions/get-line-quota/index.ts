@@ -68,8 +68,8 @@ serve(async (req) => {
               consumed: data.consumed_count,
               remaining: data.remaining_count,
               percentage_used: data.percentage_used,
-              displayName: cachedInfo.displayName || "LINE OA ของหอพัก",
-              basicId: cachedInfo.basicId || "@line_oa",
+              displayName: data.bot_name || cachedInfo.displayName || "LINE OA ของหอพัก",
+              basicId: data.bot_basic_id || cachedInfo.basicId || "@line_oa",
               cached: true,
               source: "database",
               updated_at: data.updated_at
@@ -100,8 +100,8 @@ serve(async (req) => {
               consumed: legacyData.consumed_count,
               remaining: legacyData.remaining_count,
               percentage_used: legacyData.percentage_used,
-              displayName: cachedInfo.displayName || "LINE OA ของหอพัก",
-              basicId: cachedInfo.basicId || "@line_oa",
+              displayName: legacyData.bot_name || cachedInfo.displayName || "LINE OA ของหอพัก",
+              basicId: legacyData.bot_basic_id || cachedInfo.basicId || "@line_oa",
               cached: true,
               source: "database_legacy",
               updated_at: legacyData.updated_at
@@ -287,6 +287,8 @@ serve(async (req) => {
               consumed_count: consumed,
               remaining_count: remaining,
               percentage_used,
+              bot_name: displayName,
+              bot_basic_id: basicId,
               updated_at: responsePayload.updated_at
             })
             .eq("workspace_id", workspaceId)
@@ -299,6 +301,8 @@ serve(async (req) => {
               consumed_count: consumed,
               remaining_count: remaining,
               percentage_used,
+              bot_name: displayName,
+              bot_basic_id: basicId,
               updated_at: responsePayload.updated_at
             })
             .eq("id", 1)
@@ -312,6 +316,8 @@ serve(async (req) => {
               consumed_count: consumed,
               remaining_count: remaining,
               percentage_used,
+              bot_name: displayName,
+              bot_basic_id: basicId,
               updated_at: responsePayload.updated_at
             })
         }

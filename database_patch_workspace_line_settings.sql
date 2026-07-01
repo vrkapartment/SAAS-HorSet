@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS public.workspace_line_settings (
   consumed_count integer NOT NULL DEFAULT 0,
   remaining_count integer NOT NULL DEFAULT 1000,
   percentage_used integer NOT NULL DEFAULT 0,
+  bot_name text DEFAULT 'LINE OA ของหอพัก',        -- Cached LINE Bot Display Name
+  bot_basic_id text DEFAULT '@line_oa',            -- Cached LINE Bot Basic ID (e.g. @line_oa)
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

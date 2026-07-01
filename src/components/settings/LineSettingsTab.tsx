@@ -99,8 +99,8 @@ export default function LineSettingsTab() {
                 consumed: data.consumed_count,
                 remaining: data.remaining_count,
                 percentage_used: data.percentage_used,
-                displayName: "LINE OA ของหอพัก",
-                basicId: "@line_oa",
+                displayName: data.bot_name || "LINE OA ของหอพัก",
+                basicId: data.bot_basic_id || "@line_oa",
                 cached: true,
                 source: "database",
                 updated_at: data.updated_at
@@ -167,9 +167,13 @@ export default function LineSettingsTab() {
     try {
       const supabase = createClient()
       const { data, error: funcErr } = await supabase.functions.invoke(
-        `get-line-quota?workspace_id=${activeWsId}${forceRefresh ? "&bypass_cache=true" : ""}`,
+        "get-line-quota",
         {
-          method: "GET"
+          method: "GET",
+          queryParams: {
+            workspace_id: activeWsId,
+            ...(forceRefresh ? { bypass_cache: "true" } : {})
+          }
         }
       )
 
@@ -575,6 +579,16 @@ export default function LineSettingsTab() {
                   <RefreshCw className={`w-4 h-4 ${fetchingQuota ? "animate-spin" : ""}`} />
                 </button>
               </div>
+
+              {quotaError && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs sm:text-sm font-bold flex items-start gap-2.5 shadow-inner">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <span className="block font-extrabold text-rose-600 dark:text-rose-400">ดึงข้อมูลโควตาล่าสุดไม่สำเร็จ (LINE Integration Error):</span>
+                    <span className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed block">{quotaError}</span>
+                  </div>
+                </div>
+              )}
 
               {quotaData ? (
                 <div className="space-y-4 pt-2">
