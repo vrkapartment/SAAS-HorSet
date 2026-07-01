@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect } from "react"
 import { 
@@ -327,7 +327,7 @@ export default function LineSettingsTab() {
             <MessageSquare className="w-6 h-6 text-blue-500 dark:text-blue-400" />
             <span>เชื่อมต่อ LINE OA (Personal LINE OA Integration)</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 mt-2 leading-relaxed font-sans font-semibold">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed font-sans font-semibold">
             เชื่อมต่อเซิร์ฟเวอร์ LINE Developers และเปิดใช้งาน Messaging API เพื่อส่งบิลแจ้งหนี้ในรูปแบบ Flex Message สุดพรีเมียมให้ลูกบ้านโดยตรงภายใต้แบรนด์หอพักคุณเอง
           </p>
         </div>
@@ -366,13 +366,13 @@ export default function LineSettingsTab() {
         <div className="space-y-6">
           
           {/* Card: Configuration Settings */}
-          <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5">
+          <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
                 <Settings className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg md:text-xl font-black text-slate-850 dark:text-slate-100">
+                <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
                   ตั้งค่าเชื่อมต่อ LINE Messaging API
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
@@ -391,7 +391,7 @@ export default function LineSettingsTab() {
                   <input
                     type={showToken ? "text" : "password"}
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors"
+                    className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors"
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
                     required
@@ -412,14 +412,14 @@ export default function LineSettingsTab() {
                   <label className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                     LINE LIFF ID
                   </label>
-                  <span className="text-xs text-slate-400 dark:text-slate-505 font-bold">
+                  <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">
                     * จำเป็นเพื่อเชื่อมโยงผู้ใช้ให้ตรงกับ Provider ของคุณ
                   </span>
                 </div>
                 <input
                   type="text"
                   placeholder="2010442620-H4josaDy"
-                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors"
+                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors"
                   value={liffInput}
                   onChange={(e) => setLiffInput(e.target.value)}
                   required
@@ -467,14 +467,14 @@ export default function LineSettingsTab() {
 
           {/* Card: Quota Information */}
           {isConfigured && (
-            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5">
+            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5">
               <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
                     <Key className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg md:text-xl font-black text-slate-850 dark:text-slate-100">
+                    <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
                       ตรวจสอบโควตา LINE OA ของหอพัก
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
@@ -495,20 +495,20 @@ export default function LineSettingsTab() {
               {quotaData ? (
                 <div className="space-y-4 pt-2">
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850/60 rounded-2xl flex flex-col justify-between">
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
                       <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">ส่งไปแล้ว</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.consumed.toLocaleString()}</strong>
                       <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
                     </div>
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850/60 rounded-2xl flex flex-col justify-between">
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
                       <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">คงเหลือ</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.remaining.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-550 font-semibold block mt-0.5">ข้อความ</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
                     </div>
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850/60 rounded-2xl flex flex-col justify-between">
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
                       <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">โควตารวม</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.limit.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-505 font-semibold block mt-0.5">ข้อความ</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
                     </div>
                   </div>
 
@@ -518,7 +518,7 @@ export default function LineSettingsTab() {
                       <span>เปอร์เซ็นต์โควตาที่ใช้ไป</span>
                       <span className={`${percentage >= 85 ? "text-rose-500 animate-pulse" : "text-blue-500"} font-black`}>{percentage}%</span>
                     </div>
-                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-850/35">
+                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-800/35">
                       <div 
                         className={`h-full rounded-full transition-all duration-500 ${
                           percentage >= 90 ? "bg-rose-500" : percentage >= 75 ? "bg-amber-500" : "bg-blue-600"
@@ -553,7 +553,7 @@ export default function LineSettingsTab() {
         {/* Right side: Owner Setup Tutorial Manual */}
         {showManual && (
           <div className="space-y-6">
-            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl shadow-sm space-y-5 animate-fadeIn">
+            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5 animate-fadeIn">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
@@ -589,7 +589,7 @@ export default function LineSettingsTab() {
               <div className="space-y-4 text-sm font-semibold leading-relaxed text-slate-700 dark:text-slate-200">
                 
                 {/* Step 1 Accordion */}
-                <div className="border border-slate-150 dark:border-slate-850 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
                   <button
                     type="button"
                     onClick={() => setOpenStep1(!openStep1)}
@@ -599,15 +599,15 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         1
                       </span>
-                      <span className="font-extrabold text-slate-855 dark:text-slate-100 text-sm md:text-base">➡️ สร้าง Provider สำหรับหอพัก</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ สร้าง Provider สำหรับหอพัก</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep1 ? "rotate-180" : ""}`} />
                   </button>
                   
                   {openStep1 && (
-                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-850/60 text-xs sm:text-sm text-slate-600 dark:text-slate-350 font-medium space-y-3.5 animate-fadeIn">
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 animate-fadeIn">
                       <p className="leading-relaxed">
-                        เข้าสู่เว็บ <span className="font-bold text-slate-850 dark:text-slate-100">LINE Developers Console</span> สมัครบัญชีผู้พัฒนา
+                        เข้าสู่เว็บ <span className="font-bold text-slate-800 dark:text-slate-100">LINE Developers Console</span> สมัครบัญชีผู้พัฒนา
                       </p>
                       <div className="py-1">
                         <a 
@@ -628,7 +628,7 @@ export default function LineSettingsTab() {
                 </div>
 
                 {/* Step 2 Accordion */}
-                <div className="border border-slate-150 dark:border-slate-850 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
                   <button
                     type="button"
                     onClick={() => setOpenStep2(!openStep2)}
@@ -638,13 +638,13 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         2
                       </span>
-                      <span className="font-extrabold text-slate-855 dark:text-slate-100 text-sm md:text-base">➡️ สร้างระบบส่งแจ้งเตือน (Messaging API)</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ สร้างระบบส่งแจ้งเตือน (Messaging API)</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep2 ? "rotate-180" : ""}`} />
                   </button>
                   
                   {openStep2 && (
-                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-850/60 text-xs sm:text-sm text-slate-600 dark:text-slate-350 font-medium space-y-3.5 animate-fadeIn">
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 animate-fadeIn">
                       <p className="leading-relaxed">
                         กดเข้า Provider ที่พึ่งสร้าง กดสร้าง Channel ใหม่ เลือกหัวข้อ <strong className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</strong>
                       </p>
@@ -671,7 +671,7 @@ export default function LineSettingsTab() {
                           <div>• เข้าสู่ระบบและเลือก <span className="font-extrabold text-slate-800 dark:text-slate-200">Line OA ของท่าน</span></div>
                           <div>• เลื่อนแถบด้านบนฝั่งขวาชื่อ <span className="font-extrabold text-slate-800 dark:text-slate-200">"ตั้งค่า"</span></div>
                           <div>• ไปที่หัวข้อด้านบนชื่อ <span className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</span></div>
-                          <div>• กดปุ่ม <span className="font-extrabold text-slate-850 dark:text-slate-100">"ใช้ Messaging API"</span></div>
+                          <div>• กดปุ่ม <span className="font-extrabold text-slate-800 dark:text-slate-100">"ใช้ Messaging API"</span></div>
                           <div>• เลือก Provider ของท่าน และกดยอมรับ</div>
                           <div>• กลับมาที่หน้า LINE Developers Console อีกรอบ เลือก Provider ของท่าน</div>
                           <div>• จะมี Messaging API พร้อมชื่อ Line OA ของท่านแสดงขึ้นมา <span className="font-extrabold text-slate-800 dark:text-slate-200">กดเข้าไปที่ชื่อ Line OA ของท่าน</span></div>
@@ -692,7 +692,7 @@ export default function LineSettingsTab() {
                 </div>
 
                 {/* Step 3 Accordion */}
-                <div className="border border-slate-150 dark:border-slate-850 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
                   <button
                     type="button"
                     onClick={() => setOpenStep3(!openStep3)}
@@ -702,21 +702,21 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         3
                       </span>
-                      <span className="font-extrabold text-slate-855 dark:text-slate-100 text-sm md:text-base">➡️ สร้างหน้ายืนยันสิทธิ์ (LINE Login & LIFF)</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ สร้างหน้ายืนยันสิทธิ์ (LINE Login & LIFF)</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep3 ? "rotate-180" : ""}`} />
                   </button>
                   
                   {openStep3 && (
-                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-850/60 text-xs sm:text-sm text-slate-600 dark:text-slate-350 font-medium space-y-3.5 animate-fadeIn">
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 animate-fadeIn">
                       <p className="leading-relaxed">
-                        กดเข้า Provider ที่พึ่งสร้าง กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">Create New Channel</strong> เลือกหัวข้อ <strong className="font-extrabold text-slate-850 dark:text-slate-100">LINE Login</strong>
+                        กดเข้า Provider ที่พึ่งสร้าง กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">Create New Channel</strong> เลือกหัวข้อ <strong className="font-extrabold text-slate-800 dark:text-slate-100">LINE Login</strong>
                       </p>
                       <p className="leading-relaxed">
                         ตั้งค่าตามที่กำหนด:
                       </p>
                       
-                      <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-750 dark:text-slate-300">
+                      <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-700 dark:text-slate-300">
                         <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Region to provide the service</span> = Thailand</div>
                         <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Company or owner's country or region</span> = Thailand</div>
                         <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Channel name</span> = สามารถตั้งชื่อได้ตามที่ท่านต้องการ</div>
@@ -725,25 +725,25 @@ export default function LineSettingsTab() {
                       </div>
 
                       <p className="leading-relaxed">
-                        กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">I agree to the LINE Developers Agreement.</strong>
+                        กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">I agree to the LINE Developers Agreement.</strong>
                       </p>
                       <p className="leading-relaxed">
-                        กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">I have read and acknowledge LY Corporation Privacy Policy.</strong> และกด <strong className="font-extrabold text-slate-850 dark:text-slate-100">Create</strong>
+                        กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">I have read and acknowledge LY Corporation Privacy Policy.</strong> และกด <strong className="font-extrabold text-slate-800 dark:text-slate-100">Create</strong>
                       </p>
                       <p className="leading-relaxed">
-                        ไปที่แท็บด้านบนชื่อ <strong className="font-extrabold text-slate-850 dark:text-slate-100">LIFF</strong> กด <strong className="font-extrabold text-slate-850 dark:text-slate-100">Add</strong>
+                        ไปที่แท็บด้านบนชื่อ <strong className="font-extrabold text-slate-800 dark:text-slate-100">LIFF</strong> กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">Add</strong>
                       </p>
                       <p className="leading-relaxed">
                         ตั้งค่าตามที่กำหนด:
                       </p>
 
-                      <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-755 dark:text-slate-300">
+                      <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-700 dark:text-slate-300">
                         <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">LIFF app name</span> = สามารถตั้งชื่อได้ตามที่ท่านต้องการ</div>
                         <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Size</span> = full</div>
                         <div className="space-y-2 border-y border-slate-200/50 dark:border-slate-800/60 py-2.5 my-1">
                           <div className="flex items-center gap-1.5 font-semibold">• <span className="text-blue-600 dark:text-blue-400 font-bold">Endpoint URL</span> = https://saas-horset.vercel.app/tenant-register</div>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
-                            <span className="flex-1 p-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-blue-600 dark:text-blue-400 text-[11px] select-all break-all leading-normal font-mono">
+                            <span className="flex-1 p-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-blue-600 dark:text-blue-400 text-[11px] select-all break-all leading-normal font-mono">
                               https://saas-horset.vercel.app/tenant-register
                             </span>
                             <button
@@ -765,17 +765,17 @@ export default function LineSettingsTab() {
                       </div>
 
                       <p className="leading-relaxed">
-                        กดปุ่ม <strong className="font-extrabold text-slate-850 dark:text-slate-100">Add</strong> ด้านล่างสุด
+                        กดปุ่ม <strong className="font-extrabold text-slate-800 dark:text-slate-100">Add</strong> ด้านล่างสุด
                       </p>
                       <p className="leading-relaxed">
-                        คัดลอกรหัส <strong className="font-extrabold text-slate-850 dark:text-slate-100">LIFF ID</strong> มากรอกในช่องด้านซ้าย แล้วกดปุ่มบันทึกการตั้งค่า
+                        คัดลอกรหัส <strong className="font-extrabold text-slate-800 dark:text-slate-100">LIFF ID</strong> มากรอกในช่องด้านซ้าย แล้วกดปุ่มบันทึกการตั้งค่า
                       </p>
                     </div>
                   )}
                 </div>
 
                 {/* Crucial Warnings Accordion */}
-                <div className="border border-rose-250 dark:border-rose-900/40 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-rose-500/[0.01] dark:bg-rose-950/[0.04]">
+                <div className="border border-rose-200 dark:border-rose-900/40 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-rose-500/[0.01] dark:bg-rose-950/[0.04]">
                   <button
                     type="button"
                     onClick={() => setOpenWarnings(!openWarnings)}
@@ -789,37 +789,37 @@ export default function LineSettingsTab() {
                   </button>
 
                   {openWarnings && (
-                    <div className="p-5 bg-transparent border-t border-rose-200/30 dark:border-rose-900/20 space-y-4 text-xs sm:text-sm text-slate-650 dark:text-slate-300 font-medium animate-fadeIn">
+                    <div className="p-5 bg-transparent border-t border-rose-200/30 dark:border-rose-900/20 space-y-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium animate-fadeIn">
                       
                       {/* Warning 1 */}
                       <div className="space-y-1">
-                        <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           1. ต้องเผยแพร่สถานะ LINE Login เสมอ (เปลี่ยนเป็น "Published")
                         </strong>
-                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-medium">
+                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
                           เมื่อเริ่มสร้าง LINE Login ระบบจะตั้งสถานะเริ่มต้นเป็น <strong className="text-slate-700 dark:text-slate-300 font-bold">Developing (สีเทา)</strong> ทำให้เฉพาะตัวแอดมินเท่านั้นที่ใช้งานลิงก์ได้ แต่ผู้เช่าทั่วไปจะเจอปัญหากดสมัครไม่ได้หรือหน้าจอลูปหมุนวนไม่หยุด <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">วิธีแก้:</strong> คลิกที่แถบสถานะกลม ๆ สีเทามุมขวาบนของหน้า LINE Login ให้เปลี่ยนเป็นสถานะ <strong className="text-emerald-650 dark:text-emerald-400 font-extrabold">Published (สีเขียว)</strong> ก่อนใช้งานจริง
                         </p>
                       </div>
 
                       {/* Warning 2 */}
                       <div className="space-y-1">
-                        <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           2. Endpoint URL ของ LIFF ต้องมีสแลช "/tenant-register" เสมอ
                         </strong>
-                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-medium">
+                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
                           ตรวจสอบว่าในช่อง Endpoint URL ตอนลงทะเบียน LIFF มีค่าต่อท้ายครบถ้วน ไม่เป็นเพียงชื่อโดเมนเปล่า ๆ มิฉะนั้นผู้เช่าที่กดลิงก์มาจะหาข้อมูลห้องพักไม่เจอและจะขึ้นแจ้งเตือน <strong className="text-rose-500 font-bold">"ไม่ระบุข้อมูลห้องพัก"</strong> ป้องกันการยืนยันข้อมูล
                         </p>
                       </div>
 
                       {/* Warning 3 */}
                       <div className="space-y-1">
-                        <strong className="text-sm font-extrabold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           3. วิธีส่งต่อลิงก์ลงทะเบียนที่ถูกต้อง
                         </strong>
-                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-medium">
+                        <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
                           เมื่อแอดมินคลิกปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"เจนลิงก์ LINE"</strong> ให้ทำการกดปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"คัดลอกลิงก์"</strong> แล้วส่งให้ผู้เช่าตรง ๆ ทางแชททันที <strong className="text-rose-500 font-bold">ห้ามแอดมินกดเปิดลิงก์ทดสอบก่อนแล้วไปก๊อปปี้ URL บนเว็บเบราว์เซอร์ส่งให้ผู้เช่าเด็ดขาด</strong> เพราะข้อมูลตัวตนของหอพักและหมายเลขห้องพักจะสูญหายทันที
                         </p>
                       </div>
