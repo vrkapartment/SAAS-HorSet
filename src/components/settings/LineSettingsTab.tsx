@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useEffect } from "react"
 import { 
@@ -88,16 +88,22 @@ export default function LineSettingsTab() {
             setIsConfigured(!!data.channel_access_token)
             
             // Set initial quota display from cache row
-            if (data.limit_count) {
+            if (data.limit_count !== null && data.limit_count !== undefined) {
               setQuotaData({
                 limit: data.limit_count,
                 consumed: data.consumed_count,
                 remaining: data.remaining_count,
                 percentage_used: data.percentage_used,
+                displayName: "LINE OA ของหอพัก",
+                basicId: "@line_oa",
                 cached: true,
                 source: "database",
                 updated_at: data.updated_at
               })
+            }
+            if (data.channel_access_token) {
+              // Trigger a background non-forced refresh to get bot profile/fresher quota
+              setTimeout(() => loadLineQuota(false, wsId), 100)
             }
           }
         } else {
@@ -111,6 +117,8 @@ export default function LineSettingsTab() {
             consumed: 125,
             remaining: 875,
             percentage_used: 13,
+            displayName: "LINE OA ของหอพัก (Demo)",
+            basicId: "@line_oa_demo",
             cached: true,
             source: "demo",
             updated_at: new Date().toISOString()
@@ -126,8 +134,9 @@ export default function LineSettingsTab() {
     loadWorkspaceAndSettings()
   }, [isDemo])
 
-  const loadLineQuota = async (forceRefresh = false) => {
-    if (!workspaceId) return
+  const loadLineQuota = async (forceRefresh = false, targetWorkspaceId?: string) => {
+    const activeWsId = targetWorkspaceId || workspaceId
+    if (!activeWsId) return
     setFetchingQuota(true)
     setQuotaError(null)
 
@@ -138,6 +147,8 @@ export default function LineSettingsTab() {
         consumed: 125,
         remaining: 875,
         percentage_used: 13,
+        displayName: "LINE OA ของหอพัก (Demo)",
+        basicId: "@line_oa_demo",
         cached: false,
         source: "demo",
         updated_at: new Date().toISOString()
@@ -149,7 +160,7 @@ export default function LineSettingsTab() {
     try {
       const supabase = createClient()
       const { data, error: funcErr } = await supabase.functions.invoke(
-        `get-line-quota?workspace_id=${workspaceId}${forceRefresh ? "&bypass_cache=true" : ""}`,
+        `get-line-quota?workspace_id=${activeWsId}${forceRefresh ? "&bypass_cache=true" : ""}`,
         {
           method: "GET"
         }
@@ -163,6 +174,8 @@ export default function LineSettingsTab() {
           consumed: data.consumed,
           remaining: data.remaining,
           percentage_used: data.percentage_used,
+          displayName: data.displayName || "LINE OA ของหอพัก",
+          basicId: data.basicId || "@line_oa",
           source: data.source,
           cached: data.cached,
           updated_at: data.updated_at
@@ -477,7 +490,18 @@ export default function LineSettingsTab() {
                     <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
                       ตรวจสอบโควตา LINE OA ของหอพัก
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
+                    {quotaData && (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="inline-flex items-center gap-1 bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-lg text-[11px] font-black border border-green-500/20 shadow-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping shrink-0" />
+                          <span>{quotaData.displayName || "LINE OA ของหอพัก"}</span>
+                        </span>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono font-bold bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200/50 dark:border-slate-800/60 shadow-sm shrink-0">
+                          {quotaData.basicId || "@line_oa"}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">
                       โควตาสำหรับส่งข้อความ Flex Message รายเดือนของคุณ
                     </p>
                   </div>
@@ -531,13 +555,41 @@ export default function LineSettingsTab() {
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-bold pt-1">
                     <span className="flex items-center gap-1.5">
                       {quotaData.cached ? (
-                        <span className="bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500">แคชระบบ</span>
+                        <span className="bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">แคชระบบ</span>
                       ) : (
-                        <span className="bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 text-xs font-bold">อัปเดตสด</span>
+                        <span className="bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 text-[10px] font-bold uppercase tracking-wider">อัปเดตสด</span>
                       )}
-                      <span>แหล่งที่มา: {quotaData.source}</span>
+                      <span>
+                        แหล่งที่มา:{" "}
+                        <span className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wide">
+                          {quotaData.source === "api" 
+                            ? "LINE API" 
+                            : quotaData.source === "database" 
+                            ? "database" 
+                            : quotaData.source === "database_legacy" 
+                            ? "database (legacy)" 
+                            : quotaData.source === "memory" 
+                            ? "memory cache" 
+                            : quotaData.source === "demo" 
+                            ? "LINE API (Demo)" 
+                            : quotaData.source}
+                        </span>
+                      </span>
                     </span>
-                    <span>ล่าสุด: {new Date(quotaData.updated_at).toLocaleTimeString("th-TH")} น.</span>
+                    <span>
+                      ล่าสุด:{" "}
+                      {(() => {
+                        try {
+                          const date = new Date(quotaData.updated_at);
+                          return isNaN(date.getTime()) 
+                            ? "--:--:--" 
+                            : date.toLocaleTimeString("th-TH", { hour12: false });
+                        } catch (e) {
+                          return "--:--:--";
+                        }
+                      })()}{" "}
+                      น.
+                    </span>
                   </div>
                 </div>
               ) : (

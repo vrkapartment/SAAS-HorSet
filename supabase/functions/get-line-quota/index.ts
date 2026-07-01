@@ -13,6 +13,8 @@ let memoryCache: { [key: string]: {
   consumed: number;
   remaining: number;
   percentage_used: number;
+  displayName: string;
+  basicId: string;
   updatedAt: number;
 } } = {};
 
@@ -60,11 +62,14 @@ serve(async (req) => {
           const cacheAge = now - new Date(data.updated_at).getTime()
           // Only use database cache if bypassCache is FALSE
           if (!bypassCache && cacheAge < tenMinutes && data.limit_count !== null && data.consumed_count !== null) {
+            const cachedInfo = memoryCache[workspaceId] || {}
             cachedData = {
               limit: data.limit_count,
               consumed: data.consumed_count,
               remaining: data.remaining_count,
               percentage_used: data.percentage_used,
+              displayName: cachedInfo.displayName || "LINE OA ของหอพัก",
+              basicId: cachedInfo.basicId || "@line_oa",
               cached: true,
               source: "database",
               updated_at: data.updated_at
@@ -89,11 +94,14 @@ serve(async (req) => {
           }
           const cacheAge = now - new Date(legacyData.updated_at).getTime()
           if (!bypassCache && cacheAge < tenMinutes && legacyData.limit_count !== null && legacyData.consumed_count !== null) {
+            const cachedInfo = memoryCache[workspaceId] || {}
             cachedData = {
               limit: legacyData.limit_count,
               consumed: legacyData.consumed_count,
               remaining: legacyData.remaining_count,
               percentage_used: legacyData.percentage_used,
+              displayName: cachedInfo.displayName || "LINE OA ของหอพัก",
+              basicId: cachedInfo.basicId || "@line_oa",
               cached: true,
               source: "database_legacy",
               updated_at: legacyData.updated_at
@@ -120,6 +128,8 @@ serve(async (req) => {
           consumed: memoryCache[workspaceId].consumed,
           remaining: memoryCache[workspaceId].remaining,
           percentage_used: memoryCache[workspaceId].percentage_used,
+          displayName: memoryCache[workspaceId].displayName,
+          basicId: memoryCache[workspaceId].basicId,
           cached: true,
           source: "memory",
           updated_at: new Date(memoryCache[workspaceId].updatedAt).toISOString()
@@ -156,7 +166,18 @@ serve(async (req) => {
       }
     })
 
-    const [quotaRes, consumptionRes] = await Promise.all([quotaPromise, consumptionPromise])
+    const infoPromise = fetch("https://api.line.me/v2/bot/info", {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${lineAccessToken}`
+      }
+    })
+
+    const [quotaRes, consumptionRes, infoRes] = await Promise.all([
+      quotaPromise,
+      consumptionPromise,
+      infoPromise
+    ])
 
     if (!quotaRes.ok) {
       const errText = await quotaRes.text()
@@ -171,6 +192,21 @@ serve(async (req) => {
     const quotaJson = await quotaRes.json()
     const consumptionJson = await consumptionRes.json()
 
+    let displayName = "LINE OA ของหอพัก"
+    let basicId = "@line_oa"
+
+    if (infoRes.ok) {
+      try {
+        const infoJson = await infoRes.json()
+        if (infoJson.displayName) displayName = infoJson.displayName
+        if (infoJson.basicId) basicId = infoJson.basicId
+      } catch (e) {
+        console.warn("Failed to parse LINE bot info response:", e)
+      }
+    } else {
+      console.warn(`LINE Messaging API (info) error: ${infoRes.status}`)
+    }
+
     const limitType = quotaJson.type
     const limit = limitType === "none" ? 100000 : (quotaJson.value || 1000)
     const consumed = consumptionJson.totalUsage || 0
@@ -183,6 +219,8 @@ serve(async (req) => {
       consumed,
       remaining,
       percentage_used,
+      displayName,
+      basicId,
       cached: false,
       source: "api",
       updated_at: new Date().toISOString()
@@ -194,6 +232,8 @@ serve(async (req) => {
       consumed,
       remaining,
       percentage_used,
+      displayName,
+      basicId,
       updatedAt: now
     }
 
