@@ -128,6 +128,7 @@ export default function TenantPortal() {
   const [latePenaltyRate, setLatePenaltyRate] = useState(0)
   const [waiveElectricMin, setWaiveElectricMin] = useState(false)
   const [waiveWaterMin, setWaiveWaterMin] = useState(false)
+  const [extraExpenses, setExtraExpenses] = useState<any[]>([])
 
 
 
@@ -214,6 +215,7 @@ export default function TenantPortal() {
         if (data.waiveWaterMin !== undefined) {
           setWaiveWaterMin(!!data.waiveWaterMin)
         }
+        setExtraExpenses(data.extraExpenses || [])
 
         const activeBills = data.bills as any[]
         if (activeBills && activeBills.length > 0) {
@@ -368,7 +370,8 @@ export default function TenantPortal() {
         otherServiceAmount,
         waiveElectricMin,
         waiveWaterMin,
-        invoiceId: bill ? (bill.invoiceId || bill.invoice_id) : `INV-${(bill?.billingCycle || '2026-06').replace('-', '')}-${roomNumber}`
+        invoiceId: bill ? (bill.invoiceId || bill.invoice_id) : `INV-${(bill?.billingCycle || '2026-06').replace('-', '')}-${roomNumber}`,
+        extraExpenses: extraExpenses
       })
 
       const link = document.createElement("a")

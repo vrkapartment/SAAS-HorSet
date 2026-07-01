@@ -268,7 +268,9 @@ function ManageBillsContent() {
   const computedWaterCost = !isWaterWaived && waterMinChecked && waterUnitsManual <= waterMinUnit
     ? waterMinUnit * waterRate
     : waterUnitsManual * waterRate
-  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual
+
+  const selectedManualRoomExtraExpensesSum = selectedManualRoom?.extraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual + selectedManualRoomExtraExpensesSum
 
   const getPreviousCycle = (cycle: string) => {
     const [year, month] = cycle.split("-").map(Number)
@@ -1086,7 +1088,11 @@ function ManageBillsContent() {
         const elecCost = finalElecUnits * elecRate
         const waterCost = finalWaterUnits * waterRate
 
-        const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0)
+        const roomInfo = roomsList?.find((r: any) => r.roomNumber === roomNumber)
+        const extraExpenses = roomInfo?.extraExpenses || []
+        const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
+        const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0) + extraExpensesSum
 
         const billResult = await createBill(
           roomNumber,
@@ -1213,7 +1219,11 @@ function ManageBillsContent() {
           const elecCost = finalElecUnits * elecRate
           const waterCost = finalWaterUnits * waterRate
 
-          const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0)
+          const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+          const extraExpenses = roomInfo?.extraExpenses || []
+          const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
+          const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0) + extraExpensesSum
 
           await createBill(
             item.roomNumber,
@@ -1338,8 +1348,12 @@ function ManageBillsContent() {
         amount: item.billAmount || (() => {
           const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
           const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
-          return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0)
+          const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+          const extraExpenses = roomInfo?.extraExpenses || []
+          const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+          return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + extraExpensesSum
         })(),
+        extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
         waiveElectricMin: item.waiveElectricMin,
         waiveWaterMin: item.waiveWaterMin,
         promptPayId,
@@ -1416,8 +1430,12 @@ function ManageBillsContent() {
           amount: item.billAmount || (() => {
             const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
             const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
-            return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0)
+            const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+            const extraExpenses = roomInfo?.extraExpenses || []
+            const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+            return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + extraExpensesSum
           })(),
+          extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
           waiveElectricMin: item.waiveElectricMin,
           waiveWaterMin: item.waiveWaterMin,
           promptPayId,

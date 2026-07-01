@@ -31,6 +31,7 @@ interface LineBillNotificationPayload {
   totalAmount: number
   workspaceName: string
   workspaceId?: string
+  extraExpenses?: Array<{ name: string; amount: number }>
 }
 
 /**
@@ -52,6 +53,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       totalAmount,
       workspaceName,
       workspaceId,
+      extraExpenses = [],
     } = payload
 
     const supabase = await createClient()
@@ -317,7 +319,27 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
                     align: "end"
                   }
                 ]
-              }
+              },
+              ...((extraExpenses || []).map((exp) => ({
+                type: "box",
+                layout: "horizontal",
+                contents: [
+                  {
+                    type: "text",
+                    text: `➕ ${exp.name}`,
+                    color: "#374151",
+                    size: "sm"
+                  },
+                  {
+                    type: "text",
+                    text: `${Number(exp.amount || 0).toLocaleString()} บาท`,
+                    color: "#111827",
+                    size: "sm",
+                    weight: "bold",
+                    align: "end"
+                  }
+                ]
+              })))
             ]
           },
           {

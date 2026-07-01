@@ -88,6 +88,7 @@ interface RoomItem {
   roomTypeName: string
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
+  extraExpenses?: { name: string; amount: number }[]
 }
 
 interface RoomTypeItem {
@@ -211,6 +212,7 @@ function RoomsContent() {
   const [newBaseRent, setNewBaseRent] = useState<number | string>("")
   const [waiveElectricMin, setWaiveElectricMin] = useState(false)
   const [waiveWaterMin, setWaiveWaterMin] = useState(false)
+  const [extraExpenses, setExtraExpenses] = useState<{ name: string; amount: number }[]>([])
   const [formSubmitting, setFormSubmitting] = useState(false)
 
   // Room Type Form State (inside Manage Types modal)
@@ -697,6 +699,7 @@ function RoomsContent() {
     setNewBaseRent("")
     setWaiveElectricMin(false)
     setWaiveWaterMin(false)
+    setExtraExpenses([])
     
     // ตั้งค่าประเภทห้องแรกเป็นดีฟอลต์ถ้ามี
     if (roomTypes.length > 0) {
@@ -715,6 +718,7 @@ function RoomsContent() {
     setNewBaseRent(room.baseRent)
     setWaiveElectricMin(!!room.waiveElectricMin)
     setWaiveWaterMin(!!room.waiveWaterMin)
+    setExtraExpenses(room.extraExpenses || [])
     setModalOpen(true)
   }
 
@@ -801,7 +805,8 @@ function RoomsContent() {
         editingRoom.status,
         newRoomFloor,
         waiveElectricMin,
-        waiveWaterMin
+        waiveWaterMin,
+        extraExpenses
       )
       if (res.success) {
         showToast("✓ อัปเดตข้อมูลห้องพักสำเร็จ", "success")
@@ -812,7 +817,7 @@ function RoomsContent() {
       }
     } else {
       // เพิ่มห้องพักใหม่
-      const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent), newRoomFloor)
+      const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent), newRoomFloor, extraExpenses)
       if (res.success) {
         showToast("✓ เพิ่มห้องพักใหม่เข้าสู่ระบบสำเร็จ", "success")
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
@@ -2557,6 +2562,75 @@ function RoomsContent() {
                       <div className="w-11 h-6 bg-slate-200 dark:bg-slate-850 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
+                </div>
+
+                {/* Extra Expenses Config */}
+                <div className="bg-slate-50/80 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ค่าใช้จ่ายเสริมรายเดือน (สูงสุด 5 รายการ)</span>
+                    <button
+                      type="button"
+                      disabled={extraExpenses.length >= 5}
+                      onClick={() => setExtraExpenses([...extraExpenses, { name: "", amount: 0 }])}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-500 font-bold flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      เพิ่มรายการ
+                    </button>
+                  </div>
+
+                  {extraExpenses.length === 0 ? (
+                    <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold italic text-center py-2">
+                      ไม่มีค่าใช้จ่ายเสริมรายเดือน
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                      {extraExpenses.map((exp, idx) => (
+                        <div key={idx} className="flex gap-2 items-center bg-white dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-850 shadow-sm animate-in fade-in zoom-in-95 duration-150">
+                          <input
+                            type="text"
+                            required
+                            placeholder="เช่น ค่าเช่าตู้เย็น, ที่จอดรถ..."
+                            className="flex-1 h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-slate-850 dark:text-slate-100 text-xs font-semibold placeholder-slate-400"
+                            value={exp.name}
+                            onChange={(e) => {
+                              const updated = [...extraExpenses]
+                              updated[idx].name = e.target.value
+                              setExtraExpenses(updated)
+                            }}
+                          />
+                          <div className="relative w-[100px] shrink-0">
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              placeholder="บาท"
+                              className="w-full h-9 pl-3 pr-7 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-slate-850 dark:text-slate-100 text-xs font-bold text-right"
+                              value={exp.amount || ""}
+                              onChange={(e) => {
+                                const updated = [...extraExpenses]
+                                updated[idx].amount = Number(e.target.value)
+                                setExtraExpenses(updated)
+                              }}
+                            />
+                            <span className="absolute inset-y-0 right-2 flex items-center text-[10px] font-bold text-slate-400 pointer-events-none">
+                              บ.
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = extraExpenses.filter((_, i) => i !== idx)
+                              setExtraExpenses(updated)
+                            }}
+                            className="p-1.5 text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Buttons */}

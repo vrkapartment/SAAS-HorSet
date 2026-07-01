@@ -118,6 +118,7 @@ export async function getRooms() {
         roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ",
         waiveElectricMin: !!room.waive_electric_min,
         waiveWaterMin: !!room.waive_water_min,
+        extraExpenses: room.extra_expenses || [],
         allTenants: (room.tenants || []).map((t: any) => ({
           id: t.id,
           tenantName: t.tenant_name,
@@ -136,7 +137,7 @@ export async function getRooms() {
   }
 }
 
-export async function createRoom(roomNumber: string, roomTypeId: string, baseRent: number, floor: string) {
+export async function createRoom(roomNumber: string, roomTypeId: string, baseRent: number, floor: string, extraExpenses: any[] = []) {
   try {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -146,7 +147,8 @@ export async function createRoom(roomNumber: string, roomTypeId: string, baseRen
         room_type_id: roomTypeId || null, 
         base_rent: baseRent, 
         status: "available",
-        floor: floor || null
+        floor: floor || null,
+        extra_expenses: extraExpenses
       }])
       .select()
 
@@ -166,7 +168,8 @@ export async function updateRoom(
   status: "occupied" | "available",
   floor: string,
   waiveElectricMin: boolean = false,
-  waiveWaterMin: boolean = false
+  waiveWaterMin: boolean = false,
+  extraExpenses: any[] = []
 ) {
   try {
     const supabase = await createClient()
@@ -180,6 +183,7 @@ export async function updateRoom(
         floor: floor || null,
         waive_electric_min: waiveElectricMin,
         waive_water_min: waiveWaterMin,
+        extra_expenses: extraExpenses,
         updated_at: new Date().toISOString()
       })
       .eq("id", id)

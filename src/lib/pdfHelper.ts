@@ -246,6 +246,7 @@ export interface BillPdfData {
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
   invoiceId?: string
+  extraExpenses?: Array<{ name: string; amount: number }>
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -337,8 +338,11 @@ export async function generateBillPdf(data: BillPdfData) {
   const penaltyAmount = data.penaltyAmount !== undefined ? Number(data.penaltyAmount || 0) : 0
   const otherServiceAmount = data.otherServiceAmount !== undefined ? Number(data.otherServiceAmount || 0) : 0
   
+  const extraExpenses = data.extraExpenses || []
+  const extraExpensesSum = extraExpenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+
   // คำนวณค่าเช่าห้องพักที่หักส่วนลด (หรือรวมค่าปรับ/ค่าใช้จ่ายอื่นๆ เผื่อไว้) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
-  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount)
+  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount - extraExpensesSum)
 
   const elecDesc = isElecMin 
     ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
@@ -374,25 +378,43 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText(commonFee.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(commonFee.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
-  // รายการ 5: ค่าบริการอื่นๆ (แสดงต่อเมื่อมียอด)
+  let itemIndex = 5
+  // รายการค่าใช้จ่ายเสริมรายเดือน
+  if (extraExpenses && extraExpenses.length > 0) {
+    extraExpenses.forEach((exp) => {
+      const expAmt = Number(exp.amount || 0)
+      if (expAmt > 0) {
+        y -= 25
+        drawText(`${itemIndex}. ${exp.name}`, 50, y, 9, rgb(0.2, 0.2, 0.2))
+        drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
+        drawText(expAmt.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+        drawText(expAmt.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+        itemIndex++
+      }
+    })
+  }
+
+  // รายการ ค่าบริการอื่นๆ (แสดงต่อเมื่อมียอด)
   if (otherServiceAmount > 0) {
     y -= 25
-    drawText("5. ค่าบริการอื่น ๆ (Other Service Charge)", 50, y, 9, rgb(0.2, 0.2, 0.2))
+    drawText(`${itemIndex}. ค่าบริการอื่น ๆ (Other Service Charge)`, 50, y, 9, rgb(0.2, 0.2, 0.2))
     drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
     drawText(otherServiceAmount.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
     drawText(otherServiceAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+    itemIndex++
   }
 
-  // รายการ 6: ค่าปรับจ่ายล่าช้า (แสดงต่อเมื่อมียอดค่าปรับ)
+  // รายการ ค่าปรับจ่ายล่าช้า (แสดงต่อเมื่อมียอดค่าปรับ)
   if (penaltyAmount > 0) {
     y -= 25
     const days = data.lateDays !== undefined ? data.lateDays : 0
     const rate = data.latePenaltyRate !== undefined ? data.latePenaltyRate : (days > 0 ? Math.round(penaltyAmount / days) : penaltyAmount)
 
-    drawText("6. ค่าปรับจ่ายล่าช้า (Late Payment Penalty / Fine)", 50, y, 9, rgb(0.8, 0.1, 0.1))
+    drawText(`${itemIndex}. ค่าปรับจ่ายล่าช้า (Late Payment Penalty)`, 50, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(days > 0 ? `${days} วัน` : "1", 280, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(rate.toLocaleString(), 380, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(penaltyAmount.toLocaleString(), 475, y, 9, rgb(0.8, 0.1, 0.1))
+    itemIndex++
   }
 
   // ขีดเส้นใต้ตาราง

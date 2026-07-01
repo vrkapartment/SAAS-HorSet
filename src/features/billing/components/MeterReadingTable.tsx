@@ -390,10 +390,18 @@ export default function MeterReadingTable({
       portalLink = `${safeAppUrl}/portal`
     }
 
+    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+    const extraExpenses = roomInfo?.extraExpenses || []
+    const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
     const thaiCycle = formatBillingCycleThaiLocal(billingCycle)
     const otherServiceAmt = Number(item.otherServiceAmount || 0)
     const penaltyAmt = Number(item.penaltyAmount || 0)
-    const totalAmount = item.billAmount || (item.baseRent + elecCost + waterCost + commonFee + otherServiceAmt + penaltyAmt)
+    const totalAmount = item.billAmount || (item.baseRent + elecCost + waterCost + commonFee + otherServiceAmt + penaltyAmt + extraExpensesSum)
+
+    const extraExpensesText = extraExpenses && extraExpenses.length > 0
+      ? extraExpenses.map((exp: any) => `\n• ${exp.name || "ค่าใช้จ่ายเสริม"}: ${Number(exp.amount || 0).toLocaleString()} บาท`).join("")
+      : ""
 
     const text = `🏠 ${workspaceName || "หอพัก"} - ใบแจ้งค่าใช้จ่ายประจำเดือน ${thaiCycle}
 เลขห้อง: ${item.roomNumber}
@@ -476,6 +484,9 @@ export default function MeterReadingTable({
           continue
         }
 
+        const extraExpenses = roomInfo?.extraExpenses || []
+        const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
         try {
           const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
           const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
@@ -494,9 +505,10 @@ export default function MeterReadingTable({
             waterUnits: waterUnitsUsed,
             waterAmount: waterCost,
             commonFee: commonFee,
-            totalAmount: item.billAmount,
+            totalAmount: item.billAmount || (item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0) + Number(item.penaltyAmount || 0) + extraExpensesSum),
             workspaceName: workspaceName || "หอพักของเรา",
             workspaceId: currentWorkspaceId,
+            extraExpenses,
           })
 
           results[item.roomNumber] = { success: result.success, error: result.error }
@@ -634,7 +646,11 @@ export default function MeterReadingTable({
                 ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
               
-              const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0)
+              const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+              const extraExpenses = roomInfo?.extraExpenses || []
+              const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
+              const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0) + extraExpensesSum
               const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
               const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
               
@@ -704,6 +720,11 @@ export default function MeterReadingTable({
                           {item.tenantName ? (
                             <>
                               ค่าเช่า {item.baseRent.toLocaleString()}.- | ส่วนกลาง {commonFee}.-
+                              {extraExpenses.map((exp: any, index: number) => (
+                                <span key={index} className="text-indigo-600 dark:text-indigo-400 font-bold">
+                                  {" "}| {exp.name} {Number(exp.amount || 0).toLocaleString()}.-
+                                </span>
+                              ))}
                               {Number(item.otherServiceAmount || 0) > 0 && (
                                 <span className="text-teal-600 dark:text-teal-400 font-bold">
                                   {" "}| ค่าบริการอื่นๆ {Number(item.otherServiceAmount).toLocaleString()}.-
@@ -1365,7 +1386,11 @@ export default function MeterReadingTable({
                     ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
                   
-                  const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0)
+                  const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+                  const extraExpenses = roomInfo?.extraExpenses || []
+                  const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
+                  const calculatedAmount = item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0) + extraExpensesSum
                   const displayedTotal = calculatedAmount + (item.penaltyAmount || 0)
 
                   const isModified = item.billStatus !== "not_created" && item.billAmount !== displayedTotal
@@ -1402,6 +1427,11 @@ export default function MeterReadingTable({
                               {item.tenantName ? (
                                 <>
                                   ค่าเช่า {item.baseRent.toLocaleString()}.-
+                                  {extraExpenses.map((exp: any, index: number) => (
+                                    <div key={index} className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mt-0.5">
+                                      {exp.name} +{Number(exp.amount || 0).toLocaleString()}.-
+                                    </div>
+                                  ))}
                                   {Number(item.otherServiceAmount || 0) > 0 && (
                                     <div className="text-[10px] text-teal-600 dark:text-teal-400 font-bold mt-0.5">
                                       ค่าบริการอื่นๆ +{Number(item.otherServiceAmount).toLocaleString()}.-
