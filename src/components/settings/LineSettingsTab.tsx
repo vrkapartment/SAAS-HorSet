@@ -167,13 +167,9 @@ export default function LineSettingsTab() {
     try {
       const supabase = createClient()
       const { data, error: funcErr } = await supabase.functions.invoke(
-        "get-line-quota",
+        `get-line-quota?workspace_id=${activeWsId}${forceRefresh ? "&bypass_cache=true" : ""}`,
         {
-          method: "GET",
-          queryParams: {
-            workspace_id: activeWsId,
-            ...(forceRefresh ? { bypass_cache: "true" } : {})
-          }
+          method: "GET"
         }
       )
 
