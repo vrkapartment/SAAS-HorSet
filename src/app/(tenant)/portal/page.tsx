@@ -338,9 +338,10 @@ export default function TenantPortal() {
     ? (bill.penaltyAmount !== null && bill.penaltyAmount !== undefined ? Number(bill.penaltyAmount) : (isDemo ? (lateDays * latePenaltyRate) : 0))
     : 0
 
+  const extraExpensesSum = extraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
   const totalAmount = bill 
     ? Number(bill.amount) 
-    : (baseRent + elecAmount + waterAmount + commonAreaFee + otherServiceAmount)
+    : (baseRent + elecAmount + waterAmount + commonAreaFee + otherServiceAmount + extraExpensesSum)
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
@@ -601,6 +602,17 @@ export default function TenantPortal() {
               </div>
               <span className="font-semibold text-slate-200">{commonAreaFee.toLocaleString()} บาท</span>
             </div>
+
+            {/* ค่าใช้จ่ายเสริมรายเดือน (ถ้ามี) */}
+            {extraExpenses && extraExpenses.length > 0 && extraExpenses.map((exp: any, index: number) => (
+              <div key={index} className="flex justify-between items-center pb-2.5 border-b border-slate-900">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>➕ {exp.name}</span>
+                </div>
+                <span className="font-semibold text-slate-200">{Number(exp.amount || 0).toLocaleString()} บาท</span>
+              </div>
+            ))}
 
             {/* ค่าบริการอื่น ๆ (ถ้ามี) */}
             {otherServiceAmount > 0 && (
