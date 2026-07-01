@@ -38,6 +38,9 @@ export default function LineSettingsTab() {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null)
   const [isConfigured, setIsConfigured] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [savedToken, setSavedToken] = useState("")
+  const [savedLiff, setSavedLiff] = useState("")
   
   // Quota Status
   const [fetchingQuota, setFetchingQuota] = useState(false)
@@ -85,6 +88,8 @@ export default function LineSettingsTab() {
           } else if (data) {
             setTokenInput(data.channel_access_token || "")
             setLiffInput(data.liff_id || "")
+            setSavedToken(data.channel_access_token || "")
+            setSavedLiff(data.liff_id || "")
             setIsConfigured(!!data.channel_access_token)
             
             // Set initial quota display from cache row
@@ -111,6 +116,8 @@ export default function LineSettingsTab() {
           setWorkspaceId("d290f1ee-6c54-4b01-90e6-d701748f0851")
           setTokenInput("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo_token_apartment_owner")
           setLiffInput("2010442620-H4josaDy")
+          setSavedToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo_token_apartment_owner")
+          setSavedLiff("2010442620-H4josaDy")
           setIsConfigured(true)
           setQuotaData({
             limit: 1000,
@@ -204,6 +211,9 @@ export default function LineSettingsTab() {
     if (isDemo) {
       await new Promise((resolve) => setTimeout(resolve, 600))
       setIsConfigured(!!trimmedToken)
+      setSavedToken(trimmedToken)
+      setSavedLiff(trimmedLiff)
+      setIsEditing(false)
       setSettingsSuccess("บันทึกการเชื่อมต่อจำลองสำเร็จ!")
       setSavingSettings(false)
       return
@@ -251,6 +261,9 @@ export default function LineSettingsTab() {
       if (error) throw error
 
       setIsConfigured(!!trimmedToken)
+      setSavedToken(trimmedToken)
+      setSavedLiff(trimmedLiff)
+      setIsEditing(false)
       setSettingsSuccess("บันทึกข้อมูลการเชื่อมต่อ LINE OA สำเร็จ!")
       
       // Trigger a live quota reload
@@ -263,6 +276,14 @@ export default function LineSettingsTab() {
     } finally {
       setSavingSettings(false)
     }
+  }
+
+  const handleCancelEdit = () => {
+    setTokenInput(savedToken)
+    setLiffInput(savedLiff)
+    setIsEditing(false)
+    setSettingsError(null)
+    setSettingsSuccess(null)
   }
 
   const handleDeleteSettings = async () => {
@@ -299,7 +320,10 @@ export default function LineSettingsTab() {
 
       setTokenInput("")
       setLiffInput("")
+      setSavedToken("")
+      setSavedLiff("")
       setIsConfigured(false)
+      setIsEditing(false)
       setQuotaData(null)
       setSettingsSuccess("ลบการเชื่อมต่อ LINE OA ของคุณเรียบร้อยแล้ว")
     } catch (err: any) {
@@ -404,10 +428,11 @@ export default function LineSettingsTab() {
                   <input
                     type={showToken ? "text" : "password"}
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors"
+                    className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
                     required
+                    disabled={isConfigured && !isEditing}
                   />
                   <button
                     type="button"
@@ -432,10 +457,11 @@ export default function LineSettingsTab() {
                 <input
                   type="text"
                   placeholder="2010442620-H4josaDy"
-                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors"
+                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   value={liffInput}
                   onChange={(e) => setLiffInput(e.target.value)}
                   required
+                  disabled={isConfigured && !isEditing}
                 />
               </div>
 
@@ -455,8 +481,8 @@ export default function LineSettingsTab() {
               )}
 
               {/* Buttons */}
-              <div className="flex gap-2.5 justify-end pt-2">
-                {isConfigured && (
+              <div className="flex gap-2.5 justify-end pt-2 flex-wrap">
+                {isConfigured && !isEditing && (
                   <button
                     type="button"
                     onClick={handleDeleteSettings}
@@ -466,14 +492,41 @@ export default function LineSettingsTab() {
                     ลบการเชื่อมต่อ
                   </button>
                 )}
-                <button
-                  type="submit"
-                  disabled={savingSettings}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-blue-500/10"
-                >
-                  {savingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  <span>{isConfigured ? "อัปเดตข้อมูลเชื่อมต่อ" : "บันทึกข้อมูลเชื่อมต่อ"}</span>
-                </button>
+
+                {isConfigured && isEditing && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={savingSettings}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold cursor-pointer transition-colors"
+                  >
+                    ยกเลิกการแก้ไข
+                  </button>
+                )}
+
+                {isConfigured && !isEditing ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(true)
+                      setSettingsSuccess(null)
+                      setSettingsError(null)
+                    }}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-md shadow-blue-500/10"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>แก้ไขข้อมูล API</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={savingSettings}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-blue-500/10"
+                  >
+                    {savingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>{isConfigured ? "อัปเดตข้อมูลเชื่อมต่อ" : "บันทึกข้อมูลเชื่อมต่อ"}</span>
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -487,8 +540,13 @@ export default function LineSettingsTab() {
                     <Key className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
-                      ตรวจสอบโควตา LINE OA ของหอพัก
+                    <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <span>ตรวจสอบโควตา LINE OA</span>
+                      {quotaData?.displayName && (
+                        <span className="text-blue-600 dark:text-blue-400">
+                          "{quotaData.displayName}"
+                        </span>
+                      )}
                     </h3>
                     {quotaData && (
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
