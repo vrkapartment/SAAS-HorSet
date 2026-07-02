@@ -1735,8 +1735,8 @@ function RoomsContent() {
               ))}
             </div>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 shrink-0">
+            {/* View Mode Toggle (Hidden on Mobile) */}
+            <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 shrink-0">
               <button
                 onClick={() => setViewMode("floor")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${

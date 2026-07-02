@@ -780,8 +780,8 @@ export default function TenantsPage() {
             })}
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 shrink-0">
+          {/* View Mode Toggle (Hidden on Mobile) */}
+          <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 shrink-0">
             <button
               onClick={() => setViewMode("grid")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -875,9 +875,10 @@ export default function TenantsPage() {
           </button>
         </div>
       ) : activeTab === "current" ? (
-        viewMode === "grid" ? (
-          // Grid/Block View for Current Tenants
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <>
+          {/* Always Grid View on Mobile, conditional Grid on Desktop */}
+          <div className={viewMode === "grid" ? "block" : "block md:hidden"}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredCurrent.map((t) => {
               const status = getContractStatus(t.contractStart, t.contractEnd)
               return (
@@ -946,9 +947,11 @@ export default function TenantsPage() {
               </div>
             )}
           </div>
-        ) : (
-          // Table View for Current Tenants
-          <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
+          </div>
+
+          {/* Table View: Shown on Desktop only when viewMode === 'table', hidden on Mobile */}
+          <div className={viewMode === "table" ? "hidden md:block" : "hidden"}>
+            <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
                 <thead>
@@ -1016,12 +1019,14 @@ export default function TenantsPage() {
               </table>
             </div>
           </div>
-        )
+          </div>
+        </>
       ) : (
         // Tab 2: Archived Old Tenants List (VIEW ONLY OR DELETE ACCORDING TO USER PERMISSIONS)
-        viewMode === "grid" ? (
-          // Grid/Block View for Old Tenants
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <>
+          {/* Always Grid View on Mobile, conditional Grid on Desktop */}
+          <div className={viewMode === "grid" ? "block" : "block md:hidden"}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredOld.map((t) => (
               <div 
                 key={t.id} 
@@ -1101,9 +1106,11 @@ export default function TenantsPage() {
               </div>
             )}
           </div>
-        ) : (
-          // Table View for Old Tenants
-          <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
+          </div>
+
+          {/* Table View: Shown on Desktop only when viewMode === 'table', hidden on Mobile */}
+          <div className={viewMode === "table" ? "hidden md:block" : "hidden"}>
+            <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
                 <thead>
@@ -1181,7 +1188,8 @@ export default function TenantsPage() {
               </table>
             </div>
           </div>
-        )
+          </div>
+        </>
       )}
 
       {/* Safety Notice Panel (PDPA Compliance & Security) */}
