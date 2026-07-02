@@ -1587,17 +1587,6 @@ function RoomsContent() {
                 <span className="sm:hidden">เทมเพลต</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setIsRoomTemplateGuideModalOpen(true)}
-                title="เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของห้องพัก"
-                className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
-              >
-                <HelpCircle className="w-4 h-4 text-indigo-500" />
-                <span className="hidden sm:inline">คู่มือการใช้ CSV</span>
-                <span className="sm:hidden">คู่มือ CSV</span>
-              </button>
-              
               {hasEditPermission && (
                 <label className="relative">
                   <span className={`px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${uploadingCsv ? "opacity-60 cursor-not-allowed" : ""}`}>
@@ -1618,6 +1607,17 @@ function RoomsContent() {
                   />
                 </label>
               )}
+
+              <button
+                type="button"
+                onClick={() => setIsRoomTemplateGuideModalOpen(true)}
+                title="เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของห้องพัก"
+                className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
+              >
+                <HelpCircle className="w-4 h-4 text-indigo-500" />
+                <span className="hidden sm:inline">คู่มือการใช้ CSV</span>
+                <span className="sm:hidden">คู่มือ CSV</span>
+              </button>
             </div>
 
             {/* Add Room Button (desktop only) */}
@@ -3515,7 +3515,7 @@ function RoomsContent() {
                   </div>
                   <div>
                     <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                      💡 คำแนะนำในการกรอกไฟล์เทมเพลตห้องพัก
+                      💡 คู่มือการใช้ไฟล์ CSV สำหรับการเพิ่มห้องพัก
                     </h3>
                     <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 mt-1 font-semibold">
                       โปรดอ่านคำแนะนำนี้เพื่อนำเข้าข้อมูลห้องพักได้อย่างราบรื่นและถูกต้องครับ
@@ -3557,7 +3557,7 @@ function RoomsContent() {
                       หากประเภทห้องพักสะกดไม่ถูกต้อง
                     </h4>
                     <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
-                      กรณีที่ชื่อประเภทห้องพักในไฟล์สะกดไม่ถูกต้อง สะกดผิด เว้นวรรคเกิน หรือไม่มีอยู่ในระบบ ระบบจะแสดงหน้าต่างนำทางแบบอินเตอร์แอคทีฟ (Interactive Mapping) ให้เลือกแก้ไขและจับคู่วันอัปโหลดได้ทันทีโดยไม่ต้องไปนั่งแก้ไฟล์ใหม่ครับ!
+                      กรณีที่ชื่อประเภทห้องพักในไฟล์สะกดไม่ถูกต้อง สะกดผิด เว้นวรรคเกิน หรือไม่มีอยู่ในระบบ ระบบจะแสดงหน้าต่างให้ท่านเลือก &quot;ประเภทห้องพัก&quot; ได้ทันทีโดยไม่ต้องไปนั่งแก้ไฟล์
                     </p>
                   </div>
                 </div>
@@ -3572,7 +3572,7 @@ function RoomsContent() {
                       ชั้นวางห้องพัก (กำหนดเองหรือเว้นว่างไว้)
                     </h4>
                     <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
-                      คอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md">floor</span> (ชั้น) สามารถกำหนดได้เอง หรือหากเว้นว่างไว้ ระบบจะช่วยคาดเดาและจัดตำแหน่งชั้นให้อัตโนมัติโดยอิงจากหลักสิบหรือหลักร้อยของเลขห้องพักให้ครับ
+                      คอลัมน์ floor (ชั้น) สามารถกำหนดได้เอง หรือหากเว้นว่างไว้ ระบบจะช่วยจัดตำแหน่งชั้นให้อัตโนมัติโดยอิงจากหลักสิบหรือหลักร้อยของเลขห้องพัก
                     </p>
                   </div>
                 </div>
