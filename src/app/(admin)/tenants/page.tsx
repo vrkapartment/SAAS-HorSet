@@ -29,7 +29,9 @@ import {
   Sparkles,
   ArrowUpDown,
   AlertCircle,
-  Info
+  Info,
+  LayoutGrid,
+  List
 } from "lucide-react"
 import { getTenants, getOldTenants, deleteOldTenant, createTenantsBatch } from "@/features/tenant/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
@@ -73,6 +75,7 @@ export default function TenantsPage() {
   
   // Tabs and State
   const [activeTab, setActiveTab] = useState<"current" | "old">("current")
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tableNotFound, setTableNotFound] = useState(false)
@@ -727,43 +730,81 @@ export default function TenantsPage() {
       </div>
 
       {/* Tabs and Search Bar Container */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-        {/* Tab switch buttons */}
-        <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800 w-full md:w-auto">
-          <button
-            onClick={() => setActiveTab("current")}
-            className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-lg text-center transition-all duration-200 cursor-pointer ${
-              activeTab === "current"
-                ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            }`}
-          >
-            <UserCheck className="w-4 h-4" />
-            ผู้เช่าปัจจุบัน ({currentTenants.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("old")}
-            className={`flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold rounded-lg text-center transition-all duration-200 cursor-pointer ${
-              activeTab === "old"
-                ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            }`}
-          >
-            <UserMinus className="w-4 h-4" />
-            ผู้เช่าเก่า/ย้ายออก ({stats.oldTotalCount})
-          </button>
-        </div>
-
-        {/* Real-time Search Input */}
-        <div className="relative w-full md:w-72">
+      <div className="glass-panel p-4 rounded-2xl border border-slate-200/60 dark:border-slate-900/60 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        {/* Search bar with ambient border glow */}
+        <div className="relative flex-1 max-w-md w-full">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400 dark:text-slate-500">
+            <Search className="w-4 h-4" />
+          </span>
           <input
             type="text"
             placeholder="ค้นหาชื่อ, ห้องพัก, เบอร์โทร..."
+            className="w-full h-11 pl-10 pr-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-xs font-medium transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:text-slate-100 text-slate-700 shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
           />
-          <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery("")}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Filters & View switcher Row */}
+        <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 w-full xl:w-auto">
+          {/* Tab switch buttons as Filter Badges Row */}
+          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">สถานะผู้เช่า:</span>
+            {[
+              { id: "current", label: `ผู้เช่าปัจจุบัน (${currentTenants.length})`, icon: UserCheck },
+              { id: "old", label: `ผู้เช่าเก่า/ย้ายออก (${stats.oldTotalCount})`, icon: UserMinus }
+            ].map(tab => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === tab.id
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow shadow-slate-950/10"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 shrink-0">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "grid"
+                  ? "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>บล็อก</span>
+            </button>
+            <button
+              onClick={() => setViewMode("table")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "table"
+                  ? "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>ตาราง</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -834,77 +875,313 @@ export default function TenantsPage() {
           </button>
         </div>
       ) : activeTab === "current" ? (
-        // Tab 1: Current Tenants List
-        <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider text-xs sm:text-sm">
-                  <th className="py-3.5 px-5">ห้องพัก</th>
-                  <th className="py-3.5 px-4">ชื่อผู้เช่า</th>
-                  <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
-                  <th className="py-3.5 px-4">สถานะ LINE OA</th>
-                  <th className="py-3.5 px-4">ระยะสัญญาเช่า</th>
-                  <th className="py-3.5 px-5 text-center">สถานะ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
-                {filteredCurrent.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
-                    <td className="py-4 px-5 font-black text-slate-900 dark:text-slate-100 text-sm sm:text-base">
-                      ห้อง {t.roomNumber}
-                    </td>
-                    <td className="py-4 px-4 font-extrabold text-slate-850 dark:text-slate-200">
-                      {t.fullName}
-                    </td>
-                    <td className="py-4 px-4 font-semibold font-mono text-slate-600 dark:text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                        {getMaskedPhone(t.phone)}
+        viewMode === "grid" ? (
+          // Grid/Block View for Current Tenants
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCurrent.map((t) => {
+              const status = getContractStatus(t.contractStart, t.contractEnd)
+              return (
+                <div 
+                  key={t.id} 
+                  className="glass-panel p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
+                >
+                  <div className="space-y-4">
+                    {/* Room Number & Status Badge */}
+                    <div className="flex items-center justify-between">
+                      <span className="px-3 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-black border border-blue-150/40 dark:border-blue-900/30">
+                        ห้อง {t.roomNumber}
+                      </span>
+                      {status && (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] ${status.style}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                          {status.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Tenant Name */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">ชื่อผู้เช่า</span>
+                      <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 group-hover/card:text-blue-600 dark:group-hover/card:text-blue-400 transition-colors">
+                        {t.fullName}
+                      </h4>
+                    </div>
+
+                    {/* Details */}
+                    <div className="grid grid-cols-1 gap-2.5 pt-1 text-xs">
+                      <div className="flex items-center gap-2.5 text-slate-650 dark:text-slate-300">
+                        <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                        <div>
+                          <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">เบอร์โทรศัพท์ (PDPA)</span>
+                          <span className="font-semibold font-mono text-xs">{getMaskedPhone(t.phone)}</span>
+                        </div>
                       </div>
-                    </td>
-                    <td className="py-4 px-4 font-mono text-slate-500 dark:text-slate-400">
-                      <div className="flex items-center gap-1.5">
+
+                      <div className="flex items-center gap-2.5 text-slate-650 dark:text-slate-300">
                         <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
-                        {getMaskedLine(t.lineUserId)}
+                        <div>
+                          <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">สถานะ LINE OA</span>
+                          <span className="font-semibold font-mono text-xs">{getMaskedLine(t.lineUserId)}</span>
+                        </div>
                       </div>
-                    </td>
-                    <td className="py-4 px-4 font-semibold text-slate-550 dark:text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="font-mono text-xs sm:text-sm">
+
+                      <div className="flex items-center gap-2.5 text-slate-650 dark:text-slate-300">
+                        <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                        <div>
+                          <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">ระยะสัญญาเช่า</span>
+                          <span className="font-semibold font-mono text-[11px]">
+                            {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+            {filteredCurrent.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-555 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
+                ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
+              </div>
+            )}
+          </div>
+        ) : (
+          // Table View for Current Tenants
+          <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider text-xs sm:text-sm">
+                    <th className="py-3.5 px-5">ห้องพัก</th>
+                    <th className="py-3.5 px-4">ชื่อผู้เช่า</th>
+                    <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
+                    <th className="py-3.5 px-4">สถานะ LINE OA</th>
+                    <th className="py-3.5 px-4">ระยะสัญญาเช่า</th>
+                    <th className="py-3.5 px-5 text-center">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
+                  {filteredCurrent.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
+                      <td className="py-4 px-5 font-black text-slate-900 dark:text-slate-100 text-sm sm:text-base">
+                        ห้อง {t.roomNumber}
+                      </td>
+                      <td className="py-4 px-4 font-extrabold text-slate-850 dark:text-slate-200">
+                        {t.fullName}
+                      </td>
+                      <td className="py-4 px-4 font-semibold font-mono text-slate-600 dark:text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                          {getMaskedPhone(t.phone)}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 font-mono text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
+                          {getMaskedLine(t.lineUserId)}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 font-semibold text-slate-550 dark:text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className="font-mono text-xs sm:text-sm">
+                            {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        {(() => {
+                          const status = getContractStatus(t.contractStart, t.contractEnd)
+                          if (!status) return "-"
+                          return (
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${status.style}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                              {status.label}
+                            </span>
+                          )
+                        })()}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {filteredCurrent.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-555 font-medium">
+                        ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      ) : (
+        // Tab 2: Archived Old Tenants List (VIEW ONLY OR DELETE ACCORDING TO USER PERMISSIONS)
+        viewMode === "grid" ? (
+          // Grid/Block View for Old Tenants
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredOld.map((t) => (
+              <div 
+                key={t.id} 
+                className="glass-panel p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
+              >
+                <div className="space-y-4">
+                  {/* Room Number & Delete button */}
+                  <div className="flex items-center justify-between">
+                    <span className="px-3 py-1 bg-slate-100 dark:bg-slate-950 text-slate-650 dark:text-slate-350 rounded-xl text-xs font-black border border-slate-200/40 dark:border-slate-800">
+                      ห้อง {t.roomNumber}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (!hasEditPermission) {
+                          showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+                          return
+                        }
+                        setDeleteConfirmId(t.id)
+                      }}
+                      disabled={!hasEditPermission}
+                      className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
+                        hasEditPermission
+                          ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-100/30 dark:border-rose-900/20"
+                          : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
+                      }`}
+                      title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Tenant Name */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">ชื่อผู้เช่าเก่า</span>
+                    <h4 className="text-base font-extrabold text-slate-700 dark:text-slate-300">
+                      {t.fullName}
+                    </h4>
+                  </div>
+
+                  {/* Details */}
+                  <div className="grid grid-cols-1 gap-2.5 pt-1 text-xs">
+                    <div className="flex items-center gap-2.5 text-slate-655 dark:text-slate-300">
+                      <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                      <div>
+                        <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">เบอร์โทรศัพท์ (PDPA)</span>
+                        <span className="font-semibold font-mono text-xs text-slate-500 dark:text-slate-400">{getMaskedPhone(t.phone)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 text-slate-655 dark:text-slate-300">
+                      <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                      <div>
+                        <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">ระยะเวลาที่เคยเช่า</span>
+                        <span className="font-semibold font-mono text-[11px] text-slate-500 dark:text-slate-450">
                           {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
                         </span>
                       </div>
-                    </td>
-                    <td className="py-4 px-5 text-center">
-                      {(() => {
-                        const status = getContractStatus(t.contractStart, t.contractEnd)
-                        if (!status) return "-"
-                        return (
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${status.style}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
-                            {status.label}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                  </tr>
-                ))}
+                    </div>
 
-                {filteredCurrent.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-555 font-medium">
-                      ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    <div className="flex items-center gap-2.5 text-slate-655 dark:text-slate-300">
+                      <Clock className="w-4 h-4 text-rose-500 shrink-0" />
+                      <div>
+                        <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">วันที่แจ้งคืนห้อง/ย้ายออก</span>
+                        <span className="font-bold text-xs text-rose-600 dark:text-rose-400 font-mono">
+                          {formatDateThai(t.movedOutAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {filteredOld.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-555 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
+                ไม่มีประวัติข้อมูลผู้เช่าเก่าย้ายออกในตาราง
+              </div>
+            )}
           </div>
-        </div>
-      ) : (
-        // Tab 2: Archived Old Tenants List (VIEW ONLY OR DELETE ACCORDING TO USER PERMISSIONS)
+        ) : (
+          // Table View for Old Tenants
+          <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider text-xs sm:text-sm">
+                    <th className="py-3.5 px-5">ห้องสุดท้าย</th>
+                    <th className="py-3.5 px-4">ชื่อผู้เช่าเก่า</th>
+                    <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
+                    <th className="py-3.5 px-4">ระยะเวลาที่เคยเช่า</th>
+                    <th className="py-3.5 px-4">วันที่แจ้งคืนห้อง/ย้ายออก</th>
+                    <th className="py-3.5 px-5 text-center w-24">ลบบันทึก</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
+                  {filteredOld.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
+                      <td className="py-4 px-5 font-black text-slate-700 dark:text-slate-300 text-sm sm:text-base">
+                        ห้อง {t.roomNumber}
+                      </td>
+                      <td className="py-4 px-4 font-extrabold text-slate-850 dark:text-slate-200">
+                        {t.fullName}
+                      </td>
+                      <td className="py-4 px-4 font-semibold font-mono text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          {getMaskedPhone(t.phone)}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 font-semibold text-slate-550 dark:text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-mono text-[11px]">
+                            {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 font-bold text-rose-600 dark:text-rose-450">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          <span className="font-mono text-[11px]">
+                            {formatDateThai(t.movedOutAt)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        <button
+                          onClick={() => {
+                            if (!hasEditPermission) {
+                              showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+                              return
+                            }
+                            setDeleteConfirmId(t.id)
+                          }}
+                          disabled={!hasEditPermission}
+                          className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
+                            hasEditPermission
+                              ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-100/30 dark:border-rose-900/20"
+                              : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
+                          }`}
+                          title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {filteredOld.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-555 font-medium">
+                        ไม่มีประวัติข้อมูลผู้เช่าเก่าย้ายออกในตาราง
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) USER PERMISSIONS)
         <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
