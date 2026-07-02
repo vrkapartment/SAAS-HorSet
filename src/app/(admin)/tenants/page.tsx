@@ -609,17 +609,6 @@ export default function TenantsPage() {
               <span className="sm:hidden">เทมเพลต</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setIsTemplateGuideModalOpen(true)}
-              title="เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของผู้เช่า"
-              className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
-            >
-              <HelpCircle className="w-4 h-4 text-indigo-500" />
-              <span className="hidden sm:inline">คู่มือการใช้ CSV</span>
-              <span className="sm:hidden">คู่มือ CSV</span>
-            </button>
-            
             {hasEditPermission && (
               <label className="relative flex-1 sm:flex-initial">
                 <span className={`px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm w-full justify-center ${uploadingCsv ? "opacity-60 cursor-not-allowed" : ""}`}>
@@ -640,6 +629,17 @@ export default function TenantsPage() {
                 />
               </label>
             )}
+
+            <button
+              type="button"
+              onClick={() => setIsTemplateGuideModalOpen(true)}
+              title="เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของผู้เช่า"
+              className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
+            >
+              <HelpCircle className="w-4 h-4 text-indigo-500" />
+              <span className="hidden sm:inline">คู่มือการใช้ CSV</span>
+              <span className="sm:hidden">คู่มือ CSV</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1301,7 +1301,7 @@ export default function TenantsPage() {
                 </div>
                 <div>
                   <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                    💡 คำแนะนำสำคัญในการกรอกไฟล์เทมเพลต
+                    💡 คู่มือการใช้ไฟล์ CSV สำหรับการเพิ่มประวัติผู้เช่า
                   </h3>
                   <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 mt-1 font-semibold">
                     กรุณาอ่านคำแนะนำนี้เพื่อป้องกันไม่ให้ข้อมูลสัญญารวนหรือเกิดข้อผิดพลาด
@@ -1328,7 +1328,7 @@ export default function TenantsPage() {
                     ดึงเลขห้องให้พร้อมใช้งานโดยอัตโนมัติ
                   </h4>
                   <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
-                    ระบบดึงเลขห้องพักที่มีอยู่จริงทั้งหมดในตึกของคุณ มากรอกในคอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md">room_number</span> ให้เรียบร้อยแล้วโดยอัตโนมัติ คุณไม่ต้องกรอกเลขห้องเอง
+                    ระบบดึงเลขห้องพักที่มีอยู่จริงทั้งหมดในตึกของคุณ มากรอกในคอลัมน์ room_number ให้เรียบร้อยแล้วโดยอัตโนมัติ
                   </p>
                 </div>
               </div>
@@ -1340,10 +1340,10 @@ export default function TenantsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
-                    เบอร์โทรศัพท์ (เริ่มต้นด้วยเลข 0 ได้อย่างปลอดภัย)
+                    การใส่เบอร์โทรศัพท์
                   </h4>
                   <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
-                    สามารถกรอกเบอร์โทรศัพท์ลงไปได้ตามปกติ หากบันทึกผ่าน Excel แล้วเลข 0 ตัวหน้าถูกตัดหายไป <span className="text-emerald-650 dark:text-emerald-450 font-bold">ระบบหลังบ้านของเราจะช่วยตรวจสอบและกู้คืนเลข 0 นำหน้ากลับมาให้โดยอัตโนมัติครับ</span>
+                    สามารถกรอกเบอร์โทรศัพท์ลงไปได้ตามปกติ หากบันทึกผ่าน Excel แล้วเลข 0 ตัวหน้าถูกตัดหายไป ระบบหลังบ้านของเราจะช่วยตรวจสอบและกู้คืนเลข 0 นำหน้ากลับมาให้โดยอัตโนมัติ
                   </p>
                 </div>
               </div>
@@ -1355,31 +1355,16 @@ export default function TenantsPage() {
                 </div>
                 <div className="space-y-2">
                   <h4 className="text-lg md:text-xl font-black text-amber-900 dark:text-amber-300">
-                    ⚠️ สำคัญมาก: ห้ามลบเครื่องหมาย Single Quote (&apos;) ด้านหน้าวันที่ออกเด็ดขาด!
+                    ⚠️ ห้ามลบเครื่องหมาย Single Quote (&apos;) ด้านหน้าวันที่ออกเด็ดขาด!
                   </h4>
                   <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
-                    คอลัมน์ <span className="font-extrabold text-amber-900 dark:text-amber-300 bg-amber-100/50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md">lease_start</span> ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันโดยมีเครื่องหมาย <span className="underline decoration-2 font-black text-red-650 dark:text-red-400">&apos; นำหน้า (เช่น &apos;01/07/2026)</span>
+                    คอลัมน์ lease_start ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันโดยมีเครื่องหมาย &apos; นำหน้า (เช่น &apos;01/07/2026)
                   </p>
                   <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
-                    * ห้ามลบเครื่องหมายนี้เด็ดขาด เพื่อป้องกันไม่ให้โปรแกรม Excel แปลงวันที่เป็นรูปแบบสหรัฐอเมริกา (MM/DD/YYYY) และทำงานผิดพลาด
+                    * ห้ามลบเครื่องหมายนี้เด็ดขาด ให้ลบตัวเลขด้านหลังแล้วแก้ไขโดยพิมพ์ต่อท้ายเครื่องหมาย (&apos;) เสมอ
                   </p>
                   <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
-                    * หากต้องการแก้ไขวันที่เป็นวันอื่น ให้ลบตัวเลขด้านหลังแล้วแก้ไขโดยพิมพ์ต่อท้ายเครื่องหมาย &apos; เสมอครับ
-                  </p>
-                </div>
-              </div>
-
-              {/* Item 4 */}
-              <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
-                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <div className="space-y-1.5">
-                  <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
-                    คำนวณวันสิ้นสุดสัญญาเช่าให้อัตโนมัติ
-                  </h4>
-                  <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
-                    คุณไม่จำเป็นต้องมีคอลัมน์วันสิ้นสุดสัญญาเช่า (lease_end) อีกต่อไปแล้ว! <span className="text-indigo-650 dark:text-indigo-400 font-bold">ระบบหลังบ้านของเราจะคำนวณวันหมดสัญญาเช่าให้อัตโนมัติ</span> โดยอิงจากระยะเวลาสัญญาเช่าเริ่มต้นของคุณคือ <span className="font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">{financeSettings?.lease_duration ?? 6} เดือน</span> ครับ
+                    * รูปแบบการพิมพ์ DD/MM/YYYY
                   </p>
                 </div>
               </div>
