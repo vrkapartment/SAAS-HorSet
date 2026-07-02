@@ -31,9 +31,10 @@ import {
   AlertCircle,
   Info,
   LayoutGrid,
-  List
+  List,
+  Edit
 } from "lucide-react"
-import { getTenants, getOldTenants, deleteOldTenant, createTenantsBatch } from "@/features/tenant/actions"
+import { getTenants, getOldTenants, deleteOldTenant, createTenantsBatch, updateTenant } from "@/features/tenant/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
@@ -106,6 +107,17 @@ export default function TenantsPage() {
   })
 
   const [hasEditPermission, setHasEditPermission] = useState(true)
+  // Tenant Edit States
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedTenant, setSelectedTenant] = useState<TenantItem | null>(null)
+  const [editFullName, setEditFullName] = useState("")
+  const [editPhone, setEditPhone] = useState("")
+  const [editRoomNumber, setEditRoomNumber] = useState("")
+  const [editContractStart, setEditContractStart] = useState("")
+  const [editContractEnd, setEditContractEnd] = useState("")
+  const [editLineUserId, setEditLineUserId] = useState("")
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
 
   // Custom Toast State
   const [toast, setToast] = useState<{
@@ -480,6 +492,88 @@ export default function TenantsPage() {
     }
   }
 
+  const handleEditClick = (tenant: TenantItem) => {
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
+    setSelectedTenant(tenant)
+    setEditFullName(tenant.fullName)
+    setEditPhone(tenant.phone || "")
+    setEditRoomNumber(tenant.roomNumber)
+    
+    const formatDateForInput = (dateStr: string | null | undefined) => {
+      if (!dateStr) return ""
+      try {
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) return ""
+        return d.toISOString().split("T")[0]
+      } catch {
+        return ""
+      }
+    }
+    setEditContractStart(formatDateForInput(tenant.contractStart))
+    setEditContractEnd(formatDateForInput(tenant.contractEnd))
+    setEditLineUserId(tenant.lineUserId || "")
+    setIsEditModalOpen(true)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!hasEditPermission) {
+      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      return
+    }
+    if (!selectedTenant) return
+
+    if (!editFullName.trim()) {
+      showToast("กรุณากรอกชื่อ-นามสกุล", "error")
+      return
+    }
+    if (!editPhone.trim()) {
+      showToast("กรุณากรอกเบอร์โทรศัพท์", "error")
+      return
+    }
+    if (!editRoomNumber.trim()) {
+      showToast("กรุณากรอกหมายเลขห้องพัก", "error")
+      return
+    }
+    if (!editContractStart) {
+      showToast("กรุณาเลือกวันเริ่มสัญญา", "error")
+      return
+    }
+    if (!editContractEnd) {
+      showToast("กรุณาเลือกวันสิ้นสุดสัญญา", "error")
+      return
+    }
+
+    setEditSubmitting(true)
+    try {
+      const res = await updateTenant(
+        selectedTenant.id,
+        editRoomNumber.trim(),
+        editFullName.trim(),
+        editPhone.trim(),
+        editLineUserId.trim() || null,
+        editContractStart,
+        editContractEnd
+      )
+
+      if (res.success) {
+        showToast("แก้ไขข้อมูลผู้เช่าสำเร็จแล้ว", "success")
+        setIsEditModalOpen(false)
+        setSelectedTenant(null)
+        loadData(true)
+      } else {
+        showToast(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error")
+      }
+    } catch (err) {
+      showToast("เกิดข้อผิดพลาดการเชื่อมต่อเซิร์ฟเวอร์", "error")
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
   // Filter lists based on query
   const filteredCurrent = currentTenants.filter(t => {
     const q = searchQuery.toLowerCase().trim()
@@ -837,7 +931,7 @@ export default function TenantsPage() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
-            <h4 className="text-xs font-bold text-slate-550 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <h4 className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-amber-500" /> ขั้นตอนการติดตั้งง่ายๆ ภายใน 1 นาที:
             </h4>
             <ol className="list-decimal list-inside text-xs text-slate-600 dark:text-slate-400 space-y-2.5">
@@ -878,62 +972,82 @@ export default function TenantsPage() {
         <>
           {/* Always Grid View on Mobile, conditional Grid on Desktop */}
           <div className={viewMode === "grid" ? "block" : "block md:hidden"}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredCurrent.map((t) => {
               const status = getContractStatus(t.contractStart, t.contractEnd)
               return (
                 <div 
                   key={t.id} 
-                  className="glass-panel p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
+                  className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
                 >
-                  <div className="space-y-4">
-                    {/* Room Number & Status Badge */}
-                    <div className="flex items-center justify-between">
-                      <span className="px-3 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-black border border-blue-150/40 dark:border-blue-900/30">
-                        ห้อง {t.roomNumber}
-                      </span>
-                      {status && (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] ${status.style}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
-                          {status.label}
-                        </span>
+                  <div>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div>
+                        <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
+                        <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
+                          ห้อง {t.roomNumber}
+                        </h4>
+                      </div>
+                      
+                      {/* Actions */}
+                      {hasEditPermission && (
+                        <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200/30 dark:border-slate-800/30 opacity-60 group-hover/card:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEditClick(t)}
+                            className="p-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                            title="แก้ไขข้อมูลผู้เช่า"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
 
-                    {/* Tenant Name */}
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">ชื่อผู้เช่า</span>
-                      <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 group-hover/card:text-blue-600 dark:group-hover/card:text-blue-400 transition-colors">
-                        {t.fullName}
-                      </h4>
+                    {/* Status Badge */}
+                    <div className="mb-4">
+                      {status ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-extrabold uppercase tracking-wider ${status.style}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                          {status.label}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 dark:text-slate-600">-</span>
+                      )}
                     </div>
 
                     {/* Details */}
-                    <div className="grid grid-cols-1 gap-2.5 pt-1 text-xs">
-                      <div className="flex items-center gap-2.5 text-slate-650 dark:text-slate-300">
-                        <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                        <div>
-                          <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">เบอร์โทรศัพท์ (PDPA)</span>
-                          <span className="font-semibold font-mono text-xs">{getMaskedPhone(t.phone)}</span>
-                        </div>
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
+                      <div className="flex items-center justify-between text-sm sm:text-base">
+                        <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่า:</span>
+                        <span className="font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
+                          <Users className="w-4 h-4 text-slate-400 shrink-0" />
+                          {t.fullName}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-2.5 text-slate-650 dark:text-slate-300">
-                        <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
-                        <div>
-                          <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">สถานะ LINE OA</span>
-                          <span className="font-semibold font-mono text-xs">{getMaskedLine(t.lineUserId)}</span>
-                        </div>
+                      <div className="flex items-center justify-between text-sm sm:text-base">
+                        <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                        <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
+                          <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                          {getMaskedPhone(t.phone)}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-2.5 text-slate-650 dark:text-slate-300">
-                        <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                        <div>
-                          <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">ระยะสัญญาเช่า</span>
-                          <span className="font-semibold font-mono text-[11px]">
-                            {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between text-sm sm:text-base">
+                        <span className="text-slate-400 dark:text-slate-500 font-medium">สถานะ LINE OA:</span>
+                        <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
+                          <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
+                          {getMaskedLine(t.lineUserId)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm sm:text-base">
+                        <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะสัญญาเช่า:</span>
+                        <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
+                          <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                          {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -942,7 +1056,7 @@ export default function TenantsPage() {
             })}
 
             {filteredCurrent.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-555 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
+              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
                 ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
               </div>
             )}
@@ -955,13 +1069,14 @@ export default function TenantsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider text-xs sm:text-sm">
+                  <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs sm:text-sm">
                     <th className="py-3.5 px-5">ห้องพัก</th>
                     <th className="py-3.5 px-4">ชื่อผู้เช่า</th>
                     <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
                     <th className="py-3.5 px-4">สถานะ LINE OA</th>
                     <th className="py-3.5 px-4">ระยะสัญญาเช่า</th>
                     <th className="py-3.5 px-5 text-center">สถานะ</th>
+                    {hasEditPermission && <th className="py-3.5 px-5 text-center w-24">จัดการ</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
@@ -985,7 +1100,7 @@ export default function TenantsPage() {
                           {getMaskedLine(t.lineUserId)}
                         </div>
                       </td>
-                      <td className="py-4 px-4 font-semibold text-slate-550 dark:text-slate-400">
+                      <td className="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                           <span className="font-mono text-xs sm:text-sm">
@@ -1005,12 +1120,23 @@ export default function TenantsPage() {
                           )
                         })()}
                       </td>
+                      {hasEditPermission && (
+                        <td className="py-4 px-5 text-center">
+                          <button
+                            onClick={() => handleEditClick(t)}
+                            className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center"
+                            title="แก้ไขข้อมูลผู้เช่า"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
 
                   {filteredCurrent.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-555 font-medium">
+                      <td colSpan={hasEditPermission ? 7 : 6} className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium">
                         ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
                       </td>
                     </tr>
@@ -1026,74 +1152,77 @@ export default function TenantsPage() {
         <>
           {/* Always Grid View on Mobile, conditional Grid on Desktop */}
           <div className={viewMode === "grid" ? "block" : "block md:hidden"}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredOld.map((t) => (
               <div 
                 key={t.id} 
-                className="glass-panel p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
+                className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
               >
-                <div className="space-y-4">
-                  {/* Room Number & Delete button */}
-                  <div className="flex items-center justify-between">
-                    <span className="px-3 py-1 bg-slate-100 dark:bg-slate-950 text-slate-650 dark:text-slate-350 rounded-xl text-xs font-black border border-slate-200/40 dark:border-slate-800">
-                      ห้อง {t.roomNumber}
-                    </span>
-                    <button
-                      onClick={() => {
-                        if (!hasEditPermission) {
-                          showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
-                          return
-                        }
-                        setDeleteConfirmId(t.id)
-                      }}
-                      disabled={!hasEditPermission}
-                      className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
-                        hasEditPermission
-                          ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-100/30 dark:border-rose-900/20"
-                          : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
-                      }`}
-                      title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Tenant Name */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">ชื่อผู้เช่าเก่า</span>
-                    <h4 className="text-base font-extrabold text-slate-700 dark:text-slate-300">
-                      {t.fullName}
-                    </h4>
+                <div>
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div>
+                      <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องสุดท้ายที่พัก</span>
+                      <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
+                        ห้อง {t.roomNumber}
+                      </h4>
+                    </div>
+                    
+                    {/* Actions */}
+                    <div>
+                      <button
+                        onClick={() => {
+                          if (!hasEditPermission) {
+                            showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+                            return
+                          }
+                          setDeleteConfirmId(t.id)
+                        }}
+                        disabled={!hasEditPermission}
+                        className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
+                          hasEditPermission
+                            ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-150/40 dark:border-rose-900/30"
+                            : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
+                        }`}
+                        title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Details */}
-                  <div className="grid grid-cols-1 gap-2.5 pt-1 text-xs">
-                    <div className="flex items-center gap-2.5 text-slate-655 dark:text-slate-300">
-                      <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                      <div>
-                        <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">เบอร์โทรศัพท์ (PDPA)</span>
-                        <span className="font-semibold font-mono text-xs text-slate-500 dark:text-slate-400">{getMaskedPhone(t.phone)}</span>
-                      </div>
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
+                    <div className="flex items-center justify-between text-sm sm:text-base">
+                      <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่าเก่า:</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
+                        <Users className="w-4 h-4 text-slate-400 shrink-0" />
+                        {t.fullName}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-2.5 text-slate-655 dark:text-slate-300">
-                      <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                      <div>
-                        <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">ระยะเวลาที่เคยเช่า</span>
-                        <span className="font-semibold font-mono text-[11px] text-slate-500 dark:text-slate-450">
-                          {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
-                        </span>
-                      </div>
+                    <div className="flex items-center justify-between text-sm sm:text-base">
+                      <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                      <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
+                        <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                        {getMaskedPhone(t.phone)}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-2.5 text-slate-655 dark:text-slate-300">
-                      <Clock className="w-4 h-4 text-rose-500 shrink-0" />
-                      <div>
-                        <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-semibold">วันที่แจ้งคืนห้อง/ย้ายออก</span>
-                        <span className="font-bold text-xs text-rose-600 dark:text-rose-400 font-mono">
-                          {formatDateThai(t.movedOutAt)}
-                        </span>
-                      </div>
+                    <div className="flex items-center justify-between text-sm sm:text-base">
+                      <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะเวลาที่เคยเช่า:</span>
+                      <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
+                        <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                        {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm sm:text-base">
+                      <span className="text-slate-400 dark:text-slate-500 font-medium">วันที่ย้ายออก:</span>
+                      <span className="font-bold text-rose-600 dark:text-rose-455 flex items-center gap-1.5 font-mono">
+                        <Clock className="w-4 h-4 text-rose-500 shrink-0" />
+                        {formatDateThai(t.movedOutAt)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1101,7 +1230,7 @@ export default function TenantsPage() {
             ))}
 
             {filteredOld.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-555 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
+              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
                 ไม่มีประวัติข้อมูลผู้เช่าเก่าย้ายออกในตาราง
               </div>
             )}
@@ -1114,7 +1243,7 @@ export default function TenantsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider text-xs sm:text-sm">
+                  <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs sm:text-sm">
                     <th className="py-3.5 px-5">ห้องสุดท้าย</th>
                     <th className="py-3.5 px-4">ชื่อผู้เช่าเก่า</th>
                     <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
@@ -1138,7 +1267,7 @@ export default function TenantsPage() {
                           {getMaskedPhone(t.phone)}
                         </div>
                       </td>
-                      <td className="py-4 px-4 font-semibold text-slate-550 dark:text-slate-400">
+                      <td className="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span className="font-mono text-[11px]">
@@ -1179,7 +1308,7 @@ export default function TenantsPage() {
 
                   {filteredOld.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-555 font-medium">
+                      <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium">
                         ไม่มีประวัติข้อมูลผู้เช่าเก่าย้ายออกในตาราง
                       </td>
                     </tr>
@@ -1257,7 +1386,7 @@ export default function TenantsPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">พบข้อผิดพลาดในการตรวจสอบข้อมูล</h3>
-                  <p className="text-xs text-slate-550 dark:text-slate-400 mt-0.5">การบันทึกถูกระงับเพื่อความถูกต้องของข้อมูลทั้งหมด (Atomic Safety)</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">การบันทึกถูกระงับเพื่อความถูกต้องของข้อมูลทั้งหมด (Atomic Safety)</p>
                 </div>
               </div>
               <button
@@ -1380,6 +1509,157 @@ export default function TenantsPage() {
                 รับทราบและเข้าใจคำแนะนำ
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Tenant Modal */}
+      {isEditModalOpen && selectedTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-2xl">
+                  <Edit className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                    แก้ไขข้อมูลผู้เช่า
+                  </h3>
+                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
+                    ห้อง {selectedTenant.roomNumber} • {selectedTenant.fullName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false)
+                  setSelectedTenant(null)
+                }}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleEditSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Full Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                  ชื่อ-นามสกุลผู้เช่า
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-bold"
+                  placeholder="กรุณากรอกชื่อ-นามสกุล"
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-1.5">
+                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                  เบอร์โทรศัพท์ผู้เช่า
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold"
+                  placeholder="กรุณากรอกเบอร์โทรศัพท์"
+                />
+              </div>
+
+              {/* Room Number */}
+              <div className="space-y-1.5">
+                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                  หมายเลขห้องพัก (Room Number)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editRoomNumber}
+                  onChange={(e) => setEditRoomNumber(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold"
+                  placeholder="เช่น A101"
+                />
+              </div>
+
+              {/* Date Start & End */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                    วันเริ่มสัญญา
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editContractStart}
+                    onChange={(e) => setEditContractStart(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                    วันสิ้นสุดสัญญา
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editContractEnd}
+                    onChange={(e) => setEditContractEnd(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* LINE User ID */}
+              <div className="space-y-1.5">
+                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block flex items-center justify-between">
+                  <span>LINE User ID (สำหรับแจ้งบิลอัตโนมัติ)</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ไม่บังคับกรอก</span>
+                </label>
+                <input
+                  type="text"
+                  value={editLineUserId}
+                  onChange={(e) => setEditLineUserId(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono"
+                  placeholder="Ua1b2c3d4..."
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-100 dark:border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false)
+                    setSelectedTenant(null)
+                  }}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs md:text-sm font-extrabold rounded-xl transition-all cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs md:text-sm font-black rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {editSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      กำลังบันทึก...
+                    </>
+                  ) : (
+                    "บันทึกการแก้ไข"
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
