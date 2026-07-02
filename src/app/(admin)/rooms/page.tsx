@@ -3515,7 +3515,7 @@ function RoomsContent() {
                   </div>
                   <div>
                     <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                      💡 คู่มือการใช้ไฟล์ CSV สำหรับการเพิ่มห้องพัก
+                      คู่มือการใช้ไฟล์ CSV สำหรับการเพิ่มห้องพัก
                     </h3>
                     <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 mt-1 font-semibold">
                       โปรดอ่านคำแนะนำนี้เพื่อนำเข้าข้อมูลห้องพักได้อย่างราบรื่นและถูกต้องครับ
