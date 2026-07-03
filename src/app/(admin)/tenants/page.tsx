@@ -32,7 +32,8 @@ import {
   Info,
   LayoutGrid,
   List,
-  Edit
+  Edit,
+  ChevronDown
 } from "lucide-react"
 import { getTenants, getOldTenants, deleteOldTenant, createTenantsBatch, updateTenant } from "@/features/tenant/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
@@ -110,6 +111,7 @@ export default function TenantsPage() {
   const [hasEditPermission, setHasEditPermission] = useState(true)
   // Tenant Edit States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false)
   const [selectedTenant, setSelectedTenant] = useState<TenantItem | null>(null)
   const [editFullName, setEditFullName] = useState("")
   const [editPhone, setEditPhone] = useState("")
@@ -1561,6 +1563,7 @@ export default function TenantsPage() {
               <button
                 onClick={() => {
                   setIsEditModalOpen(false)
+                  setIsRoomDropdownOpen(false)
                   setSelectedTenant(null)
                 }}
                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all cursor-pointer"
@@ -1602,38 +1605,58 @@ export default function TenantsPage() {
               </div>
 
               {/* Room Number */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 relative">
                 <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
                   หมายเลขห้องพัก (Room Number)
                 </label>
-                <select
-                  required
-                  value={editRoomNumber}
-                  onChange={(e) => setEditRoomNumber(e.target.value)}
-                  className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-bold cursor-pointer ${
-                    editRoomNumber === selectedTenant.roomNumber 
-                      ? "text-[#FFAF00]" 
-                      : "text-emerald-600 dark:text-emerald-400"
-                  }`}
+                
+                {/* Custom select trigger button */}
+                <button
+                  type="button"
+                  onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-bold cursor-pointer flex justify-between items-center text-slate-850 dark:text-slate-100"
                 >
-                  <option value="" disabled className="text-slate-400 bg-white dark:bg-slate-900 font-bold">เลือกหมายเลขห้องพัก</option>
-                  {availableRoomsDropdownOptions.map((roomNum) => {
-                    const isCurrent = roomNum === selectedTenant.roomNumber
-                    return (
-                      <option 
-                        key={roomNum} 
-                        value={roomNum} 
-                        className={`bg-white dark:bg-slate-900 font-bold ${
-                          isCurrent 
-                            ? "text-[#FFAF00]" 
-                            : "text-emerald-600 dark:text-emerald-400"
-                        }`}
-                      >
-                        ห้อง {roomNum} {isCurrent ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
-                      </option>
-                    )
-                  })}
-                </select>
+                  <span>
+                    ห้อง {editRoomNumber}{" "}
+                    <span className={editRoomNumber === selectedTenant.roomNumber ? "text-[#FFAF00]" : "text-emerald-600 dark:text-emerald-400"}>
+                      {editRoomNumber === selectedTenant.roomNumber ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
+                    </span>
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-450 transition-transform duration-200 ${isRoomDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {/* Custom options popover list */}
+                {isRoomDropdownOpen && (
+                  <>
+                    {/* Invisible click backdrop to close on click outside */}
+                    <div className="fixed inset-0 z-10" onClick={() => setIsRoomDropdownOpen(false)} />
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-20 max-h-60 overflow-y-auto py-1 animate-scale-up">
+                      {availableRoomsDropdownOptions.map((roomNum) => {
+                        const isCurrent = roomNum === selectedTenant.roomNumber
+                        return (
+                          <button
+                            key={roomNum}
+                            type="button"
+                            onClick={() => {
+                              setEditRoomNumber(roomNum)
+                              setIsRoomDropdownOpen(false)
+                            }}
+                            className={`w-full px-4 py-3 text-left text-sm md:text-base hover:bg-slate-50 dark:hover:bg-slate-950/40 font-mono font-bold transition-colors flex justify-between items-center ${
+                              editRoomNumber === roomNum 
+                                ? "bg-slate-50/50 dark:bg-slate-950/10 text-slate-900 dark:text-white" 
+                                : "text-slate-750 dark:text-slate-200"
+                            }`}
+                          >
+                            <span>ห้อง {roomNum}</span>
+                            <span className={isCurrent ? "text-[#FFAF00]" : "text-emerald-600 dark:text-emerald-400"}>
+                              {isCurrent ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Date Start & End */}
@@ -1685,6 +1708,7 @@ export default function TenantsPage() {
                   type="button"
                   onClick={() => {
                     setIsEditModalOpen(false)
+                    setIsRoomDropdownOpen(false)
                     setSelectedTenant(null)
                   }}
                   className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs md:text-sm font-extrabold rounded-xl transition-all cursor-pointer"
