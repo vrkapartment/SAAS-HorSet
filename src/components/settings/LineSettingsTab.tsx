@@ -99,6 +99,51 @@ export default function LineSettingsTab() {
 
   const isDemo = !process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL.includes("localhost") && !process.env.NEXT_PUBLIC_SUPABASE_URL
 
+  const [activeCodesList, setActiveCodesList] = useState<Array<{ code: string; expires_at: string }>>([])
+  const [isLoadingActiveCodes, setIsLoadingActiveCodes] = useState(false)
+  const [ticker, setTicker] = useState(0)
+
+  const loadActiveCodesList = async (wsId: string) => {
+    if (!wsId || isDemo) return
+    setIsLoadingActiveCodes(true)
+    try {
+      const supabase = createClient()
+      
+      // 1. Delete expired or used ones first (และทำให้ Code ไหนหมดอายุหรือใช้แล้วลบออกจาก supabase เลย)
+      await supabase
+        .from("admin_connection_codes")
+        .delete()
+        .eq("workspace_id", wsId)
+        .or(`expires_at.lt.${new Date().toISOString()},is_used.eq.true`)
+
+      // 2. Fetch the remaining unused, non-expired ones
+      const { data, error } = await supabase
+        .from("admin_connection_codes")
+        .select("code, expires_at")
+        .eq("workspace_id", wsId)
+        .eq("is_used", false)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      setActiveCodesList(data || [])
+      
+      // Set the main active connectionCode to the most recent one if available
+      if (data && data.length > 0) {
+        setConnectionCode(data[0].code)
+        setCodeExpiresAt(data[0].expires_at)
+      } else {
+        setConnectionCode(null)
+        setCodeExpiresAt(null)
+      }
+    } catch (err) {
+      console.warn("Error loading active connection codes:", err)
+    } finally {
+      setIsLoadingActiveCodes(false)
+    }
+  }
+
   useEffect(() => {
     async function loadWorkspaceAndSettings() {
       setProfileLoading(true)
@@ -149,25 +194,8 @@ export default function LineSettingsTab() {
               loadAdminProfiles(data.admin_line_user_id, wsId)
             }
 
-            // Check for active connection code on load
-            try {
-              const { data: activeCodeData } = await supabase
-                .from("admin_connection_codes")
-                .select("code, expires_at")
-                .eq("workspace_id", wsId)
-                .eq("is_used", false)
-                .gt("expires_at", new Date().toISOString())
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .maybeSingle()
-
-              if (activeCodeData) {
-                setConnectionCode(activeCodeData.code)
-                setCodeExpiresAt(activeCodeData.expires_at)
-              }
-            } catch (codeErr) {
-              console.warn("Failed to check active connection code:", codeErr)
-            }
+            // Check for active connection code on load & clean up expired ones
+            await loadActiveCodesList(wsId)
             
             // Set initial quota display from cache row
             if (data.limit_count !== null && data.limit_count !== undefined) {
@@ -332,6 +360,7 @@ export default function LineSettingsTab() {
             setDisabledAdminUserIdsInput(wsSettings.disabled_admin_line_user_ids || "")
             setSavedDisabledAdminUserIds(wsSettings.disabled_admin_line_user_ids || "")
             await loadAdminProfiles(wsSettings.admin_line_user_id || "", workspaceId)
+            await loadActiveCodesList(workspaceId)
           }
 
           setSettingsSuccess("🎉 ผูกบัญชี LINE Admin อัตโนมัติสำเร็จเรียบร้อยแล้ว!")
@@ -366,6 +395,7 @@ export default function LineSettingsTab() {
       if (res.success && res.code && res.expiresAt) {
         setConnectionCode(res.code)
         setCodeExpiresAt(res.expiresAt)
+        await loadActiveCodesList(workspaceId)
       } else {
         setModalError(res.error || "เกิดข้อผิดพลาดในการสร้างรหัส")
       }
@@ -451,16 +481,30 @@ export default function LineSettingsTab() {
     setSavedDisabledAdminUserIds(updatedDisabledStr)
   }
 
-  const handleCancelConnectionCode = async () => {
-    if (!connectionCode || !workspaceId) return
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบรหัสเชื่อมต่ออัตโนมัตินี้?")) return
+  // Tick timer to update all active connection codes countdowns in real-time
+  useEffect(() => {
+    if (activeCodesList.length === 0) return
+
+    const timer = setInterval(() => {
+      setTicker(prev => prev + 1)
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [activeCodesList])
+
+  const handleDeleteConnectionCode = async (codeToDelete: string) => {
+    if (!codeToDelete || !workspaceId) return
+    if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบรหัสเชื่อมต่อ "${codeToDelete}" นี้ออกจากระบบ?`)) return
 
     setModalLoading(true)
     try {
       if (isDemo) {
         await new Promise((resolve) => setTimeout(resolve, 300))
-        setConnectionCode(null)
-        setCodeExpiresAt(null)
+        setActiveCodesList(prev => prev.filter(c => c.code !== codeToDelete))
+        if (connectionCode === codeToDelete) {
+          setConnectionCode(null)
+          setCodeExpiresAt(null)
+        }
         setSettingsSuccess("ยกเลิกรหัสเชื่อมต่อสำเร็จ (Demo)")
         return
       }
@@ -469,20 +513,26 @@ export default function LineSettingsTab() {
       const { error } = await supabase
         .from("admin_connection_codes")
         .delete()
-        .eq("code", connectionCode)
+        .eq("code", codeToDelete)
         .eq("workspace_id", workspaceId)
 
       if (error) throw error
 
-      setConnectionCode(null)
-      setCodeExpiresAt(null)
-      setSettingsSuccess("ยกเลิกรหัสเชื่อมต่ออัตโนมัติสำเร็จเรียบร้อยแล้ว!")
+      setSettingsSuccess(`ยกเลิกรหัสเชื่อมต่อ "${codeToDelete}" สำเร็จเรียบร้อยแล้ว!`)
+      
+      // Refresh active codes list
+      await loadActiveCodesList(workspaceId)
     } catch (err: any) {
       console.error("Error canceling connection code:", err)
       setSettingsError(err.message || "เกิดข้อผิดพลาดในการยกเลิกรหัส")
     } finally {
       setModalLoading(false)
     }
+  }
+
+  const handleCancelConnectionCode = async () => {
+    if (!connectionCode) return
+    await handleDeleteConnectionCode(connectionCode)
   }
 
   const handleToggleIndividualAdminNotification = async (uid: string) => {
@@ -1335,6 +1385,74 @@ export default function LineSettingsTab() {
                     <div className="py-2.5 flex items-center justify-center gap-2 text-slate-400 text-xs font-semibold animate-pulse">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
                       <span>กำลังโหลดสถานะโปรไฟล์แอดมิน...</span>
+                    </div>
+                  )}
+
+                  {/* Active Connection Codes History List */}
+                  {activeCodesList.length > 0 && (
+                    <div className="p-4 bg-slate-500/5 dark:bg-slate-800/5 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 mt-1.5 mb-2.5 animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <h6 className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                          <span>รหัสเชื่อมต่อที่ใช้งานได้ ({activeCodesList.length})</span>
+                        </h6>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
+                          รหัสจะลบออกอัตโนมัติเมื่อหมดอายุ
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {activeCodesList.map((item, idx) => {
+                          const targetTime = +new Date(item.expires_at)
+                          const now = +new Date()
+                          const secondsLeft = Math.max(0, Math.floor((targetTime - now) / 1000))
+                          
+                          if (secondsLeft <= 0) return null; // Skip expired items
+
+                          return (
+                            <div 
+                              key={item.code || idx} 
+                              className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 shadow-sm hover:border-indigo-500/20 dark:hover:border-indigo-500/30 transition-all"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="p-1.5 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg font-mono font-black text-sm">
+                                  {item.code}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-mono text-rose-500 dark:text-rose-400 font-bold">
+                                    ⏱️ {Math.floor(secondsLeft / 60)}:{(secondsLeft % 60).toString().padStart(2, "0")} นาที
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                {/* Copy Code Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(item.code)
+                                    alert("📋 คัดลอกรหัสเชื่อมต่อสำเร็จแล้ว!")
+                                  }}
+                                  className="p-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 rounded-lg transition-all cursor-pointer shadow-sm"
+                                  title="คัดลอกรหัส"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Delete/Cancel Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteConnectionCode(item.code)}
+                                  className="p-1.5 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 hover:border-rose-500/20 text-rose-500 rounded-lg transition-all cursor-pointer shadow-sm"
+                                  title="ยกเลิกรหัสนี้"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 

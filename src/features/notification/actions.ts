@@ -1020,6 +1020,17 @@ export async function generateAdminConnectionCodeAction(workspaceId: string) {
 
     const supabase = await createClient()
 
+    // 0. ลบรหัสเชื่อมต่อที่หมดอายุแล้วทั้งหมดออกจากระบบ
+    try {
+      await supabase
+        .from("admin_connection_codes")
+        .delete()
+        .eq("workspace_id", workspaceId)
+        .lt("expires_at", new Date().toISOString())
+    } catch (cleanErr) {
+      console.warn("Failed to clean up expired codes on generate:", cleanErr)
+    }
+
     // 1. สร้างรหัสตัวเลขสุ่ม 6 หลัก
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 นาที
