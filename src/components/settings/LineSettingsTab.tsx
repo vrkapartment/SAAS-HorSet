@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
+import { getLineProfilesAction } from "@/features/notification/actions"
 
 export default function LineSettingsTab() {
   const [profileLoading, setProfileLoading] = useState(true)
@@ -52,6 +53,10 @@ export default function LineSettingsTab() {
   const [savedSecret, setSavedSecret] = useState("")
   const [savedAdminUserId, setSavedAdminUserId] = useState("")
   const [savedAdminGroupId, setSavedAdminGroupId] = useState("")
+  
+  // Admin LINE Profiles
+  const [adminProfiles, setAdminProfiles] = useState<any[]>([])
+  const [loadingProfiles, setLoadingProfiles] = useState(false)
   
   // Quota Status
   const [fetchingQuota, setFetchingQuota] = useState(false)
@@ -113,6 +118,10 @@ export default function LineSettingsTab() {
             setSavedAdminUserId(data.admin_line_user_id || "")
             setSavedAdminGroupId(data.admin_line_group_id || "")
             setIsConfigured(!!data.channel_access_token)
+
+            if (data.admin_line_user_id && wsId) {
+              loadAdminProfiles(data.admin_line_user_id, wsId)
+            }
             
             // Set initial quota display from cache row
             if (data.limit_count !== null && data.limit_count !== undefined) {
@@ -148,6 +157,7 @@ export default function LineSettingsTab() {
           setSavedAdminUserId("U123456789abcdef0123456789abcdef0")
           setSavedAdminGroupId("C123456789abcdef0123456789abcdef0")
           setIsConfigured(true)
+          loadAdminProfiles("U123456789abcdef0123456789abcdef0", "d290f1ee-6c54-4b01-90e6-d701748f0851")
           setQuotaData({
             limit: 1000,
             consumed: 125,
@@ -169,6 +179,36 @@ export default function LineSettingsTab() {
     }
     loadWorkspaceAndSettings()
   }, [isDemo])
+
+  const loadAdminProfiles = async (userIdsStr: string, wsId: string) => {
+    if (!userIdsStr || !userIdsStr.trim() || !wsId) {
+      setAdminProfiles([])
+      return
+    }
+    setLoadingProfiles(true)
+    try {
+      if (isDemo) {
+        const ids = userIdsStr.split(/[\s,\n]+/).map(id => id.trim()).filter(id => id.length > 0).slice(0, 5)
+        setAdminProfiles(ids.map((id, index) => ({
+          userId: id,
+          displayName: `แอดมินจำลองท่านที่ ${index + 1}`,
+          pictureUrl: null,
+          success: true
+        })))
+        return
+      }
+      const res = await getLineProfilesAction(userIdsStr, wsId)
+      if (res.success && res.data) {
+        setAdminProfiles(res.data)
+      } else {
+        console.error("Failed to fetch admin profiles:", res.error)
+      }
+    } catch (err) {
+      console.error("Exception loading admin profiles:", err)
+    } finally {
+      setLoadingProfiles(false)
+    }
+  }
 
   const loadLineQuota = async (forceRefresh = false, targetWorkspaceId?: string) => {
     const activeWsId = targetWorkspaceId || workspaceId
@@ -250,6 +290,11 @@ export default function LineSettingsTab() {
       setSavedAdminGroupId(trimmedAdminGroupId)
       setIsEditing(false)
       setSettingsSuccess("บันทึกการเชื่อมต่อจำลองสำเร็จ!")
+      if (trimmedAdminUserId) {
+        loadAdminProfiles(trimmedAdminUserId, workspaceId || "d290f1ee-6c54-4b01-90e6-d701748f0851")
+      } else {
+        setAdminProfiles([])
+      }
       setSavingSettings(false)
       return
     }
@@ -310,6 +355,13 @@ export default function LineSettingsTab() {
       setIsEditing(false)
       setSettingsSuccess("บันทึกข้อมูลการเชื่อมต่อ LINE OA สำเร็จ!")
       
+      // Reload admin LINE profiles
+      if (trimmedAdminUserId && workspaceId) {
+        loadAdminProfiles(trimmedAdminUserId, workspaceId)
+      } else {
+        setAdminProfiles([])
+      }
+
       // Trigger a live quota reload
       if (trimmedToken) {
         loadLineQuota(true)
@@ -663,20 +715,93 @@ export default function LineSettingsTab() {
 
                 {/* Admin User ID (for personal alerts) */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    Admin LINE User ID (แจ้งเตือนสลิปส่วนตัว)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="U123456789abcdef0123456789abcdef0"
-                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      Admin LINE User ID (แจ้งเตือนสลิปส่วนตัว - สูงสุด 5 คน)
+                    </label>
+                    <span className="text-[10px] bg-blue-500/10 text-blue-500 font-extrabold px-2 py-0.5 rounded-full">
+                      รองรับสูงสุด 5 คน
+                    </span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    placeholder="U123456789abcdef0123456789abcdef0&#10;U888888888abcdef0888888888abcdef0"
+                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed resize-none leading-relaxed"
                     value={adminUserIdInput}
                     onChange={(e) => setAdminUserIdInput(e.target.value)}
                     disabled={isConfigured && !isEditing}
                   />
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                    💡 ใส่ LINE User ID ของแอดมิน (เริ่มต้นด้วย <code className="font-mono">U...</code> มีความยาว 33 ตัวอักษร) สามารถเพิ่มได้สูงสุด 5 คน โดยคั่นด้วย<b>จุลภาค (,)</b>, <b>เว้นวรรค</b> หรือ<b>ขึ้นบรรทัดใหม่</b>
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
                     💡 พิมพ์ส่งข้อความ <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-mono">#MYID</code> คุยหา LINE OA ของท่าน บอทจะตอบกลับรหัส LINE User ID ของท่านมาให้คัดลอกมาวางที่นี่
                   </p>
+
+                  {/* Dynamic Admin Profiles Panel */}
+                  {adminProfiles.length > 0 && (
+                    <div className="mt-3.5 space-y-2.5 animate-fadeIn">
+                      <p className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5 text-blue-500" />
+                        <span>รายชื่อแอดมินที่ดึงข้อมูลสำเร็จ ({adminProfiles.length}/5 คน)</span>
+                      </p>
+                      <div className="grid grid-cols-1 gap-2">
+                        {adminProfiles.map((p, idx) => (
+                          <div 
+                            key={p.userId || idx}
+                            className={`p-3 rounded-2xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-300 hover:shadow ${
+                              p.success 
+                                ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/10 dark:border-emerald-500/20" 
+                                : "bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/10 dark:border-amber-500/20"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {p.pictureUrl ? (
+                                <img 
+                                  src={p.pictureUrl} 
+                                  alt={p.displayName} 
+                                  className="w-10 h-10 rounded-full object-cover ring-2 ring-white dark:ring-slate-800"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-extrabold text-sm shrink-0">
+                                  {p.displayName ? p.displayName.charAt(0).toUpperCase() : "?"}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <h5 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 truncate flex items-center gap-1.5">
+                                  <span>{p.displayName}</span>
+                                </h5>
+                                <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">
+                                  {p.userId}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="shrink-0">
+                              {p.success ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-lg">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  <span>พร้อมรับแจ้งเตือน</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-black rounded-lg" title={p.error}>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  <span>ไม่พบเพื่อนบอท</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {loadingProfiles && (
+                    <div className="mt-2 py-3 flex items-center justify-center gap-2 text-slate-400 text-xs font-semibold animate-pulse">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                      <span>กำลังดึงชื่อ LINE ของแอดมิน...</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* LINE Group Alert Connection Box */}

@@ -670,8 +670,12 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
       return { success: false, error: "ไม่มี Channel Access Token ของ LINE" }
     }
 
-    // เช็กว่ามีเป้าหมายในการส่งแจ้งเตือนหรือไม่
-    const hasUserId = adminLineUserId && adminLineUserId.trim()
+    // แยก User ID สูงสุด 5 คน (คั่นด้วยจุลภาค, เว้นวรรค หรือขึ้นบรรทัดใหม่)
+    const userIds = adminLineUserId
+      ? adminLineUserId.split(/[\s,\n]+/).map(id => id.trim()).filter(id => id.length > 0).slice(0, 5)
+      : []
+
+    const hasUserId = userIds.length > 0
     const hasGroupId = adminLineGroupId && adminLineGroupId.trim()
 
     if (!hasUserId && !hasGroupId) {
@@ -871,8 +875,10 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
     const promises = []
 
     if (hasUserId) {
-      console.log(`Queueing push notification to Admin Personal: ${adminLineUserId}`)
-      promises.push(sendPush(adminLineUserId))
+      for (const userId of userIds) {
+        console.log(`Queueing push notification to Admin Personal: ${userId}`)
+        promises.push(sendPush(userId))
+      }
     }
 
     if (hasGroupId) {
@@ -899,6 +905,90 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
 
   } catch (error: any) {
     console.error("sendLineSlipNotificationAction Exception:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * ดึงโปรไฟล์ LINE จาก User ID ที่กำหนด (รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่)
+ * จำกัดสูงสุด 5 คน เพื่อแสดงผลในระบบการตั้งค่าแอดมิน
+ */
+export async function getLineProfilesAction(userIdsStr: string, workspaceId: string) {
+  try {
+    if (!userIdsStr || !userIdsStr.trim() || !workspaceId) {
+      return { success: true, data: [] }
+    }
+
+    const supabase = await createClient()
+
+    // ดึงค่าคอนฟิก LINE
+    const { data: settings } = await supabase
+      .from("workspace_line_settings")
+      .select("channel_access_token")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    let channelAccessToken = settings?.channel_access_token
+    if (!channelAccessToken) {
+      channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
+    }
+
+    if (!channelAccessToken || channelAccessToken === "placeholder" || !channelAccessToken.trim()) {
+      return { success: false, error: "ไม่มี Channel Access Token ของ LINE" }
+    }
+
+    const userIds = userIdsStr
+      .split(/[\s,\n]+/)
+      .map(id => id.trim())
+      .filter(id => id.length > 0)
+      .slice(0, 5) // สูงสุด 5 คน
+
+    const profiles = await Promise.all(
+      userIds.map(async (userId) => {
+        try {
+          const res = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${channelAccessToken}`
+            }
+          })
+
+          if (res.ok) {
+            const profile = await res.json()
+            return {
+              userId,
+              displayName: profile.displayName,
+              pictureUrl: profile.pictureUrl,
+              statusMessage: profile.statusMessage,
+              success: true
+            }
+          } else {
+            const errBody = await res.json().catch(() => ({}))
+            console.error(`Error fetching profile for user ${userId}:`, errBody)
+            return {
+              userId,
+              displayName: "ไม่พบชื่อ (ยังไม่ได้เพิ่มเพื่อนบอท หรือ ID ไม่ถูกต้อง)",
+              pictureUrl: null,
+              success: false,
+              error: errBody?.message || "HTTP status " + res.status
+            }
+          }
+        } catch (err: any) {
+          console.error(`Exception fetching profile for user ${userId}:`, err)
+          return {
+            userId,
+            displayName: "ไม่สามารถเชื่อมต่อ LINE เพื่อดึงโปรไฟล์ได้",
+            pictureUrl: null,
+            success: false,
+            error: err.message
+          }
+        }
+      })
+    )
+
+    return { success: true, data: profiles }
+  } catch (error: any) {
+    console.error("getLineProfilesAction Exception:", error)
     return { success: false, error: error.message }
   }
 }
