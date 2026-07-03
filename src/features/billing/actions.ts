@@ -354,7 +354,13 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
       if (workspaceId) {
         // Dynamically import to avoid circular dependencies
         const { sendLineSlipNotificationAction } = await import("@/features/notification/actions");
-        sendLineSlipNotificationAction(id, workspaceId).catch(err => {
+        sendLineSlipNotificationAction(id, workspaceId).then(res => {
+          if (!res.success) {
+            console.error("⚠️ LINE Slip Notification Failed:", res.error);
+          } else {
+            console.log("✅ LINE Slip Notification Sent:", res.data);
+          }
+        }).catch(err => {
           console.error("Error sending LINE slip notification:", err);
         });
       }
