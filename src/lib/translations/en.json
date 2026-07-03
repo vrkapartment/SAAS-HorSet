@@ -30,9 +30,20 @@
     "hero_title": "Fast Meter Invoicing, Directly to Tenants via LINE",
     "hero_subtitle": "with HorSet Platform",
     "hero_desc": "No more paper meters, calculation errors, or high transfer fees. Generate PromptPay QRs sent directly to LINE OA with automated P.N.D. 90/94 tax reports all in one place.",
+    "hero_badge": "Professional Thai Dormitory Management Platform",
     "get_started": "Get Started",
-    "docs": "Documentation",
-    "features_title": "Our Key Features"
+    "docs": "Explore Features",
+    "features_title": "Our Key Features",
+    "features_subtitle": "Daily Operations & Compliance Suite",
+    "features_meter_title": "Easy Mobile Metering",
+    "features_meter_desc": "Staff records water/electricity on mobile while walking rooms, preventing errors or duplicates with history tracking.",
+    "features_qr_title": "Invoices & PromptPay QR",
+    "features_qr_desc": "Generate beautiful PDF invoices with EMVCo QR Code embedded, auto-filling the payment amount on bank apps.",
+    "features_line_title": "Direct LINE OA Delivery",
+    "features_line_desc": "Send invoice links and slip upload prompts directly to tenants' LINE apps instantly. Fast, convenient, and safe.",
+    "features_tax_title": "Summarize P.N.D. 90/94 Tax",
+    "features_tax_desc": "Consolidate property revenues and expenses, separating income into Section 40(5) and 40(8) for tax compliance.",
+    "footer_text": "© 2026 HorSet. All rights reserved. Built for Thai apartments and dormitory management systems."
   },
   "dashboard": {
     "system_subtitle": "SaaS Apartment Management System",
