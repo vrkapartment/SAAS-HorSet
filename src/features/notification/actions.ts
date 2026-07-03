@@ -1000,5 +1000,43 @@ export async function getLineProfilesAction(userIdsStr: string, workspaceId: str
   }
 }
 
+/**
+ * สร้างรหัสความปลอดภัย 6 หลัก สำหรับผูกข้อมูลบัญชี LINE Admin อัตโนมัติ (รหัสมีอายุ 5 นาที)
+ */
+export async function generateAdminConnectionCodeAction(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (Workspace ID)" }
+    }
+
+    const supabase = await createClient()
+
+    // 1. สร้างรหัสตัวเลขสุ่ม 6 หลัก
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 นาที
+
+    // 2. บันทึกลงในตาราง admin_connection_codes
+    const { error } = await supabase
+      .from("admin_connection_codes")
+      .insert({
+        code,
+        workspace_id: workspaceId,
+        expires_at: expiresAt,
+        is_used: false
+      })
+
+    if (error) {
+      console.error("Error inserting admin connection code:", error)
+      return { success: false, error: "ไม่สามารถสร้างรหัสเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง" }
+    }
+
+    return { success: true, code, expiresAt }
+  } catch (err: any) {
+    console.error("generateAdminConnectionCodeAction Exception:", err)
+    return { success: false, error: err.message }
+  }
+}
+
+
 
 

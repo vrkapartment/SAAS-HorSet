@@ -112,6 +112,147 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // Handle 6-digit numeric pairing code for Admin LINE Connection
+        if (/^\d{6}$/.test(text)) {
+          const userId = source.userId
+          if (userId) {
+            // Find active valid connection code from DB
+            const { data: codeData, error: codeErr } = await supabase
+              .from("admin_connection_codes")
+              .select("workspace_id, expires_at")
+              .eq("code", text)
+              .eq("is_used", false)
+              .gt("expires_at", new Date().toISOString())
+              .maybeSingle()
+
+            if (codeErr) {
+              console.error("Error querying admin_connection_codes:", codeErr)
+            }
+
+            if (codeData) {
+              const pairedWorkspaceId = codeData.workspace_id
+
+              // 1. Get workspace specific channel token dynamically
+              const { data: wsSettings } = await supabase
+                .from("workspace_line_settings")
+                .select("channel_access_token, admin_line_user_id")
+                .eq("workspace_id", pairedWorkspaceId)
+                .maybeSingle()
+
+              const activeToken = wsSettings?.channel_access_token || channelAccessToken
+
+              if (activeToken && activeToken !== "placeholder" && activeToken.trim()) {
+                // 2. Get current workspace name
+                const { data: wsData } = await supabase
+                  .from("workspaces")
+                  .select("name")
+                  .eq("id", pairedWorkspaceId)
+                  .maybeSingle()
+
+                const workspaceName = wsData?.name || "หอพักของคุณ"
+
+                const existingAdminsStr = wsSettings?.admin_line_user_id || ""
+                const existingAdmins = existingAdminsStr
+                  .split(/[\s,\n]+/)
+                  .map((id: string) => id.trim())
+                  .filter((id: string) => id.length > 0)
+
+                let replyMessageText = ""
+
+                if (existingAdmins.includes(userId)) {
+                  replyMessageText = `💡 บัญชี LINE ของคุณถูกผูกเป็นแอดมินสำหรับหอพัก "${workspaceName}" อยู่แล้วในระบบครับ!`
+                } else if (existingAdmins.length >= 5) {
+                  replyMessageText = `⚠️ ขออภัย ระบบสามารถรองรับการผูกบัญชี LINE Admin ได้สูงสุด 5 คนแล้ว หากต้องการเชื่อมต่อเพิ่มเติม กรุณาลบแอดมินคนเดิมในหน้าตั้งค่าของระบบหอพักออกก่อนครับ`
+                } else {
+                  // Add the new admin User ID
+                  existingAdmins.push(userId)
+                  const newAdminsStr = existingAdmins.join(", ")
+
+                  // Update settings table
+                  const { error: updateError } = await supabase
+                    .from("workspace_line_settings")
+                    .update({
+                      admin_line_user_id: newAdminsStr,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq("workspace_id", pairedWorkspaceId)
+
+                  if (updateError) {
+                    console.error("Error updating admin_line_user_id:", updateError)
+                    replyMessageText = `⚠️ เกิดข้อผิดพลาดทางเทคนิคในการผูกบัญชี กรุณาลองใหม่อีกครั้ง`
+                  } else {
+                    // Mark connection code as used
+                    await supabase
+                      .from("admin_connection_codes")
+                      .update({ is_used: true })
+                      .eq("code", text)
+
+                    // Try to fetch LINE user profile display name
+                    let displayName = "แอดมิน"
+                    try {
+                      const profileRes = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+                        method: "GET",
+                        headers: {
+                          "Authorization": `Bearer ${activeToken}`
+                        }
+                      })
+                      if (profileRes.ok) {
+                        const profileData = await profileRes.json()
+                        if (profileData && profileData.displayName) {
+                          displayName = profileData.displayName
+                        }
+                      }
+                    } catch (pErr) {
+                      console.error("Error fetching admin profile name:", pErr)
+                    }
+
+                    replyMessageText = `🎉 เชื่อมต่อบัญชีแอดมินสำเร็จ!\n\nสวัสดีครับคุณ ${displayName}\n\nยินดีต้อนรับเข้าสู่ระบบ! บัญชี LINE ของคุณได้รับการเชื่อมต่อเป็น LINE Admin สำหรับหอพัก "${workspaceName}" เรียบร้อยแล้ว ตั้งแต่นี้ไปคุณจะได้รับการแจ้งเตือนสลิปโอนเงินของผู้เช่าทันทีที่มีการส่งตรวจสอบครับ 🚀`
+                  }
+                }
+
+                // Reply message to the admin
+                await fetch("https://api.line.me/v2/bot/message/reply", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${activeToken}`
+                  },
+                  body: JSON.stringify({
+                    replyToken: event.replyToken,
+                    messages: [
+                      {
+                        type: "text",
+                        text: replyMessageText
+                      }
+                    ]
+                  })
+                })
+              }
+            } else {
+              // Code not found, expired, or already used
+              if (channelAccessToken && channelAccessToken !== "placeholder") {
+                await fetch("https://api.line.me/v2/bot/message/reply", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${channelAccessToken}`
+                  },
+                  body: JSON.stringify({
+                    replyToken: event.replyToken,
+                    messages: [
+                      {
+                        type: "text",
+                        text: `❌ รหัสเชื่อมต่อ "${text}" ไม่ถูกต้อง หมดอายุ (เกิน 5 นาที) หรือถูกใช้งานไปแล้ว\n\nกรุณากดปุ่ม "เพิ่มการเชื่อมต่อ Line Admin" ในหน้าตั้งค่าเว็บระบบหอพัก เพื่อสร้างรหัสใหม่ที่มีอายุ 5 นาที และส่งกลับมาอีกครั้งครับ`
+                      }
+                    ]
+                  })
+                })
+              }
+            }
+          }
+          continue
+        }
+
         // Handle #CONNECT- command for connecting Group ID
         if (text.toUpperCase().startsWith("#CONNECT-")) {
           const connectionCode = text.substring(9).trim().toLowerCase()
