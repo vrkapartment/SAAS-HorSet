@@ -86,6 +86,7 @@ export default function TenantsPage() {
   // Data lists
   const [currentTenants, setCurrentTenants] = useState<TenantItem[]>([])
   const [oldTenants, setOldTenants] = useState<OldTenantItem[]>([])
+  const [rooms, setRooms] = useState<any[]>([])
 
   // UI features
   const [searchQuery, setSearchQuery] = useState("")
@@ -379,11 +380,16 @@ export default function TenantsPage() {
     setTableNotFound(false)
     try {
       const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
-      const [currentRes, oldRes, financeRes] = await Promise.all([
+      const [currentRes, oldRes, financeRes, roomsRes] = await Promise.all([
         getTenants(),
         getOldTenants(),
-        getFinanceSettings(wsId).catch(() => ({ success: false, data: null }))
+        getFinanceSettings(wsId).catch(() => ({ success: false, data: null })),
+        getRooms().catch(() => ({ success: false, data: [] }))
       ])
+
+      if (roomsRes?.success && roomsRes.data) {
+        setRooms(roomsRes.data as any[])
+      }
 
       let activeSettings = null
       if (financeRes?.success && financeRes.data) {
@@ -655,6 +661,27 @@ export default function TenantsPage() {
         text: "text-red-500 dark:text-red-400",
         bg: "bg-red-50 dark:bg-red-950/40 text-red-500 dark:text-red-400"
       }
+
+  // Filter and sort available rooms plus current tenant's room
+  const availableRoomsDropdownOptions = (() => {
+    if (!selectedTenant) return []
+    // Find all vacant rooms
+    const vacant = rooms.filter(r => r.status === "available" || !r.tenantName)
+    
+    // Create a unique set of room numbers including current tenant's room
+    const roomNumbersSet = new Set<string>()
+    vacant.forEach(r => {
+      if (r.roomNumber) roomNumbersSet.add(r.roomNumber)
+    })
+    if (selectedTenant.roomNumber) {
+      roomNumbersSet.add(selectedTenant.roomNumber)
+    }
+    
+    // Convert back to sorted array
+    return Array.from(roomNumbersSet).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    )
+  })()
 
   return (
     <>
@@ -1579,14 +1606,19 @@ export default function TenantsPage() {
                 <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
                   หมายเลขห้องพัก (Room Number)
                 </label>
-                <input
-                  type="text"
+                <select
                   required
                   value={editRoomNumber}
                   onChange={(e) => setEditRoomNumber(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold"
-                  placeholder="เช่น A101"
-                />
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold cursor-pointer"
+                >
+                  <option value="" disabled className="text-slate-400">เลือกหมายเลขห้องพัก</option>
+                  {availableRoomsDropdownOptions.map((roomNum) => (
+                    <option key={roomNum} value={roomNum} className="dark:bg-slate-900">
+                      ห้อง {roomNum} {roomNum === selectedTenant.roomNumber ? " (ห้องปัจจุบันของผู้เช่า)" : " (ห้องว่าง)"}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Date Start & End */}
@@ -1620,15 +1652,15 @@ export default function TenantsPage() {
               {/* LINE User ID */}
               <div className="space-y-1.5">
                 <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block flex items-center justify-between">
-                  <span>LINE User ID (สำหรับแจ้งบิลอัตโนมัติ)</span>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ไม่บังคับกรอก</span>
+                  <span>LINE User ID</span>
+                  <span className="text-[10px] text-red-500 dark:text-red-400 font-bold uppercase tracking-wider">ล็อคสิทธิ์แก้ไข</span>
                 </label>
                 <input
                   type="text"
-                  value={editLineUserId}
-                  onChange={(e) => setEditLineUserId(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono"
-                  placeholder="Ua1b2c3d4..."
+                  disabled
+                  value={editLineUserId || "ไม่มีข้อมูลการเชื่อมต่อ LINE"}
+                  className="w-full px-4 py-3 bg-slate-100/85 dark:bg-slate-950/45 border border-slate-200/50 dark:border-slate-800/80 rounded-xl text-slate-500 dark:text-slate-400 text-sm md:text-base outline-none font-mono cursor-not-allowed select-all"
+                  placeholder="ไม่มีข้อมูลการเชื่อมต่อ LINE"
                 />
               </div>
 
