@@ -363,6 +363,90 @@ export default function LineSettingsTab() {
     }
   }
 
+  const handleToggleAdminNotification = async () => {
+    const nextState = !adminNotificationActive
+    
+    // If currently editing the whole form, just update local state (the parent form submit will save it)
+    if (isEditing) {
+      setAdminNotificationActive(nextState)
+      return
+    }
+
+    // Otherwise, save the toggle state instantly to the database!
+    if (!workspaceId) return
+    
+    setSavingSettings(true)
+    setSettingsError(null)
+    setSettingsSuccess(null)
+    setAdminNotificationActive(nextState) // Optimistically update state
+
+    if (isDemo) {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      setSavedAdminNotificationActive(nextState)
+      setSettingsSuccess(`อัปเดตสถานะแจ้งเตือนแอดมินเป็น ${nextState ? "เปิด" : "ปิด"} (Demo) สำเร็จ!`)
+      setSavingSettings(false)
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      
+      const { data: existingRow, error: checkErr } = await supabase
+        .from("workspace_line_settings")
+        .select("workspace_id")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle()
+
+      if (checkErr) throw checkErr
+
+      let dbError = null
+      if (existingRow) {
+        const { error: updateErr } = await supabase
+          .from("workspace_line_settings")
+          .update({
+            admin_notification_active: nextState,
+            updated_at: new Date().toISOString()
+          })
+          .eq("workspace_id", workspaceId)
+        dbError = updateErr
+      } else {
+        const { error: insertErr } = await supabase
+          .from("workspace_line_settings")
+          .insert({
+            workspace_id: workspaceId,
+            admin_notification_active: nextState,
+            limit_count: 1000,
+            consumed_count: 0,
+            remaining_count: 1000,
+            percentage_used: 0,
+            updated_at: new Date().toISOString()
+          })
+        dbError = insertErr
+      }
+
+      if (dbError) throw dbError
+
+      setSavedAdminNotificationActive(nextState)
+      setSettingsSuccess(`อัปเดตสถานะแจ้งเตือนแอดมินเป็น ${nextState ? "เปิด" : "ปิด"} เรียบร้อยแล้ว!`)
+    } catch (err: any) {
+      console.error("Error toggling admin notification:", err)
+      setAdminNotificationActive(adminNotificationActive) // Revert state
+      
+      if (err.message && (
+        err.message.includes("column") ||
+        err.message.includes("admin_notification_active")
+      )) {
+        setSettingsError(
+          "⚠️ ไม่สามารถบันทึกสถานะได้เนื่องจากฐานข้อมูลตาราง 'workspace_line_settings' ยังไม่ได้รันสคริปต์ SQL Patch!"
+        )
+      } else {
+        setSettingsError(err.message || "เกิดข้อผิดพลาดในการเปลี่ยนสถานะการแจ้งเตือน")
+      }
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!workspaceId) return
@@ -797,18 +881,13 @@ export default function LineSettingsTab() {
                   {/* Switch */}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (isConfigured && !isEditing) {
-                        alert("กรุณาคลิกปุ่ม 'แก้ไขข้อมูล API & แจ้งเตือน' ด้านล่างก่อนเปลี่ยนสถานะเปิด-ปิด")
-                        return
-                      }
-                      setAdminNotificationActive(!adminNotificationActive)
-                    }}
+                    onClick={handleToggleAdminNotification}
+                    disabled={savingSettings}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
                       adminNotificationActive 
                         ? "bg-emerald-500" 
                         : "bg-slate-200 dark:bg-slate-800"
-                    } ${isConfigured && !isEditing ? "opacity-60 cursor-not-allowed" : ""}`}
+                    } ${savingSettings ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
