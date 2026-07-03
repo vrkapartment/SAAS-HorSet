@@ -1610,14 +1610,29 @@ export default function TenantsPage() {
                   required
                   value={editRoomNumber}
                   onChange={(e) => setEditRoomNumber(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold cursor-pointer"
+                  className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-bold cursor-pointer ${
+                    editRoomNumber === selectedTenant.roomNumber 
+                      ? "text-[#FFAF00]" 
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
                 >
-                  <option value="" disabled className="text-slate-400">เลือกหมายเลขห้องพัก</option>
-                  {availableRoomsDropdownOptions.map((roomNum) => (
-                    <option key={roomNum} value={roomNum} className="dark:bg-slate-900">
-                      ห้อง {roomNum} {roomNum === selectedTenant.roomNumber ? " (ห้องปัจจุบันของผู้เช่า)" : " (ห้องว่าง)"}
-                    </option>
-                  ))}
+                  <option value="" disabled className="text-slate-400 bg-white dark:bg-slate-900 font-bold">เลือกหมายเลขห้องพัก</option>
+                  {availableRoomsDropdownOptions.map((roomNum) => {
+                    const isCurrent = roomNum === selectedTenant.roomNumber
+                    return (
+                      <option 
+                        key={roomNum} 
+                        value={roomNum} 
+                        className={`bg-white dark:bg-slate-900 font-bold ${
+                          isCurrent 
+                            ? "text-[#FFAF00]" 
+                            : "text-emerald-600 dark:text-emerald-400"
+                        }`}
+                      >
+                        ห้อง {roomNum} {isCurrent ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
 
