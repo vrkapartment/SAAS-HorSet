@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   TrendingUp,
   Users,
@@ -33,6 +33,7 @@ import { getExpenses } from "@/features/expenses/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { createClient } from "@/lib/supabase/client"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -64,8 +65,10 @@ const YEARS = [
   { value: "2027", label: "2570" }
 ]
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { t } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [isDemo, setIsDemo] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -85,6 +88,32 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState("06")
   const [selectedYear, setSelectedYear] = useState("2026")
   const [selectedCycle, setSelectedCycle] = useState("2026-06")
+
+  // Sync state from URL parameters on mount and whenever searchParams change
+  useEffect(() => {
+    const monthParam = searchParams.get("month")
+    const yearParam = searchParams.get("year")
+    if (monthParam) {
+      setSelectedMonth(monthParam)
+    }
+    if (yearParam) {
+      setSelectedYear(yearParam)
+    }
+  }, [searchParams])
+
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month)
+    const params = new URLSearchParams(window.location.search)
+    params.set("month", month)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
+
+  const handleYearChange = (year: string) => {
+    setSelectedYear(year)
+    const params = new URLSearchParams(window.location.search)
+    params.set("year", year)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
 
   // Dynamic Welcome Name
   const [welcomeName, setWelcomeName] = useState<string>("")
@@ -615,79 +644,12 @@ export default function AdminDashboard() {
     }
   }, [selectedMonth])
 
-  const SkeletonLoader = () => (
-    <div className="space-y-6">
-      {/* Stats Cards Skeleton */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-pulse">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-28 flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
-              <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
-            </div>
-            <div className="h-2.5 bg-slate-150 dark:bg-slate-700 rounded w-1/3" />
-          </div>
-        ))}
-      </div>
 
-      {/* Financial Overview Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
-        {[1, 2].map((i) => (
-          <div key={i} className="rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-36" />
-        ))}
-      </div>
-
-      {/* Quick Actions Skeleton */}
-      <div className="space-y-3">
-        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32 animate-pulse" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-pulse">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="p-4 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-16" />
-          ))}
-        </div>
-      </div>
-
-      {/* Two-Column Details Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
-        {/* Left Column Table Skeleton */}
-        <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-80 flex flex-col justify-between">
-          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4" />
-          <div className="space-y-3.5 flex-1">
-            <div className="h-8 bg-slate-100 dark:bg-slate-800 rounded-lg w-full" />
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex justify-between items-center py-2">
-                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/6" />
-                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4" />
-                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/6" />
-                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/6 text-right" />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right Column Feed Skeleton */}
-        <div className="p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-80 flex flex-col justify-between">
-          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-4" />
-          <div className="space-y-4 flex-1">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3">
-                <div className="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700 mt-1.5 shrink-0" />
-                <div className="space-y-1.5 flex-1">
-                  <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-full" />
-                  <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/4" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
 
   return (
     <>
       {/* ส่วนหัวข้อต้อนรับแบบพรีเมียม (Adaptive layout) */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight min-h-[36px] flex items-center">
             {welcomeName ? (
@@ -701,14 +663,14 @@ export default function AdminDashboard() {
           </p>
         </div>
         
-        {/* DESKTOP Month Dropdown Selector & RLS Badge (>= 768px) */}
-        <div className="hidden md:flex items-center gap-3 shrink-0">
-          {/* Dynamic Month Selector */}
-          <div className="flex items-center gap-2">
+        {/* Consolidated Month Dropdown Selector & Secure Cloud Badge */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0 pb-3 lg:pb-0 border-b lg:border-b-0 border-slate-100 dark:border-slate-800/50">
+          {/* Dynamic Month/Year Selectors */}
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-1 sm:flex-none">
             <select
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              onChange={(e) => handleMonthChange(e.target.value)}
+              className="flex-1 sm:flex-none px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             >
               {THAI_MONTHS.map(m => (
                 <option key={m.value} value={m.value}>{m.label}</option>
@@ -717,8 +679,8 @@ export default function AdminDashboard() {
 
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              onChange={(e) => handleYearChange(e.target.value)}
+              className="flex-1 sm:flex-none px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             >
               {YEARS.map(y => (
                 <option key={y.value} value={y.value}>พ.ศ. {y.label}</option>
@@ -726,65 +688,31 @@ export default function AdminDashboard() {
             </select>
           </div>
 
-          {/* ปุ่ม "ออกบิลเดือนนี้" มุมขวาบน */}
+          {/* ปุ่ม "ออกบิลเดือนนี้" */}
           <button
             onClick={() => router.push("/billing")}
-            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center gap-2 cursor-pointer shrink-0"
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
             <Receipt className="w-4 h-4" />
             <span>ออกบิลเดือนนี้</span>
           </button>
 
-          <div className="text-xs font-bold px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2.5 shadow-sm">
+          {/* ระบบเชื่อมต่อคลาวด์ปลอดภัย */}
+          <div className="flex-1 sm:flex-none text-xs font-bold px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center gap-2.5 shadow-sm text-slate-600 dark:text-slate-300">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-slate-650 dark:text-slate-350">RLS ทำงานปกติ</span>
+            <span>ระบบเชื่อมต่อคลาวด์ปลอดภัย</span>
           </div>
         </div>
-      </div>
-
-      {/* MOBILE View Selector & Shortcut Button (< 768px) */}
-      <div className="flex flex-col gap-3 md:hidden mt-4 pb-3 border-b border-slate-100 dark:border-slate-800/50 w-full">
-        <div className="flex items-center gap-2 w-full">
-          <span className="text-xs font-bold text-slate-400 shrink-0">เลือกช่วงเวลา:</span>
-          <div className="flex gap-2 flex-1">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
-            >
-              {THAI_MONTHS.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm outline-none"
-            >
-              {YEARS.map(y => (
-                <option key={y.value} value={y.value}>พ.ศ. {y.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <button
-          onClick={() => router.push("/manage-bills")}
-          className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-98 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer animate-fade-in"
-        >
-          <Receipt className="w-4 h-4" />
-          <span>ออกบิลเดือนนี้</span>
-        </button>
       </div>
 
       {loading ? (
         <SkeletonLoader />
       ) : dbError ? (
         <div className="mt-8 p-8 md:p-12 rounded-3xl bg-red-50/40 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30 text-center space-y-6 max-w-2xl mx-auto backdrop-blur-md animate-fade-in shadow-xl">
-          <div className="inline-flex p-4 rounded-2xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 animate-bounce mx-auto">
-            <AlertTriangle className="w-12 h-12" />
+          <div className="inline-flex p-4 rounded-2xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 mx-auto transition-transform hover:scale-105 duration-300 group">
+            <AlertTriangle className="w-12 h-12 transition-transform duration-300 group-hover:rotate-12" />
           </div>
           <div className="space-y-2">
             <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
@@ -800,7 +728,7 @@ export default function AdminDashboard() {
                 setLoading(true);
                 loadDashboardData(true);
               }}
-              className="px-6 py-3 bg-red-650 hover:bg-red-700 active:scale-95 text-white font-extrabold text-sm rounded-xl shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer"
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold text-sm rounded-xl shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer"
             >
               ลองเชื่อมต่อใหม่อีกครั้ง (Retry)
             </button>
@@ -924,17 +852,17 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-2 mb-3.5">
               <Zap className="w-4 h-4 text-amber-500" />
               <h4 className="text-xs md:text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                การดำเนินการด่วน (Quick Actions)
+                {t("dashboard.quick_actions")}
               </h4>
             </div>
 
             {/* MOBILE VIEW GRID (< 768px, Large 48px touch targets, comfortable spaces) */}
             <div className="grid grid-cols-2 gap-3.5 md:hidden">
               {[
-                { label: "จดมิเตอร์น้ำไฟ", sub: "Utility Meter", path: "/billing", icon: Receipt, bg: "from-blue-500/10 to-blue-500/5 text-blue-500 border-blue-500/20 dark:border-blue-500/30" },
-                { label: "ออกบิลค่าเช่า", sub: "New Month Bill", path: "/manage-bills", icon: Plus, bg: "from-teal-500/10 to-teal-500/5 text-teal-500 border-teal-500/20 dark:border-teal-500/30" },
-                { label: "จัดการผู้เช่า", sub: "Manage Tenants", path: "/tenants", icon: Users, bg: "from-indigo-500/10 to-indigo-500/5 text-indigo-500 border-indigo-500/20 dark:border-indigo-500/30" },
-                { label: "รายจ่ายรายวัน", sub: "Daily Expense", path: "/daily-bills", icon: Coins, bg: "from-amber-500/10 to-amber-500/5 text-amber-500 border-amber-500/20 dark:border-amber-500/30" }
+                { label: t("dashboard.action_meter"), sub: "Utility Meter", path: "/billing", icon: Receipt, bg: "from-blue-500/10 to-blue-500/5 text-blue-500 border-blue-500/20 dark:border-blue-500/30" },
+                { label: t("dashboard.action_bill"), sub: "New Month Bill", path: "/manage-bills", icon: Plus, bg: "from-teal-500/10 to-teal-500/5 text-teal-500 border-teal-500/20 dark:border-teal-500/30" },
+                { label: t("dashboard.action_tenants"), sub: "Manage Tenants", path: "/tenants", icon: Users, bg: "from-indigo-500/10 to-indigo-500/5 text-indigo-500 border-indigo-500/20 dark:border-indigo-500/30" },
+                { label: t("dashboard.action_expense"), sub: "Daily Expense", path: "/daily-bills", icon: Coins, bg: "from-amber-500/10 to-amber-500/5 text-amber-500 border-amber-500/20 dark:border-amber-500/30" }
               ].map((act, idx) => {
                 const Icon = act.icon
                 return (
@@ -947,8 +875,10 @@ export default function AdminDashboard() {
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-extrabold text-slate-850 dark:text-slate-100">{act.label}</p>
-                      <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">{act.sub}</p>
+                      <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{act.label}</p>
+                      {act.label !== act.sub && (
+                        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">{act.sub}</p>
+                      )}
                     </div>
                   </button>
                 )
@@ -958,10 +888,10 @@ export default function AdminDashboard() {
             {/* DESKTOP VIEW GRID (>= 768px, Dense info style, fine hover hover effect) */}
             <div className="hidden md:grid grid-cols-4 gap-4">
               {[
-                { label: "จดมิเตอร์น้ำไฟ", desc: "บันทึกและคำนวณมิเตอร์ไฟฟ้าน้ำประปา", path: "/billing", icon: Receipt, color: "text-blue-500", bg: "bg-blue-500/10" },
-                { label: "ออกบิลค่าเช่าประจำเดือน", desc: "สร้างและจัดส่งใบแจ้งหนี้ไปยัง LINE OA", path: "/manage-bills", icon: Plus, color: "text-teal-500", bg: "bg-teal-500/10" },
-                { label: "จัดการสัญญาเช่า & ผู้เช่า", desc: "เพิ่มสัญญา ปรับปรุงข้อมูล จัดการห้องพัก", path: "/tenants", icon: Users, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-                { label: "บันทึกรายจ่ายรายวัน", desc: "จดบันทึกรายจ่ายจิปาถะของหอพัก", path: "/daily-bills", icon: Coins, color: "text-amber-500", bg: "bg-amber-500/10" }
+                { label: t("dashboard.action_meter"), desc: t("dashboard.action_meter_desc"), path: "/billing", icon: Receipt, color: "text-blue-500", bg: "bg-blue-500/10" },
+                { label: t("dashboard.action_bill"), desc: t("dashboard.action_bill_desc"), path: "/manage-bills", icon: Plus, color: "text-teal-500", bg: "bg-teal-500/10" },
+                { label: t("dashboard.action_tenants"), desc: t("dashboard.action_tenants_desc"), path: "/tenants", icon: Users, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+                { label: t("dashboard.action_expense"), desc: t("dashboard.action_expense_desc"), path: "/daily-bills", icon: Coins, color: "text-amber-500", bg: "bg-amber-500/10" }
               ].map((act, idx) => {
                 const Icon = act.icon
                 return (
@@ -977,7 +907,7 @@ export default function AdminDashboard() {
                       <h5 className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{act.label}</h5>
                       <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 truncate mt-0.5">{act.desc}</p>
                     </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-3.5 dark:text-slate-650 ml-auto opacity-0 group-hover:opacity-100 transition-all shrink-0" />
+                    <ArrowUpRight className="w-4 h-4 text-slate-400 dark:text-slate-500 ml-auto opacity-0 group-hover:opacity-100 transition-all shrink-0" />
                   </button>
                 )
               })}
@@ -1045,7 +975,7 @@ export default function AdminDashboard() {
                       <th className="pb-3 text-right pr-2">เวลา</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-600 dark:text-slate-300">
                     {recentTransactions.map((tx, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 group transition-all duration-150">
                         <td className="py-3.5 pl-2 font-bold text-slate-800 dark:text-slate-200">{tx.room}</td>
@@ -1066,7 +996,7 @@ export default function AdminDashboard() {
                     ))}
                     {recentTransactions.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-555 font-medium">
+                        <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500 font-medium">
                           ไม่มีข้อมูลธุรกรรมหรือบิลในรอบบัญชีนี้
                         </td>
                       </tr>
@@ -1092,7 +1022,7 @@ export default function AdminDashboard() {
                         </span>
                       </div>
                       
-                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-2 text-xs text-slate-650 dark:text-slate-400">
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-2 text-xs text-slate-600 dark:text-slate-400">
                         <div className="flex justify-between">
                           <span className="text-slate-400 dark:text-slate-500 font-medium">ผู้เช่า:</span>
                           <span className="font-semibold text-slate-700 dark:text-slate-200">{tx.tenant}</span>
@@ -1107,7 +1037,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-400 dark:text-slate-500 font-medium">เวลาบันทึก:</span>
-                          <span className="font-mono text-[10px] text-slate-400 dark:text-slate-550">{tx.time}</span>
+                          <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">{tx.time}</span>
                         </div>
                       </div>
                     </div>
@@ -1155,5 +1085,84 @@ export default function AdminDashboard() {
         </>
       )}
     </>
+  )
+}
+
+function SkeletonLoader() {
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-pulse">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-28 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+              <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
+            </div>
+            <div className="h-2.5 bg-slate-150 dark:bg-slate-700 rounded w-1/3" />
+          </div>
+        ))}
+      </div>
+
+      {/* Financial Overview Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+        {[1, 2].map((i) => (
+          <div key={i} className="rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-36" />
+        ))}
+      </div>
+
+      {/* Quick Actions Skeleton */}
+      <div className="space-y-3">
+        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32 animate-pulse" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-pulse">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-4 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-16" />
+          ))}
+        </div>
+      </div>
+
+      {/* Two-Column Details Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+        {/* Left Column Table Skeleton */}
+        <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-80 flex flex-col justify-between">
+          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4" />
+          <div className="space-y-3.5 flex-1">
+            <div className="h-8 bg-slate-100 dark:bg-slate-800 rounded-lg w-full" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex justify-between items-center py-2">
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/6" />
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4" />
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/6" />
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/6 text-right" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Column Feed Skeleton */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800/80 h-80 flex flex-col justify-between">
+          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-4" />
+          <div className="space-y-4 flex-1">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3">
+                <div className="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700 mt-1.5 shrink-0" />
+                <div className="space-y-1.5 flex-1">
+                  <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-full" />
+                  <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={<SkeletonLoader />}>
+      <AdminDashboardContent />
+    </Suspense>
   )
 }

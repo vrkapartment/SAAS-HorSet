@@ -58,7 +58,16 @@
     "current_cycle": "Current Cycle • Jun 2026",
     "support_mode": "Support Active",
     "authorized_revoke": "Authorized (Click to revoke)",
-    "access_revoked": "Access Revoked"
+    "access_revoked": "Access Revoked",
+    "quick_actions": "Quick Actions",
+    "action_meter": "Utility Meter",
+    "action_meter_desc": "Record and calculate electricity/water meters",
+    "action_bill": "New Month Bill",
+    "action_bill_desc": "Create and deliver invoices to LINE OA",
+    "action_tenants": "Manage Tenants",
+    "action_tenants_desc": "Add contracts, update info, manage rooms",
+    "action_expense": "Daily Expense",
+    "action_expense_desc": "Record miscellaneous expenses of the property"
   },
   "test_connection": {
     "title": "Supabase Connection Diagnostics",

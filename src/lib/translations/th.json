@@ -58,7 +58,16 @@
     "current_cycle": "รอบบิลปัจจุบัน • มิ.ย. 2026",
     "support_mode": "เข้าช่วยเหลือระบบ",
     "authorized_revoke": "อนุญาตอยู่ (คลิกยกเลิก)",
-    "access_revoked": "ปิดการเข้าถึง"
+    "access_revoked": "ปิดการเข้าถึง",
+    "quick_actions": "การดำเนินการด่วน",
+    "action_meter": "จดมิเตอร์น้ำไฟ",
+    "action_meter_desc": "บันทึกและคำนวณมิเตอร์ไฟฟ้าน้ำประปา",
+    "action_bill": "ออกบิลค่าเช่าประจำเดือน",
+    "action_bill_desc": "สร้างและจัดส่งใบแจ้งหนี้ไปยัง LINE OA",
+    "action_tenants": "จัดการสัญญาเช่า & ผู้เช่า",
+    "action_tenants_desc": "เพิ่มสัญญา ปรับปรุงข้อมูล จัดการห้องพัก",
+    "action_expense": "บันทึกรายจ่ายรายวัน",
+    "action_expense_desc": "จดบันทึกรายจ่ายจิปาถะของหอพัก"
   },
   "test_connection": {
     "title": "ระบบตรวจสอบการเชื่อมต่อ Supabase",
