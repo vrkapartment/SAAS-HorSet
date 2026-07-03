@@ -349,6 +349,17 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
       }
     }
 
+    if (status === "pending" && finalData) {
+      const workspaceId = finalData.workspace_id || billData?.workspace_id;
+      if (workspaceId) {
+        // Dynamically import to avoid circular dependencies
+        const { sendLineSlipNotificationAction } = await import("@/features/notification/actions");
+        sendLineSlipNotificationAction(id, workspaceId).catch(err => {
+          console.error("Error sending LINE slip notification:", err);
+        });
+      }
+    }
+
     return { success: true, data: finalData }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล"

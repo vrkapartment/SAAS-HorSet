@@ -608,4 +608,286 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
   }
 }
 
+/**
+ * ส่งข้อความแจ้งเตือนสลิปโอนเงินใหม่ไปยัง Admin (ทั้งแบบส่วนตัวและกลุ่มทีมงาน)
+ */
+export async function sendLineSlipNotificationAction(billId: string, workspaceId: string) {
+  try {
+    const supabase = await createClient()
+
+    // 1. ดึงข้อมูลบิล
+    const { data: bill, error: billError } = await supabase
+      .from("bills")
+      .select("id, room_number, tenant_name, amount, billing_cycle, slip_url")
+      .eq("id", billId)
+      .maybeSingle()
+
+    if (billError || !bill) {
+      console.error("Error fetching bill for slip notification:", billError)
+      return { success: false, error: "ไม่พบข้อมูลบิลสำหรับแจ้งเตือนสลิป" }
+    }
+
+    // 2. ดึงชื่อหอพัก
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("name")
+      .eq("id", workspaceId)
+      .maybeSingle()
+    
+    const workspaceName = ws?.name || "หอพัก"
+
+    // 3. ดึงค่าคอนฟิก LINE
+    const { data: settings } = await supabase
+      .from("workspace_line_settings")
+      .select("channel_access_token, admin_line_user_id, admin_line_group_id")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    let channelAccessToken = settings?.channel_access_token
+    const adminLineUserId = settings?.admin_line_user_id
+    const adminLineGroupId = settings?.admin_line_group_id
+
+    // Fallback to process.env.LINE_CHANNEL_ACCESS_TOKEN if workspace specific is missing
+    if (!channelAccessToken) {
+      channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
+    }
+
+    if (!channelAccessToken || channelAccessToken === "placeholder" || !channelAccessToken.trim()) {
+      return { success: false, error: "ไม่มี Channel Access Token ของ LINE" }
+    }
+
+    // เช็กว่ามีเป้าหมายในการส่งแจ้งเตือนหรือไม่
+    const hasUserId = adminLineUserId && adminLineUserId.trim()
+    const hasGroupId = adminLineGroupId && adminLineGroupId.trim()
+
+    if (!hasUserId && !hasGroupId) {
+      console.log("No admin LINE User ID or Group ID configured, skipping notification.")
+      return { success: true, message: "ไม่มีการตั้งค่าแจ้งเตือนฝั่งแอดมิน ข้ามกระบวนการ" }
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    let safeAppUrl = appUrl.trim()
+    while (safeAppUrl.endsWith("/")) {
+      safeAppUrl = safeAppUrl.slice(0, -1)
+    }
+
+    const verifyLink = `${safeAppUrl}/manage-bills?verify_bill_id=${billId}&cycle=${encodeURIComponent(bill.billing_cycle)}`
+
+    // สร้าง Flex Message
+    const altText = `📥 สลิปใหม่รอตรวจ: ห้อง ${bill.room_number} ยอด ${Number(bill.amount).toLocaleString()} บาท`
+    
+    const flexMessageContent: any = {
+      type: "bubble",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: "#4F46E5", // Indigo Premium
+        paddingTop: "xl",
+        paddingBottom: "xl",
+        paddingStart: "xl",
+        paddingEnd: "xl",
+        contents: [
+          {
+            type: "text",
+            text: "📥 มีผู้เช่าอัปโหลดสลิปโอนเงินใหม่",
+            color: "#FFFFFF",
+            size: "sm",
+            weight: "bold"
+          },
+          {
+            type: "text",
+            text: workspaceName,
+            color: "#E0E7FF",
+            size: "md",
+            margin: "xs",
+            weight: "bold"
+          }
+        ]
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingTop: "xl",
+        paddingBottom: "xl",
+        paddingStart: "xl",
+        paddingEnd: "xl",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            contents: [
+              {
+                type: "text",
+                text: "หมายเลขห้อง",
+                color: "#6B7280",
+                size: "sm"
+              },
+              {
+                type: "text",
+                text: `ห้อง ${bill.room_number}`,
+                color: "#111827",
+                size: "sm",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          },
+          {
+            type: "box",
+            layout: "horizontal",
+            margin: "md",
+            contents: [
+              {
+                type: "text",
+                text: "ชื่อผู้เช่า",
+                color: "#6B7280",
+                size: "sm"
+              },
+              {
+                type: "text",
+                text: bill.tenant_name,
+                color: "#111827",
+                size: "sm",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          },
+          {
+            type: "box",
+            layout: "horizontal",
+            margin: "md",
+            contents: [
+              {
+                type: "text",
+                text: "รอบบิล",
+                color: "#6B7280",
+                size: "sm"
+              },
+              {
+                type: "text",
+                text: bill.billing_cycle,
+                color: "#111827",
+                size: "sm",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          },
+          {
+            type: "box",
+            layout: "horizontal",
+            margin: "md",
+            contents: [
+              {
+                type: "text",
+                text: "ยอดเงินที่แจ้งโอน",
+                color: "#6B7280",
+                size: "sm"
+              },
+              {
+                type: "text",
+                text: `${Number(bill.amount).toLocaleString()} บาท`,
+                color: "#10B981",
+                size: "md",
+                weight: "bold",
+                align: "end"
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+    // หากมีภาพสลิปที่ส่งเข้ามา ให้นำมาแสดงเป็นภาพพรีวิวในตัว LINE Flex Message เลยเพื่อความพรีเมียม
+    if (bill.slip_url && bill.slip_url.startsWith("http")) {
+      flexMessageContent.hero = {
+        type: "image",
+        url: bill.slip_url,
+        size: "full",
+        aspectRatio: "3:4",
+        aspectMode: "cover"
+      }
+    }
+
+    // ปุ่ม Action ท้าย Flex Message
+    flexMessageContent.footer = {
+      type: "box",
+      layout: "vertical",
+      paddingTop: "md",
+      paddingBottom: "md",
+      paddingStart: "xl",
+      paddingEnd: "xl",
+      contents: [
+        {
+          type: "button",
+          style: "primary",
+          color: "#4F46E5",
+          height: "sm",
+          action: {
+            type: "uri",
+            label: "🔍 ตรวจสอบสลิป & ยืนยัน",
+            uri: verifyLink
+          }
+        }
+      ]
+    }
+
+    // ฟังก์ชันยิงหาเป้าหมาย
+    const sendPush = async (toTarget: string) => {
+      return fetch("https://api.line.me/v2/bot/message/push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${channelAccessToken}`
+        },
+        body: JSON.stringify({
+          to: toTarget.trim(),
+          messages: [
+            {
+              type: "flex",
+              altText,
+              contents: flexMessageContent
+            }
+          ]
+        })
+      })
+    }
+
+    const promises = []
+
+    if (hasUserId) {
+      console.log(`Queueing push notification to Admin Personal: ${adminLineUserId}`)
+      promises.push(sendPush(adminLineUserId))
+    }
+
+    if (hasGroupId) {
+      console.log(`Queueing push notification to Admin Group: ${adminLineGroupId}`)
+      promises.push(sendPush(adminLineGroupId))
+    }
+
+    const results = await Promise.all(promises)
+    let anySuccess = false
+    for (const res of results) {
+      if (res.ok) {
+        anySuccess = true
+      } else {
+        const errJson = await res.json().catch(() => ({}))
+        console.error("Error sending push notification via LINE Messaging API:", errJson)
+      }
+    }
+
+    if (anySuccess) {
+      return { success: true, data: "แจ้งเตือนสลิปโอนเงินใหม่หาทีมงานนิติบุคคลสำเร็จ" }
+    } else {
+      return { success: false, error: "ไม่สามารถส่งข้อความแจ้งเตือนเข้าไลน์แอดมินหรือไลน์กลุ่มได้" }
+    }
+
+  } catch (error: any) {
+    console.error("sendLineSlipNotificationAction Exception:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+
 

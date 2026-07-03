@@ -16,7 +16,9 @@ import {
   HelpCircle,
   Copy,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Bell,
+  Users
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -29,9 +31,13 @@ export default function LineSettingsTab() {
   // Settings Inputs
   const [tokenInput, setTokenInput] = useState("")
   const [liffInput, setLiffInput] = useState("")
+  const [secretInput, setSecretInput] = useState("")
+  const [adminUserIdInput, setAdminUserIdInput] = useState("")
+  const [adminGroupIdInput, setAdminGroupIdInput] = useState("")
   
   // Password Visibility
   const [showToken, setShowToken] = useState(false)
+  const [showSecret, setShowSecret] = useState(false)
   
   // Action status
   const [savingSettings, setSavingSettings] = useState(false)
@@ -39,8 +45,13 @@ export default function LineSettingsTab() {
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null)
   const [isConfigured, setIsConfigured] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  
+  // Saved States (for Cancel comparison)
   const [savedToken, setSavedToken] = useState("")
   const [savedLiff, setSavedLiff] = useState("")
+  const [savedSecret, setSavedSecret] = useState("")
+  const [savedAdminUserId, setSavedAdminUserId] = useState("")
+  const [savedAdminGroupId, setSavedAdminGroupId] = useState("")
   
   // Quota Status
   const [fetchingQuota, setFetchingQuota] = useState(false)
@@ -50,9 +61,13 @@ export default function LineSettingsTab() {
   // Interactive Manual & Utility states
   const [showManual, setShowManual] = useState(true)
   const [copiedEndpoint, setCopiedEndpoint] = useState(false)
+  const [copiedWebhook, setCopiedWebhook] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
+  
   const [openStep1, setOpenStep1] = useState(true)
   const [openStep2, setOpenStep2] = useState(true)
   const [openStep3, setOpenStep3] = useState(true)
+  const [openStep4, setOpenStep4] = useState(true)
   const [openWarnings, setOpenWarnings] = useState(true)
 
   const isDemo = !process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL.includes("localhost") && !process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -88,8 +103,15 @@ export default function LineSettingsTab() {
           } else if (data) {
             setTokenInput(data.channel_access_token || "")
             setLiffInput(data.liff_id || "")
+            setSecretInput(data.channel_secret || "")
+            setAdminUserIdInput(data.admin_line_user_id || "")
+            setAdminGroupIdInput(data.admin_line_group_id || "")
+            
             setSavedToken(data.channel_access_token || "")
             setSavedLiff(data.liff_id || "")
+            setSavedSecret(data.channel_secret || "")
+            setSavedAdminUserId(data.admin_line_user_id || "")
+            setSavedAdminGroupId(data.admin_line_group_id || "")
             setIsConfigured(!!data.channel_access_token)
             
             // Set initial quota display from cache row
@@ -116,8 +138,15 @@ export default function LineSettingsTab() {
           setWorkspaceId("d290f1ee-6c54-4b01-90e6-d701748f0851")
           setTokenInput("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo_token_apartment_owner")
           setLiffInput("2010442620-H4josaDy")
+          setSecretInput("0ca9550dc4ec7ce043831d47e18154bf")
+          setAdminUserIdInput("U123456789abcdef0123456789abcdef0")
+          setAdminGroupIdInput("C123456789abcdef0123456789abcdef0")
+          
           setSavedToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo_token_apartment_owner")
           setSavedLiff("2010442620-H4josaDy")
+          setSavedSecret("0ca9550dc4ec7ce043831d47e18154bf")
+          setSavedAdminUserId("U123456789abcdef0123456789abcdef0")
+          setSavedAdminGroupId("C123456789abcdef0123456789abcdef0")
           setIsConfigured(true)
           setQuotaData({
             limit: 1000,
@@ -207,12 +236,18 @@ export default function LineSettingsTab() {
 
     const trimmedToken = tokenInput.trim()
     const trimmedLiff = liffInput.trim()
+    const trimmedSecret = secretInput.trim()
+    const trimmedAdminUserId = adminUserIdInput.trim()
+    const trimmedAdminGroupId = adminGroupIdInput.trim()
 
     if (isDemo) {
       await new Promise((resolve) => setTimeout(resolve, 600))
       setIsConfigured(!!trimmedToken)
       setSavedToken(trimmedToken)
       setSavedLiff(trimmedLiff)
+      setSavedSecret(trimmedSecret)
+      setSavedAdminUserId(trimmedAdminUserId)
+      setSavedAdminGroupId(trimmedAdminGroupId)
       setIsEditing(false)
       setSettingsSuccess("บันทึกการเชื่อมต่อจำลองสำเร็จ!")
       setSavingSettings(false)
@@ -238,6 +273,9 @@ export default function LineSettingsTab() {
           .update({
             channel_access_token: trimmedToken || null,
             liff_id: trimmedLiff || null,
+            channel_secret: trimmedSecret || null,
+            admin_line_user_id: trimmedAdminUserId || null,
+            admin_line_group_id: trimmedAdminGroupId || null,
             updated_at: new Date().toISOString()
           })
           .eq("workspace_id", workspaceId)
@@ -249,6 +287,9 @@ export default function LineSettingsTab() {
             workspace_id: workspaceId,
             channel_access_token: trimmedToken || null,
             liff_id: trimmedLiff || null,
+            channel_secret: trimmedSecret || null,
+            admin_line_user_id: trimmedAdminUserId || null,
+            admin_line_group_id: trimmedAdminGroupId || null,
             limit_count: 1000,
             consumed_count: 0,
             remaining_count: 1000,
@@ -263,6 +304,9 @@ export default function LineSettingsTab() {
       setIsConfigured(!!trimmedToken)
       setSavedToken(trimmedToken)
       setSavedLiff(trimmedLiff)
+      setSavedSecret(trimmedSecret)
+      setSavedAdminUserId(trimmedAdminUserId)
+      setSavedAdminGroupId(trimmedAdminGroupId)
       setIsEditing(false)
       setSettingsSuccess("บันทึกข้อมูลการเชื่อมต่อ LINE OA สำเร็จ!")
       
@@ -272,7 +316,20 @@ export default function LineSettingsTab() {
       }
     } catch (err: any) {
       console.error("Error saving LINE settings:", err)
-      setSettingsError(err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลตั้งค่า")
+      
+      // Smart detection of database missing columns error
+      if (err.message && (
+        (err.message.includes("column") && err.message.includes("does not exist")) ||
+        err.message.includes("admin_line_user_id") ||
+        err.message.includes("admin_line_group_id") ||
+        err.message.includes("channel_secret")
+      )) {
+        setSettingsError(
+          "⚠️ ระบบหลังบ้านตรวจพบว่าตาราง 'workspace_line_settings' ยังไม่ได้เพิ่มฟิลด์ใหม่สำหรับแจ้งเตือนแอดมิน\n\nกรุณาแจ้งให้ผู้ดูแลระบบ (Admin) รันไฟล์ SQL Patch 'database_patch_line_notifications.sql' ในหน้า Supabase Dashboard SQL Editor เพื่อเตรียมพร้อมตารางก่อน!"
+        )
+      } else {
+        setSettingsError(err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลตั้งค่า")
+      }
     } finally {
       setSavingSettings(false)
     }
@@ -281,6 +338,9 @@ export default function LineSettingsTab() {
   const handleCancelEdit = () => {
     setTokenInput(savedToken)
     setLiffInput(savedLiff)
+    setSecretInput(savedSecret)
+    setAdminUserIdInput(savedAdminUserId)
+    setAdminGroupIdInput(savedAdminGroupId)
     setIsEditing(false)
     setSettingsError(null)
     setSettingsSuccess(null)
@@ -298,7 +358,16 @@ export default function LineSettingsTab() {
       await new Promise((resolve) => setTimeout(resolve, 500))
       setTokenInput("")
       setLiffInput("")
+      setSecretInput("")
+      setAdminUserIdInput("")
+      setAdminGroupIdInput("")
+      setSavedToken("")
+      setSavedLiff("")
+      setSavedSecret("")
+      setSavedAdminUserId("")
+      setSavedAdminGroupId("")
       setIsConfigured(false)
+      setIsEditing(false)
       setQuotaData(null)
       setSettingsSuccess("ลบข้อมูลเชื่อมต่อจำลองเรียบร้อยแล้ว")
       setSavingSettings(false)
@@ -312,6 +381,9 @@ export default function LineSettingsTab() {
         .update({
           channel_access_token: null,
           liff_id: null,
+          channel_secret: null,
+          admin_line_user_id: null,
+          admin_line_group_id: null,
           updated_at: new Date().toISOString()
         })
         .eq("workspace_id", workspaceId)
@@ -320,8 +392,14 @@ export default function LineSettingsTab() {
 
       setTokenInput("")
       setLiffInput("")
+      setSecretInput("")
+      setAdminUserIdInput("")
+      setAdminGroupIdInput("")
       setSavedToken("")
       setSavedLiff("")
+      setSavedSecret("")
+      setSavedAdminUserId("")
+      setSavedAdminGroupId("")
       setIsConfigured(false)
       setIsEditing(false)
       setQuotaData(null)
@@ -334,12 +412,70 @@ export default function LineSettingsTab() {
     }
   }
 
+  const handleClearGroupId = async () => {
+    if (!workspaceId) return
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการยกเลิกการเชื่อมต่อกับกลุ่ม LINE ปัจจุบัน? ระบบจะหยุดส่งข้อความแจ้งเตือนสลิปเข้ากลุ่มไลน์ทีมงานทันที")) return
+
+    setSavingSettings(true)
+    setSettingsError(null)
+    setSettingsSuccess(null)
+
+    if (isDemo) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      setAdminGroupIdInput("")
+      setSavedAdminGroupId("")
+      setSettingsSuccess("ยกเลิกการเชื่อมต่อกลุ่ม LINE จำลองสำเร็จ!")
+      setSavingSettings(false)
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("workspace_line_settings")
+        .update({
+          admin_line_group_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq("workspace_id", workspaceId)
+
+      if (error) throw error
+
+      setAdminGroupIdInput("")
+      setSavedAdminGroupId("")
+      setSettingsSuccess("ยกเลิกการเชื่อมต่อกลุ่ม LINE สำเร็จ!")
+    } catch (err: any) {
+      console.error("Error clearing group ID:", err)
+      setSettingsError(err.message || "เกิดข้อผิดพลาดในการยกเลิกการเชื่อมต่อกลุ่ม LINE")
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
   const handleCopyEndpoint = () => {
     if (typeof window !== "undefined") {
-      const endpoint = "https://saas-horset.vercel.app/tenant-register"
+      const endpoint = `${window.location.origin}/tenant-register`
       navigator.clipboard.writeText(endpoint)
       setCopiedEndpoint(true)
       setTimeout(() => setCopiedEndpoint(false), 2000)
+    }
+  }
+
+  const handleCopyWebhook = () => {
+    if (typeof window !== "undefined" && workspaceId) {
+      const webhook = `${window.location.origin}/api/webhook/line?workspace_id=${workspaceId}`
+      navigator.clipboard.writeText(webhook)
+      setCopiedWebhook(true)
+      setTimeout(() => setCopiedWebhook(false), 2000)
+    }
+  }
+
+  const handleCopyConnectionCode = () => {
+    if (typeof window !== "undefined" && workspaceId) {
+      const code = `#CONNECT-${workspaceId.substring(0, 8)}`
+      navigator.clipboard.writeText(code)
+      setCopiedCode(true)
+      setTimeout(() => setCopiedCode(false), 2000)
     }
   }
 
@@ -386,90 +522,240 @@ export default function LineSettingsTab() {
         </button>
       </div>
 
-      {/* 2. Header Information Alert */}
-      <div className="p-4 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl flex gap-3 text-blue-600 dark:text-blue-400">
-        <Info className="w-5 h-5 shrink-0 mt-0.5" />
-        <div className="space-y-1.5 font-bold">
-          <h4 className="font-extrabold text-sm sm:text-base">ระบบเชื่อมต่อ LINE OA ส่วนตัวรายหอพัก</h4>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
-            ระบบของเราทำงานแบบแยกอิสระ (Multi-Tenancy) ให้หอพักของคุณได้เชื่อมต่อกับ LINE Developers ของตนเองโดยตรง ส่งผลให้ลูกบ้านรับบิลแจ้งค่าเช่าด้วยระบบแชทพรีเมียม (Flex Message) ภายใต้ชื่อ LINE OA แบรนด์หอพักคุณเอง และใช้โควตารายเดือนแยกต่างหากอย่างปลอดภัย
-          </p>
-        </div>
-      </div>
-
-      <div className={`grid grid-cols-1 ${showManual ? "lg:grid-cols-2" : "lg:grid-cols-1"} gap-6 items-start transition-all duration-300`}>
+      {/* 2. Main Content Grid */}
+      <div className={`grid grid-cols-1 ${showManual ? "lg:grid-cols-2" : "max-w-3xl mx-auto"} gap-6`}>
         
-        {/* Left side: Forms & Settings */}
+        {/* Left side: Configuration Column */}
         <div className="space-y-6">
           
           {/* Card: Configuration Settings */}
           <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
-                <Settings className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
-                  ตั้งค่าเชื่อมต่อ LINE Messaging API
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
-                  เชื่อมต่อเซิร์ฟเวอร์ LINE OA เข้ากับระบบส่งบิลของคุณ
-                </p>
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
+                  <Settings className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
+                    ตั้งค่าบัญชี LINE OA หอพัก
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                    กำหนดค่าการเชื่อมต่อเพื่อรันระบบบิลและแจ้งเตือนอัตโนมัติ
+                  </p>
+                </div>
               </div>
             </div>
 
-            <form onSubmit={handleSaveSettings} className="space-y-5 pt-2">
-              {/* Token Input */}
-              <div className="space-y-2">
-                <label className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                  LINE Channel Access Token (Long-Lived)
-                </label>
-                <div className="relative flex items-center">
+            <form onSubmit={handleSaveSettings} className="space-y-6 pt-2">
+              
+              {/* SECTION 1: Messaging API & LIFF Setup */}
+              <div className="space-y-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+                <h4 className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span>ส่วนที่ 1: บิลค่าเช่าลูกบ้าน (Messaging API & LIFF ID)</span>
+                </h4>
+
+                {/* Token Input */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                    LINE Channel Access Token (Long-Lived)
+                  </label>
+                  <div className="relative flex items-center">
+                    <input
+                      type={showToken ? "text" : "password"}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={tokenInput}
+                      onChange={(e) => setTokenInput(e.target.value)}
+                      required
+                      disabled={isConfigured && !isEditing}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowToken(!showToken)}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                    >
+                      {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* LIFF ID Input */}
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      LINE LIFF ID
+                    </label>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">
+                      * จำเป็นสำหรับการผูกบัญชีลูกบ้าน
+                    </span>
+                  </div>
                   <input
-                    type={showToken ? "text" : "password"}
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
+                    type="text"
+                    placeholder="2010442620-H4josaDy"
+                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    value={liffInput}
+                    onChange={(e) => setLiffInput(e.target.value)}
                     required
                     disabled={isConfigured && !isEditing}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowToken(!showToken)}
-                    className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
-                  >
-                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
               </div>
 
-              {/* LIFF ID Input */}
-              <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                  <label className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    LINE LIFF ID
+              {/* SECTION 2: Admin Alerts Setup */}
+              <div className="space-y-4 pt-1">
+                <h4 className="text-xs sm:text-sm font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  <span>ส่วนที่ 2: ระบบแจ้งเตือนแอดมิน (Admin Notification Config)</span>
+                </h4>
+
+                {/* Webhook Endpoint Display (Only visible if configured) */}
+                {workspaceId && (
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 shadow-inner">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Webhook URL สำหรับ LINE Developers:</span>
+                      <button
+                        type="button"
+                        onClick={handleCopyWebhook}
+                        className={`text-[11px] font-black flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all ${
+                          copiedWebhook ? "bg-green-500/15 text-green-500 border border-green-500/20" : "bg-blue-500/10 text-blue-500 hover:bg-blue-500/15 border border-blue-500/15"
+                        }`}
+                      >
+                        {copiedWebhook ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedWebhook ? "คัดลอกแล้ว!" : "คัดลอก"}</span>
+                      </button>
+                    </div>
+                    <div className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200/50 dark:border-slate-800/80 break-all leading-normal select-all">
+                      {typeof window !== "undefined" ? `${window.location.origin}/api/webhook/line?workspace_id=${workspaceId}` : `https://saas-horset.vercel.app/api/webhook/line?workspace_id=${workspaceId}`}
+                    </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                      💡 นำ URL นี้ไปบันทึกในช่อง Webhook URL ของ Messaging API ใน LINE Developers Console และเปิดใช้งาน "Use Webhook"
+                    </p>
+                  </div>
+                )}
+
+                {/* LINE Channel Secret Input */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                    LINE Channel Secret
                   </label>
-                  <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">
-                    * จำเป็นเพื่อเชื่อมโยงผู้ใช้ให้ตรงกับ Provider ของคุณ
-                  </span>
+                  <div className="relative flex items-center">
+                    <input
+                      type={showSecret ? "text" : "password"}
+                      placeholder="0ca9550dc4ec7ce043831d47e18154bf"
+                      className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={secretInput}
+                      onChange={(e) => setSecretInput(e.target.value)}
+                      disabled={isConfigured && !isEditing}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecret(!showSecret)}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                    >
+                      {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                    * จำเป็นสำหรับตรวจสอบความปลอดภัย (Verify Signature) ของ LINE Webhook
+                  </p>
                 </div>
-                <input
-                  type="text"
-                  placeholder="2010442620-H4josaDy"
-                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  value={liffInput}
-                  onChange={(e) => setLiffInput(e.target.value)}
-                  required
-                  disabled={isConfigured && !isEditing}
-                />
+
+                {/* Admin User ID (for personal alerts) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                    Admin LINE User ID (แจ้งเตือนสลิปส่วนตัว)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="U123456789abcdef0123456789abcdef0"
+                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    value={adminUserIdInput}
+                    onChange={(e) => setAdminUserIdInput(e.target.value)}
+                    disabled={isConfigured && !isEditing}
+                  />
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                    💡 พิมพ์ส่งข้อความ <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-mono">#MYID</code> คุยหา LINE OA ของท่าน บอทจะตอบกลับรหัส LINE User ID ของท่านมาให้คัดลอกมาวางที่นี่
+                  </p>
+                </div>
+
+                {/* LINE Group Alert Connection Box */}
+                <div className="space-y-2 pt-1">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                    สถานะการเชื่อมต่อกลุ่ม LINE (แจ้งเตือนสลิปกลุ่มทีมงาน)
+                  </label>
+                  
+                  {adminGroupIdInput ? (
+                    <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fadeIn">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>เชื่อมต่อกลุ่ม LINE สำเร็จ</span>
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 break-all select-all pl-4">
+                          Group ID: {adminGroupIdInput}
+                        </div>
+                      </div>
+                      
+                      {(!isConfigured || isEditing) && (
+                        <button
+                          type="button"
+                          onClick={handleClearGroupId}
+                          className="shrink-0 px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 hover:border-rose-500/30 text-rose-500 rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm"
+                        >
+                          ยกเลิกเชื่อมกลุ่ม
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 shadow-inner leading-relaxed">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        <span className="text-sm font-bold text-slate-500 dark:text-slate-400">ยังไม่ได้เชื่อมต่อกับกลุ่ม LINE ทีมงาน</span>
+                      </div>
+                      
+                      {workspaceId ? (
+                        <div className="space-y-3.5 pl-4">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                            👉 วิธีเชื่อมต่อ: ดึงบัญชี LINE OA หอพักตัวนี้เข้ากลุ่มแชทไลน์ทีมงาน/กลุ่มไลน์นิติบุคคลของคุณ จากนั้นพิมพ์คำสั่งเชื่อมต่อส่งลงในแชทกลุ่มดังนี้:
+                          </p>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <span className="flex-1 p-2.5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xs md:text-sm text-center tracking-wider rounded-xl select-all">
+                              #CONNECT-{workspaceId.substring(0, 8)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleCopyConnectionCode}
+                              className={`shrink-0 px-4 py-2.5 border text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                copiedCode
+                                  ? "bg-green-500/15 text-green-500 border-green-500/20 shadow-sm"
+                                  : "bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-450 border-blue-500/15 shadow-sm"
+                              }`}
+                            >
+                              {copiedCode ? <Check className="w-3.5 h-3.5 animate-bounce" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedCode ? "คัดลอกแล้ว!" : "คัดลอกคำสั่ง"}</span>
+                            </button>
+                          </div>
+                          <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                            * เมื่อพิมพ์รหัสในกลุ่มสำเร็จ บอทจะลงทะเบียนเชื่อมต่อ Group ID เข้าสู่ระบบหอพักนี้ทันทีแบบอัตโนมัติ
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-rose-500 font-bold pl-4">กรุณาลงทะเบียนหรือเชื่อมต่อ LINE OA สำเร็จก่อนเพื่อรับรหัสเชื่อมต่อกลุ่ม</span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Status Alert */}
               {settingsError && (
-                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl text-sm font-bold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{settingsError}</span>
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs sm:text-sm font-bold flex items-start gap-2.5 shadow-inner">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1 whitespace-pre-line leading-relaxed">{settingsError}</div>
                 </div>
               )}
 
@@ -481,7 +767,7 @@ export default function LineSettingsTab() {
               )}
 
               {/* Buttons */}
-              <div className="flex gap-2.5 justify-end pt-2 flex-wrap">
+              <div className="flex gap-2.5 justify-end pt-3 flex-wrap">
                 {isConfigured && !isEditing && (
                   <button
                     type="button"
@@ -516,7 +802,7 @@ export default function LineSettingsTab() {
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-md shadow-blue-500/10"
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    <span>แก้ไขข้อมูล API</span>
+                    <span>แก้ไขข้อมูล API & แจ้งเตือน</span>
                   </button>
                 ) : (
                   <button
@@ -526,7 +812,7 @@ export default function LineSettingsTab() {
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-blue-500/10"
                   >
                     {savingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>{isConfigured ? "อัปเดตข้อมูลเชื่อมต่อ" : "บันทึกข้อมูลเชื่อมต่อ"}</span>
+                    <span>{isConfigured ? "อัปเดตข้อมูลตั้งค่า" : "บันทึกข้อมูลตั้งค่า"}</span>
                   </button>
                 )}
               </div>
@@ -691,19 +977,20 @@ export default function LineSettingsTab() {
                   </div>
                 </div>
                 
-                {/* Master expand/collapse button */}
+                 {/* Master expand/collapse button */}
                 <button
                   type="button"
                   onClick={() => {
-                    const allOpen = openStep1 && openStep2 && openStep3 && openWarnings;
+                    const allOpen = openStep1 && openStep2 && openStep3 && openStep4 && openWarnings;
                     setOpenStep1(!allOpen);
                     setOpenStep2(!allOpen);
                     setOpenStep3(!allOpen);
+                    setOpenStep4(!allOpen);
                     setOpenWarnings(!allOpen);
                   }}
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0"
                 >
-                  {openStep1 && openStep2 && openStep3 && openWarnings ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
+                  {openStep1 && openStep2 && openStep3 && openStep4 && openWarnings ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
                 </button>
               </div>
 
@@ -892,6 +1179,67 @@ export default function LineSettingsTab() {
                       <p className="leading-relaxed">
                         คัดลอกรหัส <strong className="font-extrabold text-slate-800 dark:text-slate-100">LIFF ID</strong> มากรอกในช่องด้านซ้าย แล้วกดปุ่มบันทึกการตั้งค่า
                       </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 4 Accordion */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenStep4(!openStep4)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
+                        4
+                      </span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ เปิดใช้งานแจ้งเตือนฝั่ง Admin และทีมงาน</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep4 ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {openStep4 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-4 animate-fadeIn">
+                      <div className="space-y-1.5">
+                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          1. บันทึก Webhook URL
+                        </strong>
+                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
+                          คัดลอก <strong className="text-blue-600 dark:text-blue-450 font-extrabold">Webhook URL</strong> จากกล่องสีฟ้าใน ส่วนที่ 2 ทางด้านซ้ายของท่าน แล้วนำไปกรอกลงในช่อง <strong className="font-bold">Webhook URL</strong> ใต้แท็บ Messaging API ของ Messaging API Channel ใน LINE Developers Console จากนั้นคลิกบันทึกและตรวจสอบว่าได้เปิดใช้สวิตช์ <strong className="text-blue-600 font-bold">"Use Webhook"</strong> เป็นที่เรียบร้อยแล้ว
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          2. ระบุ LINE Channel Secret
+                        </strong>
+                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
+                          ไปที่แท็บ <strong className="font-bold">Basic settings</strong> เลื่อนลงไปที่ช่อง <strong className="font-bold">Channel secret</strong> คัดลอกรหัสมาวางลงในช่อง <strong className="font-bold">LINE Channel Secret</strong> ด้านซ้าย (เพื่อนำมาใช้ถอดรหัสและ Verify ลายเซ็นดิจิตอลของ LINE Webhook ป้องกันผู้ไม่หวังดีส่ง Request ปลอม)
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          3. ผูกบัญชีแจ้งเตือน Admin ส่วนตัว
+                        </strong>
+                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
+                          ให้ทำการสแกน QR Code เพื่อแชทคุยกับ LINE OA ของหอพักตัวนี้ จากนั้นพิมพ์ข้อความส่งหาบอทว่า <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono font-bold text-blue-600">#MYID</code> บอทจะตอบกลับด้วยรหัส LINE User ID ส่วนตัวของคุณทันที ให้ทำการคัดลอกค่านี้มาใส่ในช่อง <strong className="font-bold">Admin LINE User ID</strong> และกดบันทึก
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          4. ผูกบัญชีแจ้งเตือนกลุ่มนิติบุคคล / กลุ่มทีมงาน
+                        </strong>
+                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
+                          ให้เชิญ LINE OA ของหอพักตัวนี้เข้าไปร่วมในกลุ่มแชทไลน์นิติบุคคล/กลุ่มทีมงาน จากนั้นให้สมาชิกในกลุ่มส่งข้อความคำสั่งรหัสเชื่อมต่อเข้าไปในกลุ่ม (เช่น <code className="bg-indigo-50 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono font-bold text-indigo-600 dark:text-indigo-400 select-all">#CONNECT-...</code>) บอทจะทำการลงทะเบียนรหัสกลุ่มเข้ากับระบบหอพักนี้ทันทีแบบอัตโนมัติพร้อมส่งข้อความตอบกลับเพื่อยืนยันเชื่อมต่อสำเร็จ!
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
