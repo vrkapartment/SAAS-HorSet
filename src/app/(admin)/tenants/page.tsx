@@ -121,6 +121,10 @@ export default function TenantsPage() {
   const [editLineUserId, setEditLineUserId] = useState("")
   const [editSubmitting, setEditSubmitting] = useState(false)
 
+  // Sorting State
+  const [sortField, setSortField] = useState<"room" | "fullName" | "line" | "lease" | "status">("room")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+
 
   // Custom Toast State
   const [toast, setToast] = useState<{
@@ -582,16 +586,48 @@ export default function TenantsPage() {
     }
   }
 
-  // Filter lists based on query
-  const filteredCurrent = currentTenants.filter(t => {
-    const q = searchQuery.toLowerCase().trim()
-    if (!q) return true
-    return (
-      t.fullName.toLowerCase().includes(q) ||
-      t.roomNumber.toLowerCase().includes(q) ||
-      (t.phone && t.phone.includes(q))
-    )
-  })
+  // Filter lists based on query and apply sorting
+  const filteredCurrent = [...currentTenants]
+    .filter(t => {
+      const q = searchQuery.toLowerCase().trim()
+      if (!q) return true
+      return (
+        t.fullName.toLowerCase().includes(q) ||
+        t.roomNumber.toLowerCase().includes(q) ||
+        (t.phone && t.phone.includes(q))
+      )
+    })
+    .sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortField) {
+        case "room":
+          comparison = a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' })
+          break
+        case "fullName":
+          comparison = a.fullName.localeCompare(b.fullName, "th")
+          break
+        case "line":
+          const lineA = a.lineUserId || ""
+          const lineB = b.lineUserId || ""
+          comparison = lineA.localeCompare(lineB)
+          break
+        case "lease":
+          const leaseA = a.contractStart || ""
+          const leaseB = b.contractStart || ""
+          comparison = leaseA.localeCompare(leaseB)
+          break
+        case "status":
+          const statusA = getContractStatus(a.contractStart, a.contractEnd)?.label || ""
+          const statusB = getContractStatus(b.contractStart, b.contractEnd)?.label || ""
+          comparison = statusA.localeCompare(statusB, "th")
+          break
+        default:
+          comparison = 0
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison
+    })
 
   const filteredOld = oldTenants.filter(t => {
     const q = searchQuery.toLowerCase().trim()
@@ -684,6 +720,42 @@ export default function TenantsPage() {
       a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
     )
   })()
+
+  const handleSort = (field: "room" | "fullName" | "line" | "lease" | "status") => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortDirection("asc")
+    }
+  }
+
+  const renderSortHeader = (
+    label: string,
+    field: "room" | "fullName" | "line" | "lease" | "status",
+    className = "",
+    isCenter = false
+  ) => {
+    const isActive = sortField === field
+    return (
+      <th className={`py-3.5 px-4 select-none ${className}`}>
+        <button
+          type="button"
+          onClick={() => handleSort(field)}
+          className={`flex items-center gap-1.5 hover:text-slate-850 dark:hover:text-slate-100 transition-colors uppercase tracking-wider text-xs sm:text-sm font-bold cursor-pointer outline-none ${
+            isCenter ? "justify-center mx-auto" : "justify-start text-left"
+          }`}
+        >
+          <span>{label}</span>
+          <ArrowUpDown
+            className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+              isActive ? "text-blue-500 font-extrabold" : "text-slate-350 dark:text-slate-650 opacity-40"
+            }`}
+          />
+        </button>
+      </th>
+    )
+  }
 
   return (
     <>
@@ -1099,12 +1171,12 @@ export default function TenantsPage() {
               <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs sm:text-sm">
-                    <th className="py-3.5 px-5">ห้องพัก</th>
-                    <th className="py-3.5 px-4">ชื่อผู้เช่า</th>
-                    <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
-                    <th className="py-3.5 px-4">สถานะ LINE OA</th>
-                    <th className="py-3.5 px-4">ระยะสัญญาเช่า</th>
-                    <th className="py-3.5 px-5 text-center">สถานะ</th>
+                    {renderSortHeader("ห้องพัก", "room", "py-3.5 px-5")}
+                    {renderSortHeader("ชื่อผู้เช่า", "fullName", "py-3.5 px-4")}
+                    <th className="py-3.5 px-4 select-none">เบอร์โทรศัพท์ (PDPA)</th>
+                    {renderSortHeader("สถานะ LINE OA", "line", "py-3.5 px-4")}
+                    {renderSortHeader("ระยะสัญญาเช่า", "lease", "py-3.5 px-4")}
+                    {renderSortHeader("สถานะ", "status", "py-3.5 px-5 text-center", true)}
                     {hasEditPermission && <th className="py-3.5 px-5 text-center w-24">จัดการ</th>}
                   </tr>
                 </thead>
