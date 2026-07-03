@@ -653,9 +653,16 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
     // 3. ดึงค่าคอนฟิก LINE
     const { data: settings } = await supabase
       .from("workspace_line_settings")
-      .select("channel_access_token, admin_line_user_id, admin_line_group_id")
+      .select("channel_access_token, admin_line_user_id, admin_line_group_id, admin_notification_active")
       .eq("workspace_id", workspaceId)
       .maybeSingle()
+
+    const adminNotificationActive = settings?.admin_notification_active !== false
+
+    if (!adminNotificationActive) {
+      console.log("Admin LINE notification is disabled for workspace:", workspaceId)
+      return { success: true, message: "ระบบแจ้งเตือนแอดมินปิดใช้งานอยู่ ข้ามกระบวนการ" }
+    }
 
     let channelAccessToken = settings?.channel_access_token
     const adminLineUserId = settings?.admin_line_user_id

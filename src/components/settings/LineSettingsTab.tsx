@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   Bell,
+  BellOff,
   Users,
   Plus,
   Trash2,
@@ -38,6 +39,7 @@ export default function LineSettingsTab() {
   const [secretInput, setSecretInput] = useState("")
   const [adminUserIdInput, setAdminUserIdInput] = useState("")
   const [adminGroupIdInput, setAdminGroupIdInput] = useState("")
+  const [adminNotificationActive, setAdminNotificationActive] = useState(true)
   
   // Password Visibility
   const [showToken, setShowToken] = useState(false)
@@ -56,6 +58,7 @@ export default function LineSettingsTab() {
   const [savedSecret, setSavedSecret] = useState("")
   const [savedAdminUserId, setSavedAdminUserId] = useState("")
   const [savedAdminGroupId, setSavedAdminGroupId] = useState("")
+  const [savedAdminNotificationActive, setSavedAdminNotificationActive] = useState(true)
   
   // Admin LINE Profiles
   const [adminProfiles, setAdminProfiles] = useState<any[]>([])
@@ -127,6 +130,8 @@ export default function LineSettingsTab() {
             setSavedSecret(data.channel_secret || "")
             setSavedAdminUserId(data.admin_line_user_id || "")
             setSavedAdminGroupId(data.admin_line_group_id || "")
+            setAdminNotificationActive(data.admin_notification_active !== false)
+            setSavedAdminNotificationActive(data.admin_notification_active !== false)
             setIsConfigured(!!data.channel_access_token)
 
             if (data.admin_line_user_id && wsId) {
@@ -379,6 +384,7 @@ export default function LineSettingsTab() {
       setSavedSecret(trimmedSecret)
       setSavedAdminUserId(trimmedAdminUserId)
       setSavedAdminGroupId(trimmedAdminGroupId)
+      setSavedAdminNotificationActive(adminNotificationActive)
       setIsEditing(false)
       setSettingsSuccess("บันทึกการเชื่อมต่อจำลองสำเร็จ!")
       if (trimmedAdminUserId) {
@@ -412,6 +418,7 @@ export default function LineSettingsTab() {
             channel_secret: trimmedSecret || null,
             admin_line_user_id: trimmedAdminUserId || null,
             admin_line_group_id: trimmedAdminGroupId || null,
+            admin_notification_active: adminNotificationActive,
             updated_at: new Date().toISOString()
           })
           .eq("workspace_id", workspaceId)
@@ -426,6 +433,7 @@ export default function LineSettingsTab() {
             channel_secret: trimmedSecret || null,
             admin_line_user_id: trimmedAdminUserId || null,
             admin_line_group_id: trimmedAdminGroupId || null,
+            admin_notification_active: adminNotificationActive,
             limit_count: 1000,
             consumed_count: 0,
             remaining_count: 1000,
@@ -443,6 +451,7 @@ export default function LineSettingsTab() {
       setSavedSecret(trimmedSecret)
       setSavedAdminUserId(trimmedAdminUserId)
       setSavedAdminGroupId(trimmedAdminGroupId)
+      setSavedAdminNotificationActive(adminNotificationActive)
       setIsEditing(false)
       setSettingsSuccess("บันทึกข้อมูลการเชื่อมต่อ LINE OA สำเร็จ!")
       
@@ -465,10 +474,11 @@ export default function LineSettingsTab() {
         (err.message.includes("column") && err.message.includes("does not exist")) ||
         err.message.includes("admin_line_user_id") ||
         err.message.includes("admin_line_group_id") ||
-        err.message.includes("channel_secret")
+        err.message.includes("channel_secret") ||
+        err.message.includes("admin_notification_active")
       )) {
         setSettingsError(
-          "⚠️ ระบบหลังบ้านตรวจพบว่าตาราง 'workspace_line_settings' ยังไม่ได้เพิ่มฟิลด์ใหม่สำหรับแจ้งเตือนแอดมิน\n\nกรุณาแจ้งให้ผู้ดูแลระบบ (Admin) รันไฟล์ SQL Patch 'database_patch_line_notifications.sql' ในหน้า Supabase Dashboard SQL Editor เพื่อเตรียมพร้อมตารางก่อน!"
+          "⚠️ ระบบหลังบ้านตรวจพบว่าตาราง 'workspace_line_settings' ยังไม่ได้เพิ่มฟิลด์ใหม่สำหรับแจ้งเตือนแอดมิน\n\nกรุณาแจ้งให้ผู้ดูแลระบบ (Admin) รันไฟล์ SQL Patch 'database_patch_toggle_admin_notifications.sql' ในหน้า Supabase Dashboard SQL Editor เพื่อเตรียมพร้อมตารางก่อน!"
         )
       } else {
         setSettingsError(err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลตั้งค่า")
@@ -484,6 +494,7 @@ export default function LineSettingsTab() {
     setSecretInput(savedSecret)
     setAdminUserIdInput(savedAdminUserId)
     setAdminGroupIdInput(savedAdminGroupId)
+    setAdminNotificationActive(savedAdminNotificationActive)
     setIsEditing(false)
     setSettingsError(null)
     setSettingsSuccess(null)
@@ -504,11 +515,13 @@ export default function LineSettingsTab() {
       setSecretInput("")
       setAdminUserIdInput("")
       setAdminGroupIdInput("")
+      setAdminNotificationActive(true)
       setSavedToken("")
       setSavedLiff("")
       setSavedSecret("")
       setSavedAdminUserId("")
       setSavedAdminGroupId("")
+      setSavedAdminNotificationActive(true)
       setIsConfigured(false)
       setIsEditing(false)
       setQuotaData(null)
@@ -527,6 +540,7 @@ export default function LineSettingsTab() {
           channel_secret: null,
           admin_line_user_id: null,
           admin_line_group_id: null,
+          admin_notification_active: true,
           updated_at: new Date().toISOString()
         })
         .eq("workspace_id", workspaceId)
@@ -538,11 +552,13 @@ export default function LineSettingsTab() {
       setSecretInput("")
       setAdminUserIdInput("")
       setAdminGroupIdInput("")
+      setAdminNotificationActive(true)
       setSavedToken("")
       setSavedLiff("")
       setSavedSecret("")
       setSavedAdminUserId("")
       setSavedAdminGroupId("")
+      setSavedAdminNotificationActive(true)
       setIsConfigured(false)
       setIsEditing(false)
       setQuotaData(null)
@@ -751,6 +767,58 @@ export default function LineSettingsTab() {
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                   <span>ส่วนที่ 2: ระบบแจ้งเตือนแอดมิน (Admin Notification Config)</span>
                 </h4>
+
+                {/* Enable/Disable Admin Notification System Toggle Switch Card */}
+                <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl transition-colors shrink-0 ${
+                      adminNotificationActive 
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+                        : "bg-slate-100 dark:bg-slate-950 text-slate-400"
+                    }`}>
+                      {adminNotificationActive ? (
+                        <Bell className="w-5 h-5 animate-pulse" />
+                      ) : (
+                        <BellOff className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div className="space-y-0.5">
+                      <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">
+                        สถานะระบบแจ้งเตือนแอดมิน
+                      </h5>
+                      <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                        {adminNotificationActive 
+                          ? "🟢 เปิดใช้งาน: บоทจะแจ้งเตือนเมื่อผู้เช่าส่งหลักฐานการโอนเงิน" 
+                          : "🔴 ปิดการแจ้งเตือน: แอดมินจะไม่ได้รับสลิปจนกว่าจะเปิดใช้งานอีกครั้ง"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Switch */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isConfigured && !isEditing) {
+                        alert("กรุณาคลิกปุ่ม 'แก้ไขข้อมูล API & แจ้งเตือน' ด้านล่างก่อนเปลี่ยนสถานะเปิด-ปิด")
+                        return
+                      }
+                      setAdminNotificationActive(!adminNotificationActive)
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
+                      adminNotificationActive 
+                        ? "bg-emerald-500" 
+                        : "bg-slate-200 dark:bg-slate-800"
+                    } ${isConfigured && !isEditing ? "opacity-60 cursor-not-allowed" : ""}`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
+                        adminNotificationActive ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className={`space-y-4 transition-all duration-300 ${!adminNotificationActive ? "opacity-65 pointer-events-none select-none" : ""}`}>
 
                 {/* Webhook Endpoint Display (Only visible if configured) */}
                 {workspaceId && (
@@ -979,6 +1047,8 @@ export default function LineSettingsTab() {
                   )}
                 </div>
               </div>
+
+              </div> {/* Closes the opacity-65 visual wrapper */}
 
               {/* Status Alert */}
               {settingsError && (
