@@ -94,8 +94,12 @@ export default function LineSettingsTab() {
   const [openStep1, setOpenStep1] = useState(true)
   const [openStep2, setOpenStep2] = useState(true)
   const [openStep3, setOpenStep3] = useState(true)
-  const [openStep4, setOpenStep4] = useState(true)
   const [openWarnings, setOpenWarnings] = useState(true)
+
+  const [openSubStep1, setOpenSubStep1] = useState(true)
+  const [openSubStep2, setOpenSubStep2] = useState(true)
+  const [openSubStep3, setOpenSubStep3] = useState(true)
+  const [openSubStep4, setOpenSubStep4] = useState(true)
 
   const isDemo = !process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL.includes("localhost") && !process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -1756,6 +1760,7 @@ export default function LineSettingsTab() {
         {/* Right side: Owner Setup Tutorial Manual */}
         {showManual && (
           <div className="space-y-6">
+            {/* Card 1: คู่มือเชื่อมต่อระบบ LINE OA ส่วนตัว */}
             <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5 animate-fadeIn">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
@@ -1772,20 +1777,19 @@ export default function LineSettingsTab() {
                   </div>
                 </div>
                 
-                 {/* Master expand/collapse button */}
+                 {/* Master expand/collapse button for Card 1 */}
                 <button
                   type="button"
                   onClick={() => {
-                    const allOpen = openStep1 && openStep2 && openStep3 && openStep4 && openWarnings;
+                    const allOpen = openStep1 && openStep2 && openStep3 && openWarnings;
                     setOpenStep1(!allOpen);
                     setOpenStep2(!allOpen);
                     setOpenStep3(!allOpen);
-                    setOpenStep4(!allOpen);
                     setOpenWarnings(!allOpen);
                   }}
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0"
                 >
-                  {openStep1 && openStep2 && openStep3 && openStep4 && openWarnings ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
+                  {openStep1 && openStep2 && openStep3 && openWarnings ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
                 </button>
               </div>
 
@@ -1978,67 +1982,6 @@ export default function LineSettingsTab() {
                   )}
                 </div>
 
-                {/* Step 4 Accordion */}
-                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
-                  <button
-                    type="button"
-                    onClick={() => setOpenStep4(!openStep4)}
-                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
-                        4
-                      </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ เปิดใช้งานแจ้งเตือนฝั่ง Admin และทีมงาน</span>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep4 ? "rotate-180" : ""}`} />
-                  </button>
-
-                  {openStep4 && (
-                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-4 animate-fadeIn">
-                      <div className="space-y-1.5">
-                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          1. บันทึก Webhook URL
-                        </strong>
-                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
-                          คัดลอก <strong className="text-blue-600 dark:text-blue-450 font-extrabold">Webhook URL</strong> จากกล่องสีฟ้าใน ส่วนที่ 2 ทางด้านซ้ายของท่าน แล้วนำไปกรอกลงในช่อง <strong className="font-bold">Webhook URL</strong> ใต้แท็บ Messaging API ของ Messaging API Channel ใน LINE Developers Console จากนั้นคลิกบันทึกและตรวจสอบว่าได้เปิดใช้สวิตช์ <strong className="text-blue-600 font-bold">"Use Webhook"</strong> เป็นที่เรียบร้อยแล้ว
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          2. ระบุ LINE Channel Secret
-                        </strong>
-                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
-                          ไปที่แท็บ <strong className="font-bold">Basic settings</strong> เลื่อนลงไปที่ช่อง <strong className="font-bold">Channel secret</strong> คัดลอกรหัสมาวางลงในช่อง <strong className="font-bold">LINE Channel Secret</strong> ด้านซ้าย (เพื่อนำมาใช้ถอดรหัสและ Verify ลายเซ็นดิจิตอลของ LINE Webhook ป้องกันผู้ไม่หวังดีส่ง Request ปลอม)
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          3. ผูกบัญชีแจ้งเตือน Admin ส่วนตัว
-                        </strong>
-                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
-                          ให้ทำการสแกน QR Code เพื่อแชทคุยกับ LINE OA ของหอพักตัวนี้ จากนั้นพิมพ์ข้อความส่งหาบอทว่า <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono font-bold text-blue-600">#MYID</code> บอทจะตอบกลับด้วยรหัส LINE User ID ส่วนตัวของคุณทันที ให้ทำการคัดลอกค่านี้มาใส่ในช่อง <strong className="font-bold">Admin LINE User ID</strong> และกดบันทึก
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          4. ผูกบัญชีแจ้งเตือนกลุ่มนิติบุคคล / กลุ่มทีมงาน
-                        </strong>
-                        <p className="pl-4 leading-relaxed text-slate-500 dark:text-slate-400">
-                          ให้เชิญ LINE OA ของหอพักตัวนี้เข้าไปร่วมในกลุ่มแชทไลน์นิติบุคคล/กลุ่มทีมงาน จากนั้นให้สมาชิกในกลุ่มส่งข้อความคำสั่งรหัสเชื่อมต่อเข้าไปในกลุ่ม (เช่น <code className="bg-indigo-50 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono font-bold text-indigo-600 dark:text-indigo-400 select-all">#CONNECT-...</code>) บอทจะทำการลงทะเบียนรหัสกลุ่มเข้ากับระบบหอพักนี้ทันทีแบบอัตโนมัติพร้อมส่งข้อความตอบกลับเพื่อยืนยันเชื่อมต่อสำเร็จ!
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* Crucial Warnings Accordion */}
                 <div className="border border-rose-200 dark:border-rose-900/40 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-rose-500/[0.01] dark:bg-rose-950/[0.04]">
                   <button
@@ -2063,7 +2006,7 @@ export default function LineSettingsTab() {
                           1. ต้องเผยแพร่สถานะ LINE Login เสมอ (เปลี่ยนเป็น "Published")
                         </strong>
                         <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                          เมื่อเริ่มสร้าง LINE Login ระบบจะตั้งสถานะเริ่มต้นเป็น <strong className="text-slate-700 dark:text-slate-300 font-bold">Developing (สีเทา)</strong> ทำให้เฉพาะตัวแอดมินเท่านั้นที่ใช้งานลิงก์ได้ แต่ผู้เช่าทั่วไปจะเจอปัญหากดสมัครไม่ได้หรือหน้าจอลูปหมุนวนไม่หยุด <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">วิธีแก้:</strong> คลิกที่แถบสถานะกลม ๆ สีเทามุมขวาบนของหน้า LINE Login ให้เปลี่ยนเป็นสถานะ <strong className="text-emerald-650 dark:text-emerald-400 font-extrabold">Published (สีเขียว)</strong> ก่อนใช้งานจริง
+                          เมื่อเริ่มสร้าง LINE Login ระบบจะตั้งสถานะเริ่มต้นเป็น <strong className="text-slate-700 dark:text-slate-300 font-bold">Developing (สีเทา)</strong> ทำให้เฉพาะตัวแอดมินเท่านั้นที่ใช้งานลิงก์ได้ แต่ผู้เช่าทั่วไปจะเจอปัญหากดสมัครไม่ได้หรือหน้าจอลูปหมุนวนไม่หยุด <strong className="text-emerald-650 dark:text-emerald-400 font-extrabold">วิธีแก้:</strong> คลิกที่แถบสถานะกลม ๆ สีเทามุมขวาบนของหน้า LINE Login ให้เปลี่ยนเป็นสถานะ <strong className="text-emerald-650 dark:text-emerald-400 font-extrabold">Published (สีเขียว)</strong> ก่อนใช้งานจริง
                         </p>
                       </div>
 
@@ -2095,6 +2038,170 @@ export default function LineSettingsTab() {
 
               </div>
             </div>
+
+            {/* Card 2: คู่มือเชื่อมต่อระบบแจ้งเตือนฝั่งผู้ให้เช่า */}
+            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                    <Settings className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
+                      คู่มือเชื่อมต่อระบบแจ้งเตือนฝั่งผู้ให้เช่า
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
+                      ขั้นตอนเปิดใช้งานแจ้งเตือนสลิปโอนเงินเข้า LINE แอดมินและกลุ่มทีมงาน
+                    </p>
+                  </div>
+                </div>
+                
+                 {/* Master expand/collapse button for Card 2 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allSubOpen = openSubStep1 && openSubStep2 && openSubStep3 && openSubStep4;
+                    setOpenSubStep1(!allSubOpen);
+                    setOpenSubStep2(!allSubOpen);
+                    setOpenSubStep3(!allSubOpen);
+                    setOpenSubStep4(!allSubOpen);
+                  }}
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0"
+                >
+                  {openSubStep1 && openSubStep2 && openSubStep3 && openSubStep4 ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
+                </button>
+              </div>
+
+              {/* Instruction Sub-steps List */}
+              <div className="space-y-4 text-sm font-semibold leading-relaxed text-slate-700 dark:text-slate-200">
+                
+                {/* Sub-step 1: Webhook URL */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenSubStep1(!openSubStep1)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
+                        1
+                      </span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ บันทึก Webhook URL</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep1 ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {openSubStep1 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3 animate-fadeIn">
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                        คัดลอก <strong className="text-blue-600 dark:text-blue-450 font-extrabold">Webhook URL</strong> จากกล่องสีฟ้าใน ส่วนที่ 2 ทางด้านซ้ายของท่าน
+                      </p>
+                      
+                      <div className="py-2.5">
+                        <a 
+                          href="https://developers.line.biz" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-500/10"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>เข้าสู่ LINE Developers Console 🌐</span>
+                        </a>
+                      </div>
+
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                        เลือก <strong className="font-bold">Messaging API Channel</strong> ของท่าน เลื่อนแถบไปที่หัวข้อด้านบนชื่อ <strong className="font-bold">Messaging API</strong> เลือกลงมาตรงคำว่า <strong className="font-bold">Webhook URL</strong> นำข้อมูล Webhook URL ที่ก๊อปปี้ไปวางในช่องและกดคลิก <strong className="font-bold">Update</strong> บันทึกข้อมูล จากนั้นตรวจสอบว่าได้เปิดใช้สวิตช์ <strong className="text-blue-600 font-bold">"Use Webhook"</strong> เป็นที่เรียบร้อยแล้ว
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-step 2: Channel Secret */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenSubStep2(!openSubStep2)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
+                        2
+                      </span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ระบุ LINE Channel Secret</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep2 ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {openSubStep2 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-1.5 animate-fadeIn">
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                        ไปที่แท็บ <strong className="font-bold">Basic settings</strong> เลื่อนลงไปที่ช่อง <strong className="font-bold">Channel secret</strong> คัดลอกรหัสมาวางลงในช่อง <strong className="font-bold">LINE Channel Secret</strong> ด้านซ้าย (เพื่อนำมาใช้ถอดรหัสและ Verify ลายเซ็นดิจิตอลของ LINE Webhook ป้องกันผู้ไม่หวังดีส่ง Request ปลอม)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-step 3: Admin User ID Pairing */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenSubStep3(!openSubStep3)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
+                        3
+                      </span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ผูกบัญชีแจ้งเตือน Admin ส่วนตัว</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep3 ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {openSubStep3 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-2.5 animate-fadeIn">
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                        แอดมินแต่ละท่านต้องทำการแอดเพื่อนบอตและทำตามวิธีใดวิธีหนึ่งดังนี้:
+                      </p>
+                      <div className="space-y-2 text-slate-500 dark:text-slate-400 font-medium pl-2 text-xs sm:text-sm leading-relaxed">
+                        <div>
+                          👉 <strong className="text-slate-850 dark:text-slate-200">วิธีที่ 1 (อัตโนมัติ - แนะนำ):</strong> คลิกปุ่ม <strong className="text-blue-600">"เพิ่มการเชื่อมต่อ Line Admin"</strong> ทางฝั่งซ้ายของท่าน แล้วกดยืนยันปุ่มสีฟ้าเพื่อสร้างรหัสตัวเลข 6 หลักชั่วคราวอายุ 5 นาที พิมพ์เฉพาะตัวเลขนี้ส่งหาบอตในห้องแชทไลน์ บอตจะผูกบัญชีให้ท่านโดยอัตโนมัติทันที!
+                        </div>
+                        <div className="pt-1">
+                          👉 <strong className="text-slate-850 dark:text-slate-200">วิธีที่ 2 (แบบกรอกรหัสด้วยตัวเอง):</strong> ส่งคำสั่งคุยหาบอตว่า <code className="bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded font-mono font-bold text-blue-600">#MYID</code> บอตจะส่ง LINE User ID ส่วนตัวของท่านกลับมา นำรหัสยาว 33 ตัวอักษรนั้นมากรอกลงในช่องค้นหาประวัติแบบแมนนวลเพื่อตรวจสอบโปรไฟล์และผูกบัญชีแอดมิน
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-step 4: Admin LINE Group Pairing */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 shadow-sm bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpenSubStep4(!openSubStep4)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
+                        4
+                      </span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ผูกบัญชีแจ้งเตือนกลุ่มนิติบุคคล / กลุ่มทีมงาน</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep4 ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {openSubStep4 && (
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-1.5 animate-fadeIn">
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                        เชิญ LINE OA ของหอพักตัวนี้เข้าไปร่วมในกลุ่มแชทไลน์นิติบุคคล/กลุ่มทีมงาน จากนั้นให้สมาชิกในกลุ่มส่งข้อความคำสั่งรหัสเชื่อมต่อเข้าไปในกลุ่ม (เช่น <code className="bg-indigo-50 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono font-bold text-indigo-600 dark:text-indigo-400 select-all">#CONNECT-...</code>) บอทจะทำการลงทะเบียนรหัสกลุ่มเข้ากับระบบหอพักนี้ทันทีแบบอัตโนมัติพร้อมส่งข้อความตอบกลับเพื่อยืนยันเชื่อมต่อสำเร็จ!
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+
           </div>
         )}
 
