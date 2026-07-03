@@ -59,6 +59,8 @@ export default function LineSettingsTab() {
   const [savedAdminUserId, setSavedAdminUserId] = useState("")
   const [savedAdminGroupId, setSavedAdminGroupId] = useState("")
   const [savedAdminNotificationActive, setSavedAdminNotificationActive] = useState(true)
+  const [disabledAdminUserIdsInput, setDisabledAdminUserIdsInput] = useState("")
+  const [savedDisabledAdminUserIds, setSavedDisabledAdminUserIds] = useState("")
   
   // Admin LINE Profiles
   const [adminProfiles, setAdminProfiles] = useState<any[]>([])
@@ -131,6 +133,8 @@ export default function LineSettingsTab() {
             setSecretInput(data.channel_secret || "")
             setAdminUserIdInput(data.admin_line_user_id || "")
             setAdminGroupIdInput(data.admin_line_group_id || "")
+            setDisabledAdminUserIdsInput(data.disabled_admin_line_user_ids || "")
+            setSavedDisabledAdminUserIds(data.disabled_admin_line_user_ids || "")
             
             setSavedToken(data.channel_access_token || "")
             setSavedLiff(data.liff_id || "")
@@ -143,6 +147,26 @@ export default function LineSettingsTab() {
 
             if (data.admin_line_user_id && wsId) {
               loadAdminProfiles(data.admin_line_user_id, wsId)
+            }
+
+            // Check for active connection code on load
+            try {
+              const { data: activeCodeData } = await supabase
+                .from("admin_connection_codes")
+                .select("code, expires_at")
+                .eq("workspace_id", wsId)
+                .eq("is_used", false)
+                .gt("expires_at", new Date().toISOString())
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+              if (activeCodeData) {
+                setConnectionCode(activeCodeData.code)
+                setCodeExpiresAt(activeCodeData.expires_at)
+              }
+            } catch (codeErr) {
+              console.warn("Failed to check active connection code:", codeErr)
             }
             
             // Set initial quota display from cache row
@@ -278,7 +302,7 @@ export default function LineSettingsTab() {
 
   // Real-time Polling for automated code usage
   useEffect(() => {
-    if (!showAddModal || !connectionCode || pairingTab !== "auto") return
+    if (!connectionCode) return
 
     let isSubscribed = true
     const interval = setInterval(async () => {
@@ -298,14 +322,16 @@ export default function LineSettingsTab() {
           // Re-fetch workspace settings to load newly added admin profiles
           const { data: wsSettings } = await supabase
             .from("workspace_line_settings")
-            .select("admin_line_user_id")
+            .select("admin_line_user_id, disabled_admin_line_user_ids")
             .eq("workspace_id", workspaceId)
             .maybeSingle()
 
-          if (wsSettings && wsSettings.admin_line_user_id) {
-            setAdminUserIdInput(wsSettings.admin_line_user_id)
-            setSavedAdminUserId(wsSettings.admin_line_user_id)
-            await loadAdminProfiles(wsSettings.admin_line_user_id, workspaceId)
+          if (wsSettings) {
+            setAdminUserIdInput(wsSettings.admin_line_user_id || "")
+            setSavedAdminUserId(wsSettings.admin_line_user_id || "")
+            setDisabledAdminUserIdsInput(wsSettings.disabled_admin_line_user_ids || "")
+            setSavedDisabledAdminUserIds(wsSettings.disabled_admin_line_user_ids || "")
+            await loadAdminProfiles(wsSettings.admin_line_user_id || "", workspaceId)
           }
 
           setSettingsSuccess("🎉 ผูกบัญชี LINE Admin อัตโนมัติสำเร็จเรียบร้อยแล้ว!")
@@ -322,7 +348,7 @@ export default function LineSettingsTab() {
       isSubscribed = false
       clearInterval(interval)
     }
-  }, [showAddModal, connectionCode, pairingTab, workspaceId])
+  }, [connectionCode, workspaceId])
 
   const handleGenerateConnectionCode = async () => {
     if (!workspaceId) return
@@ -414,6 +440,96 @@ export default function LineSettingsTab() {
     setAdminProfiles(updatedProfiles)
     const updatedUidsStr = updatedProfiles.map((p: any) => p.userId).join(",")
     setAdminUserIdInput(updatedUidsStr)
+
+    // Clean up disabled list
+    const disabledList = disabledAdminUserIdsInput
+      ? disabledAdminUserIdsInput.split(/[\s,\n]+/).map(id => id.trim()).filter(id => id.length > 0)
+      : []
+    const updatedDisabledList = disabledList.filter(id => id !== uidToDelete)
+    const updatedDisabledStr = updatedDisabledList.join(",")
+    setDisabledAdminUserIdsInput(updatedDisabledStr)
+    setSavedDisabledAdminUserIds(updatedDisabledStr)
+  }
+
+  const handleCancelConnectionCode = async () => {
+    if (!connectionCode || !workspaceId) return
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบรหัสเชื่อมต่ออัตโนมัตินี้?")) return
+
+    setModalLoading(true)
+    try {
+      if (isDemo) {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        setConnectionCode(null)
+        setCodeExpiresAt(null)
+        setSettingsSuccess("ยกเลิกรหัสเชื่อมต่อสำเร็จ (Demo)")
+        return
+      }
+
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("admin_connection_codes")
+        .delete()
+        .eq("code", connectionCode)
+        .eq("workspace_id", workspaceId)
+
+      if (error) throw error
+
+      setConnectionCode(null)
+      setCodeExpiresAt(null)
+      setSettingsSuccess("ยกเลิกรหัสเชื่อมต่ออัตโนมัติสำเร็จเรียบร้อยแล้ว!")
+    } catch (err: any) {
+      console.error("Error canceling connection code:", err)
+      setSettingsError(err.message || "เกิดข้อผิดพลาดในการยกเลิกรหัส")
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  const handleToggleIndividualAdminNotification = async (uid: string) => {
+    if (!workspaceId) return
+
+    const disabledList = disabledAdminUserIdsInput
+      ? disabledAdminUserIdsInput.split(/[\s,\n]+/).map(id => id.trim()).filter(id => id.length > 0)
+      : []
+
+    let newDisabledList: string[]
+    if (disabledList.includes(uid)) {
+      newDisabledList = disabledList.filter(id => id !== uid)
+    } else {
+      newDisabledList = [...disabledList, uid]
+    }
+
+    const newDisabledStr = newDisabledList.join(",")
+    
+    setDisabledAdminUserIdsInput(newDisabledStr)
+    setSavedDisabledAdminUserIds(newDisabledStr)
+
+    setSavingSettings(true)
+    try {
+      if (isDemo) {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        setSettingsSuccess("อัปเดตการรับแจ้งเตือนสำหรับแอดมินคนนี้สำเร็จ (Demo)!")
+        return
+      }
+
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("workspace_line_settings")
+        .update({
+          disabled_admin_line_user_ids: newDisabledStr || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq("workspace_id", workspaceId)
+
+      if (error) throw error
+
+      setSettingsSuccess("อัปเดตการรับแจ้งเตือนสำหรับแอดมินสำเร็จเรียบร้อยแล้ว!")
+    } catch (err: any) {
+      console.error("Error toggling individual admin notification:", err)
+      setDisabledAdminUserIdsInput(savedDisabledAdminUserIds)
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
 
@@ -614,6 +730,7 @@ export default function LineSettingsTab() {
             admin_line_user_id: trimmedAdminUserId || null,
             admin_line_group_id: trimmedAdminGroupId || null,
             admin_notification_active: adminNotificationActive,
+            disabled_admin_line_user_ids: disabledAdminUserIdsInput || null,
             updated_at: new Date().toISOString()
           })
           .eq("workspace_id", workspaceId)
@@ -629,6 +746,7 @@ export default function LineSettingsTab() {
             admin_line_user_id: trimmedAdminUserId || null,
             admin_line_group_id: trimmedAdminGroupId || null,
             admin_notification_active: adminNotificationActive,
+            disabled_admin_line_user_ids: disabledAdminUserIdsInput || null,
             limit_count: 1000,
             consumed_count: 0,
             remaining_count: 1000,
@@ -690,6 +808,7 @@ export default function LineSettingsTab() {
     setAdminUserIdInput(savedAdminUserId)
     setAdminGroupIdInput(savedAdminGroupId)
     setAdminNotificationActive(savedAdminNotificationActive)
+    setDisabledAdminUserIdsInput(savedDisabledAdminUserIds)
     setIsEditing(false)
     setSettingsError(null)
     setSettingsSuccess(null)
@@ -1073,65 +1192,134 @@ export default function LineSettingsTab() {
                     </span>
                   </div>
 
+                  {/* Active Connection Code Banner */}
+                  {connectionCode && codeCountdown > 0 && (
+                    <div className="p-4 bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fadeIn mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl font-mono font-extrabold text-sm shrink-0 animate-pulse">
+                          {connectionCode}
+                        </div>
+                        <div className="space-y-0.5 min-w-0">
+                          <h6 className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                            รหัสเชื่อมต่อแอดมินอัตโนมัติเปิดใช้งานอยู่
+                          </h6>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold truncate">
+                            ส่งรหัสนี้ไปหาบอทเพื่อผูกบัญชี (เหลือเวลา {Math.floor(codeCountdown / 60)}:{(codeCountdown % 60).toString().padStart(2, '0')})
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCancelConnectionCode}
+                        className="shrink-0 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 hover:border-rose-500/30 text-rose-500 rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm"
+                      >
+                        ยกเลิกรหัส
+                      </button>
+                    </div>
+                  )}
+
                   {/* Admin Profiles Cards List */}
                   {adminProfiles.length > 0 ? (
                     <div className="grid grid-cols-1 gap-2.5 animate-fadeIn">
-                      {adminProfiles.map((p, idx) => (
-                        <div 
-                          key={p.userId || idx}
-                          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-300 hover:shadow-md ${
-                            p.success 
-                              ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/10 dark:border-emerald-500/20" 
-                              : "bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/10 dark:border-amber-500/20"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            {p.pictureUrl ? (
-                              <img 
-                                src={p.pictureUrl} 
-                                alt={p.displayName} 
-                                className="w-11 h-11 rounded-full object-cover ring-2 ring-white dark:ring-slate-800 shrink-0"
-                                style={{ width: "44px", height: "44px" }}
-                              />
-                            ) : (
-                              <div className="w-11 h-11 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-extrabold text-sm shrink-0">
-                                {p.displayName ? p.displayName.charAt(0).toUpperCase() : "?"}
+                      {adminProfiles.map((p, idx) => {
+                        const isNotificationEnabled = !disabledAdminUserIdsInput
+                          .split(/[\s,\n]+/)
+                          .map(id => id.trim())
+                          .filter(id => id.length > 0)
+                          .includes(p.userId);
+
+                        return (
+                          <div 
+                            key={p.userId || idx}
+                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-300 hover:shadow-md ${
+                              p.success 
+                                ? isNotificationEnabled
+                                  ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/10 dark:border-emerald-500/20" 
+                                  : "bg-slate-500/5 dark:bg-slate-500/10 border-slate-200 dark:border-slate-800 opacity-80"
+                                : "bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/10 dark:border-amber-500/20"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0">
+                              {p.pictureUrl ? (
+                                <img 
+                                  src={p.pictureUrl} 
+                                  alt={p.displayName} 
+                                  className={`w-11 h-11 rounded-full object-cover ring-2 ring-white dark:ring-slate-800 shrink-0 ${
+                                    isNotificationEnabled ? "" : "grayscale"
+                                  }`}
+                                  style={{ width: "44px", height: "44px" }}
+                                />
+                              ) : (
+                                <div className={`w-11 h-11 rounded-full flex items-center justify-center text-slate-500 font-extrabold text-sm shrink-0 ${
+                                  isNotificationEnabled ? "bg-slate-200 dark:bg-slate-800" : "bg-slate-100 dark:bg-slate-900"
+                                }`}>
+                                  {p.displayName ? p.displayName.charAt(0).toUpperCase() : "?"}
+                                </div>
+                              )}
+                              <div className="min-w-0 space-y-0.5">
+                                <h5 className={`text-sm font-extrabold truncate flex items-center gap-2 ${
+                                  isNotificationEnabled ? "text-slate-700 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 line-through"
+                                }`}>
+                                  <span>{p.displayName}</span>
+                                  {p.success ? (
+                                    isNotificationEnabled ? (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black rounded">
+                                        <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                        <span>พร้อมใช้งาน</span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-400 dark:bg-slate-900 dark:text-slate-500 text-[9px] font-black rounded">
+                                        <span className="w-1 h-1 rounded-full bg-slate-400" />
+                                        <span>ปิดแจ้งเตือน</span>
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-black rounded" title={p.error}>
+                                      <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
+                                      <span>ยังไม่เพิ่มเพื่อน</span>
+                                    </span>
+                                  )}
+                                </h5>
+                                <p className="text-[10px] font-mono font-semibold text-slate-400 dark:text-slate-500 truncate">
+                                  ID: {p.userId}
+                                </p>
                               </div>
-                            )}
-                            <div className="min-w-0 space-y-0.5">
-                              <h5 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 truncate flex items-center gap-2">
-                                <span>{p.displayName}</span>
-                                {p.success ? (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black rounded">
-                                    <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                                    <span>พร้อมใช้งาน</span>
-                                  </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {/* Toggle individual notification */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleIndividualAdminNotification(p.userId)}
+                                className={`p-2 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                                  isNotificationEnabled
+                                    ? "bg-indigo-500/10 hover:bg-indigo-500/15 border-indigo-500/20 text-indigo-600 dark:text-indigo-400"
+                                    : "bg-slate-500/5 hover:bg-slate-500/10 border-slate-200 dark:border-slate-850 text-slate-400"
+                                }`}
+                                title={isNotificationEnabled ? "ปิดการแจ้งเตือนสลิปส่วนตัวสำหรับแอดมินคนนี้" : "เปิดการแจ้งเตือนสลิปส่วนตัวสำหรับแอดมินคนนี้"}
+                              >
+                                {isNotificationEnabled ? (
+                                  <Bell className="w-4 h-4" />
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-black rounded" title={p.error}>
-                                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
-                                    <span>ยังไม่เพิ่มเพื่อน</span>
-                                  </span>
+                                  <BellOff className="w-4 h-4" />
                                 )}
-                              </h5>
-                              <p className="text-[10px] font-mono font-semibold text-slate-400 dark:text-slate-500 truncate">
-                                ID: {p.userId}
-                              </p>
+                              </button>
+
+                              {/* Delete/Remove Button - only visible during Editing or if Not Configured */}
+                              {(!isConfigured || isEditing) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAdmin(p.userId)}
+                                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer shadow-sm group shrink-0"
+                                  title="ลบผู้ใช้แอดมินท่านนี้"
+                                >
+                                  <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                </button>
+                              )}
                             </div>
                           </div>
-                          
-                          {/* Delete/Remove Button - only visible during Editing or if Not Configured */}
-                          {(!isConfigured || isEditing) && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteAdmin(p.userId)}
-                              className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer shadow-sm group shrink-0"
-                              title="ลบผู้ใช้แอดมินท่านนี้"
-                            >
-                              <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="py-6 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-500 font-semibold text-xs">
@@ -1894,6 +2082,14 @@ export default function LineSettingsTab() {
                           <span className="text-xs text-rose-500 dark:text-rose-400 font-bold block">
                             ⏱️ รหัสหมดอายุในอีก {Math.floor(codeCountdown / 60)}:{(codeCountdown % 60).toString().padStart(2, "0")} นาที
                           </span>
+                          <button
+                            type="button"
+                            onClick={handleCancelConnectionCode}
+                            className="mt-2 text-[11px] text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 font-black flex items-center justify-center gap-1 mx-auto transition-all bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 hover:border-rose-500/20 px-3 py-1 rounded-lg"
+                          >
+                            <X className="w-3.5 h-3.5 shrink-0" />
+                            <span>ยกเลิกรหัสนี้</span>
+                          </button>
                         </div>
 
                         <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex items-start gap-2.5 animate-pulse">

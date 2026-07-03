@@ -1,5 +1,5 @@
 -- =========================================================================
--- Database Patch: Admin LINE Connection Codes
+-- Database Patch: Admin LINE Connection Codes & Individual Admin Toggles
 -- =========================================================================
 
 -- 1. Create admin_connection_codes table
@@ -29,9 +29,14 @@ USING (
   )
 );
 
--- 5. Add comments
+-- 5. Add column to workspace_line_settings to store separate disabled admin user IDs
+ALTER TABLE public.workspace_line_settings 
+  ADD COLUMN IF NOT EXISTS disabled_admin_line_user_ids text;
+
+-- 6. Add comments
 COMMENT ON TABLE public.admin_connection_codes IS 'Temporary 5-minute codes to allow LINE Admins to bind their LINE UID automatically by sending the code to the bot';
 COMMENT ON COLUMN public.admin_connection_codes.code IS '6-digit random code used to pair LINE UID';
 COMMENT ON COLUMN public.admin_connection_codes.workspace_id IS 'Associated workspace id';
 COMMENT ON COLUMN public.admin_connection_codes.expires_at IS 'Expiration timestamp, strictly 5 minutes from creation';
 COMMENT ON COLUMN public.admin_connection_codes.is_used IS 'Flag to mark code as consumed';
+COMMENT ON COLUMN public.workspace_line_settings.disabled_admin_line_user_ids IS 'Comma-separated list of admin LINE UIDs that have notifications disabled';

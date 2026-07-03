@@ -653,7 +653,7 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
     // 3. ดึงค่าคอนฟิก LINE
     const { data: settings } = await supabase
       .from("workspace_line_settings")
-      .select("channel_access_token, admin_line_user_id, admin_line_group_id, admin_notification_active")
+      .select("channel_access_token, admin_line_user_id, admin_line_group_id, admin_notification_active, disabled_admin_line_user_ids")
       .eq("workspace_id", workspaceId)
       .maybeSingle()
 
@@ -667,6 +667,7 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
     let channelAccessToken = settings?.channel_access_token
     const adminLineUserId = settings?.admin_line_user_id
     const adminLineGroupId = settings?.admin_line_group_id
+    const disabledAdminLineUserIds = settings?.disabled_admin_line_user_ids || ""
 
     // Fallback to process.env.LINE_CHANNEL_ACCESS_TOKEN if workspace specific is missing
     if (!channelAccessToken) {
@@ -677,9 +678,17 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
       return { success: false, error: "ไม่มี Channel Access Token ของ LINE" }
     }
 
-    // แยก User ID สูงสุด 5 คน (คั่นด้วยจุลภาค, เว้นวรรค หรือขึ้นบรรทัดใหม่)
+    const disabledList = disabledAdminLineUserIds
+      ? disabledAdminLineUserIds.split(/[\s,\n]+/).map((id: string) => id.trim()).filter((id: string) => id.length > 0)
+      : []
+
+    // แยก User ID สูงสุด 5 คน (คั่นด้วยจุลภาค, เว้นวรรค หรือขึ้นบรรทัดใหม่) และคัดกรองเฉพาะคนที่ไม่โดนปิดแจ้งเตือน
     const userIds = adminLineUserId
-      ? (adminLineUserId as string).split(/[\s,\n]+/).map((id: string) => id.trim()).filter((id: string) => id.length > 0).slice(0, 5)
+      ? (adminLineUserId as string)
+          .split(/[\s,\n]+/)
+          .map((id: string) => id.trim())
+          .filter((id: string) => id.length > 0 && !disabledList.includes(id))
+          .slice(0, 5)
       : []
 
     const hasUserId = userIds.length > 0
