@@ -721,6 +721,65 @@ export default function TenantsPage() {
     )
   })()
 
+  const getRoomFloor = (roomNum: string) => {
+    const room = rooms.find(r => r.roomNumber === roomNum)
+    if (room && room.floor) return String(room.floor)
+    
+    // Fallback: If room number starts with digits, use the first digit as the floor
+    const match = roomNum.match(/^\d+/)
+    if (match) {
+      if (roomNum.length >= 3) {
+        return roomNum.substring(0, roomNum.length - 2) // e.g. "102" -> "1", "1203" -> "12"
+      }
+      return match[0][0]
+    }
+    const charMatch = roomNum.match(/^[A-Za-z]+(\d+)/) // e.g. "A101"
+    if (charMatch && charMatch[1]) {
+      const numStr = charMatch[1]
+      if (numStr.length >= 3) {
+        return numStr.substring(0, numStr.length - 2)
+      }
+      return numStr[0]
+    }
+    return "1"
+  }
+
+  // Group filteredCurrent by floor for Grid View
+  const currentByFloor = (() => {
+    const grouped: { [key: string]: TenantItem[] } = {}
+    filteredCurrent.forEach((t) => {
+      const floor = getRoomFloor(t.roomNumber)
+      if (!grouped[floor]) {
+        grouped[floor] = []
+      }
+      grouped[floor].push(t)
+    })
+    return grouped
+  })()
+
+  // Get sorted floors
+  const sortedFloors = Object.keys(currentByFloor).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  )
+
+  // Group filteredOld by floor for Grid View
+  const oldByFloor = (() => {
+    const grouped: { [key: string]: OldTenantItem[] } = {}
+    filteredOld.forEach((t) => {
+      const floor = getRoomFloor(t.roomNumber)
+      if (!grouped[floor]) {
+        grouped[floor] = []
+      }
+      grouped[floor].push(t)
+    })
+    return grouped
+  })()
+
+  // Get sorted floors for old tenants
+  const sortedOldFloors = Object.keys(oldByFloor).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  )
+
   const handleSort = (field: "room" | "fullName" | "line" | "lease" | "status") => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
@@ -1073,95 +1132,113 @@ export default function TenantsPage() {
         <>
           {/* Always Grid View on Mobile, conditional Grid on Desktop */}
           <div className={viewMode === "grid" ? "block" : "block md:hidden"}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredCurrent.map((t) => {
-              const status = getContractStatus(t.contractStart, t.contractEnd)
-              return (
-                <div 
-                  key={t.id} 
-                  className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
-                >
-                  <div>
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div>
-                        <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
-                        <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
-                          ห้อง {t.roomNumber}
-                        </h4>
-                      </div>
-                      
-                      {/* Actions */}
-                      {hasEditPermission && (
-                        <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200/30 dark:border-slate-800/30 opacity-60 group-hover/card:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleEditClick(t)}
-                            className="p-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
-                            title="แก้ไขข้อมูลผู้เช่า"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Status Badge */}
-                    <div className="mb-4">
-                      {status ? (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-extrabold uppercase tracking-wider ${status.style}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
-                          {status.label}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 dark:text-slate-600">-</span>
-                      )}
-                    </div>
-
-                    {/* Details */}
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
-                      <div className="flex items-center justify-between text-sm sm:text-base">
-                        <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่า:</span>
-                        <span className="font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
-                          <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                          {t.fullName}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm sm:text-base">
-                        <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
-                        <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
-                          <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                          {getMaskedPhone(t.phone)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm sm:text-base">
-                        <span className="text-slate-400 dark:text-slate-500 font-medium">สถานะ LINE OA:</span>
-                        <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
-                          <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
-                          {getMaskedLine(t.lineUserId)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm sm:text-base">
-                        <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะสัญญาเช่า:</span>
-                        <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
-                          <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                          {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
-                        </span>
-                      </div>
-                    </div>
+            {sortedFloors.map((floor) => (
+              <div key={floor} className="space-y-4 mb-8">
+                {/* Floor Header Badge */}
+                <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/40 px-5 py-3 rounded-2xl border border-slate-200/40 dark:border-slate-800/80 shadow-sm">
+                  <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-mono font-black text-sm rounded-lg">
+                    FL {floor}
                   </div>
+                  <h3 className="text-base md:text-lg font-black text-slate-850 dark:text-slate-100">
+                    ชั้น {floor}
+                  </h3>
+                  <span className="text-xs md:text-sm text-slate-400 dark:text-slate-500 font-bold ml-auto bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-150 dark:border-slate-800">
+                    ผู้เช่า {currentByFloor[floor].length} ห้อง
+                  </span>
                 </div>
-              )
-            })}
+
+                {/* Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {currentByFloor[floor].map((t) => {
+                    const status = getContractStatus(t.contractStart, t.contractEnd)
+                    return (
+                      <div 
+                        key={t.id} 
+                        className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
+                      >
+                        <div>
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div>
+                              <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
+                              <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
+                                ห้อง {t.roomNumber}
+                              </h4>
+                            </div>
+                            
+                            {/* Actions */}
+                            {hasEditPermission && (
+                              <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200/30 dark:border-slate-800/30 opacity-60 group-hover/card:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleEditClick(t)}
+                                  className="p-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                                  title="แก้ไขข้อมูลผู้เช่า"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Status Badge */}
+                          <div className="mb-4">
+                            {status ? (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-extrabold uppercase tracking-wider ${status.style}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                                {status.label}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 dark:text-slate-600">-</span>
+                            )}
+                          </div>
+
+                          {/* Details */}
+                          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
+                            <div className="flex items-center justify-between text-sm sm:text-base">
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่า:</span>
+                              <span className="font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
+                                <Users className="w-4 h-4 text-slate-400 shrink-0" />
+                                {t.fullName}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm sm:text-base">
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                              <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
+                                <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                                {getMaskedPhone(t.phone)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm sm:text-base">
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">สถานะ LINE OA:</span>
+                              <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
+                                <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
+                                {getMaskedLine(t.lineUserId)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm sm:text-base">
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะสัญญาเช่า:</span>
+                              <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
+                                <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                                {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
 
             {filteredCurrent.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
+              <div className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
                 ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
               </div>
             )}
-          </div>
           </div>
 
           {/* Table View: Shown on Desktop only when viewMode === 'table', hidden on Mobile */}
@@ -1253,89 +1330,107 @@ export default function TenantsPage() {
         <>
           {/* Always Grid View on Mobile, conditional Grid on Desktop */}
           <div className={viewMode === "grid" ? "block" : "block md:hidden"}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredOld.map((t) => (
-              <div 
-                key={t.id} 
-                className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
-              >
-                <div>
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องสุดท้ายที่พัก</span>
-                      <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
-                        ห้อง {t.roomNumber}
-                      </h4>
-                    </div>
-                    
-                    {/* Actions */}
-                    <div>
-                      <button
-                        onClick={() => {
-                          if (!hasEditPermission) {
-                            showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
-                            return
-                          }
-                          setDeleteConfirmId(t.id)
-                        }}
-                        disabled={!hasEditPermission}
-                        className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
-                          hasEditPermission
-                            ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-150/40 dark:border-rose-900/30"
-                            : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
-                        }`}
-                        title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+            {sortedOldFloors.map((floor) => (
+              <div key={floor} className="space-y-4 mb-8">
+                {/* Floor Header Badge */}
+                <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/40 px-5 py-3 rounded-2xl border border-slate-200/40 dark:border-slate-800/80 shadow-sm">
+                  <div className="px-3 py-1 bg-rose-100/80 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-mono font-black text-sm rounded-lg">
+                    FL {floor}
                   </div>
+                  <h3 className="text-base md:text-lg font-black text-slate-850 dark:text-slate-100">
+                    ชั้น {floor}
+                  </h3>
+                  <span className="text-xs md:text-sm text-slate-400 dark:text-slate-500 font-bold ml-auto bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-150 dark:border-slate-800">
+                    ประวัติ {oldByFloor[floor].length} รายการ
+                  </span>
+                </div>
 
-                  {/* Details */}
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
-                    <div className="flex items-center justify-between text-sm sm:text-base">
-                      <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่าเก่า:</span>
-                      <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
-                        <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                        {t.fullName}
-                      </span>
-                    </div>
+                {/* Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {oldByFloor[floor].map((t) => (
+                    <div 
+                      key={t.id} 
+                      className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
+                    >
+                      <div>
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div>
+                            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องสุดท้ายที่พัก</span>
+                            <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
+                              ห้อง {t.roomNumber}
+                            </h4>
+                          </div>
+                          
+                          {/* Actions */}
+                          <div>
+                            <button
+                              onClick={() => {
+                                if (!hasEditPermission) {
+                                  showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+                                  return
+                                }
+                                setDeleteConfirmId(t.id)
+                              }}
+                              disabled={!hasEditPermission}
+                              className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
+                                hasEditPermission
+                                  ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-150/40 dark:border-rose-900/30"
+                                  : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
+                              }`}
+                              title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
 
-                    <div className="flex items-center justify-between text-sm sm:text-base">
-                      <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
-                      <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
-                        <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                        {getMaskedPhone(t.phone)}
-                      </span>
-                    </div>
+                        {/* Details */}
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
+                          <div className="flex items-center justify-between text-sm sm:text-base">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่าเก่า:</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
+                              <Users className="w-4 h-4 text-slate-400 shrink-0" />
+                              {t.fullName}
+                            </span>
+                          </div>
 
-                    <div className="flex items-center justify-between text-sm sm:text-base">
-                      <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะเวลาที่เคยเช่า:</span>
-                      <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
-                        <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                        {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
-                      </span>
-                    </div>
+                          <div className="flex items-center justify-between text-sm sm:text-base">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                            <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
+                              <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                              {getMaskedPhone(t.phone)}
+                            </span>
+                          </div>
 
-                    <div className="flex items-center justify-between text-sm sm:text-base">
-                      <span className="text-slate-400 dark:text-slate-500 font-medium">วันที่ย้ายออก:</span>
-                      <span className="font-bold text-rose-600 dark:text-rose-455 flex items-center gap-1.5 font-mono">
-                        <Clock className="w-4 h-4 text-rose-500 shrink-0" />
-                        {formatDateThai(t.movedOutAt)}
-                      </span>
+                          <div className="flex items-center justify-between text-sm sm:text-base">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะเวลาที่เคยเช่า:</span>
+                            <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
+                              <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                              {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-sm sm:text-base">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">วันที่ย้ายออก:</span>
+                            <span className="font-bold text-rose-600 dark:text-rose-455 flex items-center gap-1.5 font-mono">
+                              <Clock className="w-4 h-4 text-rose-500 shrink-0" />
+                              {formatDateThai(t.movedOutAt)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             ))}
 
             {filteredOld.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
+              <div className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
                 ไม่มีประวัติข้อมูลผู้เช่าเก่าย้ายออกในตาราง
               </div>
             )}
-          </div>
           </div>
 
           {/* Table View: Shown on Desktop only when viewMode === 'table', hidden on Mobile */}
