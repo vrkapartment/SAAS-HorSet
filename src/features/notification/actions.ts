@@ -672,7 +672,7 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
 
     // แยก User ID สูงสุด 5 คน (คั่นด้วยจุลภาค, เว้นวรรค หรือขึ้นบรรทัดใหม่)
     const userIds = adminLineUserId
-      ? adminLineUserId.split(/[\s,\n]+/).map(id => id.trim()).filter(id => id.length > 0).slice(0, 5)
+      ? (adminLineUserId as string).split(/[\s,\n]+/).map((id: string) => id.trim()).filter((id: string) => id.length > 0).slice(0, 5)
       : []
 
     const hasUserId = userIds.length > 0
