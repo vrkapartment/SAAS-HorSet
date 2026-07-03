@@ -18,7 +18,10 @@ import {
   ChevronDown,
   ChevronUp,
   Bell,
-  Users
+  Users,
+  Plus,
+  Trash2,
+  X
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -57,6 +60,13 @@ export default function LineSettingsTab() {
   // Admin LINE Profiles
   const [adminProfiles, setAdminProfiles] = useState<any[]>([])
   const [loadingProfiles, setLoadingProfiles] = useState(false)
+  
+  // Add LINE Admin Connection Modal States
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newUidInput, setNewUidInput] = useState("")
+  const [modalLoading, setModalLoading] = useState(false)
+  const [modalProfilePreview, setModalProfilePreview] = useState<any | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
   
   // Quota Status
   const [fetchingQuota, setFetchingQuota] = useState(false)
@@ -209,6 +219,87 @@ export default function LineSettingsTab() {
       setLoadingProfiles(false)
     }
   }
+
+  const handleOpenAddModal = () => {
+    if (adminProfiles.length >= 5) {
+      alert("ขออภัย! ระบบรองรับแอดมินแจ้งเตือนสูงสุดได้ 5 คน")
+      return
+    }
+    setNewUidInput("")
+    setModalProfilePreview(null)
+    setModalError(null)
+    setShowAddModal(true)
+  }
+
+  const handleCloseAddModal = () => {
+    setShowAddModal(false)
+  }
+
+  const handleLookupProfile = async () => {
+    const trimmedUid = newUidInput.trim()
+    if (!trimmedUid) {
+      setModalError("กรุณาระบุ LINE User ID ของแอดมินก่อน")
+      return
+    }
+    if (!trimmedUid.startsWith("U") || trimmedUid.length !== 33) {
+      setModalError("รูปแบบรหัสไม่ถูกต้อง (ต้องขึ้นต้นด้วยอักษร U และมีความยาว 33 ตัวอักษร)")
+      return
+    }
+    if (adminProfiles.some((p: any) => p.userId === trimmedUid)) {
+      setModalError("LINE User ID นี้ได้รับการเพิ่มเชื่อมต่อแอดมินอยู่แล้ว")
+      return
+    }
+
+    setModalLoading(true)
+    setModalError(null)
+    setModalProfilePreview(null)
+
+    try {
+      if (isDemo) {
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        setModalProfilePreview({
+          userId: trimmedUid,
+          displayName: "แอดมินจำลอง (จากการสืบค้นเดโม)",
+          pictureUrl: null,
+          success: true
+        })
+        return
+      }
+
+      const res = await getLineProfilesAction(trimmedUid, workspaceId || "d290f1ee-6c54-4b01-90e6-d701748f0851")
+      if (res.success && res.data && res.data.length > 0) {
+        const profile = res.data[0]
+        setModalProfilePreview(profile)
+      } else {
+        setModalError(res.error || "ไม่สามารถค้นหาข้อมูลผู้ใช้ได้ (กรุณาเพิ่มเพื่อนบอทและตรวจสอบ ID)")
+      }
+    } catch (err: any) {
+      console.error("Error looking up profile:", err)
+      setModalError(err.message || "เกิดข้อผิดพลาดในการตรวจสอบโปรไฟล์")
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  const handleConfirmAddAdmin = () => {
+    if (!modalProfilePreview) return
+    
+    const updatedProfiles = [...adminProfiles, modalProfilePreview]
+    setAdminProfiles(updatedProfiles)
+    
+    const updatedUidsStr = updatedProfiles.map((p: any) => p.userId).join(",")
+    setAdminUserIdInput(updatedUidsStr)
+    
+    setShowAddModal(false)
+  }
+
+  const handleDeleteAdmin = (uidToDelete: string) => {
+    const updatedProfiles = adminProfiles.filter((p: any) => p.userId !== uidToDelete)
+    setAdminProfiles(updatedProfiles)
+    const updatedUidsStr = updatedProfiles.map((p: any) => p.userId).join(",")
+    setAdminUserIdInput(updatedUidsStr)
+  }
+
 
   const loadLineQuota = async (forceRefresh = false, targetWorkspaceId?: string) => {
     const activeWsId = targetWorkspaceId || workspaceId
@@ -714,94 +805,107 @@ export default function LineSettingsTab() {
                 </div>
 
                 {/* Admin User ID (for personal alerts) */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                      Admin LINE User ID (แจ้งเตือนสลิปส่วนตัว - สูงสุด 5 คน)
+                      รายชื่อแอดมินรับแจ้งเตือนสลิปส่วนตัว ({adminProfiles.length}/5 คน)
                     </label>
                     <span className="text-[10px] bg-blue-500/10 text-blue-500 font-extrabold px-2 py-0.5 rounded-full">
                       รองรับสูงสุด 5 คน
                     </span>
                   </div>
-                  <textarea
-                    rows={3}
-                    placeholder="U123456789abcdef0123456789abcdef0&#10;U888888888abcdef0888888888abcdef0"
-                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed resize-none leading-relaxed"
-                    value={adminUserIdInput}
-                    onChange={(e) => setAdminUserIdInput(e.target.value)}
-                    disabled={isConfigured && !isEditing}
-                  />
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                    💡 ใส่ LINE User ID ของแอดมิน (เริ่มต้นด้วย <code className="font-mono">U...</code> มีความยาว 33 ตัวอักษร) สามารถเพิ่มได้สูงสุด 5 คน โดยคั่นด้วย<b>จุลภาค (,)</b>, <b>เว้นวรรค</b> หรือ<b>ขึ้นบรรทัดใหม่</b>
-                  </p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                    💡 พิมพ์ส่งข้อความ <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-mono">#MYID</code> คุยหา LINE OA ของท่าน บอทจะตอบกลับรหัส LINE User ID ของท่านมาให้คัดลอกมาวางที่นี่
-                  </p>
 
-                  {/* Dynamic Admin Profiles Panel */}
-                  {adminProfiles.length > 0 && (
-                    <div className="mt-3.5 space-y-2.5 animate-fadeIn">
-                      <p className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-blue-500" />
-                        <span>รายชื่อแอดมินที่ดึงข้อมูลสำเร็จ ({adminProfiles.length}/5 คน)</span>
-                      </p>
-                      <div className="grid grid-cols-1 gap-2">
-                        {adminProfiles.map((p, idx) => (
-                          <div 
-                            key={p.userId || idx}
-                            className={`p-3 rounded-2xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-300 hover:shadow ${
-                              p.success 
-                                ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/10 dark:border-emerald-500/20" 
-                                : "bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/10 dark:border-amber-500/20"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              {p.pictureUrl ? (
-                                <img 
-                                  src={p.pictureUrl} 
-                                  alt={p.displayName} 
-                                  className="w-10 h-10 rounded-full object-cover ring-2 ring-white dark:ring-slate-800"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-extrabold text-sm shrink-0">
-                                  {p.displayName ? p.displayName.charAt(0).toUpperCase() : "?"}
-                                </div>
-                              )}
-                              <div className="min-w-0">
-                                <h5 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 truncate flex items-center gap-1.5">
-                                  <span>{p.displayName}</span>
-                                </h5>
-                                <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">
-                                  {p.userId}
-                                </p>
+                  {/* Admin Profiles Cards List */}
+                  {adminProfiles.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2.5 animate-fadeIn">
+                      {adminProfiles.map((p, idx) => (
+                        <div 
+                          key={p.userId || idx}
+                          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-300 hover:shadow-md ${
+                            p.success 
+                              ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/10 dark:border-emerald-500/20" 
+                              : "bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/10 dark:border-amber-500/20"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            {p.pictureUrl ? (
+                              <img 
+                                src={p.pictureUrl} 
+                                alt={p.displayName} 
+                                className="w-11 h-11 rounded-full object-cover ring-2 ring-white dark:ring-slate-800 shrink-0"
+                                style={{ width: "44px", height: "44px" }}
+                              />
+                            ) : (
+                              <div className="w-11 h-11 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-extrabold text-sm shrink-0">
+                                {p.displayName ? p.displayName.charAt(0).toUpperCase() : "?"}
                               </div>
-                            </div>
-                            
-                            <div className="shrink-0">
-                              {p.success ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-lg">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  <span>พร้อมรับแจ้งเตือน</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-black rounded-lg" title={p.error}>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                  <span>ไม่พบเพื่อนบอท</span>
-                                </span>
-                              )}
+                            )}
+                            <div className="min-w-0 space-y-0.5">
+                              <h5 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 truncate flex items-center gap-2">
+                                <span>{p.displayName}</span>
+                                {p.success ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black rounded">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                    <span>พร้อมใช้งาน</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-black rounded" title={p.error}>
+                                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
+                                    <span>ยังไม่เพิ่มเพื่อน</span>
+                                  </span>
+                                )}
+                              </h5>
+                              <p className="text-[10px] font-mono font-semibold text-slate-400 dark:text-slate-500 truncate">
+                                ID: {p.userId}
+                              </p>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          
+                          {/* Delete/Remove Button - only visible during Editing or if Not Configured */}
+                          {(!isConfigured || isEditing) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAdmin(p.userId)}
+                              className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer shadow-sm group shrink-0"
+                              title="ลบผู้ใช้แอดมินท่านนี้"
+                            >
+                              <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-6 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-500 font-semibold text-xs">
+                      <Users className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-2 shrink-0 animate-pulse" />
+                      <span>ยังไม่มีการเชื่อมต่อแอดมิน LINE</span>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1">
+                        คลิกปุ่มด้านล่างเพื่อเพิ่มการเชื่อมต่อแอดมินสำหรับส่งสลิปโอนเงินแจ้งเตือนโดยตรง
+                      </p>
                     </div>
                   )}
 
                   {loadingProfiles && (
-                    <div className="mt-2 py-3 flex items-center justify-center gap-2 text-slate-400 text-xs font-semibold animate-pulse">
+                    <div className="py-2.5 flex items-center justify-center gap-2 text-slate-400 text-xs font-semibold animate-pulse">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                      <span>กำลังดึงชื่อ LINE ของแอดมิน...</span>
+                      <span>กำลังโหลดสถานะโปรไฟล์แอดมิน...</span>
                     </div>
                   )}
+
+                  {/* Add Connection Trigger Button */}
+                  {(!isConfigured || isEditing) && adminProfiles.length < 5 ? (
+                    <button
+                      type="button"
+                      onClick={handleOpenAddModal}
+                      className="w-full py-4 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-500/5 dark:hover:border-blue-500/30 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-slate-500 hover:text-blue-600 cursor-pointer shadow-sm group"
+                    >
+                      <span className="p-2 bg-slate-100 dark:bg-slate-950 text-slate-400 group-hover:text-blue-500 group-hover:bg-blue-500/10 rounded-full transition-all">
+                        <Plus className="w-5 h-5 shrink-0" />
+                      </span>
+                      <span className="text-xs font-black">เพิ่มการเชื่อมต่อ Line Admin</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">เพื่อตรวจจับชื่อโปรไฟล์แอดมินในระบบก่อนผูกการรับแจ้งเตือน</span>
+                    </button>
+                  ) : null}
                 </div>
 
                 {/* LINE Group Alert Connection Box */}
@@ -1423,6 +1527,155 @@ export default function LineSettingsTab() {
                   )}
                 </div>
 
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* LINE Admin Connection Modal Overlay */}
+        {showAddModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity cursor-pointer"
+              onClick={handleCloseAddModal}
+            />
+
+            {/* Modal Card */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/85 rounded-3xl w-full max-w-md shadow-2xl p-6 relative z-10 animate-scaleIn space-y-5">
+              {/* Header */}
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-500/10 text-blue-500 rounded-xl">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-slate-800 dark:text-slate-100">
+                      เชื่อมต่อ LINE Admin
+                    </h4>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider mt-0.5">
+                      แอดมินแจ้งเตือนส่วนตัว
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseAddModal}
+                  className="p-1.5 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-xl transition-all cursor-pointer border border-slate-100 dark:border-slate-800/50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">
+                    ระบุ LINE User ID ของแอดมิน (UID)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="U123456789abcdef0123456789abcdef0"
+                      className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60"
+                      value={newUidInput}
+                      onChange={(e) => setNewUidInput(e.target.value)}
+                      disabled={modalLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleLookupProfile}
+                      className="px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={modalLoading || !newUidInput.trim()}
+                    >
+                      {modalLoading ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        "ตกลง"
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                    💡 แอดมินต้องพิมพ์ส่งคำสั่ง <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-mono text-[10px]">#MYID</code> คุยหาบอทก่อนเพื่อเปิดใช้งานและรับรหัสความยาว 33 ตัวอักษร
+                  </p>
+                </div>
+
+                {/* Error Box */}
+                {modalError && (
+                  <div className="p-3 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl flex items-start gap-2 animate-fadeIn">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="text-xs font-bold leading-relaxed">{modalError}</span>
+                  </div>
+                )}
+
+                {/* Dynamic LINE Profile Preview Card */}
+                {modalProfilePreview && (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-2xl animate-scaleIn space-y-3.5 shadow-inner">
+                    <span className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                      ตรวจสอบข้อมูลโปรไฟล์สำเร็จ
+                    </span>
+                    
+                    <div className="flex items-center gap-3.5">
+                      {modalProfilePreview.pictureUrl ? (
+                        <img 
+                          src={modalProfilePreview.pictureUrl} 
+                          alt={modalProfilePreview.displayName} 
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-white dark:ring-slate-800 shrink-0"
+                          style={{ width: "48px", height: "48px" }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-black text-base shrink-0 border border-slate-300 dark:border-slate-700">
+                          {modalProfilePreview.displayName ? modalProfilePreview.displayName.charAt(0).toUpperCase() : "?"}
+                        </div>
+                      )}
+                      <div className="min-w-0 space-y-0.5">
+                        <h5 className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
+                          {modalProfilePreview.displayName}
+                        </h5>
+                        <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">
+                          ID: {modalProfilePreview.userId}
+                        </p>
+                      </div>
+                    </div>
+
+                    {modalProfilePreview.success ? (
+                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span className="text-[11px] font-bold">บัญชี LINE นี้เพิ่มเพื่อนบอทแล้ว พร้อมแจ้งเตือน!</span>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2 text-amber-600 dark:text-amber-400 leading-normal">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div className="text-[10px] font-bold">
+                          <span>ยังไม่ได้แอดเพื่อนบอท: </span>
+                          <p className="font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                            โปรไฟล์นี้จะไม่ได้รับข้อความแจ้งเตือนจนกว่าจะเพิ่มบอทเป็นเพื่อนใน LINE
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCloseAddModal}
+                  className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black transition-all cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAddAdmin}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+                  disabled={!modalProfilePreview}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>ยืนยันการเพิ่ม</span>
+                </button>
               </div>
             </div>
           </div>
