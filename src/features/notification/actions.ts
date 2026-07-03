@@ -613,7 +613,21 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
  */
 export async function sendLineSlipNotificationAction(billId: string, workspaceId: string) {
   try {
-    const supabase = await createClient()
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    let supabase = await createClient()
+
+    // ใช้ Service Role Client ในการดึงข้อมูลบิลและค่าเซ็ตติ้ง เนื่องจากขั้นตอนนี้รันโดยผู้เช่า (Public Portal / Anon) 
+    // ซึ่งจะไม่ผ่านนโยบาย RLS (Row Level Security) ทั่วไป ทำให้ดึงข้อมูลบิลเพื่อส่งไลน์แอดมินล้มเหลว
+    if (url && serviceKey && !serviceKey.includes("placeholder")) {
+      const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+      supabase = createSupabaseClient(url, serviceKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      }) as any
+    }
 
     // 1. ดึงข้อมูลบิล
     const { data: bill, error: billError } = await supabase
