@@ -910,58 +910,99 @@ function AdminDashboardContent() {
               </h4>
             </div>
 
-            {/* MOBILE VIEW GRID (< 768px, Large 48px touch targets, comfortable spaces) */}
-            <div className="grid grid-cols-2 gap-3.5 md:hidden">
+            {/* Unified Responsive Quick Actions Grid (Adaptive Design System) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 md:gap-4">
               {[
-                { label: t("dashboard.action_meter"), sub: "Utility Meter", path: "/billing", icon: Receipt, bg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-500/30" },
-                { label: t("dashboard.action_bill"), sub: "New Month Bill", path: "/manage-bills", icon: Plus, bg: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20 dark:border-teal-500/30" },
-                { label: t("dashboard.action_tenants"), sub: "Manage Tenants", path: "/tenants", icon: Users, bg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 dark:border-indigo-500/30" },
-                { label: t("dashboard.action_expense"), sub: "Daily Expense", path: "/daily-bills", icon: Coins, bg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/30" }
+                {
+                  label: t("dashboard.action_meter"),
+                  sub: "Utility Meter",
+                  desc: t("dashboard.action_meter_desc"),
+                  path: "/billing",
+                  icon: Receipt,
+                  color: "text-blue-600 dark:text-blue-400",
+                  bg: "bg-blue-500/10 border-blue-500/20 dark:border-blue-500/30",
+                  desktopBg: "bg-blue-500/10 text-blue-500"
+                },
+                {
+                  label: t("dashboard.action_bill"),
+                  sub: "New Month Bill",
+                  desc: t("dashboard.action_bill_desc"),
+                  path: "/manage-bills",
+                  icon: Plus,
+                  color: "text-teal-600 dark:text-teal-400",
+                  bg: "bg-teal-500/10 border-teal-500/20 dark:border-teal-500/30",
+                  desktopBg: "bg-teal-500/10 text-teal-500"
+                },
+                {
+                  label: t("dashboard.action_tenants"),
+                  sub: "Manage Tenants",
+                  desc: t("dashboard.action_tenants_desc"),
+                  path: "/tenants",
+                  icon: Users,
+                  color: "text-indigo-600 dark:text-indigo-400",
+                  bg: "bg-indigo-500/10 border-indigo-500/20 dark:border-indigo-500/30",
+                  desktopBg: "bg-indigo-500/10 text-indigo-500"
+                },
+                {
+                  label: t("dashboard.action_expense"),
+                  sub: "Daily Expense",
+                  desc: t("dashboard.action_expense_desc"),
+                  path: "/daily-bills",
+                  icon: Coins,
+                  color: "text-amber-600 dark:text-amber-400",
+                  bg: "bg-amber-500/10 border-amber-500/20 dark:border-amber-500/30",
+                  desktopBg: "bg-amber-500/10 text-amber-500"
+                }
               ].map((act, idx) => {
                 const Icon = act.icon
                 return (
                   <button
                     key={idx}
                     onClick={() => router.push(`${act.path}?month=${selectedMonth}&year=${selectedYear}`)}
-                    className={`flex flex-col justify-between p-4 ${act.bg} border rounded-2xl active:scale-95 active:shadow-inner transition-all text-left shadow-sm h-24 cursor-pointer`}
+                    className={`
+                      cursor-pointer border text-left rounded-2xl transition-all duration-300 group
+                      /* Mobile layout design */
+                      flex flex-col justify-between p-4 h-24 shadow-sm
+                      ${act.bg} active:scale-95 active:shadow-inner
+                      /* Desktop layout transformation */
+                      md:flex-row md:items-center md:gap-4 md:h-auto md:bg-white md:dark:bg-slate-850 md:hover:bg-slate-50 md:dark:hover:bg-slate-800 md:border-slate-200/60 md:dark:border-slate-800/80 md:hover:-translate-y-0.5 md:hover:shadow-md md:active:scale-100 md:active:shadow-none
+                    `}
                   >
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded-xl w-fit shadow-sm">
-                      <Icon className="w-5 h-5" />
+                    {/* Icon block */}
+                    <div className="flex items-center shrink-0">
+                      {/* Mobile version icon */}
+                      <div className="md:hidden p-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm">
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      {/* Desktop version icon */}
+                      <div className={`hidden md:block p-3 rounded-xl group-hover:scale-105 transition-transform duration-300 ${act.desktopBg}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{act.label}</p>
-                      {act.label !== act.sub && (
-                        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">{act.sub}</p>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
 
-            {/* DESKTOP VIEW GRID (>= 768px, Dense info style, fine hover hover effect) */}
-            <div className="hidden md:grid grid-cols-4 gap-4">
-              {[
-                { label: t("dashboard.action_meter"), desc: t("dashboard.action_meter_desc"), path: "/billing", icon: Receipt, color: "text-blue-500", bg: "bg-blue-500/10" },
-                { label: t("dashboard.action_bill"), desc: t("dashboard.action_bill_desc"), path: "/manage-bills", icon: Plus, color: "text-teal-500", bg: "bg-teal-500/10" },
-                { label: t("dashboard.action_tenants"), desc: t("dashboard.action_tenants_desc"), path: "/tenants", icon: Users, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-                { label: t("dashboard.action_expense"), desc: t("dashboard.action_expense_desc"), path: "/daily-bills", icon: Coins, color: "text-amber-500", bg: "bg-amber-500/10" }
-              ].map((act, idx) => {
-                const Icon = act.icon
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => router.push(`${act.path}?month=${selectedMonth}&year=${selectedYear}`)}
-                    className="flex items-center gap-4 p-4 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl text-left hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer"
-                  >
-                    <div className={`p-3 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-300 ${act.bg} ${act.color}`}>
-                      <Icon className="w-5 h-5" />
+                    {/* Text labels container */}
+                    <div className="min-w-0 flex-1 md:flex-initial">
+                      {/* Mobile text version */}
+                      <div className="md:hidden">
+                        <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">{act.label}</p>
+                        {act.label !== act.sub && (
+                          <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase truncate">{act.sub}</p>
+                        )}
+                      </div>
+
+                      {/* Desktop text version */}
+                      <div className="hidden md:block">
+                        <h5 className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+                          {act.label}
+                        </h5>
+                        <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                          {act.desc}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h5 className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{act.label}</h5>
-                      <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 truncate mt-0.5">{act.desc}</p>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 dark:text-slate-500 ml-auto opacity-0 group-hover:opacity-100 transition-all shrink-0" />
+
+                    {/* Desktop-only action trigger arrow */}
+                    <ArrowUpRight className="hidden md:block w-4 h-4 text-slate-400 dark:text-slate-500 ml-auto opacity-0 group-hover:opacity-100 transition-all shrink-0" />
                   </button>
                 )
               })}
