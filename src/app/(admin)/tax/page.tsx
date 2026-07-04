@@ -823,20 +823,15 @@ export default function TaxPage() {
       )}
 
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-1">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20 dark:shadow-indigo-500/10">
-            <FileText className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
-              สรุปข้อมูลเพื่อการยื่นภาษีเงินได้
-            </h2>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              คัดแยกรายได้อพาร์ทเมนท์ตามกฎหมายสรรพากรไทย ภ.ง.ด. 94 และ ภ.ง.ด. 90
-            </p>
-          </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+            <FileText className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            สรุปข้อมูลเพื่อการยื่นภาษีเงินได้
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+            คัดแยกรายได้อพาร์ทเมนท์ตามกฎหมายสรรพากรไทย ภ.ง.ด. 94 และ ภ.ง.ด. 90
+          </p>
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto self-stretch md:self-auto justify-end">

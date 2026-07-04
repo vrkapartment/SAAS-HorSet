@@ -196,15 +196,13 @@ function SettingsHubContent() {
   return (
     <div className="p-0 sm:p-2 space-y-6 w-full pb-16">
       {/* Page Header */}
-      <div className="flex items-center gap-3 mb-2 px-1">
-        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shadow-sm">
-          <Settings className="w-6 h-6 animate-spin-slow" />
-        </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-slate-100 font-sans tracking-tight">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+            <Settings className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin-slow" />
             ตั้งค่าระบบ (System Settings)
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 font-bold">
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
             ปรับแต่งสิทธิ์การใช้งานพนักงาน ข้อมูลหอพัก บัญชีการรับเงิน และตั้งค่าความปลอดภัยโปรไฟล์ของคุณ
           </p>
         </div>

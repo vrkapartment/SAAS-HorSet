@@ -696,9 +696,9 @@ function AdminDashboardContent() {
   return (
     <>
       {/* ส่วนหัวข้อต้อนรับแบบพรีเมียม (Adaptive layout) */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight min-h-[36px] flex items-center">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
             {welcomeName ? (
               `ยินดีต้อนรับกลับ ${welcomeName}!`
             ) : (

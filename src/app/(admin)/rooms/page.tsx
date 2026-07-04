@@ -1519,14 +1519,12 @@ function RoomsContent() {
         {/* 1. HEADER SECTION */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold mb-1">
-              <Home className="w-3.5 h-3.5" /> ระบบบริหารจัดการอพาร์ทเมนท์
-            </div>
-            <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+              <Home className="w-8 h-8 text-blue-600 dark:text-blue-400" />
               จัดการห้องพักและผู้เช่า
             </h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-2xl leading-relaxed">
-              ตารางรวมรายชื่อห้องพักทั้งหมด (Room-centric) เพิ่มผู้เช่า ทำสัญญาเช่าใหม่ เจนลิงก์สำหรับส่งให้ผู้เช่าลงทะเบียนผ่าน LINE และดำเนินการย้ายออกในหน้ารวมหน้านี้หน้าเดียว
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              ตารางรวมรายชื่อห้องพักทั้งหมด จัดการตึกของท่านในหน้านี้หน้าเดียว
             </p>
           </div>
 

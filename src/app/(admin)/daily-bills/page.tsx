@@ -513,13 +513,14 @@ export default function DailyBillsPage() {
         </div>
       )}
       {/* Header section with responsive layout and action toggles */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-            <Coins className="w-5.5 h-5.5 text-teal-500 dark:text-teal-400" /> บันทึกและจัดการบิลค่าใช้จ่ายรายวัน
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+            <Coins className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            บันทึกและจัดการบิลค่าใช้จ่าย
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-450 mt-1 leading-relaxed max-w-2xl">
-            สมุดจดรายจ่ายประจำวันของหอพัก แยกสัดส่วนเพื่อนำไปหักลดหย่อนภาษีสรรพากรตามจริงมาตรา 40(5) และ 40(8) อัตโนมัติ ป้องกันข้อมูลตกหล่น
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+            สมุดจดรายจ่ายประจำวัน แยกสัดส่วนเพื่อนำไปหักลดหย่อนภาษีอัตโนมัติ ป้องกันข้อมูลตกหล่น
           </p>
         </div>
 

@@ -1645,13 +1645,13 @@ function UnifiedBillingContent() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <Gauge className="w-6 h-6 xl:w-7 xl:h-7 2xl:w-8 2xl:h-8 text-blue-500" />
-            <h2 className={`text-2xl xl:text-3xl 2xl:text-4xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดมิเตอร์ และดูบิล</h2>
-          </div>
-          <p className={`text-sm xl:text-base 2xl:text-lg mt-1.5 xl:mt-2 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+            <Gauge className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            จดมิเตอร์ และดูบิล
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
             ระบบบันทึกจดเลขมิเตอร์ไฟฟ้า มิเตอร์น้ำประปา และตรวจสอบสรุปยอดบิลอย่างง่ายประจำหอพัก
           </p>
         </div>
