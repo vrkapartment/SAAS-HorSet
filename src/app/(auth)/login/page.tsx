@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Script from "next/script"
-import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight } from "lucide-react"
+import { Key, Mail, CheckCircle2, Lock, ArrowRight } from "lucide-react"
 import { loginAction } from "@/features/auth/actions"
 import { createClient } from "@/lib/supabase/client"
 import { clearCachedUserProfile } from "@/features/auth/client"
@@ -268,9 +268,9 @@ export default function LoginPage() {
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* โลโก้และหัวข้อโปรเจกต์ */}
-      <div className="text-center z-10 mb-8">
-        <div className="inline-flex items-center justify-center p-3 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/20 mb-3 animate-pulse">
-          <Shield className="w-8 h-8 text-white" />
+      <div className="text-center z-10 mb-8 flex flex-col items-center">
+        <div className="inline-flex items-center justify-center p-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl shadow-xl shadow-blue-500/10 mb-3 w-16 h-16 transition-transform duration-300 hover:scale-105">
+          <img src="/horset_icon.png" className="w-12 h-12 object-contain" alt="HorSet Logo" />
         </div>
         <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-400">
           HorSet <span className="text-blue-500 font-semibold">(หอเสร็จ)</span>
@@ -377,7 +377,7 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleVerify2FA} className="space-y-6">
             <div className="text-center space-y-2">
-              <Shield className="w-12 h-12 text-blue-500 mx-auto animate-bounce" />
+              <Lock className="w-12 h-12 text-blue-500 mx-auto animate-bounce" />
               <h2 className="text-xl font-semibold text-slate-100">ยืนยันตัวตนสองขั้นตอน (2FA)</h2>
               <p className="text-xs text-slate-400 max-w-[280px] mx-auto">
                 กรอกรหัสความปลอดภัย 6 หลักจากแอปพลิเคชัน Authenticator ของคุณ (เช่น Google Authenticator)
