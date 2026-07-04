@@ -758,8 +758,9 @@ export default function TenantPortal() {
             <CheckCircle2 className="w-16 h-16 text-teal-400 mx-auto animate-bounce" />
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-slate-100">ยอดชำระของคุณเสร็จเรียบร้อย!</h3>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                ขอบคุณสำหรับการชำระเงินรอบเดือนนี้อย่างตรงเวลา ทางแสนสุขแมนชั่นได้รับเงินโอนและบันทึกสิทธิ์เรียบร้อยแล้ว
+              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                ขอบคุณสำหรับการชำระเงินรอบเดือนนี้<br />
+                ทาง {workspaceName || "แสนสุขแมนชั่น"} ได้รับเงินโอนเรียบร้อยแล้ว
               </p>
             </div>
           </div>
