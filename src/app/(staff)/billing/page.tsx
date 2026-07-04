@@ -232,6 +232,7 @@ function UnifiedBillingContent() {
   const [otherServiceAmountManual, setOtherServiceAmountManual] = useState(0)
 
   const [savingAll, setSavingAll] = useState(false)
+  const [savingRows, setSavingRows] = useState<Record<string, boolean>>({})
   const [savingProgress, setSavingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
 
   const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
@@ -884,9 +885,7 @@ function UnifiedBillingContent() {
       penaltyAmount: sendPenaltyAmount,
       billAmount: sendBillAmount
     })
-    
-    setSavingAll(true)
-    setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
+    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
     
     try {
       const { updateBillPenalty } = await import("@/features/billing/actions")
@@ -917,7 +916,7 @@ function UnifiedBillingContent() {
       console.error("💥 [Client] Exception caught in handleSaveLateDays:", err)
       alert(`💥 เกิดข้อผิดพลาดร้ายแรงในการบันทึกค่าปรับ:\n${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setSavingAll(false)
+      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
       console.log("🏁 [Client] handleSaveLateDays finished execution flow")
     }
   }
@@ -1092,8 +1091,7 @@ function UnifiedBillingContent() {
     const otherServiceVal = Number(item.otherServiceAmount || 0)
     const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal + extraExpensesSum
 
-    setSavingAll(true)
-    setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
+    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
 
     try {
       // 1. บันทึกมิเตอร์ใน DB
@@ -1107,7 +1105,7 @@ function UnifiedBillingContent() {
       )
       if (!meterRes.success) {
         alert(meterRes.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์")
-        setSavingAll(false)
+        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
         return
       }
 
@@ -1116,7 +1114,7 @@ function UnifiedBillingContent() {
         showToast(`บันทึกข้อมูลมิเตอร์ห้อง ${roomNumber} สำเร็จ! (ไม่มีผู้เช่า จึงไม่ได้ออกบิล)`)
         const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
         updateLocalStateAndCache(roomNumber, formattedMeter, undefined)
-        setSavingAll(false)
+        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
         return
       }
 
@@ -1132,7 +1130,7 @@ function UnifiedBillingContent() {
       )
       if (!billRes.success) {
         alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
-        setSavingAll(false)
+        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
         return
       }
 
@@ -1144,7 +1142,7 @@ function UnifiedBillingContent() {
       console.error(err)
       alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
     } finally {
-      setSavingAll(false)
+      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
     }
   }
 
@@ -1691,6 +1689,16 @@ function UnifiedBillingContent() {
         </div>
       </div>
 
+      {/* สรุปสถิติด้านบนของแดชบอร์ด */}
+      <BillingSummaryStats
+        isDark={isDark}
+        billedCount={billedCount}
+        totalOccupied={totalOccupied}
+        paidCount={paidCount}
+        pendingCount={pendingCount}
+        unpaidCount={unpaidCount}
+      />
+
       {/* Tab Switcher */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 mt-8 mb-8">
         <button
@@ -1722,6 +1730,7 @@ function UnifiedBillingContent() {
         <MeterReadingTable
           isDark={isDark}
           loading={loading}
+          savingRows={savingRows}
           userPermissions={userPermissions}
           hasEditPermission={userPermissions.manage_meters_bills_edit}
           unifiedItems={unifiedItems}
@@ -1824,7 +1833,7 @@ function UnifiedBillingContent() {
                         </td>
 
                         {/* ค่าเช่าห้อง */}
-                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-350" : "text-slate-600"}`}>
+                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                           {item.tenantName ? `${item.baseRent.toLocaleString()}.-` : "-"}
                         </td>
 
@@ -1861,7 +1870,7 @@ function UnifiedBillingContent() {
                         </td>
 
                         {/* ค่าส่วนกลาง */}
-                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-350" : "text-slate-600"}`}>
+                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                           {item.tenantName ? `${commonFee.toLocaleString()}.-` : "-"}
                         </td>
 
@@ -1877,7 +1886,7 @@ function UnifiedBillingContent() {
                               </div>
                             </div>
                           ) : (
-                            <div className={`text-sm sm:text-base font-bold ${isDark ? "text-slate-650" : "text-slate-400"}`}>-</div>
+                            <div className={`text-sm sm:text-base font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>-</div>
                           )}
                         </td>
                       </tr>
@@ -1929,11 +1938,11 @@ function UnifiedBillingContent() {
                           {item.roomNumber}
                         </span>
                         {item.status === "occupied" ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                             มีผู้เช่า
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
                             ว่าง
                           </span>
                         )}
@@ -1941,11 +1950,11 @@ function UnifiedBillingContent() {
                       
                       {item.tenantName && (
                         <div className="text-right">
-                          <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</div>
+                          <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</div>
                           <div className="text-base font-black text-teal-600 dark:text-teal-400 font-mono">
                             {simplifiedTotal.toLocaleString()}.-
                           </div>
-                          <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
+                          <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
                             {`${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`}
                           </div>
                         </div>
@@ -1959,7 +1968,7 @@ function UnifiedBillingContent() {
                       <div className={`rounded-xl p-3 border ${
                         isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50/50 border-slate-100"
                       }`}>
-                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
+                        <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
                           <Home className="w-3 h-3 text-amber-500" /> ค่าเช่าห้อง
                         </div>
                         <div className={`text-sm font-black font-mono ${isDark ? "text-slate-200" : "text-slate-800"}`}>
@@ -1971,7 +1980,7 @@ function UnifiedBillingContent() {
                       <div className={`rounded-xl p-3 border ${
                         isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50/50 border-slate-100"
                       }`}>
-                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
+                        <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
                           <ShieldAlert className="w-3 h-3 text-indigo-500" /> ค่าส่วนกลาง
                         </div>
                         <div className={`text-sm font-black font-mono ${isDark ? "text-slate-200" : "text-slate-800"}`}>
@@ -1983,7 +1992,7 @@ function UnifiedBillingContent() {
                       <div className={`rounded-xl p-3 border ${
                         isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/30 border-blue-100"
                       }`}>
-                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                        <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
                           <Zap className="w-3 h-3" /> ไฟฟ้า (kWh)
                         </div>
                         {hasElecCurr ? (
@@ -1991,12 +2000,12 @@ function UnifiedBillingContent() {
                             <div className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
                               {elecCost.toLocaleString()}.-
                             </div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                            <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
                               {item.elecPrev} ➔ {item.elecCurr} ({elecUnitsUsed} หน่วย)
                             </div>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-slate-400 italic">ไม่มีข้อมูล</span>
+                          <span className="text-xs text-slate-400 italic">ไม่มีข้อมูล</span>
                         )}
                       </div>
 
@@ -2004,7 +2013,7 @@ function UnifiedBillingContent() {
                       <div className={`rounded-xl p-3 border ${
                         isDark ? "bg-teal-500/5 border-teal-500/10" : "bg-teal-50/30 border-teal-100"
                       }`}>
-                        <div className={`text-[10px] font-bold flex items-center gap-1 mb-1 ${isDark ? "text-teal-400" : "text-teal-655"}`}>
+                        <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
                           <Droplet className="w-3 h-3" /> น้ำประปา (m³)
                         </div>
                         {hasWaterCurr ? (
@@ -2012,12 +2021,12 @@ function UnifiedBillingContent() {
                             <div className="text-sm font-black text-teal-600 dark:text-teal-400 font-mono">
                               {waterCost.toLocaleString()}.-
                             </div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                            <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
                               {item.waterPrev} ➔ {item.waterCurr} ({waterUnitsUsed} หน่วย)
                             </div>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-slate-400 italic">ไม่มีข้อมูล</span>
+                          <span className="text-xs text-slate-400 italic">ไม่มีข้อมูล</span>
                         )}
                       </div>
                     </div>
