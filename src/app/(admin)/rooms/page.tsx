@@ -191,6 +191,7 @@ function RoomsContent() {
   
   // Unified Tenant Modals
   const [contractModalOpen, setContractModalOpen] = useState(false)
+  const [contractSuccess, setContractSuccess] = useState(false)
   const [tenantDetailModalOpen, setTenantDetailModalOpen] = useState(false)
   const [lineLinkModalOpen, setLineLinkModalOpen] = useState(false)
   const [lineDisconnectConfirmOpen, setLineDisconnectConfirmOpen] = useState(false)
@@ -887,6 +888,7 @@ function RoomsContent() {
     setSelectedRoom(room)
     setTenantNameInput("")
     setTenantPhoneInput("")
+    setContractSuccess(false)
     
     const today = new Date()
     const duration = financeSettings?.lease_duration ?? 6
@@ -924,36 +926,19 @@ function RoomsContent() {
       )
       
       if (res.success) {
-        showToast(`✓ ทำสัญญาห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว! ถัดไปคือแชร์ลิงก์ให้ผู้เช่าเชื่อมต่อกับ LINE`, "success")
-        setContractModalOpen(false)
+        showToast(`✓ ทำสัญญาห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว!`, "success")
         await loadData(true) // เคลียร์แคชและโหลดข้อมูลจริง
         
-        // ค้นหาข้อมูลห้องที่พึ่งอัปเดตเพื่อเปิด Modal เจนลิงก์ LINE ต่อให้แอดมินทันที
+        // อัปเดต selectedRoom ใน state ทันทีเพื่อให้แสดงผลใน Success View ได้ครบถ้วน
         const updatedRoom = rooms.find(r => r.roomNumber === selectedRoom.roomNumber)
-        if (updatedRoom) {
-          // หน่วงเวลาเปิดเพื่อความต่อเนื่องของ UI
-          setTimeout(() => {
-            setSelectedRoom({
-              ...updatedRoom,
-              tenantName: tenantNameInput,
-              tenantPhone: tenantPhoneInput,
-              tenantId: res.data.id
-            })
-            setLineLinkModalOpen(true)
-          }, 400)
-        } else {
-          // หากหาใน state ทันทีไม่เจอก็จำลองอ็อบเจกต์ขึ้นมา
-          setTimeout(() => {
-            setSelectedRoom({
-              ...selectedRoom,
-              tenantName: tenantNameInput,
-              tenantPhone: tenantPhoneInput,
-              tenantId: res.data.id,
-              status: "occupied"
-            })
-            setLineLinkModalOpen(true)
-          }, 400)
-        }
+        setSelectedRoom({
+          ...(updatedRoom || selectedRoom),
+          tenantName: tenantNameInput,
+          tenantPhone: tenantPhoneInput,
+          tenantId: res.data.id,
+          status: "occupied"
+        })
+        setContractSuccess(true)
       } else {
         showToast(res.error || "ทำสัญญาผู้เช่าไม่สำเร็จ", "error")
       }
@@ -2778,8 +2763,17 @@ function RoomsContent() {
               
               <div className="flex justify-between items-center shrink-0 relative z-10">
                 <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-blue-500" /> 
-                  ทำสัญญาเช่าห้อง {selectedRoom.roomNumber}
+                  {contractSuccess ? (
+                    <>
+                      <Share2 className="w-5 h-5 text-emerald-500" /> 
+                      เจนลิงก์ LINE (ห้อง {selectedRoom.roomNumber})
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-5 h-5 text-blue-500" /> 
+                      ทำสัญญาเช่าห้อง {selectedRoom.roomNumber}
+                    </>
+                  )}
                 </h3>
                 <button 
                   onClick={() => setContractModalOpen(false)}
@@ -2789,95 +2783,198 @@ function RoomsContent() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitContract} className="space-y-4.5 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
-                
-                {/* Room Info Preview */}
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-slate-700 dark:text-slate-300">ประเภท: {selectedRoom.roomTypeName}</span>
+              {contractSuccess ? (
+                <div className="space-y-4 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                  
+                  {/* Visual success/share note */}
+                  <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 text-xs text-emerald-900/90 dark:text-emerald-100/90 space-y-2 animate-in fade-in duration-300">
+                    <div className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      ทำสัญญาสำเร็จ! กรุณาส่งลิงก์นี้ให้ผู้เช่าเชื่อมโยง LINE
+                    </div>
+                    <p className="leading-relaxed text-emerald-800/80 dark:text-emerald-300/80">
+                      ลิงก์ LINE LIFF นี้ได้รับการล็อค Workspace ID และหมายเลขห้องพัก ({selectedRoom.roomNumber}) ไว้อย่างปลอดภัย ผู้เช่าสามารถเข้าลงทะเบียนด้วย LINE บนสมาร์ทโฟนเพื่อรับส่งบิลค่าน้ำค่าไฟได้ทันที
+                    </p>
                   </div>
-                  <div className="font-extrabold text-slate-850 dark:text-slate-200">
-                    อัตราค่าเช่า: {selectedRoom.baseRent.toLocaleString()} บาท/เดือน
+
+                  {/* Tenant Details Preview */}
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/60 px-4 py-1.5 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-400">ชื่อผู้เช่า:</span> 
+                      <span className="font-extrabold text-slate-850 dark:text-slate-200">
+                        {selectedRoom.tenantName || tenantNameInput}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-400">เบอร์โทรศัพท์:</span> 
+                      <span className="font-mono font-bold text-slate-850 dark:text-slate-200">
+                        {selectedRoom.tenantPhone || tenantPhoneInput}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-400">หมายเลขห้อง:</span> 
+                      <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-t border-slate-100/50 dark:border-slate-800/50">
+                      <span className="text-slate-400">อัตราค่าเช่าห้อง:</span> 
+                      <span className="font-bold text-slate-850 dark:text-slate-200">{(selectedRoom.baseRent || 0).toLocaleString()} บาท/เดือน</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-400">เงินประกัน (มัดจำ):</span> 
+                      <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
+                        {financeSettings ? (
+                          financeSettings.deposit_type === "fixed" ? (
+                            (() => {
+                              const roomTypeDeposit = selectedRoom.roomTypeId ? roomTypeDeposits[selectedRoom.roomTypeId] : undefined
+                              const amount = roomTypeDeposit !== undefined ? roomTypeDeposit : (financeSettings.deposit_amount || 0)
+                              return `${amount.toLocaleString()} บาท (คงที่ตามประเภทห้อง)`
+                            })()
+                          ) : (
+                            `${financeSettings.deposit_amount || 0} เดือน (${((selectedRoom.baseRent || 0) * (financeSettings.deposit_amount || 0)).toLocaleString()} บาท)`
+                          )
+                        ) : "กำลังโหลด..."}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-400">ค่าเช่าล่วงหน้า:</span> 
+                      <span className="font-extrabold text-blue-600 dark:text-blue-400">
+                        {financeSettings ? `${financeSettings.advance_rent || 0} เดือน` : "กำลังโหลด..."}{" "}
+                        {financeSettings && `(${((selectedRoom.baseRent || 0) * (financeSettings.advance_rent || 0)).toLocaleString()} บาท)`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Pre-filled Link Section */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">ลิงก์ลงทะเบียน LINE LIFF สำหรับแชร์</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        className="flex-1 h-11 px-3.5 bg-slate-100 dark:bg-slate-950 border border-slate-250 dark:border-slate-900 rounded-xl text-slate-500 text-[11px] select-all focus:outline-none font-mono"
+                        value={getLiffRegistrationLink(selectedRoom.roomNumber)}
+                      />
+                      <button
+                        onClick={() => handleCopyLinkToClipboard(selectedRoom.roomNumber)}
+                        className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer shrink-0"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        คัดลอกลิงก์
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Instruction steps */}
+                  <div className="pt-2 text-[11px] text-slate-500 space-y-2">
+                    <div className="font-bold text-slate-700 dark:text-slate-300">💡 วิธีการแชร์และใช้งาน:</div>
+                    <ul className="list-decimal pl-4 space-y-1.5 leading-relaxed">
+                      <li>กดปุ่ม <strong className="text-slate-700 dark:text-slate-200">คัดลอกลิงก์</strong> ด้านบน</li>
+                      <li>ส่งลิงก์นี้ไปทาง LINE หรือช่องทางแชทให้กับผู้เช่าโดยตรง</li>
+                      <li>ผู้เช่ากดลิงก์บนมือถือ จะเปิดหน้าจอ LINE LIFF เพื่อกรอกข้อมูลผู้เช่าและกดยืนยันตัวตน UID เพื่อเสร็จสิ้น</li>
+                    </ul>
+                  </div>
+
+                  {/* Done Button */}
+                  <div className="pt-3 flex">
+                    <button
+                      onClick={() => setContractModalOpen(false)}
+                      className="flex-1 h-12 md:h-10 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs rounded-xl active:scale-95 transition-all cursor-pointer"
+                    >
+                      ปิดหน้าต่างเสร็จสิ้น
+                    </button>
                   </div>
                 </div>
+              ) : (
+                <form onSubmit={handleSubmitContract} className="space-y-4.5 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                  
+                  {/* Room Info Preview */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-slate-700 dark:text-slate-300">ประเภท: {selectedRoom.roomTypeName}</span>
+                    </div>
+                    <div className="font-extrabold text-slate-850 dark:text-slate-200">
+                      อัตราค่าเช่า: {selectedRoom.baseRent.toLocaleString()} บาท/เดือน
+                    </div>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ชื่อ-นามสกุล ผู้เช่า</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="ระบุชื่อ-นามสกุลจริงของผู้เช่า..."
-                    className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
-                    value={tenantNameInput}
-                    onChange={(e) => setTenantNameInput(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">เบอร์โทรศัพท์มือถือ</label>
-                  <input
-                    type="tel"
-                    required
-                    maxLength={10}
-                    placeholder="เช่น 0891234567..."
-                    className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-bold font-mono"
-                    value={tenantPhoneInput}
-                    onChange={(e) => setTenantPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3.5">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">วันเริ่มสัญญา</label>
+                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ชื่อ-นามสกุล ผู้เช่า</label>
                     <input
-                      type="date"
+                      type="text"
                       required
-                      className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-colors cursor-pointer"
-                      value={contractStartInput}
-                      onChange={(e) => handleContractStartChange(e.target.value)}
+                      placeholder="ระบุชื่อ-นามสกุลจริงของผู้เช่า..."
+                      className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-medium"
+                      value={tenantNameInput}
+                      onChange={(e) => setTenantNameInput(e.target.value)}
                     />
                   </div>
+
                   <div className="space-y-1.5">
-                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">วันสิ้นสุดสัญญา</label>
+                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">เบอร์โทรศัพท์มือถือ</label>
                     <input
-                      type="date"
+                      type="tel"
                       required
-                      className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-colors cursor-pointer"
-                      value={contractEndInput}
-                      onChange={(e) => setContractEndInput(e.target.value)}
+                      maxLength={10}
+                      placeholder="เช่น 0891234567..."
+                      className="w-full h-12 md:h-10 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors placeholder-slate-400 font-bold font-mono"
+                      value={tenantPhoneInput}
+                      onChange={(e) => setTenantPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
                     />
                   </div>
-                </div>
 
-                {/* Info Note */}
-                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-semibold flex items-start gap-1.5 leading-normal bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
-                  <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    เมื่อบันทึกข้อมูลแล้ว สัญญาจะเริ่มทำงานทันที โดยระบบจะสร้าง URL Dynamic Pre-filled เพื่อแชร์ให้ผู้เช่าเชื่อมโยง UID และสิทธิ์รับบิลตรงผ่าน LINE
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">วันเริ่มสัญญา</label>
+                      <input
+                        type="date"
+                        required
+                        className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-colors cursor-pointer"
+                        value={contractStartInput}
+                        onChange={(e) => handleContractStartChange(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">วันสิ้นสุดสัญญา</label>
+                      <input
+                        type="date"
+                        required
+                        className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-colors cursor-pointer"
+                        value={contractEndInput}
+                        onChange={(e) => setContractEndInput(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Info Note */}
+                  <span className="text-[10px] text-blue-500 dark:text-blue-400 font-semibold flex items-start gap-1.5 leading-normal bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>
+                      เมื่อบันทึกข้อมูลแล้ว สัญญาจะเริ่มทำงานทันที โดยระบบจะสร้าง URL Dynamic Pre-filled เพื่อแชร์ให้ผู้เช่าเชื่อมโยง UID และสิทธิ์รับบิลตรงผ่าน LINE
+                    </span>
                   </span>
-                </span>
 
-                {/* Submit / Cancel Buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 pt-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setContractModalOpen(false)}
-                    disabled={contractSubmitting}
-                    className="order-2 sm:order-1 w-full sm:flex-1 h-11 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer"
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={contractSubmitting}
-                    className="order-1 sm:order-2 w-full sm:flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow shadow-blue-600/10 transition-all duration-150 active:scale-95 cursor-pointer"
-                  >
-                    {contractSubmitting ? (
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : "สร้างสัญญาและเชื่อมต่อ LINE"}
-                  </button>
-                </div>
-              </form>
+                  {/* Submit / Cancel Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setContractModalOpen(false)}
+                      disabled={contractSubmitting}
+                      className="order-2 sm:order-1 w-full sm:flex-1 h-11 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={contractSubmitting}
+                      className="order-1 sm:order-2 w-full sm:flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow shadow-blue-600/10 transition-all duration-150 active:scale-95 cursor-pointer"
+                    >
+                      {contractSubmitting ? (
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : "สร้างสัญญาและเชื่อมต่อ LINE"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}
@@ -2908,22 +3005,22 @@ function RoomsContent() {
                 
                 {/* Visual success/share note */}
                 {selectedRoom.tenantName ? (
-                  <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                  <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 text-xs text-emerald-900/90 dark:text-emerald-100/90 space-y-2">
                     <div className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
                       ทำสัญญาสำเร็จ! กรุณาส่งลิงก์นี้ให้ผู้เช่าเชื่อมโยง LINE
                     </div>
-                    <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                    <p className="leading-relaxed text-emerald-800/80 dark:text-emerald-300/80">
                       ลิงก์ LINE LIFF นี้ได้รับการล็อค Workspace ID และหมายเลขห้องพัก ({selectedRoom.roomNumber}) ไว้อย่างปลอดภัย ผู้เช่าสามารถเข้าลงทะเบียนด้วย LINE บนสมาร์ทโฟนเพื่อรับส่งบิลค่าน้ำค่าไฟได้ทันที
                     </p>
                   </div>
                 ) : (
-                  <div className="p-4 rounded-2xl bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/10 dark:border-blue-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                  <div className="p-4 rounded-2xl bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/10 dark:border-blue-500/20 text-xs text-blue-950/90 dark:text-blue-100/90 space-y-2">
                     <div className="font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
                       <Share2 className="w-4 h-4 shrink-0" />
                       แชร์ลิงก์ให้ผู้เช่าลงทะเบียน (ห้องว่าง)
                     </div>
-                    <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                    <p className="leading-relaxed text-blue-800/80 dark:text-blue-300/80">
                       แชร์ลิงก์ LINE LIFF นี้ให้กับผู้เช่าคนใหม่ ผู้เช่าจะสามารถกรอกชื่อ-นามสกุล และเบอร์โทรศัพท์มือถือผ่านสมาร์ทโฟนของตนเอง เพื่อผูกบัญชีและลงทะเบียนผู้เช่าระบบอพาร์ทเมนท์เข้ากับห้อง {selectedRoom.roomNumber} ได้โดยตรงทันที
                     </p>
                   </div>
