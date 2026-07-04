@@ -1648,10 +1648,10 @@ function UnifiedBillingContent() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <Gauge className="w-6 h-6 text-blue-500" />
-            <h2 className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดมิเตอร์ และดูบิล</h2>
+            <Gauge className="w-6 h-6 xl:w-7 xl:h-7 2xl:w-8 2xl:h-8 text-blue-500" />
+            <h2 className={`text-2xl xl:text-3xl 2xl:text-4xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จดมิเตอร์ และดูบิล</h2>
           </div>
-          <p className={`text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          <p className={`text-sm xl:text-base 2xl:text-lg mt-1.5 xl:mt-2 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             ระบบบันทึกจดเลขมิเตอร์ไฟฟ้า มิเตอร์น้ำประปา และตรวจสอบสรุปยอดบิลอย่างง่ายประจำหอพัก
           </p>
         </div>
@@ -1659,8 +1659,8 @@ function UnifiedBillingContent() {
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className={`w-full md:w-auto h-11 px-4 border rounded-xl focus:outline-none focus:border-blue-500 text-sm font-bold transition-all cursor-pointer ${
-              isDark ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-300 text-slate-800"
+            className={`w-full md:w-auto h-11 px-4 xl:h-12 xl:px-5 2xl:h-14 2xl:px-6 border rounded-xl focus:outline-none focus:border-blue-500 text-sm xl:text-base 2xl:text-lg font-bold transition-all cursor-pointer ${
+              isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-850" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-50"
             }`}
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
@@ -1686,24 +1686,24 @@ function UnifiedBillingContent() {
       <div className="flex border-b border-slate-200 dark:border-slate-800 mt-8 mb-8">
         <button
           onClick={() => setPageActiveTab("meters")}
-          className={`px-6 py-3.5 font-bold text-sm md:text-base transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2.5 ${
+          className={`px-6 py-3.5 xl:px-8 xl:py-4 2xl:px-10 2xl:py-5 font-bold text-sm md:text-base xl:text-lg 2xl:text-xl transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2.5 ${
             pageActiveTab === "meters"
               ? "border-blue-500 text-blue-600 dark:text-blue-400 font-black"
               : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
           }`}
         >
-          <Gauge className="w-5 h-5 text-blue-500" />
+          <Gauge className="w-5 h-5 xl:w-6 xl:h-6 2xl:w-7 2xl:h-7 text-blue-500" />
           <span>จดเลขมิเตอร์</span>
         </button>
         <button
           onClick={() => setPageActiveTab("summary")}
-          className={`px-6 py-3.5 font-bold text-sm md:text-base transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2.5 ${
+          className={`px-6 py-3.5 xl:px-8 xl:py-4 2xl:px-10 2xl:py-5 font-bold text-sm md:text-base xl:text-lg 2xl:text-xl transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2.5 ${
             pageActiveTab === "summary"
               ? "border-teal-500 text-teal-600 dark:text-teal-400 font-black"
               : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
           }`}
         >
-          <FileText className="w-5 h-5 text-teal-500" />
+          <FileText className="w-5 h-5 xl:w-6 xl:h-6 2xl:w-7 2xl:h-7 text-teal-500" />
           <span>สรุปบิล</span>
         </button>
       </div>
@@ -1761,14 +1761,14 @@ function UnifiedBillingContent() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm sm:text-base border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold bg-slate-50/50 dark:bg-slate-900/10 text-xs sm:text-sm">
-                  <th className="py-3.5 pl-3 w-20">เลขห้อง</th>
-                  <th className="py-3.5 text-center w-28">สถานะห้อง</th>
-                  <th className="py-3.5 text-right w-28">ค่าเช่าห้อง</th>
-                  <th className="py-3.5 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า</th>
-                  <th className="py-3.5 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ</th>
-                  <th className="py-3.5 text-right w-28">ค่าส่วนกลาง</th>
-                  <th className="py-3.5 text-right pr-4 w-44 font-bold">ยอดบิลรวม</th>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold bg-slate-50/50 dark:bg-slate-900/10 text-xs sm:text-sm xl:text-base 2xl:text-lg">
+                  <th className="py-3.5 xl:py-4 2xl:py-5 pl-3 xl:pl-4 2xl:pl-5 w-20 xl:w-24 2xl:w-28">เลขห้อง</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center w-28 xl:w-32 2xl:w-36">สถานะห้อง</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right w-28 xl:w-32 2xl:w-36">ค่าเช่าห้อง</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 xl:w-52 2xl:w-60 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 xl:w-52 2xl:w-60 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right w-28 xl:w-32 2xl:w-36">ค่าส่วนกลาง</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right pr-4 xl:pr-5 2xl:pr-6 w-44 xl:w-52 2xl:w-60 font-bold">ยอดบิลรวม</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -1776,8 +1776,8 @@ function UnifiedBillingContent() {
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3">
-                        <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
-                        <span>กำลังโหลดข้อมูลรวม...</span>
+                        <RefreshCw className="w-6 h-6 xl:w-7 xl:h-7 2xl:w-8 2xl:h-8 text-blue-500 animate-spin" />
+                        <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg">กำลังโหลดข้อมูลรวม...</span>
                       </div>
                     </td>
                   </tr>
@@ -1799,76 +1799,76 @@ function UnifiedBillingContent() {
 
                     return (
                       <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
-                        <td className={`py-4 pl-3 font-black text-sm sm:text-base ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
+                        <td className={`py-4 xl:py-5 2xl:py-6 pl-3 xl:pl-4 2xl:pl-5 font-black text-sm sm:text-base xl:text-lg 2xl:text-xl ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
                         
                         {/* สถานะห้อง */}
-                        <td className="py-4 text-center">
+                        <td className="py-4 xl:py-5 2xl:py-6 text-center">
                           {item.status === "occupied" ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs sm:text-sm font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center px-2.5 py-1 xl:px-3.5 xl:py-1.5 2xl:px-4 2xl:py-2 rounded-full text-xs sm:text-sm xl:text-base 2xl:text-lg font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                               มีผู้เช่า
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs sm:text-sm font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
+                            <span className="inline-flex items-center px-2.5 py-1 xl:px-3.5 xl:py-1.5 2xl:px-4 2xl:py-2 rounded-full text-xs sm:text-sm xl:text-base 2xl:text-lg font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
                               ว่าง
                             </span>
                           )}
                         </td>
 
                         {/* ค่าเช่าห้อง */}
-                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                        <td className={`py-4 xl:py-5 2xl:py-6 text-right font-mono text-sm sm:text-base xl:text-lg 2xl:text-xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                           {item.tenantName ? `${item.baseRent.toLocaleString()}.-` : "-"}
                         </td>
 
                         {/* มิเตอร์ไฟฟ้า */}
-                        <td className="py-4 text-center bg-blue-50/10 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-3">
+                        <td className="py-4 xl:py-5 2xl:py-6 text-center bg-blue-50/10 dark:bg-blue-500/5 border-l border-slate-200 dark:border-slate-800/40 px-3 xl:px-4 2xl:px-5">
                           {hasElecCurr ? (
                             <div className="flex flex-col items-center justify-center">
-                              <div className="text-sm sm:text-base font-black text-blue-600 dark:text-blue-400 font-mono">
+                              <div className="text-sm sm:text-base xl:text-lg 2xl:text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
                                 {elecCost.toLocaleString()}.-
                               </div>
-                              <div className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                              <div className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 font-semibold mt-0.5 xl:mt-1">
                                 {item.elecPrev} ➔ {item.elecCurr} (ใช้ไป {elecUnitsUsed} หน่วย)
                               </div>
                             </div>
                           ) : (
-                            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
+                            <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
                           )}
                         </td>
 
                         {/* มิเตอร์น้ำ */}
-                        <td className="py-4 text-center bg-teal-50/10 dark:bg-teal-500/5 border-l border-r border-slate-200 dark:border-slate-800/40 px-3">
+                        <td className="py-4 xl:py-5 2xl:py-6 text-center bg-teal-50/10 dark:bg-teal-500/5 border-l border-r border-slate-200 dark:border-slate-800/40 px-3 xl:px-4 2xl:px-5">
                           {hasWaterCurr ? (
                             <div className="flex flex-col items-center justify-center">
-                              <div className="text-sm sm:text-base font-black text-teal-600 dark:text-teal-400 font-mono">
+                              <div className="text-sm sm:text-base xl:text-lg 2xl:text-xl font-black text-teal-600 dark:text-teal-400 font-mono">
                                 {waterCost.toLocaleString()}.-
                               </div>
-                              <div className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                              <div className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 font-semibold mt-0.5 xl:mt-1">
                                 {item.waterPrev} ➔ {item.waterCurr} (ใช้ไป {waterUnitsUsed} หน่วย)
                               </div>
                             </div>
                           ) : (
-                            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
+                            <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
                           )}
                         </td>
 
                         {/* ค่าส่วนกลาง */}
-                        <td className={`py-4 text-right font-mono text-sm sm:text-base ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                        <td className={`py-4 xl:py-5 2xl:py-6 text-right font-mono text-sm sm:text-base xl:text-lg 2xl:text-xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                           {item.tenantName ? `${commonFee.toLocaleString()}.-` : "-"}
                         </td>
 
                         {/* ยอดบิลรวม */}
-                        <td className="py-4 text-right pr-4 font-mono">
+                        <td className="py-4 xl:py-5 2xl:py-6 text-right pr-4 xl:pr-5 2xl:pr-6 font-mono">
                           {item.tenantName ? (
                             <div className="flex flex-col items-end">
-                              <div className={`text-sm sm:text-base font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                              <div className={`text-sm sm:text-base xl:text-lg 2xl:text-xl font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
                                 {simplifiedTotal.toLocaleString()}.-
                               </div>
-                              <div className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">
+                              <div className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500">
                                 {`${item.baseRent.toLocaleString()} + ${elecCost.toLocaleString()} + ${waterCost.toLocaleString()} + ${commonFee.toLocaleString()}`}
                               </div>
                             </div>
                           ) : (
-                            <div className={`text-sm sm:text-base font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>-</div>
+                            <div className={`text-sm sm:text-base xl:text-lg 2xl:text-xl font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>-</div>
                           )}
                         </td>
                       </tr>

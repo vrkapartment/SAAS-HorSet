@@ -1378,46 +1378,46 @@ export default function MeterReadingTable({
 
         {/* Desktop View: Standard Dense Table (>= 768px) */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs xl:text-sm 2xl:text-base border-collapse">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-500 dark:text-slate-450 uppercase tracking-wider bg-transparent">
-                <th className="py-3.5 pl-3 w-16">ห้อง</th>
+              <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] xl:text-xs 2xl:text-sm font-semibold text-slate-500 dark:text-slate-450 uppercase tracking-wider bg-transparent">
+                <th className="py-3.5 pl-3 w-16 xl:w-20 2xl:w-24">ห้อง</th>
                 {mode === "meters" ? (
-                  <th className="py-3.5 w-40">สถานะห้อง</th>
+                  <th className="py-3.5 w-40 xl:w-48 2xl:w-56">สถานะห้อง</th>
                 ) : (
-                  <th className="py-3.5 w-40">ผู้เช่า / ค่าเช่า</th>
+                  <th className="py-3.5 w-40 xl:w-48 2xl:w-56">ผู้เช่า / ค่าเช่า</th>
                 )}
                 
                 {/* 1. แถบจัดการบิล */}
                 {activeTab === "all" && (
                   <>
-                    <th className="py-3.5 text-center w-44 text-slate-500 dark:text-slate-450">มิเตอร์ไฟฟ้า (kWh)</th>
-                    <th className="py-3.5 text-center w-44 text-slate-500 dark:text-slate-450">มิเตอร์น้ำ (m³)</th>
-                    <th className="py-3.5 text-center w-36 text-slate-500 dark:text-slate-450">ค่าบริการอื่น ๆ (บาท)</th>
-                    <th className="py-3.5 text-center w-36 text-slate-500 dark:text-slate-450">ปรับล่าช้า (วัน)</th>
-                    <th className="py-3.5 text-right pr-4 w-32">ยอดรวมบิล</th>
-                    <th className="py-3.5 text-center w-28">สถานะ</th>
-                    <th className="py-3.5 text-center w-52 pr-2">การจัดการบิล</th>
+                    <th className="py-3.5 text-center w-44 xl:w-52 2xl:w-60 text-slate-500 dark:text-slate-450">มิเตอร์ไฟฟ้า (kWh)</th>
+                    <th className="py-3.5 text-center w-44 xl:w-52 2xl:w-60 text-slate-500 dark:text-slate-450">มิเตอร์น้ำ (m³)</th>
+                    <th className="py-3.5 text-center w-36 xl:w-44 2xl:w-48 text-slate-500 dark:text-slate-450">ค่าบริการอื่น ๆ (บาท)</th>
+                    <th className="py-3.5 text-center w-36 xl:w-44 2xl:w-48 text-slate-500 dark:text-slate-450">ปรับล่าช้า (วัน)</th>
+                    <th className="py-3.5 text-right pr-4 w-32 xl:w-36 2xl:w-40">ยอดรวมบิล</th>
+                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36">สถานะ</th>
+                    <th className="py-3.5 text-center w-52 xl:w-60 2xl:w-68 pr-2">การจัดการบิล</th>
                   </>
                 )}
 
                 {/* 2. แถบมิเตอร์ไฟ */}
                 {activeTab === "electric" && (
                   <>
-                    <th className="py-3.5 text-center w-32 text-slate-500 dark:text-slate-450">ไฟก่อนหน้า</th>
-                    <th className="py-3.5 text-center w-36 text-slate-500 dark:text-slate-450">ไฟรอบนี้</th>
-                    <th className="py-3.5 text-center w-28 text-slate-500 dark:text-slate-450">หน่วย/ยอดไฟ</th>
-                    <th className="py-3.5 text-center w-40 pr-2">บันทึกข้อมูล</th>
+                    <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">ไฟก่อนหน้า</th>
+                    <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">ไฟรอบนี้</th>
+                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">หน่วย/ยอดไฟ</th>
+                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">บันทึกข้อมูล</th>
                   </>
                 )}
 
                 {/* 3. แถบมิเตอร์น้ำ */}
                 {activeTab === "water" && (
                   <>
-                    <th className="py-3.5 text-center w-32 text-slate-500 dark:text-slate-450">น้ำก่อนหน้า</th>
-                    <th className="py-3.5 text-center w-36 text-slate-500 dark:text-slate-450">น้ำรอบนี้</th>
-                    <th className="py-3.5 text-center w-28 text-slate-500 dark:text-slate-450">หน่วย/ยอดน้ำ</th>
-                    <th className="py-3.5 text-center w-40 pr-2">บันทึกข้อมูล</th>
+                    <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">น้ำก่อนหน้า</th>
+                    <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">น้ำรอบนี้</th>
+                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">หน่วย/ยอดน้ำ</th>
+                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">บันทึกข้อมูล</th>
                   </>
                 )}
               </tr>
@@ -1464,36 +1464,36 @@ export default function MeterReadingTable({
                   return (
                     <tr key={item.roomNumber} className={`transition-colors border-b border-slate-100 dark:border-slate-800/60 ${isDark ? "hover:bg-slate-900/10" : "hover:bg-slate-50/50"}`}>
                       {/* ห้อง */}
-                      <td className={`py-4 pl-3 font-semibold text-sm ${isDark ? "text-slate-200" : "text-slate-700"}`}>{item.roomNumber}</td>
+                      <td className={`py-4 pl-3 font-semibold text-sm xl:text-base 2xl:text-lg ${isDark ? "text-slate-200" : "text-slate-700"}`}>{item.roomNumber}</td>
                       
                       {/* ผู้เช่า / ค่าเช่าห้อง หรือ สถานะห้อง */}
                       <td className="py-4">
                         {mode === "meters" ? (
                           item.status === "occupied" ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] xl:text-xs 2xl:text-sm font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
                               มีผู้เช่า
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] xl:text-xs 2xl:text-sm font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400">
                               ว่าง
                             </span>
                           )
                         ) : (
                           <>
-                            <div className={`font-medium text-sm truncate max-w-[160px] ${isDark ? "text-slate-200" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
+                            <div className={`font-medium text-sm xl:text-base 2xl:text-lg truncate max-w-[160px] xl:max-w-[200px] 2xl:max-w-[240px] ${isDark ? "text-slate-200" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
                               {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
                             </div>
-                            <div className={`text-xs mt-0.5 font-mono ${isDark ? "text-slate-450" : "text-slate-500"}`}>
+                            <div className={`text-xs xl:text-sm 2xl:text-base mt-0.5 font-mono ${isDark ? "text-slate-450" : "text-slate-500"}`}>
                               {item.tenantName ? (
                                 <>
                                   ค่าเช่า {item.baseRent.toLocaleString()}.-
                                   {extraExpenses.map((exp: any, index: number) => (
-                                    <div key={index} className="text-[10px] text-slate-500 dark:text-slate-440 font-medium mt-0.5">
+                                    <div key={index} className="text-[10px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-440 font-medium mt-0.5">
                                       {exp.name} +{Number(exp.amount || 0).toLocaleString()}.-
                                     </div>
                                   ))}
                                   {Number(item.otherServiceAmount || 0) > 0 && (
-                                    <div className="text-[10px] text-slate-500 dark:text-slate-440 font-medium mt-0.5">
+                                    <div className="text-[10px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-440 font-medium mt-0.5">
                                       ค่าบริการอื่นๆ +{Number(item.otherServiceAmount).toLocaleString()}.-
                                     </div>
                                   )}
@@ -1509,14 +1509,14 @@ export default function MeterReadingTable({
                         <>
                           {/* มิเตอร์ไฟฟ้า (kWh) - อ่านอย่างเดียว */}
                           <td className="py-4 text-center px-3">
-                            <div className="font-mono text-xs sm:text-sm font-medium">
+                            <div className="font-mono text-xs sm:text-sm xl:text-base 2xl:text-lg font-medium">
                               <span className={isDark ? "text-slate-500" : "text-slate-400"}>{item.elecPrev}</span>
                               <span className="mx-1.5 text-slate-300 dark:text-slate-700">→</span>
                               <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{item.elecCurr || "-"}</span>
                             </div>
                             <div className="mt-1">
                               {hasElecCurr ? (
-                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] xl:text-xs 2xl:text-sm font-medium ${
                                   elecUnitsUsed < 0 
                                     ? "bg-rose-500/10 text-rose-600 dark:text-rose-450" 
                                     : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400"
@@ -1524,21 +1524,21 @@ export default function MeterReadingTable({
                                   {elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
                                 </span>
                               ) : (
-                                <span className="text-[10px] text-slate-400 dark:text-slate-500 italic font-medium">รอจดในแถบไฟ</span>
+                                <span className="text-[10px] xl:text-xs 2xl:text-sm text-slate-400 dark:text-slate-500 italic font-medium">รอจดในแถบไฟ</span>
                               )}
                             </div>
                           </td>
 
                           {/* มิเตอร์น้ำ (m³) - อ่านอย่างเดียว */}
                           <td className="py-4 text-center px-3">
-                            <div className="font-mono text-xs sm:text-sm font-medium">
+                            <div className="font-mono text-xs sm:text-sm xl:text-base 2xl:text-lg font-medium">
                               <span className={isDark ? "text-slate-500" : "text-slate-400"}>{item.waterPrev}</span>
                               <span className="mx-1.5 text-slate-300 dark:text-slate-700">→</span>
                               <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{item.waterCurr || "-"}</span>
                             </div>
                             <div className="mt-1">
                               {hasWaterCurr ? (
-                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] xl:text-xs 2xl:text-sm font-medium ${
                                   waterUnitsUsed < 0 
                                     ? "bg-rose-500/10 text-rose-600 dark:text-rose-450" 
                                     : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
@@ -1546,7 +1546,7 @@ export default function MeterReadingTable({
                                   {waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
                                 </span>
                               ) : (
-                                <span className="text-[10px] text-slate-400 dark:text-slate-500 italic font-medium">รอจดในแถบน้ำ</span>
+                                <span className="text-[10px] xl:text-xs 2xl:text-sm text-slate-400 dark:text-slate-500 italic font-medium">รอจดในแถบน้ำ</span>
                               )}
                             </div>
                           </td>
@@ -1560,16 +1560,16 @@ export default function MeterReadingTable({
                                   inputMode="numeric"
                                   placeholder="0"
                                   disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                                  className={`w-20 text-right px-2 py-1 border rounded font-mono text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                                  className={`w-20 xl:w-24 2xl:w-28 text-right px-2 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                     isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                   }`}
                                   value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
                                   onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
                                 />
-                                <span className={`text-[11px] font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>บาท</span>
+                                <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>บาท</span>
                               </div>
                             ) : (
-                              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">-</span>
+                              <span className="text-xs xl:text-sm 2xl:text-base text-slate-400 dark:text-slate-500 font-medium">-</span>
                             )}
                           </td>
 
@@ -1583,22 +1583,22 @@ export default function MeterReadingTable({
                                     inputMode="numeric"
                                     placeholder="0"
                                     disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                                    className={`w-14 text-center px-1.5 py-1 border rounded font-mono text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                                    className={`w-14 xl:w-16 2xl:w-20 text-center px-1.5 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                       isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                     }`}
                                     value={item.lateDays !== undefined ? item.lateDays : 0}
                                     onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
                                   />
-                                  <span className={`text-[11px] font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>วัน</span>
+                                  <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>วัน</span>
                                 </div>
                                 {latePenaltyRate > 0 && (
-                                  <span className={`text-[10px] mt-1 font-medium ${isDark ? "text-rose-400" : "text-rose-600"}`} title={`ค่าปรับวันละ ${latePenaltyRate} บาท`}>
+                                  <span className={`text-[10px] xl:text-xs 2xl:text-sm mt-1 font-medium ${isDark ? "text-rose-400" : "text-rose-600"}`} title={`ค่าปรับวันละ ${latePenaltyRate} บาท`}>
                                     +{((item.lateDays || 0) * latePenaltyRate).toLocaleString()}.-
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">-</span>
+                              <span className="text-xs xl:text-sm 2xl:text-base text-slate-400 dark:text-slate-500 font-medium">-</span>
                             )}
                           </td>
 
@@ -1608,15 +1608,15 @@ export default function MeterReadingTable({
                               item.billStatus !== "not_created" ? (
                                 <div className="flex flex-col items-end">
                                   <div className="flex items-center gap-1 justify-end">
-                                    <span className={`font-mono text-sm font-semibold ${
+                                    <span className={`font-mono text-sm xl:text-base 2xl:text-lg font-semibold ${
                                       isDark ? "text-slate-100" : "text-slate-800"
                                     }`}>
                                       {Number(item.billAmount !== undefined ? item.billAmount : 0).toLocaleString()}
                                     </span>
-                                    <span className={`text-[11px] font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>บาท</span>
+                                    <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>บาท</span>
                                   </div>
                                   {isModified && (
-                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium mt-1 bg-amber-500/10 border border-amber-500/20 ${
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] xl:text-xs 2xl:text-sm font-medium mt-1 bg-amber-500/10 border border-amber-500/20 ${
                                       isDark ? "text-amber-400" : "text-amber-600"
                                     }`}>
                                       ยอดเงินเปลี่ยน
@@ -1625,10 +1625,10 @@ export default function MeterReadingTable({
                                 </div>
                               ) : (
                                 <div className="flex flex-col items-end">
-                                  <div className={`text-sm font-semibold ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                                  <div className={`text-sm xl:text-base 2xl:text-lg font-semibold ${isDark ? "text-slate-100" : "text-slate-800"}`}>
                                     {displayedTotal.toLocaleString()}.-
                                   </div>
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium mt-1 bg-slate-500/10 border border-slate-500/20 ${
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] xl:text-xs 2xl:text-sm font-medium mt-1 bg-slate-500/10 border border-slate-500/20 ${
                                     isDark ? "text-slate-450" : "text-slate-500"
                                   }`}>
                                     รอสร้างบิล
@@ -1636,7 +1636,7 @@ export default function MeterReadingTable({
                                 </div>
                               )
                             ) : (
-                              <div className={`text-sm font-medium ${isDark ? "text-slate-600" : "text-slate-400"}`}>
+                              <div className={`text-sm xl:text-base 2xl:text-lg font-medium ${isDark ? "text-slate-600" : "text-slate-400"}`}>
                                 -
                               </div>
                             )}
@@ -1651,7 +1651,7 @@ export default function MeterReadingTable({
                                   setSlipModalOpen(true)
                                 }
                               }}
-                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] xl:text-xs 2xl:text-sm font-medium border ${
                                 item.billStatus === "pending" ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors" : ""
                               } ${
                                 !item.tenantName ? (isDark ? "bg-slate-800/40 text-slate-500 border-slate-700/30" : "bg-slate-100 text-slate-400 border-slate-200") :
@@ -1681,7 +1681,7 @@ export default function MeterReadingTable({
                                     }
                                   }}
                                   disabled={savingRows?.[item.roomNumber]}
-                                  className={`px-2.5 py-1 border rounded text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+                                  className={`px-2.5 py-1 xl:py-1.5 border rounded text-xs xl:text-sm 2xl:text-base font-medium transition-colors flex items-center gap-1 xl:gap-1.5 cursor-pointer ${
                                     savingRows?.[item.roomNumber]
                                       ? (isDark ? "border-slate-800/80 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                       : (isDark
@@ -1691,9 +1691,9 @@ export default function MeterReadingTable({
                                   title="บันทึกจำนวนวันปรับล่าช้าลงระบบ"
                                 >
                                   {savingRows?.[item.roomNumber] ? (
-                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
                                   ) : (
-                                    <Save className="w-3.5 h-3.5" />
+                                    <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                   )}
                                   <span>
                                     {savingRows?.[item.roomNumber] ? "กำลังบันทึก" : "บันทึกบิล"}
@@ -1705,11 +1705,11 @@ export default function MeterReadingTable({
                                     setSelectedBill(item)
                                     setSlipModalOpen(true)
                                   }}
-                                  className={`px-2.5 py-1 border rounded transition-colors text-xs font-medium flex items-center gap-1 cursor-pointer ${
+                                  className={`px-2.5 py-1 xl:py-1.5 border rounded transition-colors text-xs xl:text-sm 2xl:text-base font-medium flex items-center gap-1 xl:gap-1.5 cursor-pointer ${
                                     isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
                                   }`}
                                 >
-                                  <Eye className="w-3.5 h-3.5" />
+                                  <Eye className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                   <span>ตรวจสลิป</span>
                                 </button>
                               ) : item.billStatus !== "not_created" ? (
@@ -1719,7 +1719,7 @@ export default function MeterReadingTable({
                                     <button
                                       onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
                                       disabled={currentUserRole === "staff"}
-                                      className={`px-2.5 py-1 border rounded transition-colors flex items-center gap-1 ${
+                                      className={`px-2.5 py-1 xl:py-1.5 border rounded transition-colors flex items-center gap-1 xl:gap-1.5 ${
                                         currentUserRole === "staff"
                                           ? "opacity-40 cursor-not-allowed"
                                           : "cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/30"
@@ -1728,8 +1728,8 @@ export default function MeterReadingTable({
                                       }`}
                                       title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด/บันทึกชำระเงินตรง"}
                                     >
-                                      <CheckCircle className={`w-3.5 h-3.5 ${currentUserRole === "staff" ? "text-slate-500 dark:text-slate-600" : "text-emerald-500"}`} />
-                                      <span className="text-xs font-medium">
+                                      <CheckCircle className={`w-3.5 h-3.5 xl:w-4 xl:h-4 ${currentUserRole === "staff" ? "text-slate-500 dark:text-slate-600" : "text-emerald-500"}`} />
+                                      <span className="text-xs xl:text-sm 2xl:text-base font-medium">
                                         รับเงินแล้ว
                                       </span>
                                     </button>
@@ -1745,7 +1745,7 @@ export default function MeterReadingTable({
                                           [item.roomNumber]: !isCurrentlyUnlocked
                                         }));
                                       }}
-                                      className={`px-2.5 py-1 border rounded transition-colors text-xs font-medium flex items-center gap-1 cursor-pointer ${
+                                      className={`px-2.5 py-1 xl:py-1.5 border rounded transition-colors text-xs xl:text-sm 2xl:text-base font-medium flex items-center gap-1 xl:gap-1.5 cursor-pointer ${
                                         unlockedPaidRooms[item.roomNumber]
                                           ? isDark
                                             ? "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20"
@@ -1758,12 +1758,12 @@ export default function MeterReadingTable({
                                     >
                                       {unlockedPaidRooms[item.roomNumber] ? (
                                         <>
-                                          <X className="w-3.5 h-3.5" />
+                                          <X className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                           <span>ยกเลิกแก้ไข</span>
                                         </>
                                       ) : (
                                         <>
-                                          <Edit3 className="w-3.5 h-3.5" />
+                                          <Edit3 className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                           <span>แก้ไขบิล</span>
                                         </>
                                       )}
@@ -1771,7 +1771,7 @@ export default function MeterReadingTable({
                                   )}
                                 </>
                               ) : (
-                                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">ยังไม่ออกบิล</span>
+                                <span className="text-xs xl:text-sm 2xl:text-base text-slate-400 dark:text-slate-500 font-medium">ยังไม่ออกบิล</span>
                               )}
                             </div>
                           </td>
@@ -1788,15 +1788,15 @@ export default function MeterReadingTable({
                                 type="text"
                                 inputMode="decimal"
                                 placeholder="กรอกเลข"
-                                className={`w-20 text-center px-1.5 py-1 border rounded font-mono text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors ${
+                                className={`w-20 xl:w-24 2xl:w-28 text-center px-1.5 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors ${
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                 }`}
                                 value={item.elecPrev}
                                 onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
                               />
                             ) : (
-                              <span className={`font-mono text-xs px-2 py-0.5 rounded border ${
-                                isDark ? "text-slate-400 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-50 border-slate-200"
+                              <span className={`font-mono text-xs xl:text-sm 2xl:text-base px-2 py-0.5 xl:px-2.5 xl:py-1 rounded border ${
+                                isDark ? "text-slate-450 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-50 border-slate-200"
                               }`}>
                                 {item.elecPrev}
                               </span>
@@ -1810,13 +1810,13 @@ export default function MeterReadingTable({
                                 type="text"
                                 placeholder="กรอกเลข"
                                 disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                                className={`w-24 text-left pl-2 pr-8 py-1 border rounded font-mono text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                                className={`w-24 xl:w-28 2xl:w-32 text-left pl-2 pr-8 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                 }`}
                                 value={item.elecCurr}
                                 onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
                               />
-                              <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium pointer-events-none ${
+                              <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[10px] xl:text-xs 2xl:text-sm font-medium pointer-events-none ${
                                 isDark ? "text-slate-500" : "text-slate-400"
                               }`}>
                                 kWh
@@ -1827,13 +1827,13 @@ export default function MeterReadingTable({
                               const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
                               if (units > 3000) {
                                   return (
-                                    <div className="text-[11px] text-rose-600 dark:text-rose-450 font-medium flex items-center justify-center gap-1 mt-1">
+                                    <div className="text-[11px] xl:text-xs 2xl:text-sm text-rose-600 dark:text-rose-450 font-medium flex items-center justify-center gap-1 mt-1">
                                       <span>⚠️ เกิน 3,000 หน่วย</span>
                                     </div>
                                   );
                               } else if (isRollover) {
                                   return (
-                                    <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center justify-center gap-1 mt-1">
+                                    <div className="text-[11px] xl:text-xs 2xl:text-sm text-amber-600 dark:text-amber-400 font-medium flex items-center justify-center gap-1 mt-1">
                                       <span>🔄 หมุนครบรอบ (+{units})</span>
                                     </div>
                                   );
@@ -1851,7 +1851,7 @@ export default function MeterReadingTable({
                                       onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
                                       disabled={isDisabled}
                                       title={`เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition-colors ${
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 xl:px-2.5 xl:py-1 rounded border text-[11px] xl:text-xs 2xl:text-sm font-medium transition-colors ${
                                         isDark 
                                           ? "bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20" 
                                           : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
@@ -1867,7 +1867,7 @@ export default function MeterReadingTable({
                                       type="button"
                                       onClick={() => handleOpenReplacementModal(item.roomNumber, "electric")}
                                       disabled={isDisabled}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border border-dashed text-[11px] font-medium transition-colors ${
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 xl:px-2.5 xl:py-1 rounded border border-dashed text-[11px] xl:text-xs 2xl:text-sm font-medium transition-colors ${
                                         isDark 
                                           ? "border-slate-800 text-slate-500 hover:text-slate-400 hover:bg-slate-900/30" 
                                           : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
@@ -1884,10 +1884,10 @@ export default function MeterReadingTable({
 
                           {/* หน่วย / ยอดไฟ */}
                           <td className="py-4 text-center font-mono">
-                            <div className={`font-semibold text-xs sm:text-sm ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : "text-indigo-600 dark:text-indigo-400"}`}>
+                            <div className={`font-semibold text-xs sm:text-sm xl:text-base 2xl:text-lg ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : "text-indigo-600 dark:text-indigo-400"}`}>
                               {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                            <div className="text-[11px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                               {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
                                 ? `${elecCost.toLocaleString()}.- ${!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
                                 : "-"}
@@ -1897,7 +1897,7 @@ export default function MeterReadingTable({
                               if (repl && hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000) {
                                   return (
                                     <div 
-                                      className={`mt-1 text-[10px] leading-tight px-1.5 py-0.5 rounded font-medium max-w-[130px] mx-auto cursor-help ${
+                                      className={`mt-1 text-[10px] xl:text-xs 2xl:text-sm leading-tight px-1.5 py-0.5 rounded font-medium max-w-[130px] xl:max-w-[160px] mx-auto cursor-help ${
                                         isDark ? "bg-slate-800/40 text-slate-400" : "bg-slate-50 text-slate-500 border border-slate-100"
                                       }`}
                                       title={`สูตรคำนวณมิเตอร์เสียกลางเดือน:\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.elecPrev}) + (จดรอบนี้: ${item.elecCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
@@ -1917,16 +1917,16 @@ export default function MeterReadingTable({
                                 await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
                               }}
                               disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
-                              className={`px-2.5 py-1 border rounded text-xs font-medium transition-colors flex items-center gap-1.5 mx-auto cursor-pointer ${
+                              className={`px-2.5 py-1 xl:py-1.5 border rounded text-xs xl:text-sm 2xl:text-base font-medium transition-colors flex items-center gap-1.5 mx-auto cursor-pointer ${
                                 (isSaveDisabled || savingRows?.[item.roomNumber])
                                   ? (isDark ? "border-slate-800/80 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                   : (isDark ? "border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400" : "border-indigo-250 bg-indigo-50 hover:bg-indigo-100 text-indigo-700")
                               }`}
                             >
                               {savingRows?.[item.roomNumber] ? (
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
                               ) : (
-                                <Save className="w-3.5 h-3.5" />
+                                <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                               )}
                               <span>บันทึกมิเตอร์ไฟ</span>
                             </button>
@@ -1944,14 +1944,14 @@ export default function MeterReadingTable({
                                 type="text"
                                 inputMode="decimal"
                                 placeholder="กรอกเลข"
-                                className={`w-28 h-11 text-center font-mono text-sm font-semibold rounded-xl border transition-all focus:outline-none focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 ${
+                                className={`w-28 xl:w-32 2xl:w-36 h-11 text-center font-mono text-sm xl:text-base 2xl:text-lg font-semibold rounded-xl border transition-all focus:outline-none focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 ${
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-250 text-slate-800"
                                 }`}
                                 value={item.waterPrev}
                                 onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
                               />
                             ) : (
-                              <span className={`font-mono text-xs px-3 py-1.5 rounded-lg border font-semibold inline-block ${
+                              <span className={`font-mono text-xs xl:text-sm 2xl:text-base px-3 py-1.5 rounded-lg border font-semibold inline-block ${
                                 isDark ? "text-slate-300 bg-slate-900/50 border-slate-800/40" : "text-slate-600 bg-slate-50 border-slate-200"
                               }`}>
                                 {item.waterPrev}
@@ -1966,7 +1966,7 @@ export default function MeterReadingTable({
                                 type="text"
                                 placeholder="กรอกเลข"
                                 disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                                className={`w-32 h-11 text-center font-mono text-sm font-semibold rounded-xl border transition-all focus:outline-none focus:ring-4 disabled:opacity-60 disabled:cursor-not-allowed ${
+                                className={`w-32 xl:w-36 2xl:w-40 h-11 text-center font-mono text-sm xl:text-base 2xl:text-lg font-semibold rounded-xl border transition-all focus:outline-none focus:ring-4 disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark 
                                     ? "bg-slate-950 border-slate-800/80 text-slate-100 placeholder:text-slate-600 focus:border-teal-500 focus:ring-teal-500/10" 
                                     : "bg-white border-slate-250 text-slate-800 placeholder:text-slate-400 focus:border-teal-500 focus:ring-teal-500/10"
@@ -1974,7 +1974,7 @@ export default function MeterReadingTable({
                                 value={item.waterCurr}
                                 onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
                               />
-                              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold pointer-events-none ${
+                              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] xl:text-xs 2xl:text-sm font-bold pointer-events-none ${
                                 isDark ? "text-slate-500" : "text-slate-400"
                               }`}>
                                 m³
@@ -1985,13 +1985,13 @@ export default function MeterReadingTable({
                               const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
                               if (units > 3000) {
                                   return (
-                                    <div className="text-[11px] text-rose-600 dark:text-rose-450 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
+                                    <div className="text-[11px] xl:text-xs 2xl:text-sm text-rose-600 dark:text-rose-450 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
                                       <span>⚠️ เกิน 3,000 หน่วย</span>
                                     </div>
                                   );
                               } else if (isRollover) {
                                   return (
-                                    <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
+                                    <div className="text-[11px] xl:text-xs 2xl:text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
                                       <span>🔄 หมุนรอบ (+{units})</span>
                                     </div>
                                   );
@@ -2009,7 +2009,7 @@ export default function MeterReadingTable({
                                       onClick={() => handleOpenReplacementModal(item.roomNumber, "water", repl)}
                                       disabled={isDisabled}
                                       title={`เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
-                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-all ${
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 xl:px-3 xl:py-1.5 rounded-xl border text-[11px] xl:text-xs 2xl:text-sm font-semibold transition-all ${
                                         isDark 
                                           ? "bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20" 
                                           : "bg-amber-50 border-amber-200 text-amber-750 hover:bg-amber-100"
@@ -2025,7 +2025,7 @@ export default function MeterReadingTable({
                                       type="button"
                                       onClick={() => handleOpenReplacementModal(item.roomNumber, "water")}
                                       disabled={isDisabled}
-                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border border-dashed text-[11px] font-semibold transition-all ${
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 xl:px-3 xl:py-1.5 rounded-xl border border-dashed text-[11px] xl:text-xs 2xl:text-sm font-semibold transition-all ${
                                         isDark 
                                           ? "border-slate-800 text-slate-500 hover:text-slate-450 hover:bg-slate-900/30" 
                                           : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
@@ -2042,18 +2042,18 @@ export default function MeterReadingTable({
 
                           {/* หน่วย / ยอดน้ำ */}
                           <td className="py-4 text-center font-mono bg-teal-500/[0.015] dark:bg-teal-500/[0.02]">
-                            <div className={`font-bold text-sm sm:text-base ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : "text-teal-600 dark:text-teal-400"}`}>
+                            <div className={`font-bold text-sm sm:text-base xl:text-lg 2xl:text-xl ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : "text-teal-600 dark:text-teal-400"}`}>
                               {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                             </div>
                             <div className="mt-1 flex items-center justify-center">
                               {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000 ? (
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg border text-xs font-bold ${
+                                <span className={`inline-flex items-center px-2.5 py-0.5 xl:py-1 rounded-lg border text-xs xl:text-sm 2xl:text-base font-bold ${
                                   isDark ? "bg-teal-500/10 border-teal-500/20 text-teal-400" : "bg-teal-50 border-teal-100 text-teal-750"
                                 }`}>
                                   {waterCost.toLocaleString()}.- {!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? " (ขั้นต่ำ)" : ""}
                                 </span>
                               ) : (
-                                <span className="text-slate-400 dark:text-slate-600 text-xs">-</span>
+                                <span className="text-slate-400 dark:text-slate-600 text-xs xl:text-sm 2xl:text-base">-</span>
                               )}
                             </div>
                             {(() => {
@@ -2061,7 +2061,7 @@ export default function MeterReadingTable({
                               if (repl && hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000) {
                                   return (
                                     <div 
-                                      className={`mt-1.5 text-[10px] leading-tight px-1.5 py-0.5 rounded font-medium max-w-[130px] mx-auto cursor-help ${
+                                      className={`mt-1.5 text-[10px] xl:text-xs 2xl:text-sm leading-tight px-1.5 py-0.5 rounded font-medium max-w-[130px] mx-auto cursor-help ${
                                         isDark ? "bg-slate-800/40 text-slate-400" : "bg-slate-50 text-slate-500 border border-slate-100"
                                       }`}
                                       title={`สูตรคำนวณมิเตอร์เสียกลางเดือน:\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.waterPrev}) + (จดรอบนี้: ${item.waterCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
@@ -2081,16 +2081,16 @@ export default function MeterReadingTable({
                                 await onSaveRowWithRolloverCheck(item.roomNumber, "water");
                               }}
                               disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
-                              className={`h-11 px-4 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
+                              className={`h-11 px-4 xl:px-5 rounded-xl text-xs xl:text-sm 2xl:text-base font-bold transition-all border flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
                                 (isSaveDisabled || savingRows?.[item.roomNumber])
                                   ? (isDark ? "border-slate-850 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                   : (isDark ? "border-teal-500/20 bg-teal-500/10 hover:bg-teal-600 text-teal-400 hover:text-white" : "border-teal-200 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white")
                               }`}
                             >
                               {savingRows?.[item.roomNumber] ? (
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
                               ) : (
-                                <Save className="w-3.5 h-3.5" />
+                                <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                               )}
                               <span>บันทึกมิเตอร์น้ำ</span>
                             </button>

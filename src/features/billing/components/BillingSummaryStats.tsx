@@ -32,11 +32,11 @@ export default function BillingSummaryStats({
           <Gauge className="w-5 h-5 sm:w-6 h-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate transition-colors duration-300 ${
+          <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-300 ${
             isDark ? "text-slate-400 group-hover:text-blue-400" : "text-slate-500 group-hover:text-blue-600"
           }`}>บันทึกมิเตอร์แล้ว</p>
-          <p className={`text-base sm:text-lg lg:text-xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-slate-100" : "text-slate-850"}`}>
-            {billedCount} <span className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-500">/ {totalOccupied} ห้อง</span>
+          <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-slate-100" : "text-slate-850"}`}>
+            {billedCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">/ {totalOccupied} ห้อง</span>
           </p>
         </div>
       </div>
@@ -53,11 +53,11 @@ export default function BillingSummaryStats({
           <CheckCircle className="w-5 h-5 sm:w-6 h-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
+          <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
             isDark ? "text-slate-400 group-hover:text-emerald-400" : "text-slate-500 group-hover:text-emerald-600"
           }`}>ชำระเงินเรียบร้อย</p>
-          <p className={`text-base sm:text-lg lg:text-xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-slate-100" : "text-slate-850"}`}>
-            {paidCount} <span className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
+          <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-slate-100" : "text-slate-850"}`}>
+            {paidCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
           </p>
         </div>
       </div>
@@ -75,15 +75,15 @@ export default function BillingSummaryStats({
           <Clock className="w-5 h-5 sm:w-6 h-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
+          <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
             isDark ? "text-slate-400 group-hover:text-amber-400" : "text-slate-500 group-hover:text-amber-600"
           }`}>รอตรวจสอบสลิป</p>
-          <p className={`text-base sm:text-lg lg:text-xl font-black mt-0.5 tracking-tight truncate ${
+          <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${
             pendingCount > 0 
               ? `animate-pulse ${isDark ? "text-amber-400" : "text-amber-600"}` 
               : (isDark ? "text-slate-450" : "text-slate-800")
           }`}>
-            {pendingCount} <span className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
+            {pendingCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
           </p>
         </div>
       </div>
@@ -100,11 +100,11 @@ export default function BillingSummaryStats({
           <AlertCircle className="w-5 h-5 sm:w-6 h-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
+          <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
             isDark ? "text-slate-400 group-hover:text-rose-400" : "text-slate-500 group-hover:text-rose-600"
           }`}>ค้างชำระเงิน</p>
-          <p className={`text-base sm:text-lg lg:text-xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-rose-400" : "text-rose-600"}`}>
-            {unpaidCount} <span className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
+          <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-rose-400" : "text-rose-600"}`}>
+            {unpaidCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
           </p>
         </div>
       </div>

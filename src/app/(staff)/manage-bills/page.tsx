@@ -1562,10 +1562,10 @@ function ManageBillsContent() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <Receipt className="w-6 h-6 text-indigo-500" />
-            <h2 className={`text-2xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จัดการใบแจ้งหนี้</h2>
+            <Receipt className="w-6 h-6 xl:w-7 xl:h-7 2xl:w-8 2xl:h-8 text-indigo-500" />
+            <h2 className={`text-2xl xl:text-3xl 2xl:text-4xl font-black ${isDark ? "text-slate-100" : "text-slate-900"}`}>จัดการใบแจ้งหนี้</h2>
           </div>
-          <p className={`text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          <p className={`text-sm xl:text-base 2xl:text-lg mt-1.5 xl:mt-2 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             ระบบจัดการใบแจ้งหนี้ค่าเช่าหอพัก ตรวจสอบสลิปโอนเงิน ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดเพิ่มเติม
           </p>
         </div>
@@ -1582,9 +1582,9 @@ function ManageBillsContent() {
                 }
                 setCreateBillModalOpen(true)
               }}
-              className="h-11 px-3 sm:px-5 rounded-xl bg-slate-850 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 border border-slate-700/30 dark:border-slate-300 shadow-md text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 w-full sm:w-auto"
+              className="h-11 px-3 sm:px-5 xl:h-12 xl:px-6 2xl:h-14 2xl:px-8 rounded-xl bg-slate-850 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 border border-slate-700/30 dark:border-slate-300 shadow-md text-xs sm:text-sm xl:text-base 2xl:text-lg font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 w-full sm:w-auto"
             >
-              <Plus className="w-4 h-4 shrink-0" />
+              <Plus className="w-4 h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 shrink-0" />
               <span className="truncate">
                 <span className="hidden sm:inline">สร้างบิลด้วยตนเอง</span>
                 <span className="inline sm:hidden">สร้างบิลพิเศษ</span>
@@ -1594,7 +1594,7 @@ function ManageBillsContent() {
 
           {/* แถบเลือกเดือนรอบบิล */}
           <select
-            className={`w-full md:w-auto h-11 px-4 border rounded-xl focus:outline-none focus:border-blue-500 text-sm font-bold transition-all cursor-pointer ${
+            className={`w-full md:w-auto h-11 px-4 xl:h-12 xl:px-5 2xl:h-14 2xl:px-6 border rounded-xl focus:outline-none focus:border-blue-500 text-sm xl:text-base 2xl:text-lg font-bold transition-all cursor-pointer ${
               isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-850" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-50"
             }`}
             value={billingCycle}
@@ -1620,7 +1620,7 @@ function ManageBillsContent() {
       {/* Filter Tabs Row */}
       <div className="flex flex-wrap items-center justify-between gap-3 mt-6 mb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`text-xs font-bold uppercase tracking-wider mr-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+          <span className={`text-xs xl:text-sm 2xl:text-base font-bold uppercase tracking-wider mr-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
             ตัวกรองบิล:
           </span>
           {[
@@ -1632,7 +1632,7 @@ function ManageBillsContent() {
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id as any)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 shadow-sm ${
+              className={`px-4 py-2 xl:px-5 xl:py-2.5 2xl:px-6 2xl:py-3.5 rounded-xl text-xs xl:text-sm 2xl:text-base font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
                 statusFilter === tab.id
                   ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
                   : isDark
@@ -1641,7 +1641,7 @@ function ManageBillsContent() {
               }`}
             >
               <span>{tab.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+              <span className={`text-[10px] xl:text-xs 2xl:text-sm px-1.5 py-0.5 xl:px-2 xl:py-1 rounded-md font-mono ${
                 statusFilter === tab.id
                   ? "bg-white/20 text-white dark:bg-black/10 dark:text-slate-900"
                   : isDark ? "bg-slate-800 text-slate-350" : "bg-slate-100 text-slate-600"
