@@ -174,6 +174,73 @@ export async function deleteTenant(id: string, roomNumber: string) {
   }
 }
 
+export async function lazyCleanupPastDueTenants(workspaceId: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true, count: 0 }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    // ดึงวันที่ปัจจุบันตามโซนเวลาประเทศไทย (+07:00)
+    const d = new Date(new Date().getTime() + 7 * 60 * 60 * 1000)
+    const year = d.getUTCFullYear()
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const date = String(d.getUTCDate()).padStart(2, '0')
+    const todayStr = `${year}-${month}-${date}`
+
+    // 1. ค้นหาประวัติการแจ้งยกเลิกสัญญาที่เลยกำหนดแล้ว (cancellation_date <= todayStr)
+    const { data: cancellations, error: cancelError } = await supabase
+      .from("cancelled_contracts")
+      .select("tenant_id, room_number")
+      .eq("workspace_id", workspaceId)
+      .lte("cancellation_date", todayStr)
+
+    if (cancelError) throw cancelError
+
+    if (!cancellations || cancellations.length === 0) {
+      return { success: true, count: 0 }
+    }
+
+    const tenantIdsToCleanup = cancellations.map(c => c.tenant_id).filter(Boolean) as string[]
+
+    if (tenantIdsToCleanup.length === 0) {
+      return { success: true, count: 0 }
+    }
+
+    // 2. ดึงรายชื่อผู้เช่าที่ต้องการทำความสะอาดและตรวจสอบความถูกต้องของสิทธิ์ผู้ใช้
+    const { data: tenants, error: fetchTenantsError } = await supabase
+      .from("tenants")
+      .select("id, room_id, rooms(room_number)")
+      .in("id", tenantIdsToCleanup)
+      .eq("workspace_id", workspaceId)
+
+    if (fetchTenantsError) throw fetchTenantsError
+
+    if (!tenants || tenants.length === 0) {
+      return { success: true, count: 0 }
+    }
+
+    let cleanedCount = 0
+
+    // 3. ทยอยประมวลผลล้างสัญญาผู้เช่าและบันทึกข้อมูลประวัติผู้เช่าเก่า
+    for (const t of tenants) {
+      const roomNumber = (t.rooms as any)?.room_number || ""
+      const res = await deleteTenant(t.id, roomNumber)
+      if (res.success) {
+        cleanedCount++
+      }
+    }
+
+    return { success: true, count: cleanedCount }
+  } catch (error) {
+    console.error("Error in lazyCleanupPastDueTenants:", error)
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการทำความสะอาดข้อมูลผู้เช่าล่าช้า"
+    return { success: false, error: errorMessage, count: 0 }
+  }
+}
+
+
 export async function getOldTenants() {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true, data: [] }

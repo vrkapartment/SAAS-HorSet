@@ -57,7 +57,8 @@ import {
   saveCancelledContract,
   deleteCancelledContract,
   migrateLocalStorageCancelledContracts,
-  disconnectLine
+  disconnectLine,
+  lazyCleanupPastDueTenants
 } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
@@ -590,42 +591,22 @@ function RoomsContent() {
         }
       }
 
-      // LAZY CLEANUP: ตรวจสอบและย้ายออกผู้เช่าที่แจ้งย้ายออกล่วงหน้าแล้วเลยกำหนด (cancellationDate <= today)
-      if (roomsData.length > 0 && loadedCancellations.length > 0) {
-        const d = new Date()
-        const year = d.getFullYear()
-        const month = String(d.getMonth() + 1).padStart(2, '0')
-        const date = String(d.getDate()).padStart(2, '0')
-        const todayStr = `${year}-${month}-${date}`
-
-        const tenantsToCleanup = roomsData.filter(room => {
-          if (!room.tenantId) return false
-          const matchedCancel = loadedCancellations.find(c => c.tenantId === room.tenantId)
-          if (matchedCancel && matchedCancel.cancellationDate && matchedCancel.cancellationDate <= todayStr) {
-            return true
-          }
-          return false
-        })
-
-        if (tenantsToCleanup.length > 0) {
-          console.log(`Lazy cleanup: Found ${tenantsToCleanup.length} past-due checked out tenants. Cleaning up in database...`)
-          
-          const cleanupPromises = tenantsToCleanup.map(room => deleteTenant(room.tenantId!, room.roomNumber))
-          await Promise.all(cleanupPromises)
-          
-          if (wsId) {
-            clearWorkspaceCache(wsId)
-          }
+      // LAZY CLEANUP: เรียกทำงานผ่าน Server Action ครั้งเดียวแบบรวมศูนย์ ลด Race Conditions และการส่งคำสั่งเขียน DB ซ้ำซ้อนจาก Client
+      if (roomsData.length > 0 && loadedCancellations.length > 0 && wsId) {
+        const cleanupRes = await lazyCleanupPastDueTenants(wsId)
+        if (cleanupRes.success && cleanupRes.count && cleanupRes.count > 0) {
+          console.log(`Lazy cleanup success: Removed ${cleanupRes.count} past-due tenants server-side. Refreshing view...`)
+          clearWorkspaceCache(wsId)
           const [roomsResNew, typesResNew] = await Promise.all([getRooms(), getRoomTypes()])
           if (roomsResNew.success && roomsResNew.data) {
             const finalRooms = roomsResNew.data as RoomItem[]
             setRooms(finalRooms)
-            if (wsId) setCachedData(wsId, "rooms", finalRooms)
+            setCachedData(wsId, "rooms", finalRooms)
           }
           if (typesResNew.success && typesResNew.data) {
             const finalTypes = typesResNew.data as RoomTypeItem[]
             setRoomTypes(finalTypes)
-            if (wsId) setCachedData(wsId, "room_types", finalTypes)
+            setCachedData(wsId, "room_types", finalTypes)
           }
         }
       }
