@@ -1721,6 +1721,8 @@ function ManageBillsContent() {
         onMeterReplacementsChange={async () => {
           await loadData(billingCycle, true)
         }}
+        handleDownloadAllBillsPdf={handleDownloadAllBillsPdf}
+        downloadingAllPdf={downloadingAllPdf}
       />
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}

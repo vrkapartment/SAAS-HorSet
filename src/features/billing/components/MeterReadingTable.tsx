@@ -39,11 +39,12 @@ interface MeterReadingTableProps {
   handleSaveLateDays?: (roomNumber: string) => Promise<void>
   latePenaltyRate?: number
   handleOtherServiceChange?: (roomNumber: string, value: string) => void
-  handleBillAmountChange?: (roomNumber: string, value: string) => void
   mode?: "meters" | "billing"
   meterReplacements?: any[]
   onMeterReplacementsChange?: () => void | Promise<void>
   savingRows?: {[roomNumber: string]: boolean}
+  handleDownloadAllBillsPdf?: () => Promise<void>
+  downloadingAllPdf?: boolean
 }
 
 export default function MeterReadingTable({
@@ -80,11 +81,12 @@ export default function MeterReadingTable({
   handleSaveLateDays,
   latePenaltyRate = 0,
   handleOtherServiceChange,
-  handleBillAmountChange,
   mode = "billing",
   meterReplacements = [],
   onMeterReplacementsChange,
-  savingRows = {}
+  savingRows = {},
+  handleDownloadAllBillsPdf,
+  downloadingAllPdf = false
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const hasEdit = hasEditPermission !== undefined ? hasEditPermission : permissions.manage_meters_bills_edit
@@ -599,28 +601,57 @@ export default function MeterReadingTable({
             </div>
 
             {activeTab === "all" && unifiedItems.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (!permissions.billing_send_line) {
-                    alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
-                    return
-                  }
-                  setBulkSendResults({})
-                  setBulkSendingStatus("idle")
-                  setBulkSendModalOpen(true)
-                }}
-                disabled={!permissions.billing_send_line}
-                className={`w-full sm:w-auto h-9 px-5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
-                  !permissions.billing_send_line
-                    ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
-                    : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98]"
-                }`}
-                title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>ส่ง LINE OA ทุกห้องพร้อมกัน</span>
-              </button>
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                {/* ปุ่มดาวน์โหลด PDF บิลรวมทุกห้อง */}
+                {permissions.billing_download_pdf && handleDownloadAllBillsPdf && (
+                  <button
+                    type="button"
+                    onClick={handleDownloadAllBillsPdf}
+                    disabled={downloadingAllPdf}
+                    className={`w-full sm:w-auto h-9 px-4 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-95 cursor-pointer ${
+                      downloadingAllPdf
+                        ? "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
+                        : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-500/10 hover:shadow-blue-500/20"
+                    }`}
+                  >
+                    {downloadingAllPdf ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>บีบอัด ZIP...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5 shrink-0" />
+                        <span>เซฟบิล PDF ทุกห้องพร้อมกัน</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* ปุ่มส่ง LINE OA ทุกห้องพร้อมกัน */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!permissions.billing_send_line) {
+                      alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+                      return
+                    }
+                    setBulkSendResults({})
+                    setBulkSendingStatus("idle")
+                    setBulkSendModalOpen(true)
+                  }}
+                  disabled={!permissions.billing_send_line}
+                  className={`w-full sm:w-auto h-9 px-4 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] ${
+                    !permissions.billing_send_line
+                      ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
+                      : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20"
+                  }`}
+                  title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>ส่ง LINE OA ทุกห้องพร้อมกัน</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -746,17 +777,12 @@ export default function MeterReadingTable({
                           item.billStatus !== "not_created" ? (
                             <div className="flex flex-col items-end mt-1">
                               <div className="flex items-center gap-1 justify-end">
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
-                                  className={`w-24 text-right pr-1.5 py-0.5 border rounded font-mono text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-bold disabled:opacity-60 disabled:cursor-not-allowed ${
-                                    isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                                  }`}
-                                  value={item.billAmount !== undefined ? item.billAmount : 0}
-                                  onChange={(e) => handleBillAmountChange?.(item.roomNumber, e.target.value)}
-                                />
-                                <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>บาท</span>
+                                <span className={`font-mono text-sm font-black ${
+                                  isDark ? "text-slate-100" : "text-slate-800"
+                                }`}>
+                                  {Number(item.billAmount !== undefined ? item.billAmount : 0).toLocaleString()}
+                                </span>
+                                <span className={`text-[10px] font-bold ${isDark ? "text-slate-450" : "text-slate-500"}`}>บาท</span>
                               </div>
                               {isModified && (
                                 <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold mt-1 ${
@@ -1582,17 +1608,12 @@ export default function MeterReadingTable({
                               item.billStatus !== "not_created" ? (
                                 <div className="flex flex-col items-end">
                                   <div className="flex items-center gap-1.5 justify-end">
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      disabled={item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber]}
-                                      className={`w-32 text-right pr-2.5 py-2 border rounded-lg font-mono text-sm sm:text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all font-black disabled:opacity-60 disabled:cursor-not-allowed ${
-                                        isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                                      }`}
-                                      value={item.billAmount !== undefined ? item.billAmount : 0}
-                                      onChange={(e) => handleBillAmountChange?.(item.roomNumber, e.target.value)}
-                                    />
-                                    <span className={`text-xs sm:text-sm font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>บาท</span>
+                                    <span className={`font-mono text-base sm:text-lg font-black ${
+                                      isDark ? "text-slate-100" : "text-slate-800"
+                                    }`}>
+                                      {Number(item.billAmount !== undefined ? item.billAmount : 0).toLocaleString()}
+                                    </span>
+                                    <span className={`text-xs sm:text-sm font-bold ${isDark ? "text-slate-450" : "text-slate-500"}`}>บาท</span>
                                   </div>
                                   {isModified && (
                                     <span className={`inline-block text-[10px] sm:text-xs bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-black mt-1.5 ${

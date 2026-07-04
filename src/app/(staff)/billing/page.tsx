@@ -750,23 +750,6 @@ function UnifiedBillingContent() {
     )
   }
 
-  // อัปเดตยอดเงินรวมเมื่อผู้ใช้แก้ไขตัวเลข ยอดบิลรวม โดยตรง
-  const handleBillAmountChange = (roomNumber: string, value: string) => {
-    setUnifiedItems(prev =>
-      prev.map(item => {
-        if (item.roomNumber !== roomNumber) return item
-        
-        const amountVal = value === "" ? 0 : Number(value)
-        if (isNaN(amountVal)) return item
-
-        return {
-          ...item,
-          billAmount: amountVal,
-          isEdited: true
-        }
-      })
-    )
-  }
 
   // ตัวแปรและฟังก์ชันช่วยจัดรูปแบบข้อมูลและอัปเดตแคชเพื่อความเร็วสูงสุดแบบไม่ต้องโหลดข้อมูลใหม่ (Option 1 - Optimistic / Local State Update)
   const formatDbBillToCamelCase = (b: any) => ({
@@ -1762,7 +1745,6 @@ function UnifiedBillingContent() {
           handleSaveLateDays={handleSaveLateDays}
           latePenaltyRate={latePenaltyRate}
           handleOtherServiceChange={handleOtherServiceChange}
-          handleBillAmountChange={handleBillAmountChange}
           mode="meters"
           meterReplacements={meterReplacements}
           onMeterReplacementsChange={async () => {
