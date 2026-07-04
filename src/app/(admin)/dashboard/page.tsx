@@ -89,20 +89,61 @@ function AdminDashboardContent() {
   const [selectedYear, setSelectedYear] = useState("2026")
   const [selectedCycle, setSelectedCycle] = useState("2026-06")
 
-  // Sync state from URL parameters on mount and whenever searchParams change
+  // Adaptive Switcher on Mobile/Tablet Compact
+  const [activeTab, setActiveTab] = useState<"transactions" | "activities">("transactions")
+
+  // Sync state from URL parameters or sessionStorage on mount and whenever searchParams change
   useEffect(() => {
     const monthParam = searchParams.get("month")
     const yearParam = searchParams.get("year")
+    const tabParam = searchParams.get("tab")
+
+    // 1. Handle Month Context
     if (monthParam) {
       setSelectedMonth(monthParam)
+      sessionStorage.setItem("dashboard_month", monthParam)
+    } else {
+      const cachedMonth = sessionStorage.getItem("dashboard_month")
+      if (cachedMonth) {
+        setSelectedMonth(cachedMonth)
+        const params = new URLSearchParams(window.location.search)
+        params.set("month", cachedMonth)
+        router.replace(`?${params.toString()}`, { scroll: false })
+      }
     }
+
+    // 2. Handle Year Context
     if (yearParam) {
       setSelectedYear(yearParam)
+      sessionStorage.setItem("dashboard_year", yearParam)
+    } else {
+      const cachedYear = sessionStorage.getItem("dashboard_year")
+      if (cachedYear) {
+        setSelectedYear(cachedYear)
+        const params = new URLSearchParams(window.location.search)
+        params.set("year", cachedYear)
+        router.replace(`?${params.toString()}`, { scroll: false })
+      }
     }
-  }, [searchParams])
+
+    // 3. Handle Active Tab Context
+    if (tabParam === "transactions" || tabParam === "activities") {
+      setActiveTab(tabParam)
+      sessionStorage.setItem("dashboard_tab", tabParam)
+    } else {
+      const cachedTab = sessionStorage.getItem("dashboard_tab") as "transactions" | "activities"
+      if (cachedTab === "transactions" || cachedTab === "activities") {
+        setActiveTab(cachedTab)
+        const params = new URLSearchParams(window.location.search)
+        params.set("tab", cachedTab)
+        router.replace(`?${params.toString()}`, { scroll: false })
+      }
+    }
+  }, [searchParams, router])
 
   const handleMonthChange = (month: string) => {
     setSelectedMonth(month)
+    sessionStorage.setItem("dashboard_month", month)
     const params = new URLSearchParams(window.location.search)
     params.set("month", month)
     router.replace(`?${params.toString()}`, { scroll: false })
@@ -110,8 +151,17 @@ function AdminDashboardContent() {
 
   const handleYearChange = (year: string) => {
     setSelectedYear(year)
+    sessionStorage.setItem("dashboard_year", year)
     const params = new URLSearchParams(window.location.search)
     params.set("year", year)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
+
+  const handleTabChange = (tab: "transactions" | "activities") => {
+    setActiveTab(tab)
+    sessionStorage.setItem("dashboard_tab", tab)
+    const params = new URLSearchParams(window.location.search)
+    params.set("tab", tab)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
 
@@ -127,9 +177,6 @@ function AdminDashboardContent() {
   const [rawBills, setRawBills] = useState<any[]>([])
   const [rawExpenses, setRawExpenses] = useState<any[]>([])
   const [rawOldTenants, setRawOldTenants] = useState<any[]>([])
-
-  // Adaptive Switcher on Mobile/Tablet Compact
-  const [activeTab, setActiveTab] = useState<"transactions" | "activities">("transactions")
 
   // Sync Cycle state whenever Month or Year changes
   useEffect(() => {
@@ -690,7 +737,7 @@ function AdminDashboardContent() {
 
           {/* ปุ่ม "ออกบิลเดือนนี้" */}
           <button
-            onClick={() => router.push("/billing")}
+            onClick={() => router.push(`/billing?month=${selectedMonth}&year=${selectedYear}`)}
             className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
             <Receipt className="w-4 h-4" />
@@ -743,7 +790,14 @@ function AdminDashboardContent() {
               return (
                 <div 
                   key={idx} 
-                  onClick={() => router.push(stat.path || "/")}
+                  onClick={() => {
+                    if (stat.path) {
+                      const connector = stat.path.includes("?") ? "&" : "?"
+                      router.push(`${stat.path}${connector}month=${selectedMonth}&year=${selectedYear}`)
+                    } else {
+                      router.push("/")
+                    }
+                  }}
                   className="bg-white dark:bg-slate-850 p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm relative overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-md cursor-pointer hover:border-slate-300 dark:hover:border-slate-700/80 active:scale-[0.98] group"
                 >
                   <div className="flex justify-between items-start">
@@ -868,7 +922,7 @@ function AdminDashboardContent() {
                 return (
                   <button
                     key={idx}
-                    onClick={() => router.push(act.path)}
+                    onClick={() => router.push(`${act.path}?month=${selectedMonth}&year=${selectedYear}`)}
                     className={`flex flex-col justify-between p-4 ${act.bg} border rounded-2xl active:scale-95 active:shadow-inner transition-all text-left shadow-sm h-24 cursor-pointer`}
                   >
                     <div className="p-2 bg-white dark:bg-slate-900 rounded-xl w-fit shadow-sm">
@@ -897,7 +951,7 @@ function AdminDashboardContent() {
                 return (
                   <button
                     key={idx}
-                    onClick={() => router.push(act.path)}
+                    onClick={() => router.push(`${act.path}?month=${selectedMonth}&year=${selectedYear}`)}
                     className="flex items-center gap-4 p-4 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl text-left hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 group cursor-pointer"
                   >
                     <div className={`p-3 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-300 ${act.bg} ${act.color}`}>
@@ -919,7 +973,7 @@ function AdminDashboardContent() {
             <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => setActiveTab("transactions")}
+                onClick={() => handleTabChange("transactions")}
                 className={`flex-1 py-3 text-xs font-extrabold rounded-lg text-center transition-all duration-200 cursor-pointer ${
                   activeTab === "transactions" 
                     ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm" 
@@ -931,7 +985,7 @@ function AdminDashboardContent() {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("activities")}
+                onClick={() => handleTabChange("activities")}
                 className={`flex-1 py-3 text-xs font-extrabold rounded-lg text-center transition-all duration-200 cursor-pointer ${
                   activeTab === "activities" 
                     ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm" 
@@ -954,7 +1008,7 @@ function AdminDashboardContent() {
                   <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" /> สถานะบิลและการรับเงินล่าสุด
                 </h3>
                 <button 
-                  onClick={() => router.push("/manage-bills")}
+                  onClick={() => router.push(`/manage-bills?month=${selectedMonth}&year=${selectedYear}`)}
                   className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline cursor-pointer py-2 px-3"
                   style={{ minHeight: "36px" }}
                 >
