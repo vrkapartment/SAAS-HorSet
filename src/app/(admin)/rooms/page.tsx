@@ -1611,9 +1611,16 @@ function RoomsContent() {
             <div className="p-3 bg-slate-100 dark:bg-slate-950/60 text-slate-600 dark:text-slate-400 rounded-xl group-hover:scale-110 transition-transform">
               <Building className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ห้องพักทั้งหมด</span>
-              <span className="text-lg md:text-xl font-extrabold text-slate-850 dark:text-slate-100 mt-0.5 block">{loading ? "..." : totalRoomsCount} ห้อง</span>
+              <span className="text-lg md:text-xl font-extrabold text-slate-850 dark:text-slate-100 mt-0.5 flex items-center gap-1.5 leading-none">
+                {loading ? (
+                  <span className="inline-block h-5 w-12 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                ) : (
+                  <span className="tabular-nums font-black">{totalRoomsCount}</span>
+                )}
+                <span className="text-xs md:text-sm font-bold text-slate-500">ห้อง</span>
+              </span>
             </div>
           </div>
 
@@ -1622,9 +1629,16 @@ function RoomsContent() {
             <div className="p-3 bg-red-500/10 text-red-500 rounded-xl group-hover:scale-110 transition-transform">
               <Home className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ห้องว่าง</span>
-              <span className="text-lg md:text-xl font-extrabold text-red-600 dark:text-red-400 mt-0.5 block">{loading ? "..." : vacantRoomsCount} ห้อง</span>
+              <span className="text-lg md:text-xl font-extrabold text-red-600 dark:text-red-400 mt-0.5 flex items-center gap-1.5 leading-none">
+                {loading ? (
+                  <span className="inline-block h-5 w-10 bg-red-200/50 dark:bg-red-900/30 rounded animate-pulse" />
+                ) : (
+                  <span className="tabular-nums font-black">{vacantRoomsCount}</span>
+                )}
+                <span className="text-xs md:text-sm font-bold text-red-555">ห้อง</span>
+              </span>
             </div>
           </div>
 
@@ -1633,9 +1647,16 @@ function RoomsContent() {
             <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl group-hover:scale-110 transition-transform">
               <Users className="w-5 h-5 animate-pulse" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ยังไม่ลงทะเบียนไลน์</span>
-              <span className="text-lg md:text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 block">{loading ? "..." : waitingRoomsCount} ห้อง</span>
+              <span className="text-lg md:text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1.5 leading-none">
+                {loading ? (
+                  <span className="inline-block h-5 w-10 bg-amber-200/50 dark:bg-amber-900/30 rounded animate-pulse" />
+                ) : (
+                  <span className="tabular-nums font-black">{waitingRoomsCount}</span>
+                )}
+                <span className="text-xs md:text-sm font-bold text-amber-555">ห้อง</span>
+              </span>
             </div>
           </div>
 
@@ -1644,9 +1665,16 @@ function RoomsContent() {
             <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl group-hover:scale-110 transition-transform">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">มีผู้เช่าสมบูรณ์</span>
-              <span className="text-lg md:text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{loading ? "..." : occupiedRoomsCount} ห้อง</span>
+              <span className="text-lg md:text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 leading-none">
+                {loading ? (
+                  <span className="inline-block h-5 w-10 bg-emerald-200/50 dark:bg-emerald-900/30 rounded animate-pulse" />
+                ) : (
+                  <span className="tabular-nums font-black">{occupiedRoomsCount}</span>
+                )}
+                <span className="text-xs md:text-sm font-bold text-emerald-555">ห้อง</span>
+              </span>
             </div>
           </div>
         </div>
@@ -1758,7 +1786,7 @@ function RoomsContent() {
                           {/* Floor Header */}
                           <div className="flex items-center gap-3">
                             <div className="h-px bg-slate-200 dark:bg-slate-800/60 flex-1" />
-                            <h3 className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-4 py-1.5 bg-slate-100 dark:bg-slate-950 rounded-full border border-slate-200/40 dark:border-slate-800/40">
+                            <h3 className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-4 py-1.5 bg-slate-100 dark:bg-slate-950 rounded-full border border-slate-200/40 dark:border-slate-800/40">
                               ชั้นที่ {floor}
                             </h3>
                             <div className="h-px bg-slate-200 dark:bg-slate-800/60 flex-1" />
@@ -1782,8 +1810,8 @@ function RoomsContent() {
                                   <div>
                                     <div className="flex items-start justify-between gap-2 mb-3">
                                       <div>
-                                        <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
-                                        <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
+                                        <span className="text-xs text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider block">ห้องพัก</span>
+                                        <h4 className="text-base sm:text-lg font-bold text-slate-850 dark:text-slate-100 tracking-wide">
                                           ห้อง {room.roomNumber}
                                         </h4>
                                       </div>
@@ -1811,17 +1839,17 @@ function RoomsContent() {
 
                                     {/* Room Type & Base Rent */}
                                     <div className="flex items-center justify-between gap-2 mb-4">
-                                      <span className="inline-flex items-center gap-1 text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-extrabold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30 uppercase tracking-wide">
+                                      <span className="inline-flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30 uppercase tracking-wide">
                                         <Tag className="w-2.5 h-2.5" /> {room.roomTypeName}
                                       </span>
-                                      <span className="text-sm sm:text-base font-extrabold text-slate-700 dark:text-slate-300">
+                                      <span className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-300">
                                         {room.baseRent.toLocaleString()} บ.
                                       </span>
                                     </div>
 
                                     {/* Status Badge */}
                                     <div className="mb-4">
-                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-semibold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
                                         {statusDetails.label}
                                       </span>
@@ -1966,10 +1994,10 @@ function RoomsContent() {
                                 <td className="p-4">
                                   <div className="flex flex-col gap-1.5">
                                     <div className="flex items-center gap-2">
-                                      <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm sm:text-base tracking-wide">ห้อง {room.roomNumber}</span>
-                                      <span className="inline-flex items-center text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">ชั้น {room.floor || getFloorNumber(room)}</span>
+                                      <span className="font-bold text-slate-850 dark:text-slate-100 text-sm sm:text-base tracking-wide">ห้อง {room.roomNumber}</span>
+                                      <span className="inline-flex items-center text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">ชั้น {room.floor || getFloorNumber(room)}</span>
                                     </div>
-                                    <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded w-max border border-indigo-200/30 dark:border-indigo-800/30">
+                                    <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded w-max border border-indigo-200/30 dark:border-indigo-800/30">
                                       <Tag className="w-3.5 h-3.5" /> {room.roomTypeName}
                                     </span>
                                   </div>
@@ -1978,7 +2006,7 @@ function RoomsContent() {
                                 {/* 2. Status & Monthly Rent */}
                                 <td className="p-4">
                                   <div className="flex flex-col gap-1.5">
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs sm:text-sm font-extrabold uppercase tracking-wider w-max ${statusDetails.badgeStyle}`}>
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-wider w-max ${statusDetails.badgeStyle}`}>
                                       <span className={`w-1.5 h-1.5 rounded-full ${statusDetails.dotStyle}`} />
                                       {statusDetails.label}
                                     </span>
@@ -2138,13 +2166,13 @@ function RoomsContent() {
                         {/* Mobile Header Card */}
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider block">ห้องพัก</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-lg font-extrabold text-slate-850 dark:text-slate-100 tracking-wide">ห้อง {room.roomNumber}</span>
-                              <span className="inline-flex items-center text-[9px] font-extrabold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200/50 dark:border-slate-700/50">ชั้น {room.floor || getFloorNumber(room)}</span>
+                              <span className="text-lg font-bold text-slate-850 dark:text-slate-100 tracking-wide">ห้อง {room.roomNumber}</span>
+                              <span className="inline-flex items-center text-[9px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200/50 dark:border-slate-700/50">ชั้น {room.floor || getFloorNumber(room)}</span>
                             </div>
                           </div>
-                          <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
+                          <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider ${statusDetails.badgeStyle}`}>
                             {statusDetails.label}
                           </span>
                         </div>
@@ -2153,7 +2181,7 @@ function RoomsContent() {
                         <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5 text-xs text-slate-600 dark:text-slate-300">
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400 dark:text-slate-500 font-medium">ประเภท & ค่าเช่า:</span>
-                            <span className="font-bold text-slate-800 dark:text-slate-100">
+                            <span className="font-semibold text-slate-800 dark:text-slate-100">
                               {room.roomTypeName} • {room.baseRent.toLocaleString()} บ.
                             </span>
                           </div>
@@ -2163,7 +2191,7 @@ function RoomsContent() {
                             <span className="text-slate-400 dark:text-slate-500 font-medium">ผู้เช่าปัจจุบัน:</span>
                             <span className="font-bold text-slate-800 dark:text-slate-100">
                               {room.tenantName ? (
-                                <span className="flex items-center gap-1 font-extrabold text-slate-800 dark:text-slate-200">
+                                <span className="flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200">
                                   <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {room.tenantName}
                                 </span>
                               ) : (
