@@ -556,31 +556,33 @@ export default function MeterReadingTable({
         {/* แถบควบคุมหลัก (Tabs) */}
         <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
           {mode !== "billing" ? (
-            <div className={`flex p-1 rounded-xl transition-all shadow-inner ${
-              isDark ? "bg-slate-950/60 border border-slate-900/50" : "bg-slate-100 border border-slate-200"
-            }`}>
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setActiveTab("electric")}
-                className={`flex items-center gap-2 px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-lg text-xs xl:text-xs 2xl:text-sm font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
                   activeTab === "electric"
-                    ? (isDark ? "bg-blue-950/30 text-blue-405 border border-blue-500/20 shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm")
-                    : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
+                    : isDark
+                      ? "bg-slate-900/30 border border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                      : "bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                <Zap className="w-3.5 h-3.5 text-blue-500" />
+                <Zap className={`w-3.5 h-3.5 shrink-0 ${activeTab === "electric" ? (isDark ? "text-blue-400" : "text-blue-600") : "text-blue-500"}`} />
                 <span>มิเตอร์ไฟ</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("water")}
-                className={`flex items-center gap-2 px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-lg text-xs xl:text-xs 2xl:text-sm font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
                   activeTab === "water"
-                    ? (isDark ? "bg-teal-950/30 text-teal-405 border border-teal-500/20 shadow-sm" : "bg-teal-50 text-teal-700 border border-teal-200 shadow-sm")
-                    : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
+                    : isDark
+                      ? "bg-slate-900/30 border border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                      : "bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                <Droplet className="w-3.5 h-3.5 text-teal-500" />
+                <Droplet className={`w-3.5 h-3.5 shrink-0 ${activeTab === "water" ? (isDark ? "text-teal-400" : "text-teal-600") : "text-teal-500"}`} />
                 <span>มิเตอร์น้ำ</span>
               </button>
             </div>
