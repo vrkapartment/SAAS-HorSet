@@ -559,6 +559,11 @@ export default function TenantsPage() {
       return
     }
 
+    if (new Date(editContractEnd) < new Date(editContractStart)) {
+      showToast("วันสิ้นสุดสัญญาต้องไม่เกิดขึ้นก่อนวันเริ่มสัญญา", "error")
+      return
+    }
+
     setEditSubmitting(true)
     try {
       const res = await updateTenant(
@@ -1196,7 +1201,7 @@ export default function TenantsPage() {
                           <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
                             <div className="flex items-center justify-between text-sm sm:text-base">
                               <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่า:</span>
-                              <span className="font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
+                              <span className="font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5 truncate min-w-0 flex-1 justify-end ml-4" title={t.fullName}>
                                 <Users className="w-4 h-4 text-slate-400 shrink-0" />
                                 {t.fullName}
                               </span>
@@ -1389,7 +1394,7 @@ export default function TenantsPage() {
                         <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
                           <div className="flex items-center justify-between text-sm sm:text-base">
                             <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่าเก่า:</span>
-                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate max-w-[180px]" title={t.fullName}>
+                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate min-w-0 flex-1 justify-end ml-4" title={t.fullName}>
                               <Users className="w-4 h-4 text-slate-400 shrink-0" />
                               {t.fullName}
                             </span>
@@ -1700,7 +1705,7 @@ export default function TenantsPage() {
               <button
                 type="button"
                 onClick={() => setIsTemplateGuideModalOpen(false)}
-                className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-base md:text-lg font-black rounded-2xl shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer"
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-base md:text-lg font-bold rounded-2xl shadow-lg hover:shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
               >
                 รับทราบและเข้าใจคำแนะนำ
               </button>
@@ -1719,7 +1724,7 @@ export default function TenantsPage() {
                   <Edit className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                  <h3 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                     แก้ไขข้อมูลผู้เช่า
                   </h3>
                   <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
@@ -1743,7 +1748,7 @@ export default function TenantsPage() {
             <form onSubmit={handleEditSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
               {/* Full Name */}
               <div className="space-y-1.5">
-                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
                   ชื่อ-นามสกุลผู้เช่า
                 </label>
                 <input
@@ -1751,14 +1756,14 @@ export default function TenantsPage() {
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-bold"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-medium"
                   placeholder="กรุณากรอกชื่อ-นามสกุล"
                 />
               </div>
 
               {/* Phone */}
               <div className="space-y-1.5">
-                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
                   เบอร์โทรศัพท์ผู้เช่า
                 </label>
                 <input
@@ -1773,7 +1778,7 @@ export default function TenantsPage() {
 
               {/* Room Number */}
               <div className="space-y-1.5 relative">
-                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
                   หมายเลขห้องพัก (Room Number)
                 </label>
                 
@@ -1781,11 +1786,11 @@ export default function TenantsPage() {
                 <button
                   type="button"
                   onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-bold cursor-pointer flex justify-between items-center text-slate-850 dark:text-slate-100"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold cursor-pointer flex justify-between items-center text-slate-850 dark:text-slate-100"
                 >
                   <span>
                     ห้อง {editRoomNumber}{" "}
-                    <span className={editRoomNumber === selectedTenant.roomNumber ? "text-[#FFAF00]" : "text-emerald-600 dark:text-emerald-400"}>
+                    <span className={editRoomNumber === selectedTenant.roomNumber ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
                       {editRoomNumber === selectedTenant.roomNumber ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
                     </span>
                   </span>
@@ -1808,14 +1813,14 @@ export default function TenantsPage() {
                               setEditRoomNumber(roomNum)
                               setIsRoomDropdownOpen(false)
                             }}
-                            className={`w-full px-4 py-3 text-left text-sm md:text-base hover:bg-slate-50 dark:hover:bg-slate-950/40 font-mono font-bold transition-colors flex justify-between items-center ${
+                            className={`w-full px-4 py-3 text-left text-sm md:text-base hover:bg-slate-50 dark:hover:bg-slate-950/40 font-mono font-semibold transition-colors flex justify-between items-center ${
                               editRoomNumber === roomNum 
                                 ? "bg-slate-50/50 dark:bg-slate-950/10 text-slate-900 dark:text-white" 
                                 : "text-slate-750 dark:text-slate-200"
                             }`}
                           >
                             <span>ห้อง {roomNum}</span>
-                            <span className={isCurrent ? "text-[#FFAF00]" : "text-emerald-600 dark:text-emerald-400"}>
+                            <span className={isCurrent ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
                               {isCurrent ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
                             </span>
                           </button>
@@ -1829,7 +1834,7 @@ export default function TenantsPage() {
               {/* Date Start & End */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                  <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
                     วันเริ่มสัญญา
                   </label>
                   <input
@@ -1841,7 +1846,7 @@ export default function TenantsPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block">
+                  <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
                     วันสิ้นสุดสัญญา
                   </label>
                   <input
@@ -1856,7 +1861,7 @@ export default function TenantsPage() {
 
               {/* LINE User ID */}
               <div className="space-y-1.5">
-                <label className="text-xs md:text-sm font-black text-slate-750 dark:text-slate-300 block flex items-center justify-between">
+                <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block flex items-center justify-between">
                   <span>LINE User ID</span>
                   <span className="text-[10px] text-red-500 dark:text-red-400 font-bold uppercase tracking-wider">ล็อคสิทธิ์แก้ไข</span>
                 </label>
@@ -1885,7 +1890,7 @@ export default function TenantsPage() {
                 <button
                   type="submit"
                   disabled={editSubmitting}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs md:text-sm font-black rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   {editSubmitting ? (
                     <>
