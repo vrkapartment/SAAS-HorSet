@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Building, Gauge, Receipt, FileText, BellRing, ArrowRight, Sparkles } from "lucide-react"
+import { Gauge, Receipt, FileText, BellRing, ArrowRight, Sparkles } from "lucide-react"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { LanguageToggle } from "@/components/LanguageToggle"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
@@ -19,8 +19,8 @@ export default function LandingPage() {
       {/* Header ของ Landing Page */}
       <header className="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center relative z-10">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-blue-600 dark:bg-blue-500 rounded-xl shadow-lg shadow-blue-500/15">
-            <Building className="w-5 h-5 text-white" />
+          <div className="p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-md w-9 h-9 flex items-center justify-center transition-transform duration-300 hover:scale-105">
+            <img src="/icon-512x512.png" className="w-7 h-7 object-contain" alt="HorSet Logo" />
           </div>
           <span className="text-xl font-bold tracking-wide text-slate-900 dark:text-white">
             HorSet <span className="text-blue-600 dark:text-blue-500">หอเสร็จ</span>

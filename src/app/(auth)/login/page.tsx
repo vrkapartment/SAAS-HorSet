@@ -267,10 +267,9 @@ export default function LoginPage() {
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* โลโก้และหัวข้อโปรเจกต์ */}
       <div className="text-center z-10 mb-8 flex flex-col items-center">
         <div className="inline-flex items-center justify-center p-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl shadow-xl shadow-blue-500/10 mb-3 w-16 h-16 transition-transform duration-300 hover:scale-105">
-          <img src="/horset_icon.png" className="w-12 h-12 object-contain" alt="HorSet Logo" />
+          <img src="/icon-512x512.png" className="w-12 h-12 object-contain" alt="HorSet Logo" />
         </div>
         <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-400">
           HorSet <span className="text-blue-500 font-semibold">(หอเสร็จ)</span>
