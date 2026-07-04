@@ -481,7 +481,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             const isUserAdminOrSuper = profileData.role === "admin" || profileData.role === "super_admin"
             const defaultPerms = isUserAdminOrSuper ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS
 
-            if (profileData.permissions) {
+            if (isUserAdminOrSuper) {
+              setUserPermissions(ADMIN_DEFAULT_PERMISSIONS)
+            } else if (profileData.permissions) {
               let perms = profileData.permissions
               if (typeof perms === "string") {
                 try {
