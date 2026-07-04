@@ -762,42 +762,6 @@ export default function TenantPortal() {
                 ขอบคุณสำหรับการชำระเงินรอบเดือนนี้อย่างตรงเวลา ทางแสนสุขแมนชั่นได้รับเงินโอนและบันทึกสิทธิ์เรียบร้อยแล้ว
               </p>
             </div>
-            <div className="pt-2">
-              <button
-                onClick={async () => {
-                  if (isDemo) {
-                    setBillStatus("unpaid")
-                    setUploadedSlip(null)
-                    const savedBills = getCookie("horset_bills")
-                    if (savedBills) {
-                      try {
-                        const bills = JSON.parse(decodeURIComponent(savedBills))
-                        const updatedBills = bills.map((b: any) => {
-                          if (b.roomNumber === "105" && b.billingCycle === "2026-06") {
-                            return { ...b, status: "unpaid", slipUrl: null, amount: baseRent + elecAmount + waterAmount + commonAreaFee }
-                          }
-                          return b
-                        })
-                        setCookie("horset_bills", encodeURIComponent(JSON.stringify(updatedBills)))
-                      } catch (e) {
-                        console.error(e)
-                      }
-                    }
-                  } else {
-                    if (!bill) return
-                    const res = await updateBillStatus(bill.id, "unpaid", null, baseRent + elecAmount + waterAmount + commonAreaFee)
-                    if (res.success) {
-                      setBillStatus("unpaid")
-                      setUploadedSlip(null)
-                      loadPortalData()
-                    }
-                  }
-                }}
-                className="text-xs text-slate-500 hover:text-slate-300 transition-colors underline"
-              >
-                (คลิกทดสอบ: สลับกลับไปเป็นยังไม่ได้ชำระอีกครั้ง)
-              </button>
-            </div>
           </div>
         )}
 
