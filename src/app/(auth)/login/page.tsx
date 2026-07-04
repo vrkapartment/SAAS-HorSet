@@ -276,7 +276,7 @@ export default function LoginPage() {
           HorSet <span className="text-blue-500 font-semibold">(หอเสร็จ)</span>
         </h1>
         <p className="text-slate-400 mt-2 text-sm max-w-xs mx-auto">
-          ระบบ SaaS บริหารจัดการหอพักและอพาร์ทเมนต์ครบวงจร
+          ระบบจัดการหอพักและอพาร์ทเมนต์ครบวงจร
         </p>
       </div>
 
@@ -289,18 +289,6 @@ export default function LoginPage() {
             <h2 className="text-xl font-medium text-slate-200 mb-2 flex items-center gap-2">
               <Lock className="w-5 h-5 text-blue-400" /> เข้าสู่ระบบผู้ใช้
             </h2>
-
-            {/* บาจแสดงสถานะเชื่อมต่อ Supabase */}
-            {isDemo ? (
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-[11px] flex items-center gap-2 mb-4">
-                <span>⚠️ โหมดจำลอง (ยังไม่ได้เชื่อมต่อ Supabase)</span>
-              </div>
-            ) : (
-              <div className="p-3 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl text-[11px] flex items-center gap-2 mb-4">
-                <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-ping" />
-                <span>เชื่อมต่อฐานข้อมูล Supabase แล้ว</span>
-              </div>
-            )}
 
             {/* แสดง Error */}
             {error && (
