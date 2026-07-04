@@ -1620,7 +1620,7 @@ function ManageBillsContent() {
       {/* Filter Tabs Row */}
       <div className="flex flex-wrap items-center justify-between gap-3 mt-6 mb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`text-xs xl:text-sm 2xl:text-base font-bold uppercase tracking-wider mr-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+          <span className={`text-xs xl:text-xs 2xl:text-sm font-bold uppercase tracking-wider mr-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
             ตัวกรองบิล:
           </span>
           {[
@@ -1632,7 +1632,7 @@ function ManageBillsContent() {
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id as any)}
-              className={`px-4 py-2 xl:px-5 xl:py-2.5 2xl:px-6 2xl:py-3.5 rounded-xl text-xs xl:text-sm 2xl:text-base font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
+              className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
                 statusFilter === tab.id
                   ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
                   : isDark
@@ -1641,7 +1641,7 @@ function ManageBillsContent() {
               }`}
             >
               <span>{tab.label}</span>
-              <span className={`text-[10px] xl:text-xs 2xl:text-sm px-1.5 py-0.5 xl:px-2 xl:py-1 rounded-md font-mono ${
+              <span className={`text-[10px] xl:text-[10px] 2xl:text-xs px-1.5 py-0.5 xl:px-1.5 xl:py-0.5 2xl:px-2 2xl:py-1 rounded-md font-mono ${
                 statusFilter === tab.id
                   ? "bg-white/20 text-white dark:bg-black/10 dark:text-slate-900"
                   : isDark ? "bg-slate-800 text-slate-350" : "bg-slate-100 text-slate-600"

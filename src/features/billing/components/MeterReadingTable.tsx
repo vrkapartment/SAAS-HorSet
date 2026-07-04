@@ -562,7 +562,7 @@ export default function MeterReadingTable({
               <button
                 type="button"
                 onClick={() => setActiveTab("electric")}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-lg text-xs xl:text-xs 2xl:text-sm font-bold transition-all cursor-pointer ${
                   activeTab === "electric"
                     ? (isDark ? "bg-blue-950/30 text-blue-405 border border-blue-500/20 shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm")
                     : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
@@ -574,7 +574,7 @@ export default function MeterReadingTable({
               <button
                 type="button"
                 onClick={() => setActiveTab("water")}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-lg text-xs xl:text-xs 2xl:text-sm font-bold transition-all cursor-pointer ${
                   activeTab === "water"
                     ? (isDark ? "bg-teal-950/30 text-teal-405 border border-teal-500/20 shadow-sm" : "bg-teal-50 text-teal-700 border border-teal-200 shadow-sm")
                     : (isDark ? "text-slate-500 hover:text-slate-455" : "text-slate-500 hover:text-slate-700")
@@ -585,13 +585,13 @@ export default function MeterReadingTable({
               </button>
             </div>
           ) : (
-            <div className={`text-xs font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+            <div className={`text-xs xl:text-xs 2xl:text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
               รายการบิลค่าเช่าประจำรอบบิล
             </div>
           )}
           
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold border ${
+            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-lg text-[10px] xl:text-xs 2xl:text-sm font-semibold border ${
               isDark ? "bg-slate-900/30 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
@@ -608,7 +608,7 @@ export default function MeterReadingTable({
                     type="button"
                     onClick={handleDownloadAllBillsPdf}
                     disabled={downloadingAllPdf}
-                    className={`w-full sm:w-auto h-9 px-4 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-95 cursor-pointer ${
+                    className={`w-full sm:w-auto h-9 xl:h-10 2xl:h-11 px-4 xl:px-4.5 2xl:px-5 text-xs xl:text-xs 2xl:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-95 cursor-pointer ${
                       downloadingAllPdf
                         ? "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
                         : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-500/10 hover:shadow-blue-500/20"
@@ -641,7 +641,7 @@ export default function MeterReadingTable({
                     setBulkSendModalOpen(true)
                   }}
                   disabled={!permissions.billing_send_line}
-                  className={`w-full sm:w-auto h-9 px-4 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] ${
+                  className={`w-full sm:w-auto h-9 xl:h-10 2xl:h-11 px-4 xl:px-4.5 2xl:px-5 text-xs xl:text-xs 2xl:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] ${
                     !permissions.billing_send_line
                       ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
                       : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20"
