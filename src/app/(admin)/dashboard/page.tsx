@@ -691,7 +691,7 @@ function AdminDashboardContent() {
           {/* ปุ่ม "ออกบิลเดือนนี้" */}
           <button
             onClick={() => router.push("/billing")}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
             <Receipt className="w-4 h-4" />
             <span>ออกบิลเดือนนี้</span>
@@ -859,17 +859,17 @@ function AdminDashboardContent() {
             {/* MOBILE VIEW GRID (< 768px, Large 48px touch targets, comfortable spaces) */}
             <div className="grid grid-cols-2 gap-3.5 md:hidden">
               {[
-                { label: t("dashboard.action_meter"), sub: "Utility Meter", path: "/billing", icon: Receipt, bg: "from-blue-500/10 to-blue-500/5 text-blue-500 border-blue-500/20 dark:border-blue-500/30" },
-                { label: t("dashboard.action_bill"), sub: "New Month Bill", path: "/manage-bills", icon: Plus, bg: "from-teal-500/10 to-teal-500/5 text-teal-500 border-teal-500/20 dark:border-teal-500/30" },
-                { label: t("dashboard.action_tenants"), sub: "Manage Tenants", path: "/tenants", icon: Users, bg: "from-indigo-500/10 to-indigo-500/5 text-indigo-500 border-indigo-500/20 dark:border-indigo-500/30" },
-                { label: t("dashboard.action_expense"), sub: "Daily Expense", path: "/daily-bills", icon: Coins, bg: "from-amber-500/10 to-amber-500/5 text-amber-500 border-amber-500/20 dark:border-amber-500/30" }
+                { label: t("dashboard.action_meter"), sub: "Utility Meter", path: "/billing", icon: Receipt, bg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-500/30" },
+                { label: t("dashboard.action_bill"), sub: "New Month Bill", path: "/manage-bills", icon: Plus, bg: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20 dark:border-teal-500/30" },
+                { label: t("dashboard.action_tenants"), sub: "Manage Tenants", path: "/tenants", icon: Users, bg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 dark:border-indigo-500/30" },
+                { label: t("dashboard.action_expense"), sub: "Daily Expense", path: "/daily-bills", icon: Coins, bg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/30" }
               ].map((act, idx) => {
                 const Icon = act.icon
                 return (
                   <button
                     key={idx}
                     onClick={() => router.push(act.path)}
-                    className={`flex flex-col justify-between p-4 bg-gradient-to-br ${act.bg} border rounded-2xl active:scale-95 active:shadow-inner transition-all text-left shadow-sm h-24 cursor-pointer`}
+                    className={`flex flex-col justify-between p-4 ${act.bg} border rounded-2xl active:scale-95 active:shadow-inner transition-all text-left shadow-sm h-24 cursor-pointer`}
                   >
                     <div className="p-2 bg-white dark:bg-slate-900 rounded-xl w-fit shadow-sm">
                       <Icon className="w-5 h-5" />
