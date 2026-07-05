@@ -1396,6 +1396,11 @@ function UnifiedBillingContent() {
       return
     }
 
+    if (item.billStatus === "paid") {
+      alert(`ห้อง ${roomNumber} ชำระเงินแล้ว`)
+      return
+    }
+
     try {
       const elecUnitsUsed = item.elecCurr !== "" ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
       const waterUnitsUsed = item.waterCurr !== "" ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0

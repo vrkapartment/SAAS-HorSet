@@ -480,6 +480,11 @@ export default function MeterReadingTable({
         const item = connectedRooms[i]
         setBulkSendingProgress({ current: i + 1, total: connectedRooms.length, currentRoom: item.roomNumber })
         
+        if (item.billStatus === "paid") {
+          results[item.roomNumber] = { success: false, error: "ชำระเงินแล้ว" }
+          continue
+        }
+
         const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
         const lineUserId = roomInfo?.lineUserId
 
@@ -2244,16 +2249,24 @@ export default function MeterReadingTable({
                           <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                             {bulkSendingStatus === "idle" && (
                               <button
-                                onClick={() => handleSendLine(item.roomNumber)}
+                                onClick={() => {
+                                  if (item.billStatus === "paid") {
+                                    alert(`ห้อง ${item.roomNumber} ชำระเงินแล้ว`)
+                                    return
+                                  }
+                                  handleSendLine(item.roomNumber)
+                                }}
                                 disabled={!permissions.billing_send_line}
                                 className={`h-7 px-2.5 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 transition-all shadow-sm ${
                                   !permissions.billing_send_line
                                     ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
-                                    : isDark 
-                                      ? "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/30 hover:text-emerald-300 cursor-pointer" 
-                                      : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                                    : item.billStatus === "paid"
+                                      ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60"
+                                      : isDark 
+                                        ? "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/30 hover:text-emerald-300 cursor-pointer" 
+                                        : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800 cursor-pointer"
                                 }`}
-                                title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
+                                title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : item.billStatus === "paid" ? `ห้อง ${item.roomNumber} ชำระเงินแล้ว` : undefined}
                               >
                                 <Send className="w-3 h-3" />
                                 <span className="whitespace-nowrap">ส่ง LINE OA</span>
@@ -2275,8 +2288,15 @@ export default function MeterReadingTable({
                                   สำเร็จแล้ว ✅
                                 </span>
                               ) : (
-                                <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20 whitespace-nowrap" title={result.error}>
-                                  ล้มเหลว ❌
+                                <span 
+                                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                                    result.error === "ชำระเงินแล้ว"
+                                      ? "text-blue-500 bg-blue-500/10 border-blue-500/20"
+                                      : "text-red-500 bg-red-500/10 border-red-500/20"
+                                  }`} 
+                                  title={result.error}
+                                >
+                                  {result.error === "ชำระเงินแล้ว" ? "ชำระเงินแล้ว 💰" : "ล้มเหลว ❌"}
                                 </span>
                               )
                             )}

@@ -1282,6 +1282,11 @@ function ManageBillsContent() {
       return
     }
 
+    if (item.billStatus === "paid") {
+      alert(`ห้อง ${roomNumber} ชำระเงินแล้ว`)
+      return
+    }
+
     try {
       const elecUnitsUsed = item.elecCurr !== ""
         ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr))

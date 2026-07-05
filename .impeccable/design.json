@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-04T00:17:30Z",
+  "title": "Design System: HorSet (หอเสร็จ)",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Primary Blue Light",
+        "canonical": "oklch(0.55 0.21 260)",
+        "tonalRamp": ["#eff6ff", "#dbeafe", "#bfdbfe", "#93c5fd", "#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"]
+      },
+      "primary-dark": {
+        "role": "primary",
+        "displayName": "Primary Blue Dark",
+        "canonical": "oklch(0.65 0.20 260)",
+        "tonalRamp": ["#eff6ff", "#dbeafe", "#bfdbfe", "#93c5fd", "#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Secondary Indigo Light",
+        "canonical": "oklch(0.50 0.20 275)",
+        "tonalRamp": ["#eef2ff", "#e0e7ff", "#c7d2fe", "#a5b4fc", "#818cf8", "#6366f1", "#4f46e5", "#4338ca"]
+      },
+      "secondary-dark": {
+        "role": "secondary",
+        "displayName": "Secondary Indigo Dark",
+        "canonical": "oklch(0.68 0.16 275)",
+        "tonalRamp": ["#eef2ff", "#e0e7ff", "#c7d2fe", "#a5b4fc", "#818cf8", "#6366f1", "#4f46e5", "#4338ca"]
+      },
+      "neutral-bg-light": {
+        "role": "neutral",
+        "displayName": "Background Light",
+        "canonical": "oklch(0.98 0.005 240)",
+        "tonalRamp": ["#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b", "#475569", "#334155"]
+      },
+      "neutral-bg-dark": {
+        "role": "neutral",
+        "displayName": "Background Dark",
+        "canonical": "oklch(0.12 0.012 240)",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f8fafc"]
+      },
+      "slate-150": {
+        "role": "neutral",
+        "displayName": "Slate 150 (Skeleton Light)",
+        "canonical": "oklch(0.95 0.005 240)",
+        "tonalRamp": ["#f8fafc", "#f1f5f9", "#eef2f6", "#e2e8f0", "#cbd5e1", "#94a3b8", "#475569", "#0f172a"]
+      },
+      "slate-450": {
+        "role": "neutral",
+        "displayName": "Slate 450 (Muted Icon Light)",
+        "canonical": "oklch(0.62 0.015 240)",
+        "tonalRamp": ["#cbd5e1", "#94a3b8", "#7e8ea2", "#64748b", "#475569", "#334155", "#1e293b", "#0f172a"]
+      },
+      "slate-550": {
+        "role": "neutral",
+        "displayName": "Slate 550 (Muted Text Light)",
+        "canonical": "oklch(0.48 0.018 240)",
+        "tonalRamp": ["#94a3b8", "#7e8ea2", "#556579", "#475569", "#334155", "#1e293b", "#0f172a", "#090e1a"]
+      },
+      "slate-850": {
+        "role": "neutral",
+        "displayName": "Slate 850 (Surface Slate Dark)",
+        "canonical": "oklch(0.24 0.02 240)",
+        "tonalRamp": ["#475569", "#334155", "#1e293b", "#151f32", "#0f172a", "#090e1a", "#020617", "#000000"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Text", "purpose": "Main dashboard summaries and hero counters." },
+      "headline": { "displayName": "Headline Text", "purpose": "Section headings and card headers." },
+      "body": { "displayName": "Body Prose", "purpose": "Descriptions, table records, and form labels." },
+      "label": { "displayName": "Label Text", "purpose": "Statuses, badges, and minor footnotes." }
+    },
+    "shadows": [
+      {
+        "name": "card-rest",
+        "value": "0 2px 10px -3px rgba(6, 81, 237, 0.1)",
+        "purpose": "Resting elevation state of cards on a slate-50 background."
+      },
+      {
+        "name": "card-hover",
+        "value": "0 4px 20px -2px rgba(6, 81, 237, 0.15)",
+        "purpose": "Feedback hover state elevation for actionable cards."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default timing and easing curve for all state transitions."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Standard action button for critical SaaS transactions (e.g. Save, Send Bill).",
+      "html": "<button class=\"ds-btn-primary\">บันทึกข้อมูล</button>",
+      "css": ".ds-btn-primary { background-color: #2563eb; color: #ffffff; padding: 12px 24px; font-family: 'Prompt', sans-serif; font-size: 14px; font-weight: 500; border: none; border-radius: 12px; cursor: pointer; transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); min-height: 44px; display: inline-flex; align-items: center; justify-content: center; } .ds-btn-primary:hover { background-color: #1d4ed8; transform: translateY(-0.5px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); } .ds-btn-primary:active { transform: scale(0.95); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Used for supporting and secondary layout options.",
+      "html": "<button class=\"ds-btn-secondary\">ยกเลิก</button>",
+      "css": ".ds-btn-secondary { background-color: #4f46e5; color: #ffffff; padding: 12px 24px; font-family: 'Prompt', sans-serif; font-size: 14px; font-weight: 500; border: none; border-radius: 12px; cursor: pointer; transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); min-height: 44px; display: inline-flex; align-items: center; justify-content: center; } .ds-btn-secondary:hover { background-color: #4338ca; transform: translateY(-0.5px); } .ds-btn-secondary:active { transform: scale(0.95); }"
+    },
+    {
+      "name": "Feature Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Standard container for grouping lists, forms, and summaries.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">ข้อมูลห้องพัก</h3><p class=\"ds-card-desc\">ห้อง 101 - สถานะ: ว่าง</p></div>",
+      "css": ".ds-card { background-color: #ffffff; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 16px; padding: 24px; box-shadow: 0 2px 10px -3px rgba(6, 81, 237, 0.1); transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px -2px rgba(6, 81, 237, 0.15); } .ds-card-title { font-family: 'Prompt', sans-serif; font-size: 18px; font-weight: 600; color: #0f172a; margin: 0 0 8px 0; } .ds-card-desc { font-family: 'Prompt', sans-serif; font-size: 14px; color: #475569; margin: 0; }"
+    },
+    {
+      "name": "Glassmorphic Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Premium glassmorphic background container utilizing backdrop filter blurring.",
+      "html": "<div class=\"ds-glass-card\"><h4 class=\"ds-glass-title\">ยอดมิเตอร์ล่าสุด</h4><p class=\"ds-glass-desc\">ไฟฟ้า: 324 หน่วย (รอการจดรอบถัดไป)</p></div>",
+      "css": ".ds-glass-card { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 16px; padding: 20px; transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-glass-card:hover { background: rgba(255, 255, 255, 0.85); border-color: rgba(37, 99, 235, 0.2); } .ds-glass-title { font-family: 'Prompt', sans-serif; font-size: 16px; font-weight: 600; color: #0f172a; margin: 0 0 6px 0; } .ds-glass-desc { font-family: 'Prompt', sans-serif; font-size: 14px; color: #475569; margin: 0; }"
+    },
+    {
+      "name": "Standard Input Field",
+      "kind": "input",
+      "refersTo": "card",
+      "description": "Form input field utilizing 16px (text-base) mobile zoom-protection baseline.",
+      "html": "<div class=\"ds-field-group\"><label class=\"ds-field-label\">ค่าไฟฟ้าต่อหน่วย (บาท)</label><input type=\"decimal\" class=\"ds-input\" inputmode=\"decimal\" placeholder=\"7.00\" /></div>",
+      "css": ".ds-field-group { display: flex; flex-direction: column; gap: 6px; } .ds-field-label { font-family: 'Prompt', sans-serif; font-size: 12px; font-weight: 500; color: #475569; } .ds-input { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 16px; font-family: 'Prompt', sans-serif; font-size: 16px; color: #0f172a; outline: none; transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); min-height: 44px; } .ds-input::placeholder { color: #94a3b8; } .ds-input:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Modern Thai Sanctuary",
+    "overview": "ระบบการออกแบบของ HorSet (หอเสร็จ) มุ่งเน้นการส่งมอบประสบการณ์ระดับพรีเมียม (Premium SaaS Standard) ที่สะอาดตา น่าเชื่อถือ และลื่นไหลอย่างเป็นธรรมชาติผ่านโครงสร้างเลย์เอาต์แบบ Adaptive การออกแบบให้ความรู้สึกมั่นคง ปลอดภัย ด้วยการใช้สัดส่วนพื้นที่ว่าง (Whitespace) ที่กว้างขวาง สบายตา ร่วมกับตัวอักษรไร้หัวสมัยใหม่และมิติแสงเงาที่บางเบา ช่วยลดภาระทางสมองของทั้งผู้ดูแลระบบ (Admin) ในการคำนวณบิล และผู้เช่า (Tenant) ในการชำระเงินผ่านมือถือ",
+    "keyCharacteristics": [
+      "Adaptive Layout Switching: แสดงผล Sidebar ด้านซ้ายและตารางข้อมูลบน Desktop แต่สลับเป็นแถบเมนูด้านล่างและการ์ดข้อมูลแนวตั้งบนสมาร์ทโฟนทันที",
+      "Rigid Viewport Axis: ล็อกแกนแนวนอนของหน้าจอบนอุปกรณ์พกพาด้วย overscroll-behavior-x: none และ touch-action: pan-y ป้องกันการปัดขอบจอเพื่อถอยหลัง/ไปข้างหน้าของบราวเซอร์",
+      "Ultra-Readable Contrast: ข้อความเนื้อหาและข้อความรองทั้งหมดมีอัตราส่วนความคมชัดผ่านเกณฑ์ WCAG AA เสมอ ไม่มีปัญหาสีเทาจางบนพื้นหลังขาว",
+      "Perfect Touch Targets: องค์ประกอบปฏิสัมพันธ์และปุ่มกดบนอุปกรณ์พกพามีขนาดสัมผัสขั้นต่ำ 44px ถึง 48px เสมอ ป้องกันการกดพลาด",
+      "Subtle Glassmorphism: ใช้เอฟเฟกต์เบลอหลังกระจกในส่วนหัว (Navbar) และส่วนเมนูด้านล่างบนมือถือด้วยคลาส .glass-panel และ .glass-card"
+    ],
+    "rules": [
+      {
+        "name": "The 4.5:1 Legibility Rule",
+        "body": "ข้อความรองหรือ Muted Text ทั้งหมดใน Light Mode ห้ามใช้สีต่ำกว่า --slate-600 (#475569) บนพื้นหลัง slate-50 เพื่อให้ได้อัตราส่วนความคมชัดมากกว่า 5:1 ผ่านเกณฑ์ความทุพพลภาพทางสายตาของผู้ดูแลระบบกลุ่มผู้ใหญ่",
+        "section": "colors"
+      },
+      {
+        "name": "The Hue-Tinted Neutral Rule",
+        "body": "สีเทาโทนกลางในทุกๆ จุดต้องถูกผสมสีครามแอลป์ (Slate-hue) เสมอ เพื่อหลีกเลี่ยงสีเทาแข็งๆ แบบ AI default และมอบความรู้สึกนุ่มนวลพรีเมียม",
+        "section": "colors"
+      },
+      {
+        "name": "The Line-Height Release Rule",
+        "body": "ภาษาไทยเป็นภาษาที่มีสระบนและล่างหนาแน่น ตัวหนังสือเนื้อความหลักต้องกำหนด leading-relaxed (line-height ~1.6) เสมอ เพื่อป้องกันสระชนกันและคงพื้นที่ว่างเพื่อความสวยงาม",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-Resting Rule",
+        "body": "การ์ดและพาเนลทั้งหมดต้องอยู่นิ่งบนพื้นผิวโดยปราศจากเงาที่หนาเตอะหรือสีสด เงาและมิติแผ่กว้างจะปรากฏขึ้นก็ต่อเมื่อผู้ใช้ชี้เมาส์ (Hover) หรือสัมผัสกดลงไปเท่านั้น",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do ใช้คลาสของ Tailwind ที่รองรับ Safe Area บนอุปกรณ์พกพา เช่น pb-safe หรือการตั้งระยะเผื่อช่องเมนูด้านล่าง pb-20 เสมอ",
+      "Do ใช้ Skeleton Screen (animate-pulse bg-slate-100) สำหรับแสดงผลช่วงโหลดข้อมูล แทนการปล่อยจอขาวหรือขึ้น Spinner หมุนๆ",
+      "Do กำหนดฟิลด์ตัวเลขค่าเงินและหน่วยไฟฟ้าให้รองรับ inputmode=\"decimal\" เสมอเพื่อให้แป้นพิมพ์ตัวเลขแสดงทันทีบนสมาร์ทโฟน",
+      "Do สร้างกล่องยืนยันการลบข้อมูล (Confirm Modal) ที่ปลอดภัย และมีปุ่มลบชัดเจนด้วย bg-red-50 text-red-600 ทุกครั้งก่อนกระทำการสำคัญ"
+    ],
+    "donts": [
+      "Don't ใช้สไตล์ขอบข้างการ์ดเป็นเส้นสีหนาๆ (Side-Stripe borders เช่น border-l-4 border-blue-600) ซึ่งส่งผลต่อสายตาและดูเป็นเทมเพลตสำเร็จรูป",
+      "Don't ทำรูปภาพขยายเมื่อชี้ (Scale-up on Hover) บนแท็ก <img> ใดๆ ในเว็บแอปพลิเคชัน เพื่อป้องกันความรู้สึกเกร่อและรกรุงรังของอนิเมชันสำเร็จรูป",
+      "Don't ซ่อนลิงก์ ปลุกเร้า หรือองค์ประกอบสัญกรณ์กิจกรรมหลักภายใต้สถานะ Hover เด็ดขาด เพื่อคงความพร้อมใช้บนหน้าจอมือถือซึ่งปราศจากกลไก Hover เมาส์",
+      "Don't ปล่อยหน้าจอตารางเปล่าเมื่อไม่มีข้อมูลเด็ดขาด ทุกหน้าตารางต้องมีภาพหรือไอคอน Empty State สีจางกลางจอ พร้อมบอกผู้ใช้งานและมีปุ่มกระตุ้น \"+ เพิ่มข้อมูลรายการแรก\" เสมอ",
+      "Don't บังคับให้ผู้ใช้งานเลื่อนสไลด์ตารางที่มีหลายคอลัมน์ในแนวนอนบนอุปกรณ์พกพา ให้สลับโครงสร้างเลย์เอาต์การตารางแบบ Desktop ไปแสดงผลในรูปแบบการ์ดแนวตั้งบน Mobile แทนเสมอ",
+      "Don't ใช้ตัวหนังสือไล่โทนสีรุ้ง/นีออนหรือไล่เฉดสี (Gradient text) บนพาดหัวหรือฉลากแสดงผล เนื่องจากสูญเสียสุนทรียภาพและความน่าเชื่อถือของแพลตฟอร์มการจัดการการเงิน"
+    ]
+  }
+}
