@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare, Edit3, Lock, Wrench } from "lucide-react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
 import { saveMeterReplacement, deleteMeterReplacement } from "@/features/meter/actions"
@@ -101,6 +101,7 @@ export default function MeterReadingTable({
   const [bulkSendingProgress, setBulkSendingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
   const [bulkSendResults, setBulkSendResults] = useState<{ [room: string]: { success: boolean; error?: string } }>({})
   const [copiedRooms, setCopiedRooms] = useState<{ [room: string]: boolean }>({})
+  const [copiedLinks, setCopiedLinks] = useState<{ [room: string]: boolean }>({})
   const [unlockedPaidRooms, setUnlockedPaidRooms] = useState<Record<string, boolean>>({})
 
   // --- มิเตอร์หมุนเวียนครบรอบ (Meter Rollover) & เปลี่ยนมิเตอร์ (Meter Replacement) Helpers ---
@@ -455,6 +456,65 @@ export default function MeterReadingTable({
       setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: true }))
       setTimeout(() => {
         setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: false }))
+      }, 3500)
+    } else {
+      alert("เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง")
+    }
+  }
+
+  // ฟังก์ชันสำหรับคัดลอกเฉพาะลิงก์ portal
+  const handleCopyPortalLink = async (item: any) => {
+    if (!permissions.billing_copy_summary) {
+      alert("คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      return
+    }
+
+    let portalLink = ""
+    if (currentWorkspaceId) {
+      const res = await generateSecurePortalLinkAction(currentWorkspaceId, item.roomNumber)
+      if (res.success && res.link) {
+        portalLink = res.link
+      } else {
+        const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
+        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_number=${encodeURIComponent(item.roomNumber)}`
+      }
+    } else {
+      const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
+      portalLink = `${safeAppUrl}/portal`
+    }
+
+    let copied = false
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(portalLink)
+        copied = true
+      } catch (err) {
+        console.warn("Navigator clipboard failed, trying fallback:", err)
+      }
+    }
+
+    if (!copied) {
+      try {
+        const textArea = document.createElement("textarea")
+        textArea.value = portalLink
+        textArea.style.position = "fixed"
+        textArea.style.top = "0"
+        textArea.style.left = "0"
+        textArea.style.opacity = "0"
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        copied = document.execCommand("copy")
+        document.body.removeChild(textArea)
+      } catch (err) {
+        console.error("Fallback clipboard copy failed:", err)
+      }
+    }
+
+    if (copied) {
+      setCopiedLinks(prev => ({ ...prev, [item.roomNumber]: true }))
+      setTimeout(() => {
+        setCopiedLinks(prev => ({ ...prev, [item.roomNumber]: false }))
       }, 3500)
     } else {
       alert("เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง")
@@ -2228,6 +2288,7 @@ export default function MeterReadingTable({
                   {connectedRooms.length > 0 ? (
                     connectedRooms.map(item => {
                       const result = bulkSendResults[item.roomNumber]
+                      const isCopied = copiedRooms[item.roomNumber]
                       return (
                         <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
@@ -2246,7 +2307,63 @@ export default function MeterReadingTable({
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap justify-end">
+                            {/* คัดลอกสรุปบิล */}
+                            <button
+                              onClick={() => handleCopySummary(item)}
+                              disabled={!permissions.billing_copy_summary}
+                              className={`h-8 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                                !permissions.billing_copy_summary
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
+                                  : isCopied
+                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                    : isDark 
+                                      ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
+                                      : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
+                              }`}
+                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล" : undefined}
+                            >
+                              {isCopied ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="whitespace-nowrap">คัดลอกแล้ว!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span className="whitespace-nowrap">คัดลอกสรุปบิล</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* คัดลอกลิงก์ portal */}
+                            <button
+                              onClick={() => handleCopyPortalLink(item)}
+                              disabled={!permissions.billing_copy_summary}
+                              className={`h-8 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                                !permissions.billing_copy_summary
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
+                                  : copiedLinks[item.roomNumber]
+                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                    : isDark 
+                                      ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
+                                      : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
+                              }`}
+                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal" : undefined}
+                            >
+                              {copiedLinks[item.roomNumber] ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="whitespace-nowrap">คัดลอกแล้ว!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Link className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                                  <span className="whitespace-nowrap">คัดลอกลิงก์ portal</span>
+                                </>
+                              )}
+                            </button>
+
                             {bulkSendingStatus === "idle" && (
                               <button
                                 onClick={() => {
@@ -2345,7 +2462,7 @@ export default function MeterReadingTable({
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap justify-end">
                             {/* ดาวน์โหลด PDF */}
                             <button
                               onClick={() => handleDownloadBillPdf(item)}
@@ -2395,6 +2512,34 @@ export default function MeterReadingTable({
                                 <>
                                   <Copy className="w-3.5 h-3.5" />
                                   <span className="whitespace-nowrap">คัดลอกสรุปบิล</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* คัดลอกลิงก์ portal */}
+                            <button
+                              onClick={() => handleCopyPortalLink(item)}
+                              disabled={!permissions.billing_copy_summary}
+                              className={`h-9 px-3.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                                !permissions.billing_copy_summary
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
+                                  : copiedLinks[item.roomNumber]
+                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                    : isDark 
+                                      ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
+                                      : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
+                              }`}
+                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal" : undefined}
+                            >
+                              {copiedLinks[item.roomNumber] ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="whitespace-nowrap">คัดลอกแล้ว!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Link className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                                  <span className="whitespace-nowrap">คัดลอกลิงก์ portal</span>
                                 </>
                               )}
                             </button>
