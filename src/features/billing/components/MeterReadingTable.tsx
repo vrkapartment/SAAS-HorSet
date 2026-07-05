@@ -2195,8 +2195,8 @@ export default function MeterReadingTable({
 
       {/* โมดอลสำหรับส่ง LINE OA แบบกลุ่ม */}
       {bulkSendModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className={`w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 md:p-7 rounded-3xl relative shadow-2xl border flex flex-col ${
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5 sm:p-6 md:p-10 bg-black/75 backdrop-blur-md">
+          <div className={`w-full max-w-xl md:max-w-3xl max-h-[88vh] overflow-y-auto p-5 sm:p-6 md:p-8 rounded-3xl relative shadow-2xl border flex flex-col ${
             isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
           }`}>
             {/* ปุ่มปิด */}
@@ -2278,7 +2278,7 @@ export default function MeterReadingTable({
             </div>
 
             {/* เนื้อหาหลักในโมดอล */}
-            <div className={`flex-1 border rounded-2xl p-4 overflow-y-auto min-h-[220px] max-h-[350px] mb-5 ${
+            <div className={`flex-1 border rounded-2xl p-4 sm:p-5 overflow-y-auto min-h-[220px] max-h-[350px] mb-5 ${
               isDark ? "bg-slate-950/20 border-slate-850" : "bg-slate-50 border-slate-150"
             }`}>
               
@@ -2290,7 +2290,7 @@ export default function MeterReadingTable({
                       const result = bulkSendResults[item.roomNumber]
                       const isCopied = copiedRooms[item.roomNumber]
                       return (
-                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border text-sm gap-3.5 transition-all ${
+                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -2308,34 +2308,6 @@ export default function MeterReadingTable({
                           </div>
                           
                           <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap justify-end">
-                            {/* คัดลอกสรุปบิล */}
-                            <button
-                              onClick={() => handleCopySummary(item)}
-                              disabled={!permissions.billing_copy_summary}
-                              className={`h-8 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
-                                !permissions.billing_copy_summary
-                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
-                                  : isCopied
-                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                    : isDark 
-                                      ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
-                                      : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
-                              }`}
-                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล" : undefined}
-                            >
-                              {isCopied ? (
-                                <>
-                                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                  <span className="whitespace-nowrap">คัดลอกแล้ว!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3.5 h-3.5" />
-                                  <span className="whitespace-nowrap">คัดลอกสรุปบิล</span>
-                                </>
-                              )}
-                            </button>
-
                             {/* คัดลอกลิงก์ portal */}
                             <button
                               onClick={() => handleCopyPortalLink(item)}
@@ -2445,7 +2417,7 @@ export default function MeterReadingTable({
                     unconnectedRooms.map(item => {
                       const isCopied = copiedRooms[item.roomNumber]
                       return (
-                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border text-sm gap-3.5 transition-all ${
+                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -2516,33 +2488,6 @@ export default function MeterReadingTable({
                               )}
                             </button>
 
-                            {/* คัดลอกลิงก์ portal */}
-                            <button
-                              onClick={() => handleCopyPortalLink(item)}
-                              disabled={!permissions.billing_copy_summary}
-                              className={`h-9 px-3.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
-                                !permissions.billing_copy_summary
-                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
-                                  : copiedLinks[item.roomNumber]
-                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                    : isDark 
-                                      ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
-                                      : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
-                              }`}
-                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal" : undefined}
-                            >
-                              {copiedLinks[item.roomNumber] ? (
-                                <>
-                                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                  <span className="whitespace-nowrap">คัดลอกแล้ว!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Link className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                                  <span className="whitespace-nowrap">คัดลอกลิงก์ portal</span>
-                                </>
-                              )}
-                            </button>
                           </div>
                         </div>
                       )
