@@ -21,7 +21,9 @@ import {
   Lock,
   Edit,
   X,
-  Key
+  Key,
+  Settings,
+  Languages
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { 
@@ -30,7 +32,9 @@ import {
   deleteUserProfileAdminAction,
   updateWorkspaceNameAdminAction,
   deleteWorkspaceAdminAction,
-  getSuperAdminDataAction
+  getSuperAdminDataAction,
+  getSystemSettingsAction,
+  updateSystemSettingAction
 } from "@/features/super-admin/actions"
 
 interface Workspace {
@@ -94,9 +98,14 @@ export default function SuperAdminPage() {
   const [supportGrants, setSupportGrants] = useState<{ [key: string]: string }>({})
 
   // ค้นหาและคัดกรอง
-  const [activeTab, setActiveTab] = useState<"workspaces" | "users" | "invites">("workspaces")
+  const [activeTab, setActiveTab] = useState<"workspaces" | "users" | "invites" | "settings">("workspaces")
   const [searchWorkspace, setSearchWorkspace] = useState("")
   const [searchProfile, setSearchProfile] = useState("")
+
+  // การตั้งค่าระบบ
+  const [googleProjectId, setGoogleProjectId] = useState("")
+  const [googleServiceKey, setGoogleServiceKey] = useState("")
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
 
   // ฟอร์มเพิ่ม Workspace
   const [newWorkspaceName, setNewWorkspaceName] = useState("")
@@ -123,6 +132,31 @@ export default function SuperAdminPage() {
   const [editingProfileFullName, setEditingProfileFullName] = useState("")
   const [editingProfilePhone, setEditingProfilePhone] = useState("")
   const [updatingProfile, setUpdatingProfile] = useState(false)
+
+  const handleSaveSettings = async () => {
+    setIsUpdatingSettings(true)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      if (googleProjectId) {
+        const res1 = await updateSystemSettingAction("GOOGLE_PROJECT_ID", googleProjectId)
+        if (!res1.success) throw new Error(res1.error)
+      }
+      if (googleServiceKey && googleServiceKey !== "••••••••••••••••••••••••••••••••••••") {
+        const res2 = await updateSystemSettingAction("GOOGLE_SERVICE_ACCOUNT_KEY", googleServiceKey)
+        if (!res2.success) throw new Error(res2.error)
+      }
+      setResultSuccess("บันทึกการตั้งค่าระบบเรียบร้อยแล้ว")
+      // Set masked back
+      if (googleServiceKey && googleServiceKey !== "••••••••••••••••••••••••••••••••••••") {
+        setGoogleServiceKey("••••••••••••••••••••••••••••••••••••")
+      }
+    } catch (err: any) {
+      setError(err.message || "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า")
+    } finally {
+      setIsUpdatingSettings(false)
+    }
+  }
 
   // Registration Secret Codes
   const [registrationCodes, setRegistrationCodes] = useState<RegistrationCode[]>([])
@@ -157,6 +191,18 @@ export default function SuperAdminPage() {
         setWorkspaces(wsData)
         setProfiles(profData)
         setRegistrationCodes(codeData)
+
+        // Load System Settings
+        const settingsRes = await getSystemSettingsAction()
+        if (settingsRes.success && settingsRes.data) {
+          const projectIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_PROJECT_ID")
+          const serviceKeySetting = settingsRes.data.find(s => s.key === "GOOGLE_SERVICE_ACCOUNT_KEY")
+          if (projectIdSetting) setGoogleProjectId(projectIdSetting.value)
+          // Hide actual JSON in UI by showing a masked text if it exists
+          if (serviceKeySetting && serviceKeySetting.value) {
+            setGoogleServiceKey("••••••••••••••••••••••••••••••••••••")
+          }
+        }
 
         const grantMap: { [key: string]: string } = {}
         grantData.forEach((g: any) => {
@@ -666,11 +712,12 @@ export default function SuperAdminPage() {
         </div>
 
         {/* แถบเลือกแท็บแบบพรีเมียม (Premium Tab Selector) */}
-        <div className="flex p-1 bg-slate-900/80 border border-slate-800 rounded-2xl w-full max-w-md shadow-lg relative z-10">
+        <div className="flex p-1 bg-slate-900/80 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-lg relative z-10 overflow-x-auto">
           {[
             { id: "workspaces", label: "พื้นที่ทำงาน", icon: Building },
             { id: "users", label: "บัญชีผู้ใช้งาน", icon: Users },
-            { id: "invites", label: "เชิญชวน & มอบสิทธิ์", icon: Key }
+            { id: "invites", label: "เชิญชวน & มอบสิทธิ์", icon: Key },
+            { id: "settings", label: "ตั้งค่าระบบ", icon: Settings }
           ].map((tab) => {
             const TabIcon = tab.icon
             const isTabActive = activeTab === tab.id
@@ -1247,6 +1294,80 @@ export default function SuperAdminPage() {
                         ยังไม่มีรหัสเชิญชวนในระบบ
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* แท็บตั้งค่าระบบ */}
+        {activeTab === "settings" && (
+          <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
+            {/* กล่องตั้งค่า Google Translation API */}
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent pointer-events-none" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+                    <Languages className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-extrabold text-slate-100">Google Translation API</h3>
+                    <p className="text-sm text-slate-400 mt-1">ตั้งค่าการเชื่อมต่อเพื่อใช้ระบบแปลภาษาอัตโนมัติ (Real-time i18n)</p>
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300">Google Project ID</label>
+                    <input
+                      type="text"
+                      value={googleProjectId}
+                      onChange={(e) => setGoogleProjectId(e.target.value)}
+                      placeholder="เช่น my-translation-project-1234"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                      <span>Service Account Key (JSON)</span>
+                      <span className="text-xs text-indigo-400">ถูกเข้ารหัส (AES-256) ก่อนบันทึกลงฐานข้อมูล</span>
+                    </label>
+                    <textarea
+                      value={googleServiceKey}
+                      onChange={(e) => setGoogleServiceKey(e.target.value)}
+                      placeholder='{"type": "service_account", "project_id": "...", ...}'
+                      rows={5}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm resize-none"
+                    />
+                    <p className="text-xs text-slate-500">
+                      * หากมีคีย์เดิมบันทึกไว้อยู่แล้ว จะแสดงเป็น ••••••• เพื่อความปลอดภัย หากต้องการเปลี่ยนให้ลบแล้ววางคีย์ใหม่
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800/50 flex justify-end">
+                    <button
+                      onClick={handleSaveSettings}
+                      disabled={isUpdatingSettings}
+                      className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all ${
+                        isUpdatingSettings
+                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
+                      }`}
+                    >
+                      {isUpdatingSettings ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          กำลังบันทึก...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          บันทึกการตั้งค่า
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

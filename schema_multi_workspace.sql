@@ -563,3 +563,39 @@ create index if not exists idx_tenants_phone on public.tenants (tenant_phone);
 create index if not exists idx_rooms_room_type_id on public.rooms (room_type_id);
 
 
+- -   C r e a t e   s y s t e m _ s e t t i n g s   t a b l e  
+ C R E A T E   T A B L E   I F   N O T   E X I S T S   p u b l i c . s y s t e m _ s e t t i n g s   (  
+     i d   u u i d   D E F A U L T   g e n _ r a n d o m _ u u i d ( )   P R I M A R Y   K E Y ,  
+     k e y   t e x t   N O T   N U L L   U N I Q U E ,  
+     v a l u e   t e x t   N O T   N U L L ,  
+     c r e a t e d _ a t   t i m e s t a m p   w i t h   t i m e   z o n e   D E F A U L T   t i m e z o n e ( ' u t c ' : : t e x t ,   n o w ( ) )   N O T   N U L L ,  
+     u p d a t e d _ a t   t i m e s t a m p   w i t h   t i m e   z o n e   D E F A U L T   t i m e z o n e ( ' u t c ' : : t e x t ,   n o w ( ) )   N O T   N U L L  
+ ) ;  
+  
+ - -   E n a b l e   R L S  
+ A L T E R   T A B L E   p u b l i c . s y s t e m _ s e t t i n g s   E N A B L E   R O W   L E V E L   S E C U R I T Y ;  
+  
+ - -   O n l y   s u p e r   a d m i n s   c a n   m a n a g e   s y s t e m _ s e t t i n g s  
+ C R E A T E   P O L I C Y   " S u p e r   a d m i n s   c a n   m a n a g e   s y s t e m   s e t t i n g s "   O N   p u b l i c . s y s t e m _ s e t t i n g s  
+     F O R   A L L   U S I N G   (  
+         E X I S T S   (  
+             S E L E C T   1   F R O M   p u b l i c . u s e r _ p r o f i l e s  
+             W H E R E   u s e r _ p r o f i l e s . i d   =   a u t h . u i d ( )   A N D   u s e r _ p r o f i l e s . r o l e   =   ' s u p e r _ a d m i n '  
+         )  
+     ) ;  
+  
+ - -   C r e a t e   t r i g g e r   f o r   u p d a t e d _ a t  
+ C R E A T E   O R   R E P L A C E   F U N C T I O N   p u b l i c . h a n d l e _ u p d a t e d _ a t ( )  
+ R E T U R N S   T R I G G E R   A S   $ $  
+ B E G I N  
+     N E W . u p d a t e d _ a t   =   n o w ( ) ;  
+     R E T U R N   N E W ;  
+ E N D ;  
+ $ $   L A N G U A G E   p l p g s q l ;  
+  
+ D R O P   T R I G G E R   I F   E X I S T S   s e t _ s y s t e m _ s e t t i n g s _ u p d a t e d _ a t   O N   p u b l i c . s y s t e m _ s e t t i n g s ;  
+ C R E A T E   T R I G G E R   s e t _ s y s t e m _ s e t t i n g s _ u p d a t e d _ a t  
+ B E F O R E   U P D A T E   O N   p u b l i c . s y s t e m _ s e t t i n g s  
+ F O R   E A C H   R O W  
+ E X E C U T E   F U N C T I O N   p u b l i c . h a n d l e _ u p d a t e d _ a t ( ) ;  
+ 

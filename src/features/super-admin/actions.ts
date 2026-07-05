@@ -2,6 +2,7 @@
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { encryptText, decryptText } from "@/lib/encryption"
 
 interface CreateUserParams {
   email: string
@@ -351,5 +352,59 @@ export async function getSuperAdminDataAction() {
     }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบ" }
+  }
+}
+
+export async function getSystemSettingsAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true, data: [] }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data, error } = await supabaseAdmin.from("system_settings").select("*")
+    if (error) throw error
+
+    // Decrypt values safely
+    const decryptedData = data.map(item => ({
+      ...item,
+      value: item.key.includes("KEY") || item.key.includes("SECRET") ? decryptText(item.value) : item.value
+    }))
+
+    return { success: true, data: decryptedData }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch settings" }
+  }
+}
+
+export async function updateSystemSettingAction(key: string, value: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const valueToStore = key.includes("KEY") || key.includes("SECRET") ? encryptText(value) : value
+
+    const { error } = await supabaseAdmin.from("system_settings").upsert({ key, value: valueToStore }, { onConflict: "key" })
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to update setting" }
   }
 }
