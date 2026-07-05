@@ -27,6 +27,7 @@ export interface FinanceSettings {
   lease_duration?: number
   lease_expiry_action?: "renew" | "original"
   slip_retention_months?: number
+  checkout_policy?: "DAILY_PRORATE" | "FULL_MONTH"
 }
 
 /**
@@ -144,6 +145,21 @@ export async function getFinanceSettings(workspaceId: string) {
       console.warn("Column slip_retention_months not available in workspaces. Defaulting to 0.")
     }
 
+    // 7. ดึงข้อมูลนโยบายหักเงินประกันวันย้ายออก (แยกการดึงเพื่อความปลอดภัย)
+    let checkoutPolicy: "DAILY_PRORATE" | "FULL_MONTH" = "DAILY_PRORATE"
+    try {
+      const { data: cpData, error: cpError } = await supabase
+        .from("workspaces")
+        .select("checkout_policy")
+        .eq("id", workspaceId)
+        .single()
+      if (!cpError && cpData && cpData.checkout_policy) {
+        checkoutPolicy = cpData.checkout_policy as "DAILY_PRORATE" | "FULL_MONTH"
+      }
+    } catch (e) {
+      console.warn("Column checkout_policy not available in workspaces. Defaulting to DAILY_PRORATE.")
+    }
+
     const merged = {
       ...coreData,
       ...(utilityData || {
@@ -160,7 +176,8 @@ export async function getFinanceSettings(workspaceId: string) {
       deposit_type: depositType,
       lease_duration: leaseDuration,
       lease_expiry_action: leaseExpiryAction,
-      slip_retention_months: slipRetentionMonths
+      slip_retention_months: slipRetentionMonths,
+      checkout_policy: checkoutPolicy
     }
 
     return { 
@@ -188,7 +205,8 @@ export async function getFinanceSettings(workspaceId: string) {
         deposit_type: merged.deposit_type as "months" | "fixed",
         lease_duration: Number(merged.lease_duration !== null && merged.lease_duration !== undefined ? merged.lease_duration : 6),
         lease_expiry_action: (merged.lease_expiry_action as "renew" | "original") || "renew",
-        slip_retention_months: Number(merged.slip_retention_months !== null && merged.slip_retention_months !== undefined ? merged.slip_retention_months : 0)
+        slip_retention_months: Number(merged.slip_retention_months !== null && merged.slip_retention_months !== undefined ? merged.slip_retention_months : 0),
+        checkout_policy: merged.checkout_policy || "DAILY_PRORATE"
       } as FinanceSettings 
     }
   } catch (error) {
@@ -252,7 +270,8 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         deposit_type: settings.deposit_type || "months",
         lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
         lease_expiry_action: settings.lease_expiry_action || "renew",
-        slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0)
+        slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0),
+        checkout_policy: settings.checkout_policy || "DAILY_PRORATE"
       })
       .eq("id", workspaceId)
 
@@ -262,7 +281,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         updateError.code === "42703"
 
       if (isMissingColumn) {
-        // หากคอลัมน์ deposit_type หรือ deposit_amount ยังไม่มี ให้บันทึกแบบจำกัดเท่าที่มี
+        // หากคอลัมน์ deposit_type หรือ deposit_amount หรือ checkout_policy ยังไม่มี ให้บันทึกแบบจำกัดเท่าที่มี
         const { error: lpMissingError } = await supabase
           .from("workspaces")
           .update({

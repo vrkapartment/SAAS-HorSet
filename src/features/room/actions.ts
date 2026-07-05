@@ -165,7 +165,7 @@ export async function updateRoom(
   roomNumber: string, 
   roomTypeId: string, 
   baseRent: number, 
-  status: "occupied" | "available",
+  status: "occupied" | "available" | "Pending_Refund",
   floor: string,
   waiveElectricMin: boolean = false,
   waiveWaterMin: boolean = false,
@@ -434,6 +434,22 @@ export async function createRoomsBatch(rooms: {
   } catch (error: any) {
     console.error("Critical error in createRoomsBatch:", error)
     return { success: false, error: error?.message || "เกิดข้อผิดพลาดของระบบขณะบันทึกข้อมูล" }
+  }
+}
+
+export async function updateRoomStatus(id: string, status: "occupied" | "available" | "Pending_Refund") {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("rooms")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+
+    if (error) throw error
+    return { success: true, data: data[0] }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดในการอัปเดตสถานะห้องพัก" }
   }
 }
 

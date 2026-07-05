@@ -851,7 +851,10 @@ export async function getCancelledContracts(workspaceId: string) {
       depositAmount: Number(item.deposit_amount || 0),
       refundedAmount: Number(item.refunded_amount || 0),
       actualRefund: Number(item.actual_refund !== null && item.actual_refund !== undefined ? item.actual_refund : (item.refunded_amount || 0)),
-      forfeitedAmount: Number(item.forfeited_amount || 0)
+      forfeitedAmount: Number(item.forfeited_amount || 0),
+      deductedRent405: Number(item.deducted_rent_405 || 0),
+      deductedUtilities408: Number(item.deducted_utilities_408 || 0),
+      deductedServices408: Number(item.deducted_services_408 || 0)
     }))
 
     return { success: true, data: formatted }
@@ -871,6 +874,9 @@ export async function saveCancelledContract(workspaceId: string, contract: {
   refundedAmount: number
   actualRefund?: number
   forfeitedAmount: number
+  deductedRent405?: number
+  deductedUtilities408?: number
+  deductedServices408?: number
 }) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -914,7 +920,10 @@ export async function saveCancelledContract(workspaceId: string, contract: {
       deposit_amount: contract.depositAmount,
       refunded_amount: contract.refundedAmount,
       actual_refund: contract.actualRefund !== undefined && contract.actualRefund !== null ? contract.actualRefund : contract.refundedAmount,
-      forfeited_amount: contract.forfeitedAmount
+      forfeited_amount: contract.forfeitedAmount,
+      deducted_rent_405: contract.deductedRent405 || 0,
+      deducted_utilities_408: contract.deductedUtilities408 || 0,
+      deducted_services_408: contract.deductedServices408 || 0
     }
 
     if (contract.id) {

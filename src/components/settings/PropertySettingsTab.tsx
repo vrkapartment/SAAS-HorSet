@@ -63,6 +63,7 @@ export default function PropertySettingsTab() {
 
   // ตั้งค่าระยะเวลาการเก็บไฟล์สลิปโอนเงิน (เดือน) -> 0 หมายถึง ไม่จำกัด / ตลอดไป
   const [slipRetentionMonths, setSlipRetentionMonths] = useState<number>(0)
+  const [checkoutPolicy, setCheckoutPolicy] = useState<"DAILY_PRORATE" | "FULL_MONTH">("DAILY_PRORATE")
   const [isCleaning, setIsCleaning] = useState(false)
 
   const [loading, setLoading] = useState(true)
@@ -164,6 +165,7 @@ export default function PropertySettingsTab() {
             setLeaseDuration(cached.lease_duration !== undefined ? cached.lease_duration : 6)
             setLeaseExpiryAction(cached.lease_expiry_action || "renew")
             setSlipRetentionMonths(cached.slip_retention_months !== undefined ? cached.slip_retention_months : 0)
+            setCheckoutPolicy(cached.checkout_policy || "DAILY_PRORATE")
             setIsDatabaseBacked(true)
           } else {
             const res = await getFinanceSettings(currentWsId)
@@ -194,6 +196,7 @@ export default function PropertySettingsTab() {
               setLeaseDuration(res.data.lease_duration !== undefined ? res.data.lease_duration : 6)
               setLeaseExpiryAction(res.data.lease_expiry_action || "renew")
               setSlipRetentionMonths(res.data.slip_retention_months !== undefined ? res.data.slip_retention_months : 0)
+              setCheckoutPolicy(res.data.checkout_policy || "DAILY_PRORATE")
               setIsDatabaseBacked(true)
               setCachedData(currentWsId, cacheKey, res.data)
             } else if (res.error) {
@@ -316,7 +319,8 @@ export default function PropertySettingsTab() {
         advance_rent: advanceRent,
         lease_duration: leaseDuration,
         lease_expiry_action: leaseExpiryAction,
-        slip_retention_months: slipRetentionMonths
+        slip_retention_months: slipRetentionMonths,
+        checkout_policy: checkoutPolicy
       }
 
       const res = await saveFinanceSettings(workspaceId, payload)
@@ -584,6 +588,145 @@ export default function PropertySettingsTab() {
                 <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
                   ระบุจำนวนเดือนของค่าเช่าล่วงหน้า (เช่น 1 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อบันทึกเป็นรายได้กลุ่มมาตรา 40(5) (ค่าเช่าทรัพย์สิน) ประจำปีภาษีที่สัญญาเริ่มเช่าทันที
                 </p>
+              </div>
+            </div>
+
+            {/* กล่องใหม่: การหักเงินประกันห้องพัก กรณีย้ายออกกลางเดือน */}
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
+              <div className="border-b border-slate-200 dark:border-slate-900 pb-3">
+                <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Sliders className="w-5 h-5 text-indigo-500" /> การหักเงินประกันห้องพัก กรณีย้ายออกกลางเดือน
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 font-semibold leading-relaxed">
+                  เลือกนโยบายคำนวณสัดส่วนค่าเช่าห้องพักหลัก เมื่อผู้เช่าย้ายออกระหว่างรอบเดือน
+                </p>
+              </div>
+
+              {/* ปุ่มเลือกนโยบาย */}
+              <div className="grid grid-cols-1 gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasEditPermission) setCheckoutPolicy("DAILY_PRORATE")
+                  }}
+                  disabled={!hasEditPermission}
+                  className={`flex flex-col text-left p-4.5 rounded-2xl border-2 transition-all duration-200 cursor-pointer relative overflow-hidden ${
+                    checkoutPolicy === "DAILY_PRORATE"
+                      ? "bg-indigo-500/[0.03] border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                      : "bg-transparent border-slate-150 dark:border-slate-850 text-slate-500 hover:border-slate-300 dark:hover:border-slate-850"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      checkoutPolicy === "DAILY_PRORATE" ? "border-indigo-500" : "border-slate-300 dark:border-slate-700"
+                    }`}>
+                      {checkoutPolicy === "DAILY_PRORATE" && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+                    </div>
+                    <span className="text-xs sm:text-sm font-black">คิดเฉลี่ยรายวัน (Pro-rata)</span>
+                  </div>
+                  <span className="text-[11px] sm:text-xs leading-relaxed opacity-85 font-medium text-slate-500 dark:text-slate-400">
+                    เฉลี่ยค่าเช่าตามจำนวนวันที่อยู่จริง โดยใช้เกณฑ์ 30 วันเป็นฐาน (ค่าห้อง / 30 * จำนวนวันที่อยู่จริง)
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasEditPermission) setCheckoutPolicy("FULL_MONTH")
+                  }}
+                  disabled={!hasEditPermission}
+                  className={`flex flex-col text-left p-4.5 rounded-2xl border-2 transition-all duration-200 cursor-pointer relative overflow-hidden ${
+                    checkoutPolicy === "FULL_MONTH"
+                      ? "bg-indigo-500/[0.03] border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                      : "bg-transparent border-slate-150 dark:border-slate-850 text-slate-500 hover:border-slate-300 dark:hover:border-slate-850"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      checkoutPolicy === "FULL_MONTH" ? "border-indigo-500" : "border-slate-300 dark:border-slate-700"
+                    }`}>
+                      {checkoutPolicy === "FULL_MONTH" && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+                    </div>
+                    <span className="text-xs sm:text-sm font-black">คิดค่าห้องเต็มเดือน (Full Month)</span>
+                  </div>
+                  <span className="text-[11px] sm:text-xs leading-relaxed opacity-85 font-medium text-slate-500 dark:text-slate-400">
+                    เก็บค่าเช่าห้องพักหลักเต็มจำนวนของรอบเดือนนั้นๆ โดยไม่สนว่าจะย้ายออกวันไหนระหว่างรอบเดือน
+                  </span>
+                </button>
+              </div>
+
+              {/* Interactive Real-time Preview */}
+              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-900/80 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-900 pb-2.5">
+                  <div className="text-xs sm:text-sm font-black text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                    จำลองสถานการณ์คำนวณบิลตอน Check-out (Real-time Preview)
+                  </div>
+                  <span className="text-[10px] bg-slate-200 dark:bg-slate-850 px-2 py-0.5 rounded-md font-bold text-slate-500 dark:text-slate-400">
+                    ข้อมูลจำลอง (Mock Data)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-2 text-xs text-slate-500 dark:text-slate-400 font-bold">
+                  <div>ค่าเช่าห้องพักตั้งต้น:</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">3,000.00 บาท</div>
+
+                  <div>เงินประกันหอพัก:</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">4,000.00 บาท</div>
+
+                  <div>จำนวนวันที่เข้าอยู่จริง:</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">10 วัน (ย้ายออกกลางรอบ)</div>
+
+                  <div>ค่าน้ำประปาที่ใช้จริง:</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">13 หน่วย (หน่วยละ 17 บ. = 221.00 บ.)</div>
+
+                  <div>ค่าไฟฟ้าที่ใช้จริง:</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">256 หน่วย (หน่วยละ 8 บ. = 2,048.00 บ.)</div>
+
+                  <div>ค่าล้างเครื่องปรับอากาศ:</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">500.00 บาท</div>
+                </div>
+
+                {/* ผลลัพธ์การคำนวณตามนโยบาย */}
+                <div className="pt-3.5 border-t border-slate-200 dark:border-slate-900 border-dashed space-y-3">
+                  <div className="flex justify-between items-center text-xs font-black">
+                    <span className="text-slate-600 dark:text-slate-400">ยอดหักค่าเช่าห้อง {checkoutPolicy === "DAILY_PRORATE" ? "(เฉลี่ยรายวัน)" : "(เต็มเดือน)"}:</span>
+                    <span className="font-mono text-indigo-500 dark:text-indigo-400">
+                      {checkoutPolicy === "DAILY_PRORATE" 
+                        ? "1,000.00 บาท (3,000 / 30 * 10)" 
+                        : "3,000.00 บาท (เต็มจำนวน)"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs font-black">
+                    <span className="text-slate-600 dark:text-slate-400">ยอดหักค่าน้ำไฟ & ค่าบริการอื่นๆ:</span>
+                    <span className="font-mono text-slate-700 dark:text-slate-300">2,769.00 บาท (221 + 2,048 + 500)</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs font-black border-t border-slate-200 dark:border-slate-900 pt-3">
+                    <span className="text-slate-700 dark:text-slate-200 text-sm">รวมยอดหักเงินประกันทั้งสิ้น:</span>
+                    <span className="font-mono text-rose-500 text-sm">
+                      {checkoutPolicy === "DAILY_PRORATE" ? "3,769.00 บาท" : "5,769.00 บาท"}
+                    </span>
+                  </div>
+
+                  {checkoutPolicy === "DAILY_PRORATE" ? (
+                    <div className="p-3 bg-emerald-500/[0.05] border border-emerald-500/10 rounded-xl flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">เงินประกันคืนผู้เช่าสุทธิ (Net Refund):</span>
+                      <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">231.000 บาท</span>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-rose-500/[0.05] border border-rose-500/10 rounded-xl space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-rose-600 dark:text-rose-400">เงินประกันคืนผู้เช่าสุทธิ (Net Refund):</span>
+                        <span className="font-mono text-sm font-black text-rose-600 dark:text-rose-400">0.00 บาท</span>
+                      </div>
+                      <p className="text-[10px] text-rose-500 font-bold leading-normal">
+                        ⚠️ เงินประกันไม่พอหัก! ผู้เช่าต้องชำระเพิ่มอีก <span className="font-mono underline">1,769.00</span> บาท ณ วันย้ายออก
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

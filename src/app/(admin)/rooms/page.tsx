@@ -34,7 +34,11 @@ import {
   Unlink,
   Download,
   Upload,
-  Sparkles
+  Sparkles,
+  Clock,
+  Coins,
+  Zap,
+  Droplet
 } from "lucide-react"
 import { 
   getRooms, 
@@ -77,7 +81,7 @@ interface RoomItem {
   id: string
   roomNumber: string
   floor?: string
-  status: "occupied" | "available"
+  status: "occupied" | "available" | "Pending_Refund"
   baseRent: number
   tenantId?: string | null
   tenantName: string | null
@@ -237,6 +241,23 @@ function RoomsContent() {
   const [checkoutRefund, setCheckoutRefund] = useState<number>(0)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false)
+
+  // States for Task 3: Refund Process Page/Modal
+  const [refundModalOpen, setRefundModalOpen] = useState(false)
+  const [refundingRoom, setRefundingRoom] = useState<RoomItem | null>(null)
+  const [loadingMeter, setLoadingMeter] = useState(false)
+  const [refundCheckoutDate, setRefundCheckoutDate] = useState("")
+  const [refundDeposit, setRefundDeposit] = useState(0)
+  const [finalElec, setFinalElec] = useState<number | string>("")
+  const [finalWater, setFinalWater] = useState<number | string>("")
+  const [prevElec, setPrevElec] = useState(0)
+  const [prevWater, setPrevWater] = useState(0)
+  const [isRentWaived, setIsRentWaived] = useState(false)
+  const [customDeductions, setCustomDeductions] = useState<{ id: string; name: string; amount: number | string }[]>([
+    { id: "1", name: "ค่าล้างแอร์", amount: 500 }
+  ])
+  const [refundError, setRefundError] = useState<string | null>(null)
+  const [refundSubmitting, setRefundSubmitting] = useState(false)
 
   // Tenant Editing Form State
   const [isEditingTenant, setIsEditingTenant] = useState(false)
@@ -1114,7 +1135,7 @@ function RoomsContent() {
     setCheckoutModalOpen(true)
   }
 
-  // ดำเนินการย้ายออกผู้เช่า บันทึกเงินประกันริบเข้าตารางยกเลิกสัญญา และลบผู้เช่า
+  // ดำเนินการย้ายออกผู้เช่า ปรับสถานะห้องเป็นรอดำเนินการคืนเงินประกัน
   const handleConfirmCheckout = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
@@ -1127,40 +1148,11 @@ function RoomsContent() {
       setCheckoutError("กรุณากรอกวันที่ยกเลิกสัญญา/ย้ายออก")
       return
     }
-    if (checkoutRefund < 0) {
-      setCheckoutError("จำนวนเงินโอนคืนต้องไม่ต่ำกว่า 0 บาท")
-      return
-    }
-    if (checkoutRefund > checkoutDeposit) {
-      setCheckoutError("จำนวนเงินโอนคืนต้องไม่เกินยอดเงินประกัน")
-      return
-    }
 
     setCheckoutSubmitting(true)
     setCheckoutError(null)
 
     try {
-      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
-      
-      // 1. บันทึกประวัติการยกเลิกสัญญาเพื่อใช้คำนวณภาษีเงินได้ประเภท 40(8) ที่ริบไว้ใน Supabase
-      const newCancellation = {
-        tenantId: selectedRoom.tenantId,
-        roomNumber: selectedRoom.roomNumber,
-        tenantName: selectedRoom.tenantName || "",
-        cancellationDate: checkoutDate,
-        depositAmount: Number(checkoutDeposit),
-        refundedAmount: Number(checkoutRefund),
-        actualRefund: Number(checkoutRefund), // Added for 100% compatibility with Tax page!
-        forfeitedAmount: Math.max(0, Number(checkoutDeposit) - Number(checkoutRefund))
-      }
-
-      const saveRes = await saveCancelledContract(wsId, newCancellation)
-      if (!saveRes.success) {
-        setCheckoutError(saveRes.error || "เกิดข้อผิดพลาดในการบันทึกประวัติการยกเลิกสัญญา")
-        setCheckoutSubmitting(false)
-        return
-      }
-
       // ตรวจสอบว่าเป็นวันย้ายออกล่วงหน้าในอนาคตหรือไม่
       const d = new Date()
       const year = d.getFullYear()
@@ -1171,7 +1163,7 @@ function RoomsContent() {
       const isFutureCheckout = checkoutDate > todayStr
 
       if (isFutureCheckout) {
-        // 2. ถ้าเป็นการย้ายออกล่วงหน้า ให้ปล่อยผู้เช่าค้างในห้องพักไปก่อน แต่เปลี่ยนวันสิ้นสุดสัญญา (lease_end) เป็นวันที่ย้ายออกจริง
+        // 1. ถ้าเป็นการย้ายออกล่วงหน้า ให้ปล่อยผู้เช่าค้างในห้องพักไปก่อน แต่เปลี่ยนวันสิ้นสุดสัญญา (lease_end) เป็นวันที่ย้ายออกจริง
         const updateRes = await updateTenant(
           selectedRoom.tenantId,
           selectedRoom.roomNumber,
@@ -1189,20 +1181,237 @@ function RoomsContent() {
           setCheckoutError(updateRes.error || "เกิดข้อผิดพลาดในการอัปเดตวันหมดสัญญาของผู้เช่า")
         }
       } else {
-        // 2. ย้ายออกผู้เช่าออกจากห้องพักใน Supabase ทันที
-        const res = await deleteTenant(selectedRoom.tenantId, selectedRoom.roomNumber)
+        // 2. ปรับสถานะห้องเป็น Pending_Refund เพื่อรอจัดการคืนเงินประกันปลายงวด
+        const { updateRoomStatus } = await import("@/features/room/actions")
+        const res = await updateRoomStatus(selectedRoom.id, "Pending_Refund")
         if (res.success) {
-          showToast(`✓ ดำเนินการย้ายออกผู้เช่าห้อง ${selectedRoom.roomNumber} และบันทึกประวัติภาษีสัญญายกเลิกเรียบร้อยแล้ว`, "success")
+          showToast(`✓ ย้ายห้องพัก ${selectedRoom.roomNumber} ไปที่รายการ "รอดำเนินการคืนเงินประกัน" เรียบร้อยแล้ว`, "success")
           setCheckoutModalOpen(false)
           await loadData(true)
         } else {
-          setCheckoutError(res.error || "เกิดข้อผิดพลาดในการคืนห้องพัก")
+          setCheckoutError(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะห้องพัก")
         }
       }
     } catch (err) {
-      setCheckoutError("เกิดข้อผิดพลาดในการดำเนินการคืนห้องพัก")
+      setCheckoutError("เกิดข้อผิดพลาดในการดำเนินการแจ้งคืนห้องพัก")
     } finally {
       setCheckoutSubmitting(false)
+    }
+  }
+
+  // ฟังก์ชันช่วยเหลือสำหรับกระบวนการจัดการคืนเงินประกัน (Task 3)
+  const handleOpenRefundModal = async (room: RoomItem) => {
+    setRefundingRoom(room)
+    setLoadingMeter(true)
+    setRefundError(null)
+    setRefundCheckoutDate(new Date().toISOString().split("T")[0])
+    setIsRentWaived(false)
+    
+    // ตั้งค่าบริการและค่าเสียหายอื่นเริ่มต้นเป็น "ค่าล้างแอร์" 500 บาท
+    setCustomDeductions([
+      { id: "1", name: "ค่าล้างแอร์", amount: 500 }
+    ])
+    
+    // คำนวณเงินประกันตั้งต้น
+    let calculatedDeposit = 0
+    if (financeSettings) {
+      if (financeSettings.deposit_type === "fixed") {
+        const roomTypeDeposit = room.roomTypeId ? roomTypeDeposits[room.roomTypeId] : undefined
+        calculatedDeposit = roomTypeDeposit !== undefined ? roomTypeDeposit : (financeSettings.deposit_amount || 0)
+      } else {
+        const depositMonths = financeSettings.deposit_amount || 0
+        calculatedDeposit = room.baseRent * depositMonths
+      }
+    }
+    setRefundDeposit(calculatedDeposit)
+    
+    try {
+      // ดึงเลขมิเตอร์น้ำไฟรอบล่าสุดเพื่อสืบทอด
+      const { getLatestMeterRecord } = await import("@/features/meter/actions")
+      const meterRes = await getLatestMeterRecord(room.roomNumber)
+      
+      if (meterRes.success && meterRes.data) {
+        const record = meterRes.data
+        // ดึงเลขมิเตอร์น้ำไฟที่จดจริงล่าสุด
+        const pElec = record.elecCurr !== null && record.elecCurr !== undefined ? record.elecCurr : record.elecPrev
+        const pWater = record.waterCurr !== null && record.waterCurr !== undefined ? record.waterCurr : record.waterPrev
+        setPrevElec(pElec)
+        setPrevWater(pWater)
+        setFinalElec(pElec)
+        setFinalWater(pWater)
+      } else {
+        setPrevElec(0)
+        setPrevWater(0)
+        setFinalElec("")
+        setFinalWater("")
+      }
+    } catch (err) {
+      console.error("Failed to load meter records:", err)
+      setPrevElec(0)
+      setPrevWater(0)
+    } finally {
+      setLoadingMeter(false)
+      setRefundModalOpen(true)
+    }
+  }
+
+  const handleAddCustomDeduction = () => {
+    if (customDeductions.length >= 5) {
+      showToast("สามารถระบุรายการหักเงินอื่นๆ ได้สูงสุด 5 รายการ", "error")
+      return
+    }
+    setCustomDeductions([
+      ...customDeductions,
+      { id: Date.now().toString(), name: "", amount: "" }
+    ])
+  }
+
+  const handleUpdateCustomDeduction = (id: string, field: "name" | "amount", value: string) => {
+    setCustomDeductions(prev => prev.map(item => {
+      if (item.id === id) {
+        return { ...item, [field]: value }
+      }
+      return item
+    }))
+  }
+
+  const handleRemoveCustomDeduction = (id: string) => {
+    setCustomDeductions(prev => prev.filter(item => item.id !== id))
+  }
+
+  const handleConfirmRefundSubmit = async () => {
+    if (!refundingRoom || !refundingRoom.tenantId) return
+    
+    if (finalElec === "" || finalWater === "") {
+      setRefundError("กรุณากรอกตัวเลขมิเตอร์น้ำและไฟวันย้ายออกให้ครบถ้วน")
+      return
+    }
+    
+    const fElec = Number(finalElec)
+    const fWater = Number(finalWater)
+    
+    if (isNaN(fElec) || fElec < prevElec) {
+      setRefundError(`เลขมิเตอร์ไฟวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevElec})`)
+      return
+    }
+    
+    if (isNaN(fWater) || fWater < prevWater) {
+      setRefundError(`เลขมิเตอร์น้ำวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevWater})`)
+      return
+    }
+    
+    setRefundSubmitting(true)
+    setRefundError(null)
+    
+    try {
+      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
+      
+      // 1. บันทึกเลขมิเตอร์ปลายงวดในรอบบิลปัจจุบัน และสืบทอดเป็น "เลขมิเตอร์ก่อนหน้า" ในรอบบิลถัดไป (สำหรับผู้เช่าคนใหม่)
+      const { saveMeterRecord } = await import("@/features/meter/actions")
+      
+      const currentMeterRes = await saveMeterRecord(
+        refundingRoom.roomNumber,
+        currentCycle,
+        prevElec,
+        fElec,
+        prevWater,
+        fWater
+      )
+      
+      if (!currentMeterRes.success) {
+        setRefundError(currentMeterRes.error || "เกิดข้อผิดพลาดในการจดมิเตอร์ปลายงวดรอบปัจจุบัน")
+        setRefundSubmitting(false)
+        return
+      }
+      
+      // คำนวณรอบถัดไป
+      const [yearStr, monthStr] = currentCycle.split("-")
+      let nextYear = parseInt(yearStr, 10)
+      let nextMonth = parseInt(monthStr, 10) + 1
+      if (nextMonth > 12) {
+        nextMonth = 1
+        nextYear += 1
+      }
+      const nextCycle = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
+      
+      const nextMeterRes = await saveMeterRecord(
+        refundingRoom.roomNumber,
+        nextCycle,
+        fElec,
+        "", // current value is empty for next tenant to write later
+        fWater,
+        ""
+      )
+      
+      if (!nextMeterRes.success) {
+        setRefundError(nextMeterRes.error || "เกิดข้อผิดพลาดในการสืบทอดค่าตั้งต้นมิเตอร์สำหรับผู้เช่าคนถัดไป")
+        setRefundSubmitting(false)
+        return
+      }
+      
+      // 2. สรุปการแบ่งประเภทรายได้หักภาษีปลายงวด
+      const elecUnits = fElec - prevElec
+      const waterUnits = fWater - prevWater
+      const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
+      const waterCost = waterUnits * (financeSettings?.water_rate || 18)
+      const totalUtilities408 = elecCost + waterCost
+      
+      let calcRentDeduction = 0
+      if (!isRentWaived) {
+        const daysStayed = new Date(refundCheckoutDate).getDate()
+        const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
+        if (policy === "DAILY_PRORATE") {
+          calcRentDeduction = Math.round((refundingRoom.baseRent / 30) * daysStayed * 100) / 100
+        } else {
+          calcRentDeduction = refundingRoom.baseRent
+        }
+      }
+      
+      const totalCustomDeductions = customDeductions.reduce((sum, d) => sum + Number(d.amount || 0), 0)
+      const totalDeductions = calcRentDeduction + totalUtilities408 + totalCustomDeductions
+      const netRefund = refundDeposit - totalDeductions
+      const checkoutRefundAmount = Math.max(0, netRefund)
+      const forfeitedAmountVal = Math.max(0, refundDeposit - checkoutRefundAmount)
+      
+      // 3. บันทึกสัญญายกเลิกและกระจายภาษีแยกสัดส่วนลง cancelled_contracts
+      const cancellationPayload = {
+        tenantId: refundingRoom.tenantId,
+        roomNumber: refundingRoom.roomNumber,
+        tenantName: refundingRoom.tenantName || "",
+        cancellationDate: refundCheckoutDate,
+        depositAmount: Number(refundDeposit),
+        refundedAmount: Number(checkoutRefundAmount),
+        actualRefund: Number(checkoutRefundAmount),
+        forfeitedAmount: Number(forfeitedAmountVal),
+        deductedRent405: Number(calcRentDeduction),
+        deductedUtilities408: Number(totalUtilities408),
+        deductedServices408: Number(totalCustomDeductions)
+      }
+      
+      const saveRes = await saveCancelledContract(wsId, cancellationPayload)
+      if (!saveRes.success) {
+        setRefundError(saveRes.error || "เกิดข้อผิดพลาดในการส่งข้อมูลบัญชีภาษีเงินได้หัก ณ ที่จ่าย")
+        setRefundSubmitting(false)
+        return
+      }
+      
+      // 4. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
+      const deleteRes = await deleteTenant(refundingRoom.tenantId, refundingRoom.roomNumber)
+      if (!deleteRes.success) {
+        setRefundError(deleteRes.error || "เกิดข้อผิดพลาดในการปิดระบบสัญญาผู้เช่า")
+        setRefundSubmitting(false)
+        return
+      }
+      
+      showToast(`✓ ดำเนินการสรุปคืนเงินประกันและบันทึกบัญชีภาษีหอพักของห้อง ${refundingRoom.roomNumber} เรียบร้อยแล้ว`, "success")
+      setRefundModalOpen(false)
+      await loadData(true)
+      
+    } catch (err: any) {
+      setRefundError(err?.message || "เกิดข้อผิดพลาดของระบบระหว่างสรุปปิดบัญชีคืนห้อง")
+    } finally {
+      setRefundSubmitting(false)
     }
   }
 
@@ -1324,7 +1533,14 @@ function RoomsContent() {
     const hasTenant = !!room.tenantName
     const isRegistered = !!room.lineUserId
 
-    if (!hasTenant) {
+    if (room.status === "Pending_Refund") {
+      return {
+        label: "รอดำเนินการคืนเงินประกัน",
+        badgeStyle: "bg-purple-50 text-purple-600 dark:bg-purple-950/35 dark:text-purple-400 border border-purple-200/40 dark:border-purple-800/40 font-bold",
+        dotStyle: "bg-purple-500",
+        code: "Pending_Refund"
+      }
+    } else if (!hasTenant) {
       return {
         label: "ว่าง",
         badgeStyle: "bg-red-50 text-red-600 dark:bg-red-950/35 dark:text-red-400 border border-red-200/40 dark:border-red-800/40",
@@ -1350,6 +1566,9 @@ function RoomsContent() {
 
   // คัดกรองห้องตามการค้นหาและฟิลเตอร์สถานะใหม่ (ว่าง / รอลงทะเบียน / มีผู้เช่าแล้ว)
   const filteredRooms = rooms.filter(room => {
+    // ห้องรอดำเนินการคืนเงินประกันจะถูกแยกไปอยู่ Board ด้านบนโดยเฉพาะ
+    if (room.status === "Pending_Refund") return false
+
     const matchesSearch = 
       room.roomNumber.includes(search) || 
       room.roomTypeName.toLowerCase().includes(search.toLowerCase()) ||
@@ -1773,6 +1992,87 @@ function RoomsContent() {
             <SkeletonLoader />
           ) : (
             <>
+              {/* ========================================================= */}
+              {/* TASK 2: PENDING DEPOSIT REFUND BOARD/CONTAINER           */}
+              {/* ========================================================= */}
+              {(() => {
+                const pendingRefundRooms = rooms.filter(room => room.status === "Pending_Refund")
+                if (pendingRefundRooms.length === 0) return null
+                return (
+                  <div className="mb-8 p-6 bg-gradient-to-br from-purple-500/[0.03] via-purple-500/[0.01] to-slate-500/[0.01] dark:from-purple-500/[0.02] dark:via-purple-500/[0.005] dark:to-transparent rounded-3xl border border-purple-100/60 dark:border-purple-900/30 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-[250px] h-[120px] bg-purple-500/10 rounded-full blur-[60px] pointer-events-none" />
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 relative z-10">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 rounded-2xl border border-purple-100/80 dark:border-purple-900/20 shadow-sm">
+                          <Clock className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            รอดำเนินการคืนเงินประกัน (Pending Deposit Refund)
+                            <span className="px-2.5 py-0.5 text-[10px] font-extrabold text-white bg-purple-600 rounded-full shrink-0 shadow-sm shadow-purple-600/20 animate-bounce duration-1000">
+                              {pendingRefundRooms.length} ห้อง
+                            </span>
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5 leading-normal">
+                            ห้องพักที่แจ้งย้ายออกเรียบร้อยแล้ว รอจดเลขมิเตอร์เพื่อคำนวณหักล้างหนี้และโอนเงินประกันคืน
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 relative z-10">
+                      {pendingRefundRooms.map((room) => (
+                        <div 
+                          key={room.id} 
+                          className="p-5 bg-white dark:bg-slate-900 border border-purple-100 dark:border-purple-950/40 rounded-2xl shadow-sm hover:shadow-md hover:border-purple-300 dark:hover:border-purple-800/80 transition-all duration-300 flex flex-col justify-between group"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="inline-flex items-center gap-1 text-[9px] text-purple-600 dark:text-purple-400 font-extrabold bg-purple-50 dark:bg-purple-950/30 px-2 py-0.5 rounded border border-purple-100/80 dark:border-purple-900/20 uppercase tracking-wide">
+                                แจ้งย้ายออกแล้ว
+                              </span>
+                              <h5 className="text-sm font-extrabold text-slate-850 dark:text-slate-100">
+                                ห้อง {room.roomNumber}
+                              </h5>
+                            </div>
+                            
+                            <h4 className="text-base font-extrabold text-slate-800 dark:text-slate-100 truncate">
+                              {room.tenantName}
+                            </h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-455 mt-1.5 flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              {room.tenantPhone || "ไม่มีเบอร์โทรผู้เช่า"}
+                            </p>
+                            
+                            <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-450 dark:text-slate-500 font-semibold space-y-1.5">
+                              <div className="flex justify-between">
+                                <span>ค่าเช่าเดิม:</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">{room.baseRent.toLocaleString()} บ./เดือน</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>ระยะสัญญา:</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">
+                                  {room.leaseEnd ? new Date(room.leaseEnd).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleOpenRefundModal(room)}
+                            className="mt-4.5 w-full h-10 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-[0.97] cursor-pointer shadow-md shadow-purple-600/10 hover:shadow-purple-600/20"
+                          >
+                            <Coins className="w-4 h-4" />
+                            จัดการคืนเงินประกัน
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* DESKTOP VIEW: FLOOR GRID VIEW or CONDENSED TABLE VIEW */}
               <div className="hidden md:block">
                 {viewMode === "floor" ? (
@@ -3451,14 +3751,503 @@ function RoomsContent() {
               </div>
             </div>
           </div>
+        )}        {/* ========================================================= */}
+        {/* MODAL 7: DETAILED TENANT CHECKOUT - PHASE 1: NOTIFY CHECKOUT */}
+        {/* ========================================================= */}
+        {checkoutModalOpen && selectedRoom && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300 animate-in fade-in duration-200">
+            <div className="w-full md:max-w-md bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5 relative overflow-hidden max-h-[92vh] md:max-h-[85vh] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-red-500/10 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex justify-between items-center shrink-0 relative z-10">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 rounded-xl border border-red-100 dark:border-red-900/30">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                      แจ้งคืนห้องและย้ายออก
+                    </h3>
+                    <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5 font-bold uppercase tracking-wider">ระบบจัดการคิวคืนเงินประกันหอพัก</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setCheckoutModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {checkoutError && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-650 dark:text-red-400 flex items-start gap-2 shrink-0">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{checkoutError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleConfirmCheckout} className="space-y-4 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                
+                {/* Tenant & Room summary */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/60 rounded-xl text-xs space-y-2 text-slate-650 dark:text-slate-455">
+                  <div className="flex justify-between font-bold">
+                    <span>ห้องเช่าพัก:</span>
+                    <span className="text-slate-850 dark:text-slate-200 font-extrabold">ห้อง {selectedRoom.roomNumber} ({selectedRoom.roomTypeName})</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span>ผู้เช่าปัจจุบัน:</span>
+                    <span className="text-blue-600 dark:text-blue-450 font-extrabold">{selectedRoom.tenantName}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-155 dark:border-slate-800 pt-2 text-[11px] font-semibold">
+                    <span>ค่าเช่ารายเดือน:</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-300">{selectedRoom.baseRent.toLocaleString()} บาท/เดือน</span>
+                  </div>
+                </div>
+
+                {/* Cancellation date selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] md:text-[11px] text-slate-550 dark:text-slate-400 font-bold uppercase tracking-wider block">วันที่คืนห้อง / ย้ายออกจริง <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                      <Calendar className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                    </span>
+                    <input
+                      type="date"
+                      required
+                      value={checkoutDate}
+                      onChange={(e) => setCheckoutDate(e.target.value)}
+                      className="w-full h-12 md:h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800 dark:text-slate-100 text-base md:text-xs transition-colors font-bold font-mono cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Status machine explanation */}
+                <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-100 dark:border-purple-950/20 text-xs text-purple-700 dark:text-purple-400 leading-relaxed space-y-1">
+                  <span className="font-extrabold block">ⓘ ข้อมูลลำดับขั้นตอนการทำงาน:</span>
+                  <p>เมื่อกดยืนยันแล้ว ระบบจะยังคงข้อมูลผู้เช่าและเปลี่ยนสถานะห้องพักเป็น <strong className="font-bold">"รอดำเนินการคืนเงินประกัน"</strong> ซึ่งจะถูกย้ายไปแสดงที่บอร์ดด้านบนแยกต่างหาก เพื่อให้แอดมินเข้าไปจดเลขมิเตอร์และเคลียร์ยอดเงินสุทธิอย่างถูกต้องต่อไป</p>
+                </div>
+
+                {/* Submission and Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutModalOpen(false)}
+                    disabled={checkoutSubmitting}
+                    className="order-2 sm:order-1 w-full sm:flex-1 h-11 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-55"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={checkoutSubmitting}
+                    className="order-1 sm:order-2 w-full sm:flex-1 h-11 bg-red-650 hover:bg-red-550 active:bg-red-755 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 text-xs shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    {checkoutSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        กำลังดำเนินการ...
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="w-4 h-4" />
+                        ยืนยันการแจ้งย้ายออก
+                      </>
+                    )}
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
         )}
 
         {/* ========================================================= */}
-        {/* MODAL: CSV IMPORT REPORT MODAL */}
+        {/* TASK 3: DETAILED DEPOSIT REFUND PROCESS PAGE / MODAL      */}
         {/* ========================================================= */}
-        {/* ========================================================= */}
-        {/* MODAL: INTERACTIVE CSV MAPPING MODAL */}
-        {/* ========================================================= */}
+        {refundModalOpen && refundingRoom && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300 animate-in fade-in duration-200">
+            <div className="w-full md:max-w-2xl bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-3xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 relative overflow-hidden max-h-[92vh] md:max-h-[88vh] flex flex-col animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              
+              <div className="absolute top-0 right-0 w-[300px] h-[150px] bg-purple-500/5 rounded-full blur-[60px] pointer-events-none" />
+              
+              {/* Header */}
+              <div className="flex justify-between items-center shrink-0 relative z-10 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-purple-50 dark:bg-purple-950/40 text-purple-650 dark:text-purple-400 rounded-xl border border-purple-100 dark:border-purple-900/30 shadow-sm">
+                    <Coins className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100">
+                      จัดการเคลียร์บัญชีและคืนเงินประกัน
+                    </h3>
+                    <p className="text-xs text-slate-405 dark:text-slate-500 mt-0.5 font-bold uppercase tracking-wider">ห้อง {refundingRoom.roomNumber} • ผู้เช่า: {refundingRoom.tenantName}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setRefundModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Error box */}
+              {refundError && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/25 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2 shrink-0 mt-3">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{refundError}</span>
+                </div>
+              )}
+
+              {/* Scrollable Content Form */}
+              <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+                
+                {/* 1. METER READINGS SECTION */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">1</span>
+                    <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">บันทึกเลขมิเตอร์ปลายงวดวันย้ายออก</h4>
+                  </div>
+                  
+                  {loadingMeter ? (
+                    <div className="py-4 text-center text-xs text-slate-400 font-bold flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                      กำลังดึงข้อมูลเลขมิเตอร์ครั้งก่อนหน้า...
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Electricity Meter */}
+                      <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Zap className="w-4 h-4 text-amber-500" /> มิเตอร์ไฟปลายงวด
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เลขครั้งก่อน: {prevElec}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <input
+                            type="number"
+                            placeholder="กรอกเลขมิเตอร์ไฟวันย้ายออก"
+                            value={finalElec}
+                            onChange={(e) => setFinalElec(e.target.value)}
+                            className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                          />
+                          {(() => {
+                            const units = Math.max(0, Number(finalElec || 0) - prevElec)
+                            const cost = units * (financeSettings?.electric_rate || 7)
+                            return (
+                              <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-455 pt-1">
+                                <span>จำนวนหน่วยที่ใช้: <strong className="font-extrabold text-slate-700 dark:text-slate-300">{units} หน่วย</strong></span>
+                                <span>คิดเป็นเงิน: <strong className="font-extrabold text-blue-600 dark:text-blue-400">{cost.toLocaleString()} บาท</strong></span>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Water Meter */}
+                      <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Droplet className="w-4 h-4 text-blue-500" /> มิเตอร์น้ำปลายงวด
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เลขครั้งก่อน: {prevWater}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <input
+                            type="number"
+                            placeholder="กรอกเลขมิเตอร์น้ำวันย้ายออก"
+                            value={finalWater}
+                            onChange={(e) => setFinalWater(e.target.value)}
+                            className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                          />
+                          {(() => {
+                            const units = Math.max(0, Number(finalWater || 0) - prevWater)
+                            const cost = units * (financeSettings?.water_rate || 18)
+                            return (
+                              <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-455 pt-1">
+                                <span>จำนวนหน่วยที่ใช้: <strong className="font-extrabold text-slate-700 dark:text-slate-300">{units} หน่วย</strong></span>
+                                <span>คิดเป็นเงิน: <strong className="font-extrabold text-blue-600 dark:text-blue-400">{cost.toLocaleString()} บาท</strong></span>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. RENT DEDUCTION SECTION */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">2</span>
+                    <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">คำนวณสัดส่วนค่าเช่าห้องพักกลางเดือน</h4>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                          นโยบายหอพัก: {financeSettings?.checkout_policy === "DAILY_PRORATE" ? "คิดเฉลี่ยรายวัน (DAILY_PRORATE)" : "คิดเต็มเดือน (FULL_MONTH)"}
+                        </span>
+                      </div>
+                      {(() => {
+                        const days = new Date(refundCheckoutDate).getDate()
+                        const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
+                        const calculated = policy === "DAILY_PRORATE" 
+                          ? Math.round((refundingRoom.baseRent / 30) * days * 100) / 100
+                          : refundingRoom.baseRent
+                        return (
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                            {policy === "DAILY_PRORATE" 
+                              ? `คำนวณเฉลี่ย: ${refundingRoom.baseRent.toLocaleString()} บาท / 30 วัน * อยู่จริง ${days} วัน`
+                              : `หักยอดค่าห้องพักเต็มเดือน: ${refundingRoom.baseRent.toLocaleString()} บาท`
+                            }
+                            <span className="block mt-1 font-extrabold text-slate-700 dark:text-slate-300">
+                              ยอดหักสุทธิ: {isRentWaived ? "0.00 บาท (ยกเว้นแล้ว)" : `${calculated.toLocaleString()} บาท`}
+                            </span>
+                          </p>
+                        )
+                      })()}
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setIsRentWaived(!isRentWaived)}
+                      className={`h-9 px-4 rounded-xl text-xs font-extrabold border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 duration-100 ${
+                        isRentWaived 
+                          ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                          : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border-slate-250 dark:border-slate-850 text-slate-650 dark:text-slate-300 shadow-sm"
+                      }`}
+                    >
+                      {isRentWaived ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ยกเว้นค่าเช่าเรียบร้อย
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-4 h-4 text-slate-400" />
+                          ยกเว้นค่าเช่าพัก
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. CUSTOM SERVICES & DAMAGES SECTION */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">3</span>
+                      <h4 className="text-xs font-extrabold text-slate-455 dark:text-slate-400 uppercase tracking-wider">ค่าบริการและค่าเสียหายอื่นๆ (สูงสุด 5 รายการ)</h4>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={handleAddCustomDeduction}
+                      disabled={customDeductions.length >= 5}
+                      className="h-8 px-3 rounded-lg text-[11px] font-extrabold text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/40 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-all flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> เพิ่มรายการหักเงิน
+                    </button>
+                  </div>
+
+                  {customDeductions.length === 0 ? (
+                    <div className="p-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-center text-xs text-slate-400 font-bold">
+                      ไม่มีรายการหักค่าบริการอื่น
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {customDeductions.map((item, index) => (
+                        <div key={item.id} className="flex gap-2 items-center">
+                          <div className="flex-1 grid grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              placeholder="เช่น ค่าล้างแอร์ / ค่าเสียหายลูกบิด"
+                              required
+                              value={item.name}
+                              onChange={(e) => handleUpdateCustomDeduction(item.id, "name", e.target.value)}
+                              className="col-span-2 h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-bold text-slate-800 dark:text-slate-100"
+                            />
+                            <div className="relative">
+                              <input
+                                type="number"
+                                placeholder="จำนวนเงิน"
+                                required
+                                min={0}
+                                value={item.amount}
+                                onChange={(e) => handleUpdateCustomDeduction(item.id, "amount", e.target.value)}
+                                className="w-full h-10 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                              />
+                              <span className="absolute inset-y-0 right-3 flex items-center text-[10px] text-slate-400 font-bold">บ.</span>
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomDeduction(item.id)}
+                            className="p-2.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 hover:text-red-400 rounded-xl border border-slate-100 dark:border-slate-800 cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. REAL-TIME ACCOUNTING & TAX SUMMARY SECTION */}
+                <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">4</span>
+                    <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">สรุปยอดประเมินสิทธิคืนเงินประกัน และสัดส่วนภาษี</h4>
+                  </div>
+
+                  {(() => {
+                    // Recalculate utilities
+                    const elecUnits = Math.max(0, Number(finalElec || 0) - prevElec)
+                    const waterUnits = Math.max(0, Number(finalWater || 0) - prevWater)
+                    const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
+                    const waterCost = waterUnits * (financeSettings?.water_rate || 18)
+                    const totalUtilities408 = elecCost + waterCost
+                    
+                    // Rent deduction
+                    let rentDeductionVal = 0
+                    if (!isRentWaived) {
+                      const days = new Date(refundCheckoutDate).getDate()
+                      const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
+                      if (policy === "DAILY_PRORATE") {
+                        rentDeductionVal = Math.round((refundingRoom.baseRent / 30) * days * 100) / 100
+                      } else {
+                        rentDeductionVal = refundingRoom.baseRent
+                      }
+                    }
+                    
+                    // Custom deductions
+                    const totalCustomDeductions = customDeductions.reduce((sum, d) => sum + Number(d.amount || 0), 0)
+                    
+                    // Total deductions
+                    const totalDeductions = rentDeductionVal + totalUtilities408 + totalCustomDeductions
+                    const netRefund = refundDeposit - totalDeductions
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Financial Ledger Breakdown card */}
+                        <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/20 dark:from-slate-900/40 dark:to-indigo-950/5 border border-slate-200/50 dark:border-slate-800/80 shadow-inner relative">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
+                            <div className="space-y-2.5">
+                              <div className="flex justify-between">
+                                <span className="flex items-center gap-1.5"><Coins className="w-3.5 h-3.5 text-yellow-500" /> เงินประกันตั้งต้น:</span>
+                                <span className="font-extrabold text-slate-855 dark:text-slate-100">{refundDeposit.toLocaleString()} บาท</span>
+                              </div>
+                              <div className="flex justify-between border-t border-slate-150 dark:border-slate-800/50 pt-2 text-red-600 dark:text-red-400">
+                                <span>(-) ยอดหักสัดส่วนค่าเช่าห้องพัก:</span>
+                                <span className="font-bold">{rentDeductionVal.toLocaleString()} บาท</span>
+                              </div>
+                              <div className="flex justify-between text-red-655 dark:text-red-400">
+                                <span>(-) ยอดหักค่าน้ำและค่าไฟฟ้า:</span>
+                                <span className="font-bold">{totalUtilities408.toLocaleString()} บาท</span>
+                              </div>
+                              <div className="flex justify-between text-red-655 dark:text-red-400">
+                                <span>(-) ยอดหักค่าบริการ/ค่าเสียหายอื่นๆ:</span>
+                                <span className="font-bold">{totalCustomDeductions.toLocaleString()} บาท</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-col justify-center items-center md:items-end md:text-right border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 pt-4 md:pt-0 md:pl-5 space-y-1">
+                              {netRefund >= 0 ? (
+                                <>
+                                  <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">ยอดเงินโอนคืนผู้เช่าสุทธิ</span>
+                                  <span className="text-2xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
+                                    {netRefund.toLocaleString()} บาท
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[11px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider block">ยอดผู้เช่าค้างชำระเพิ่มสุทธิ</span>
+                                  <span className="text-2xl font-extrabold font-mono text-red-600 dark:text-red-400">
+                                    {Math.abs(netRefund).toLocaleString()} บาท
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Alert when deductions exceed deposit */}
+                          {netRefund < 0 && (
+                            <div className="mt-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-[11px] text-red-600 dark:text-red-400 flex items-start gap-2 animate-bounce">
+                              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-extrabold block mb-0.5">ยอดหักเงินประกันปลายงวดติดลบ!</span>
+                                <span>เนื่องจากตัวเลขค่าใช้จ่ายหักล้างรวม {totalDeductions.toLocaleString()} บาท ซึ่งมากกว่ายอดเงินประกันที่ถืออยู่ ขอแนะนำให้แอดมินเรียกเก็บค่าปรับ/ค่าเสียหายส่วนต่างจำนวน <strong className="font-extrabold text-red-700 dark:text-red-300">{Math.abs(netRefund).toLocaleString()} บาท</strong> เพิ่มเติมจากผู้เช่าก่อนกดยืนยันปิดเช็คเอาต์</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Real-time Thai Tax allocation preview */}
+                        <div className="p-4 rounded-2xl bg-indigo-500/[0.02] border border-indigo-100 dark:border-indigo-950/20">
+                          <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block mb-2.5">ภาพรวมการจัดสรรภาษีหอพัก (Tax Allocation Preview)</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] font-bold">
+                            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl">
+                              <span className="text-slate-400 dark:text-slate-500 block mb-1">รายได้ ม. 40(5) [ค่าเช่าห้อง]</span>
+                              <span className="text-sm font-extrabold text-slate-855 dark:text-slate-100 font-mono">{rentDeductionVal.toLocaleString()} บ.</span>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl">
+                              <span className="text-slate-400 dark:text-slate-500 block mb-1">รายได้ ม. 40(8) [สาธารณูปโภค]</span>
+                              <span className="text-sm font-extrabold text-slate-855 dark:text-slate-100 font-mono">{totalUtilities408.toLocaleString()} บ.</span>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl">
+                              <span className="text-slate-400 dark:text-slate-500 block mb-1">รายได้ ม. 40(8) [บริการอื่นๆ]</span>
+                              <span className="text-sm font-extrabold text-slate-855 dark:text-slate-100 font-mono">{totalCustomDeductions.toLocaleString()} บ.</span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 block leading-normal">
+                            * ยอดสุทธิเงินประกันโอนคืนผู้เช่าส่วนที่เหลือได้รับการยกเว้นภาษี (Tax Exempt) โดยระบบจะดึงเฉพาะข้อมูลรายรับหักล้างด้านบนไปสะสมเข้าตารางภาษีเงินได้หอพักในหน้ายื่นภาษีให้อัตโนมัติ
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+
+              </div>
+
+              {/* Form Footer Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 relative z-10">
+                <button
+                  type="button"
+                  onClick={() => setRefundModalOpen(false)}
+                  disabled={refundSubmitting}
+                  className="order-2 sm:order-1 w-full sm:flex-1 h-11 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-55"
+                >
+                  ย้อนกลับ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRefundSubmit}
+                  disabled={refundSubmitting}
+                  className="order-1 sm:order-2 w-full sm:flex-1 h-11 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 text-xs shadow-lg shadow-purple-600/10 hover:shadow-purple-600/20 transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  {refundSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      กำลังบันทึกและส่งภาษี...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      ยืนยันสรุปคืนเงินประกันและปิดบัญชีภาษี
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isCsvMappingModalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
             <div className="w-full md:max-w-2xl bg-white dark:bg-slate-850 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 relative overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom flex flex-col max-h-[90vh]">

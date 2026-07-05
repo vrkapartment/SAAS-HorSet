@@ -684,7 +684,23 @@ export default function TaxPage() {
     const parts = c.cancellationDate.split("-")
     return parts[0] === taxYear
   })
-  const totalForfeitedAmount = cancelledInYear.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
+
+  // แยกรายได้จากการหักเงินประกันตามสัญญายกเลิกที่กรองมาแล้ว
+  const totalDeductedRent405 = cancelledInYear.reduce((sum, c) => sum + Number(c.deductedRent405 || 0), 0)
+  const totalDeductedUtilities408 = cancelledInYear.reduce((sum, c) => sum + Number(c.deductedUtilities408 || 0), 0)
+
+  // Backwards-compatible parser for Section 40(8) Services/Other
+  const getContractServices408 = (c: any) => {
+    const rent = Number(c.deductedRent405 || 0)
+    const utils = Number(c.deductedUtilities408 || 0)
+    const services = Number(c.deductedServices408 || 0)
+    if (rent === 0 && utils === 0 && services === 0) {
+      return Number(c.forfeitedAmount || 0)
+    }
+    return services
+  }
+
+  const totalDeductedServices408 = cancelledInYear.reduce((sum, c) => sum + getContractServices408(c), 0)
 
   // ครึ่งปีแรก (ยกเลิกสัญญาช่วงเดือน 01 - 06)
   const cancelledInYearHalf = cancelledInYear.filter(c => {
@@ -692,35 +708,38 @@ export default function TaxPage() {
     const month = parts[1] ? parseInt(parts[1], 10) : 0
     return month >= 1 && month <= 6
   })
-  const totalForfeitedAmountHalf = cancelledInYearHalf.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
 
-  // 1. รายได้รวมมาตรา 40(5) (เฉพาะค่าเช่าห้องพักหลัก) + ยอดค่าเช่าล่วงหน้า
+  const totalDeductedRent405Half = cancelledInYearHalf.reduce((sum, c) => sum + Number(c.deductedRent405 || 0), 0)
+  const totalDeductedUtilities408Half = cancelledInYearHalf.reduce((sum, c) => sum + Number(c.deductedUtilities408 || 0), 0)
+  const totalDeductedServices408Half = cancelledInYearHalf.reduce((sum, c) => sum + getContractServices408(c), 0)
+
+  // 1. รายได้รวมมาตรา 40(5) (เฉพาะค่าเช่าห้องพักหลัก) + ยอดค่าเช่าล่วงหน้า + ค่าเช่าหักจากประกันวันเช็คเอาท์
   const rent405Full = (dataSource === "system" && hasPaidBills
     ? calculatedRent405Full
-    : (dataSource === "system" ? 0 : manualRent405)) + totalAdvanceRentAmount
+    : (dataSource === "system" ? 0 : manualRent405)) + totalAdvanceRentAmount + totalDeductedRent405
 
-  // 2. รายได้รวมมาตรา 40(8) (ค่าน้ำไฟ/บริการส่วนกลาง)
-  const utilities408Full = dataSource === "system" && hasPaidBills
+  // 2. รายได้รวมมาตรา 40(8) (ค่าน้ำไฟ/บริการส่วนกลาง) + ค่าน้ำไฟหักจากประกันวันเช็คเอาท์
+  const utilities408Full = (dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Full
-    : (dataSource === "system" ? 0 : manualUtilities408)
+    : (dataSource === "system" ? 0 : manualUtilities408)) + totalDeductedUtilities408
 
-  // 3. รายได้รวมอื่นๆ มาตรา 40(8) (เงินปรับจ่ายล่าช้า / ยอดริบมัดจำ - ไม่เข้าเกณฑ์หักเหมา)
+  // 3. รายได้รวมอื่นๆ มาตรา 40(8) (เงินปรับจ่ายล่าช้า / ยอดค่าบริการและค่าเสียหายอื่นๆ วันเช็คเอาท์ - ไม่เข้าเกณฑ์หักเหมา)
   const other408Full = (dataSource === "system" && hasPaidBills
     ? calculatedOther408Full
-    : (dataSource === "system" ? 0 : manualOther408)) + totalForfeitedAmount
+    : (dataSource === "system" ? 0 : manualOther408)) + totalDeductedServices408
 
   // ครึ่งปี
   const rent405Half = (dataSource === "system" && hasPaidBills
     ? calculatedRent405Half
-    : (dataSource === "system" ? 0 : manualRent405 / 2)) + totalAdvanceRentAmountHalf
+    : (dataSource === "system" ? 0 : manualRent405 / 2)) + totalAdvanceRentAmountHalf + totalDeductedRent405Half
 
-  const utilities408Half = dataSource === "system" && hasPaidBills
+  const utilities408Half = (dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Half
-    : (dataSource === "system" ? 0 : manualUtilities408 / 2)
+    : (dataSource === "system" ? 0 : manualUtilities408 / 2)) + totalDeductedUtilities408Half
 
   const other408Half = (dataSource === "system" && hasPaidBills
     ? calculatedOther408Half
-    : (dataSource === "system" ? 0 : manualOther408 / 2)) + totalForfeitedAmountHalf
+    : (dataSource === "system" ? 0 : manualOther408 / 2)) + totalDeductedServices408Half
 
   // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5)
   // เต็มปี
@@ -1613,12 +1632,15 @@ export default function TaxPage() {
                         return sum + (roomRent * defaultAdvanceRent)
                       }, 0)
                       
-                      // บวกเงินประกันริบสะสมของเดือนนี้ (40(8))
+                      // บวกเงินประกันริบสะสมของเดือนนี้ (40(8) และ 40(5) ที่เกิดขึ้นจากการเช็คเอาท์)
                       const forfeitedBillsInMonth = cancelledInYear.filter(c => c.cancellationDate && c.cancellationDate.startsWith(`${taxYear}-${m.num}`))
-                      const forfeitedAmountInMonth = forfeitedBillsInMonth.reduce((sum, c) => sum + Number(c.forfeitedAmount || 0), 0)
+                      
+                      const rentDeductionInMonth = forfeitedBillsInMonth.reduce((sum, c) => sum + Number(c.deductedRent405 || 0), 0)
+                      const utilitiesDeductionInMonth = forfeitedBillsInMonth.reduce((sum, c) => sum + Number(c.deductedUtilities408 || 0), 0)
+                      const servicesDeductionInMonth = forfeitedBillsInMonth.reduce((sum, c) => sum + getContractServices408(c), 0)
 
-                      monthlyRent += advanceRentAmountInMonth
-                      monthlyUtil += forfeitedAmountInMonth
+                      monthlyRent += advanceRentAmountInMonth + rentDeductionInMonth
+                      monthlyUtil += utilitiesDeductionInMonth + servicesDeductionInMonth
                       sumBills += paidBillsInMonth.length
                     } else {
                       // ข้อมูลจำลอง/ manual หาร 12

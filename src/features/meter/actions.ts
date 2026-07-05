@@ -228,3 +228,37 @@ export async function deleteMeterReplacement(
     return { success: false, error: errorMessage }
   }
 }
+
+export async function getLatestMeterRecord(roomNumber: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true, data: null }
+  }
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("meter_records")
+      .select("*")
+      .eq("room_number", roomNumber)
+      .order("billing_cycle", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) return { success: true, data: null }
+
+    return {
+      success: true,
+      data: {
+        id: data.id,
+        roomNumber: data.room_number,
+        billingCycle: data.billing_cycle,
+        elecPrev: Number(data.elec_prev),
+        elecCurr: data.elec_curr === null || data.elec_curr === undefined ? null : Number(data.elec_curr),
+        waterPrev: Number(data.water_prev),
+        waterCurr: data.water_curr === null || data.water_curr === undefined ? null : Number(data.water_curr)
+      }
+    }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "เกิดข้อผิดพลาดในการดึงเลขมิเตอร์ล่าสุด" }
+  }
+}
