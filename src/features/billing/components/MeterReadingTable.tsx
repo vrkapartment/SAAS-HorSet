@@ -2196,7 +2196,7 @@ export default function MeterReadingTable({
       {/* โมดอลสำหรับส่ง LINE OA แบบกลุ่ม */}
       {bulkSendModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5 sm:p-6 md:p-10 bg-black/75 backdrop-blur-md">
-          <div className={`w-full max-w-xl md:max-w-2xl rounded-3xl relative shadow-2xl border flex flex-col ${
+          <div className={`w-full max-w-xl md:max-w-4xl rounded-3xl relative shadow-2xl border flex flex-col ${
             isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
           }`}>
             {/* ปุ่มปิด */}
@@ -2295,7 +2295,7 @@ export default function MeterReadingTable({
                         <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-nowrap min-w-0">
                             <span className={`font-black text-sm px-2.5 py-1 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>
@@ -2309,7 +2309,7 @@ export default function MeterReadingTable({
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap justify-end">
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap sm:flex-nowrap justify-end">
                             {/* คัดลอกลิงก์ portal */}
                             <button
                               onClick={() => handleCopyPortalLink(item)}
@@ -2422,7 +2422,7 @@ export default function MeterReadingTable({
                         <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-nowrap min-w-0">
                             <span className={`font-black text-sm px-2.5 py-1 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>
@@ -2436,7 +2436,7 @@ export default function MeterReadingTable({
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap justify-end">
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap sm:flex-nowrap justify-end">
                             {/* ดาวน์โหลด PDF */}
                             <button
                               onClick={() => handleDownloadBillPdf(item)}
