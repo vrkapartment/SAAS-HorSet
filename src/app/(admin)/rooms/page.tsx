@@ -69,6 +69,7 @@ import { getFinanceSettings, type FinanceSettings } from "@/features/finance/act
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { packWorkspaceAndRoom } from "@/lib/urlPacker"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
 
 function getCookie(name: string): string | undefined {
@@ -126,6 +127,7 @@ interface CsvRoomItem {
 }
 
 function RoomsContent() {
+  const { t } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeItem[]>([])
@@ -1832,10 +1834,10 @@ function RoomsContent() {
           <div>
             <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
               <Home className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-              จัดการห้องพักและผู้เช่า
+              {t("rooms.title") || "จัดการห้องพักและผู้เช่า"}
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              ตารางรวมรายชื่อห้องพักทั้งหมด จัดการตึกของท่านในหน้านี้หน้าเดียว
+              {t("rooms.subtitle") || "ตารางรวมรายชื่อห้องพักทั้งหมด จัดการตึกของท่านในหน้านี้หน้าเดียว"}
             </p>
           </div>
 
@@ -1846,7 +1848,7 @@ function RoomsContent() {
               className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
             >
               <Settings className="w-4 h-4 text-indigo-500 animate-spin-hover" />
-              {hasEditPermission ? "ตั้งค่าประเภทห้องพัก" : "ดูประเภทห้องพัก"}
+              {hasEditPermission ? (t("rooms.config_types") || "ตั้งค่าประเภทห้องพัก") : (t("rooms.view_types") || "ดูประเภทห้องพัก")}
             </button>
 
             {/* CSV Actions Group */}
@@ -1854,12 +1856,12 @@ function RoomsContent() {
               <button
                 type="button"
                 onClick={handleDownloadTemplate}
-                title="ดาวน์โหลดเทมเพลตไฟล์ CSV สำหรับเพิ่มห้องพัก"
+                title={t("rooms.download_template_title") || "ดาวน์โหลดเทมเพลตไฟล์ CSV สำหรับเพิ่มห้องพัก"}
                 className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
               >
                 <Download className="w-4 h-4 text-blue-500" />
-                <span className="hidden sm:inline">ดาวน์โหลด CSV Template</span>
-                <span className="sm:hidden">เทมเพลต</span>
+                <span className="hidden sm:inline">{t("rooms.download_template") || "ดาวน์โหลด CSV Template"}</span>
+                <span className="sm:hidden">{t("rooms.download_template_short") || "เทมเพลต"}</span>
               </button>
 
               {hasEditPermission && (
@@ -1870,8 +1872,8 @@ function RoomsContent() {
                     ) : (
                       <Upload className="w-4 h-4 text-emerald-500" />
                     )}
-                    <span className="hidden sm:inline">{uploadingCsv ? "กำลังอัปโหลด..." : "อัปโหลดไฟล์ CSV"}</span>
-                    <span className="sm:hidden">{uploadingCsv ? "..." : "อัปโหลด"}</span>
+                    <span className="hidden sm:inline">{uploadingCsv ? (t("rooms.upload_csv_loading") || "กำลังอัปโหลด...") : (t("rooms.upload_csv") || "อัปโหลดไฟล์ CSV")}</span>
+                    <span className="sm:hidden">{uploadingCsv ? "..." : (t("rooms.upload_csv_btn_short") || "อัปโหลด")}</span>
                   </span>
                   <input
                     type="file"
@@ -1886,12 +1888,12 @@ function RoomsContent() {
               <button
                 type="button"
                 onClick={() => setIsRoomTemplateGuideModalOpen(true)}
-                title="เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของห้องพัก"
+                title={t("rooms.csv_guide_title") || "เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของห้องพัก"}
                 className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
               >
                 <HelpCircle className="w-4 h-4 text-indigo-500" />
-                <span className="hidden sm:inline">คู่มือการใช้ CSV</span>
-                <span className="sm:hidden">คู่มือ CSV</span>
+                <span className="hidden sm:inline">{t("rooms.csv_guide") || "คู่มือการใช้ CSV"}</span>
+                <span className="sm:hidden">{t("rooms.csv_guide") || "คู่มือ CSV"}</span>
               </button>
             </div>
 
@@ -1907,7 +1909,7 @@ function RoomsContent() {
                 className="hidden md:flex px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs items-center gap-2 transition-all shadow shadow-blue-500/10 active:scale-95 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                เพิ่มห้องพักใหม่
+                {t("rooms.add_room") || "เพิ่มห้องพักใหม่"}
               </button>
             )}
           </div>
@@ -1921,14 +1923,14 @@ function RoomsContent() {
               <Building className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ห้องพักทั้งหมด</span>
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">{t("rooms.stats_total") || "ห้องพักทั้งหมด"}</span>
               <span className="text-lg md:text-xl font-extrabold text-slate-850 dark:text-slate-100 mt-0.5 flex items-center gap-1.5 leading-none">
                 {loading ? (
                   <span className="inline-block h-5 w-12 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
                 ) : (
                   <span className="tabular-nums font-black">{totalRoomsCount}</span>
                 )}
-                <span className="text-xs md:text-sm font-bold text-slate-500">ห้อง</span>
+                <span className="text-xs md:text-sm font-bold text-slate-500">{t("rooms.rooms_unit") || "ห้อง"}</span>
               </span>
             </div>
           </div>
@@ -1939,14 +1941,14 @@ function RoomsContent() {
               <Home className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ห้องว่าง</span>
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">{t("rooms.stats_vacant") || "ห้องว่าง"}</span>
               <span className="text-lg md:text-xl font-extrabold text-red-600 dark:text-red-400 mt-0.5 flex items-center gap-1.5 leading-none">
                 {loading ? (
                   <span className="inline-block h-5 w-10 bg-red-200/50 dark:bg-red-900/30 rounded animate-pulse" />
                 ) : (
                   <span className="tabular-nums font-black">{vacantRoomsCount}</span>
                 )}
-                <span className="text-xs md:text-sm font-bold text-red-555">ห้อง</span>
+                <span className="text-xs md:text-sm font-bold text-red-555">{t("rooms.rooms_unit") || "ห้อง"}</span>
               </span>
             </div>
           </div>
@@ -1957,14 +1959,14 @@ function RoomsContent() {
               <Users className="w-5 h-5 animate-pulse" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">ยังไม่ลงทะเบียนไลน์</span>
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">{t("rooms.stats_waiting_line") || "ยังไม่ลงทะเบียนไลน์"}</span>
               <span className="text-lg md:text-xl font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1.5 leading-none">
                 {loading ? (
                   <span className="inline-block h-5 w-10 bg-amber-200/50 dark:bg-amber-900/30 rounded animate-pulse" />
                 ) : (
                   <span className="tabular-nums font-black">{waitingRoomsCount}</span>
                 )}
-                <span className="text-xs md:text-sm font-bold text-amber-555">ห้อง</span>
+                <span className="text-xs md:text-sm font-bold text-amber-555">{t("rooms.rooms_unit") || "ห้อง"}</span>
               </span>
             </div>
           </div>
@@ -1975,14 +1977,14 @@ function RoomsContent() {
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">มีผู้เช่าสมบูรณ์</span>
+              <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 block font-semibold uppercase tracking-wider">{t("rooms.stats_fully_occupied") || "มีผู้เช่าสมบูรณ์"}</span>
               <span className="text-lg md:text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 leading-none">
                 {loading ? (
                   <span className="inline-block h-5 w-10 bg-emerald-200/50 dark:bg-emerald-900/30 rounded animate-pulse" />
                 ) : (
                   <span className="tabular-nums font-black">{occupiedRoomsCount}</span>
                 )}
-                <span className="text-xs md:text-sm font-bold text-emerald-555">ห้อง</span>
+                <span className="text-xs md:text-sm font-bold text-emerald-555">{t("rooms.rooms_unit") || "ห้อง"}</span>
               </span>
             </div>
           </div>
@@ -1997,7 +1999,7 @@ function RoomsContent() {
             </span>
             <input
               type="text"
-              placeholder="ค้นหา หมายเลขห้อง, ชื่อผู้เช่า หรือเบอร์โทรศัพท์..."
+              placeholder={t("rooms.search_placeholder") || "ค้นหา หมายเลขห้อง, ชื่อผู้เช่า หรือเบอร์โทรศัพท์..."}
               className="w-full h-11 pl-10 pr-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-xs font-medium transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -2016,22 +2018,22 @@ function RoomsContent() {
           <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 w-full xl:w-auto">
             {/* Filter Badges Row */}
             <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">ตัวกรอง:</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">{t("rooms.filter_label") || "ตัวกรอง:"}</span>
               {[
-                { id: "all", label: "ทั้งหมด" },
-                { id: "available", label: "เฉพาะห้องว่าง" },
-                { id: "has_tenant", label: "มีผู้เช่า" },
-                { id: "waiting", label: "มีผู้เช่า (รอ LINE)" },
-                { id: "occupied", label: "มีผู้เช่า (เชื่อม LINE)" }
+                { id: "all", label: t("rooms.filter_all") || "ทั้งหมด" },
+                { id: "available", label: t("rooms.filter_vacant") || "เฉพาะห้องว่าง" },
+                { id: "has_tenant", label: t("rooms.filter_occupied") || "มีผู้เช่า" },
+                { id: "waiting", label: t("rooms.filter_waiting_line") || "มีผู้เช่า (รอ LINE)" },
+                { id: "occupied", label: t("rooms.filter_connected_line") || "มีผู้เช่า (เชื่อม LINE)" }
               ].map(tab => (
                 <button
-                  key={tab.id}
-                  onClick={() => setFilter(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    filter === tab.id
-                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow shadow-slate-950/10"
-                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
+                   key={tab.id}
+                   onClick={() => setFilter(tab.id as any)}
+                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                     filter === tab.id
+                       ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow shadow-slate-950/10"
+                       : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-200"
+                   }`}
                 >
                   {tab.label}
                 </button>
@@ -2049,7 +2051,7 @@ function RoomsContent() {
                 }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>บล็อกตามชั้น</span>
+                <span>{t("rooms.view_mode_floor") || "บล็อกตามชั้น"}</span>
               </button>
               <button
                 onClick={() => setViewMode("table")}
@@ -2060,7 +2062,7 @@ function RoomsContent() {
                 }`}
               >
                 <List className="w-3.5 h-3.5" />
-                <span>ตาราง</span>
+                <span>{t("rooms.view_mode_table") || "ตาราง"}</span>
               </button>
             </div>
           </div>

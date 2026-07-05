@@ -861,19 +861,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "จดมิเตอร์ และดูบิล",
+      name: t("nav.billing") || "จดมิเตอร์ และดูบิล",
       path: "/billing",
       icon: Scroll,
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "จัดการใบแจ้งหนี้",
+      name: t("nav.manage_bills") || "จัดการใบแจ้งหนี้",
       path: "/manage-bills",
       icon: Receipt,
       roles: ["admin", "staff", "super_admin"]
     },
     {
-      name: "บันทึกบิลค่าใช้จ่าย",
+      name: t("nav.expenses") || "บันทึกบิลค่าใช้จ่าย",
       path: "/daily-bills",
       icon: Coins,
       roles: ["admin", "super_admin"]
@@ -885,7 +885,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       roles: ["admin", "super_admin"]
     },
     {
-      name: "ตั้งค่าระบบ",
+      name: t("nav.settings") || "ตั้งค่าระบบ",
       path: "/settings",
       icon: Settings,
       roles: ["admin", "staff", "super_admin"]
@@ -1048,15 +1048,15 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 <span className="truncate max-w-[130px] sm:max-w-none">
                   {pathname === "/dashboard" && (t("nav.dashboard") || "Dashboard")}
                   {pathname === "/rooms" && (t("nav.rooms") || "จัดการห้องพักและผู้เช่า")}
-                  {pathname === "/billing" && "จดมิเตอร์ และดูบิล"}
-                  {pathname === "/meter" && "จดมิเตอร์ และดูบิล"}
-                  {pathname === "/manage-bills" && "จัดการใบแจ้งหนี้"}
-                  {pathname === "/daily-bills" && "บันทึกบิลค่าใช้จ่าย (40(5) / 40(8))"}
+                  {pathname === "/billing" && (t("nav.billing") || "จดมิเตอร์ และดูบิล")}
+                  {pathname === "/meter" && (t("nav.billing") || "จดมิเตอร์ และดูบิล")}
+                  {pathname === "/manage-bills" && (t("nav.manage_bills") || "จัดการใบแจ้งหนี้")}
+                  {pathname === "/daily-bills" && (t("nav.expenses_detailed") || "บันทึกบิลค่าใช้จ่าย (40(5) / 40(8))")}
                   {pathname === "/tax" && (t("nav.tax") || "ระบบรายงานภาษีอพาร์ทเมนท์ ภ.ง.ด.")}
                   {pathname === "/finance-settings" && (t("nav.finance") || "ตั้งค่าการเงินและบัญชีรับเงิน")}
                   {pathname === "/property-settings" && (t("nav.property_settings") || "ตั้งค่าข้อมูลหอพัก")}
                   {pathname === "/test-connection" && (t("nav.test_connection") || "เช็คระบบตรวจสอบการเชื่อมต่อ Supabase")}
-                  {pathname && pathname.startsWith("/settings") && "ตั้งค่าระบบ"}
+                  {pathname && pathname.startsWith("/settings") && (t("nav.settings") || "ตั้งค่าระบบ")}
                 </span>
                 
                 {userRole === "super_admin" && (
