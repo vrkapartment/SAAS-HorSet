@@ -2196,7 +2196,7 @@ export default function MeterReadingTable({
       {/* โมดอลสำหรับส่ง LINE OA แบบกลุ่ม */}
       {bulkSendModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5 sm:p-6 md:p-10 bg-black/75 backdrop-blur-md">
-          <div className={`w-full max-w-xl md:max-w-3xl max-h-[88vh] overflow-y-auto p-5 sm:p-6 md:p-8 rounded-3xl relative shadow-2xl border flex flex-col ${
+          <div className={`w-full max-w-xl md:max-w-2xl rounded-3xl relative shadow-2xl border flex flex-col ${
             isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
           }`}>
             {/* ปุ่มปิด */}
@@ -2207,7 +2207,7 @@ export default function MeterReadingTable({
                 }
               }}
               disabled={bulkSendingStatus === "sending"}
-              className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all ${
+              className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all z-10 ${
                 bulkSendingStatus === "sending" ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               } ${
                 isDark ? "text-slate-400 hover:text-white hover:bg-slate-900/50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
@@ -2215,6 +2215,8 @@ export default function MeterReadingTable({
             >
               <X className="w-5 h-5" />
             </button>
+
+            <div className="max-h-[85vh] overflow-y-auto p-5 sm:p-6 md:p-8 flex flex-col w-full">
 
             {/* ส่วนหัวโมดอล */}
             <div className="mb-4">
@@ -2572,7 +2574,8 @@ export default function MeterReadingTable({
             </div>
           </div>
         </div>
-      )}
+      </div>
+    )}
       {/* Pop-up ยืนยันการหมุนเวียนครบรอบ (Rollover Confirmation Modal) */}
       {rolloverConfirm && rolloverConfirm.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
