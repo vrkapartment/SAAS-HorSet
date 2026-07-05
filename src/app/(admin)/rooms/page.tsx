@@ -258,6 +258,10 @@ function RoomsContent() {
   ])
   const [refundError, setRefundError] = useState<string | null>(null)
   const [refundSubmitting, setRefundSubmitting] = useState(false)
+  const [editingCancelledContractId, setEditingCancelledContractId] = useState<string | null>(null)
+  const [historicalRentDeduction, setHistoricalRentDeduction] = useState<number | "">(0)
+  const [historicalUtilitiesDeduction, setHistoricalUtilitiesDeduction] = useState<number | "">(0)
+  const [isHistoricalBreach, setIsHistoricalBreach] = useState<boolean>(false)
 
   // Tenant Editing Form State
   const [isEditingTenant, setIsEditingTenant] = useState(false)
@@ -1201,6 +1205,8 @@ function RoomsContent() {
 
   // ฟังก์ชันช่วยเหลือสำหรับกระบวนการจัดการคืนเงินประกัน (Task 3)
   const handleOpenRefundModal = async (room: RoomItem) => {
+    setEditingCancelledContractId(null)
+    setIsHistoricalBreach(false)
     setRefundingRoom(room)
     setLoadingMeter(true)
     setRefundError(null)
@@ -1255,6 +1261,37 @@ function RoomsContent() {
     }
   }
 
+  const handleEditCancelledContract = (c: any) => {
+    setEditingCancelledContractId(c.id)
+    setRefundingRoom({
+      id: "historical",
+      roomNumber: c.roomNumber,
+      roomTypeId: "",
+      status: "Vacant",
+      baseRent: 0,
+      tenantId: c.tenantId || "historical",
+      tenantName: c.tenantName || "",
+      tenantPhone: ""
+    } as any)
+    setRefundCheckoutDate(c.cancellationDate ? c.cancellationDate.split("T")[0] : new Date().toISOString().split("T")[0])
+    setRefundDeposit(c.depositAmount || 0)
+    setHistoricalRentDeduction(c.deductedRent405 || 0)
+    setHistoricalUtilitiesDeduction(c.deductedUtilities408 || 0)
+    setIsRentWaived(c.deductedRent405 === 0)
+    
+    // Determine historical breach
+    const wasRefundZero = Number(c.actualRefund ?? c.refundedAmount ?? 0) === 0
+    setIsHistoricalBreach(wasRefundZero)
+    
+    setCustomDeductions([
+      { id: "edit-1", name: "ค่าบริการและค่าปรับอื่นๆ", amount: c.deductedServices408 || 0 }
+    ])
+    
+    setRefundError(null)
+    setRefundModalOpen(true)
+  }
+
+
   const handleAddCustomDeduction = () => {
     if (customDeductions.length >= 5) {
       showToast("สามารถระบุรายการหักเงินอื่นๆ ได้สูงสุด 5 รายการ", "error")
@@ -1282,22 +1319,28 @@ function RoomsContent() {
   const handleConfirmRefundSubmit = async () => {
     if (!refundingRoom || !refundingRoom.tenantId) return
     
-    if (finalElec === "" || finalWater === "") {
-      setRefundError("กรุณากรอกตัวเลขมิเตอร์น้ำและไฟวันย้ายออกให้ครบถ้วน")
-      return
-    }
+    const isHistoricalEdit = editingCancelledContractId !== null
+    let fElec = 0
+    let fWater = 0
     
-    const fElec = Number(finalElec)
-    const fWater = Number(finalWater)
-    
-    if (isNaN(fElec) || fElec < prevElec) {
-      setRefundError(`เลขมิเตอร์ไฟวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevElec})`)
-      return
-    }
-    
-    if (isNaN(fWater) || fWater < prevWater) {
-      setRefundError(`เลขมิเตอร์น้ำวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevWater})`)
-      return
+    if (!isHistoricalEdit) {
+      if (finalElec === "" || finalWater === "") {
+        setRefundError("กรุณากรอกตัวเลขมิเตอร์น้ำและไฟวันย้ายออกให้ครบถ้วน")
+        return
+      }
+      
+      fElec = Number(finalElec)
+      fWater = Number(finalWater)
+      
+      if (isNaN(fElec) || fElec < prevElec) {
+        setRefundError(`เลขมิเตอร์ไฟวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevElec})`)
+        return
+      }
+      
+      if (isNaN(fWater) || fWater < prevWater) {
+        setRefundError(`เลขมิเตอร์น้ำวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevWater})`)
+        return
+      }
     }
     
     setRefundSubmitting(true)
@@ -1305,73 +1348,83 @@ function RoomsContent() {
     
     try {
       const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
-      const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
       
-      // 1. บันทึกเลขมิเตอร์ปลายงวดในรอบบิลปัจจุบัน และสืบทอดเป็น "เลขมิเตอร์ก่อนหน้า" ในรอบบิลถัดไป (สำหรับผู้เช่าคนใหม่)
-      const { saveMeterRecord } = await import("@/features/meter/actions")
-      
-      const currentMeterRes = await saveMeterRecord(
-        refundingRoom.roomNumber,
-        currentCycle,
-        prevElec,
-        fElec,
-        prevWater,
-        fWater
-      )
-      
-      if (!currentMeterRes.success) {
-        setRefundError(currentMeterRes.error || "เกิดข้อผิดพลาดในการจดมิเตอร์ปลายงวดรอบปัจจุบัน")
-        setRefundSubmitting(false)
-        return
-      }
-      
-      // คำนวณรอบถัดไป
-      const [yearStr, monthStr] = currentCycle.split("-")
-      let nextYear = parseInt(yearStr, 10)
-      let nextMonth = parseInt(monthStr, 10) + 1
-      if (nextMonth > 12) {
-        nextMonth = 1
-        nextYear += 1
-      }
-      const nextCycle = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
-      
-      const nextMeterRes = await saveMeterRecord(
-        refundingRoom.roomNumber,
-        nextCycle,
-        fElec,
-        "", // current value is empty for next tenant to write later
-        fWater,
-        ""
-      )
-      
-      if (!nextMeterRes.success) {
-        setRefundError(nextMeterRes.error || "เกิดข้อผิดพลาดในการสืบทอดค่าตั้งต้นมิเตอร์สำหรับผู้เช่าคนถัดไป")
-        setRefundSubmitting(false)
-        return
+      if (!isHistoricalEdit) {
+        const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
+        
+        // 1. บันทึกเลขมิเตอร์ปลายงวดในรอบบิลปัจจุบัน และสืบทอดเป็น "เลขมิเตอร์ก่อนหน้า" ในรอบบิลถัดไป (สำหรับผู้เช่าคนใหม่)
+        const { saveMeterRecord } = await import("@/features/meter/actions")
+        
+        const currentMeterRes = await saveMeterRecord(
+          refundingRoom.roomNumber,
+          currentCycle,
+          prevElec,
+          fElec,
+          prevWater,
+          fWater
+        )
+        
+        if (!currentMeterRes.success) {
+          setRefundError(currentMeterRes.error || "เกิดข้อผิดพลาดในการจดมิเตอร์ปลายงวดรอบปัจจุบัน")
+          setRefundSubmitting(false)
+          return
+        }
+        
+        // คำนวณรอบถัดไป
+        const [yearStr, monthStr] = currentCycle.split("-")
+        let nextYear = parseInt(yearStr, 10)
+        let nextMonth = parseInt(monthStr, 10) + 1
+        if (nextMonth > 12) {
+          nextMonth = 1
+          nextYear += 1
+        }
+        const nextCycle = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
+        
+        const nextMeterRes = await saveMeterRecord(
+          refundingRoom.roomNumber,
+          nextCycle,
+          fElec,
+          "", // current value is empty for next tenant to write later
+          fWater,
+          ""
+        )
+        
+        if (!nextMeterRes.success) {
+          setRefundError(nextMeterRes.error || "เกิดข้อผิดพลาดในการสืบทอดค่าตั้งต้นมิเตอร์สำหรับผู้เช่าคนถัดไป")
+          setRefundSubmitting(false)
+          return
+        }
       }
       
       // 2. สรุปการแบ่งประเภทรายได้หักภาษีปลายงวด
-      const elecUnits = fElec - prevElec
-      const waterUnits = fWater - prevWater
-      const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
-      const waterCost = waterUnits * (financeSettings?.water_rate || 18)
-      const totalUtilities408 = elecCost + waterCost
-      
+      let totalUtilities408 = 0
       let calcRentDeduction = 0
-      if (!isRentWaived) {
-        const daysStayed = new Date(refundCheckoutDate).getDate()
-        const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
-        if (policy === "DAILY_PRORATE") {
-          calcRentDeduction = Math.round((refundingRoom.baseRent / 30) * daysStayed * 100) / 100
-        } else {
-          calcRentDeduction = refundingRoom.baseRent
+      
+      if (isHistoricalEdit) {
+        totalUtilities408 = Number(historicalUtilitiesDeduction || 0)
+        calcRentDeduction = isRentWaived ? 0 : Number(historicalRentDeduction || 0)
+      } else {
+        const elecUnits = fElec - prevElec
+        const waterUnits = fWater - prevWater
+        const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
+        const waterCost = waterUnits * (financeSettings?.water_rate || 18)
+        totalUtilities408 = elecCost + waterCost
+        
+        if (!isRentWaived) {
+          const daysStayed = new Date(refundCheckoutDate).getDate()
+          const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
+          if (policy === "DAILY_PRORATE") {
+            calcRentDeduction = Math.round((refundingRoom.baseRent / 30) * daysStayed * 100) / 100
+          } else {
+            calcRentDeduction = refundingRoom.baseRent
+          }
         }
       }
       
       const totalCustomDeductions = customDeductions.reduce((sum, d) => sum + Number(d.amount || 0), 0)
       const totalDeductions = calcRentDeduction + totalUtilities408 + totalCustomDeductions
       
-      const isContractBroken = checkIfBreakContract(refundCheckoutDate, refundingRoom)
+      const isContractBroken = isHistoricalEdit ? isHistoricalBreach : checkIfBreakContract(refundCheckoutDate, refundingRoom)
       
       let checkoutRefundAmount = 0
       let forfeitedAmountVal = 0
@@ -1396,8 +1449,8 @@ function RoomsContent() {
       }
       
       // 3. บันทึกสัญญายกเลิกและกระจายภาษีแยกสัดส่วนลง cancelled_contracts
-      const cancellationPayload = {
-        tenantId: refundingRoom.tenantId,
+      const cancellationPayload: any = {
+        tenantId: refundingRoom.tenantId === "historical" ? null : refundingRoom.tenantId,
         roomNumber: refundingRoom.roomNumber,
         tenantName: refundingRoom.tenantName || "",
         cancellationDate: refundCheckoutDate,
@@ -1410,6 +1463,10 @@ function RoomsContent() {
         deductedServices408: Number(servicesDeductionVal)
       }
       
+      if (isHistoricalEdit) {
+        cancellationPayload.id = editingCancelledContractId
+      }
+      
       const saveRes = await saveCancelledContract(wsId, cancellationPayload)
       if (!saveRes.success) {
         setRefundError(saveRes.error || "เกิดข้อผิดพลาดในการส่งข้อมูลบัญชีภาษีเงินได้หัก ณ ที่จ่าย")
@@ -1417,15 +1474,22 @@ function RoomsContent() {
         return
       }
       
-      // 4. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
-      const deleteRes = await deleteTenant(refundingRoom.tenantId, refundingRoom.roomNumber)
-      if (!deleteRes.success) {
-        setRefundError(deleteRes.error || "เกิดข้อผิดพลาดในการปิดระบบสัญญาผู้เช่า")
-        setRefundSubmitting(false)
-        return
+      if (!isHistoricalEdit) {
+        // 4. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
+        const deleteRes = await deleteTenant(refundingRoom.tenantId, refundingRoom.roomNumber)
+        if (!deleteRes.success) {
+          setRefundError(deleteRes.error || "เกิดข้อผิดพลาดในการปิดระบบสัญญาผู้เช่า")
+          setRefundSubmitting(false)
+          return
+        }
       }
       
-      showToast(`✓ ดำเนินการสรุปคืนเงินประกันและบันทึกบัญชีภาษีหอพักของห้อง ${refundingRoom.roomNumber} เรียบร้อยแล้ว`, "success")
+      showToast(
+        isHistoricalEdit 
+          ? `✓ ดำเนินการปรับปรุงข้อมูลประวัติและบัญชีภาษีของห้อง ${refundingRoom.roomNumber} เรียบร้อยแล้ว`
+          : `✓ ดำเนินการสรุปคืนเงินประกันและบันทึกบัญชีภาษีหอพักของห้อง ${refundingRoom.roomNumber} เรียบร้อยแล้ว`, 
+        "success"
+      )
       setRefundModalOpen(false)
       await loadData(true)
       
@@ -2662,11 +2726,11 @@ function RoomsContent() {
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold text-xs sm:text-sm">
                       <th className="py-3 px-4">ห้องพัก / ผู้เช่า</th>
-                      <th className="py-3 px-4 text-center">วันที่ยกเลิก</th>
+                      <th className="py-3 px-4 text-center">วันที่ย้ายออก</th>
                       <th className="py-3 px-4 text-right">เงินประกัน (บาท)</th>
                       <th className="py-3 px-4 text-right">โอนคืนจริง (บาท)</th>
                       <th className="py-3 px-4 text-right">ยอดที่ริบ (บาท)</th>
-                      <th className="py-3 px-4 text-center w-16">ลบ</th>
+                      <th className="py-3 px-4 text-center w-28">การจัดการ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
@@ -2682,23 +2746,32 @@ function RoomsContent() {
                             day: "numeric",
                           }) : "-"}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
+                        <td className="py-3.5 px-4 text-right font-mono text-slate-600 dark:text-slate-455 font-bold">
                           {Number(c.depositAmount || 0).toLocaleString()}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-mono text-slate-600 dark:text-slate-450 font-bold">
+                        <td className="py-3.5 px-4 text-right font-mono text-slate-600 dark:text-slate-455 font-bold">
                           {Number((c.actualRefund ?? c.refundedAmount) ?? 0).toLocaleString()}
                         </td>
                         <td className="py-3.5 px-4 text-right font-mono font-extrabold text-red-600 dark:text-red-400 bg-red-500/5">
                           {Number(c.forfeitedAmount || 0).toLocaleString()}
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <button
-                            onClick={() => handleDeleteCancellation(c.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-red-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90"
-                            title="ลบประวัติ"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleEditCancelledContract(c)}
+                              className="p-1.5 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 bg-slate-50 hover:bg-purple-50 dark:bg-slate-900 dark:hover:bg-purple-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90"
+                              title="แก้ไขประวัติ"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCancellation(c.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-red-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90"
+                              title="ลบประวัติ"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -3925,144 +3998,258 @@ function RoomsContent() {
               {/* Scrollable Content Form */}
               <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                 
-                {/* 1. METER READINGS SECTION */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">1</span>
-                    <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">บันทึกเลขมิเตอร์ปลายงวดวันย้ายออก</h4>
-                  </div>
-                  
-                  {loadingMeter ? (
-                    <div className="py-4 text-center text-xs text-slate-400 font-bold flex items-center justify-center gap-2">
-                      <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
-                      กำลังดึงข้อมูลเลขมิเตอร์ครั้งก่อนหน้า...
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Electricity Meter */}
-                      <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                            <Zap className="w-4 h-4 text-amber-500" /> มิเตอร์ไฟปลายงวด
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เลขครั้งก่อน: {prevElec}</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <input
-                            type="number"
-                            placeholder="กรอกเลขมิเตอร์ไฟวันย้ายออก"
-                            value={finalElec}
-                            onChange={(e) => setFinalElec(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
-                          />
-                          {(() => {
-                            const units = Math.max(0, Number(finalElec || 0) - prevElec)
-                            const cost = units * (financeSettings?.electric_rate || 7)
-                            return (
-                              <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-455 pt-1">
-                                <span>จำนวนหน่วยที่ใช้: <strong className="font-extrabold text-slate-700 dark:text-slate-300">{units} หน่วย</strong></span>
-                                <span>คิดเป็นเงิน: <strong className="font-extrabold text-blue-600 dark:text-blue-400">{cost.toLocaleString()} บาท</strong></span>
-                              </div>
-                            )
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Water Meter */}
-                      <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                            <Droplet className="w-4 h-4 text-blue-500" /> มิเตอร์น้ำปลายงวด
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เลขครั้งก่อน: {prevWater}</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <input
-                            type="number"
-                            placeholder="กรอกเลขมิเตอร์น้ำวันย้ายออก"
-                            value={finalWater}
-                            onChange={(e) => setFinalWater(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
-                          />
-                          {(() => {
-                            const units = Math.max(0, Number(finalWater || 0) - prevWater)
-                            const cost = units * (financeSettings?.water_rate || 18)
-                            return (
-                              <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-455 pt-1">
-                                <span>จำนวนหน่วยที่ใช้: <strong className="font-extrabold text-slate-700 dark:text-slate-300">{units} หน่วย</strong></span>
-                                <span>คิดเป็นเงิน: <strong className="font-extrabold text-blue-600 dark:text-blue-400">{cost.toLocaleString()} บาท</strong></span>
-                              </div>
-                            )
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. RENT DEDUCTION SECTION */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">2</span>
-                    <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">คำนวณสัดส่วนค่าเช่าห้องพักกลางเดือน</h4>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
+                {editingCancelledContractId !== null ? (
+                  /* HISTORICAL ADAPTIVE FORM */
+                  <div className="space-y-6">
+                    {/* Section 1: ข้อมูลและสัดส่วนประวัติสัญญา */}
+                    <div className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                          นโยบายหอพัก: {financeSettings?.checkout_policy === "DAILY_PRORATE" ? "คิดเฉลี่ยรายวัน (DAILY_PRORATE)" : "คิดเต็มเดือน (FULL_MONTH)"}
-                        </span>
+                        <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">1</span>
+                        <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">แก้ไขข้อมูลประวัติสัญญาย้อนหลัง</h4>
                       </div>
-                      {(() => {
-                        const days = new Date(refundCheckoutDate).getDate()
-                        const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
-                        const calculated = policy === "DAILY_PRORATE" 
-                          ? Math.round((refundingRoom.baseRent / 30) * days * 100) / 100
-                          : refundingRoom.baseRent
-                        return (
-                          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                            {policy === "DAILY_PRORATE" 
-                              ? `คำนวณเฉลี่ย: ${refundingRoom.baseRent.toLocaleString()} บาท / 30 วัน * อยู่จริง ${days} วัน`
-                              : `หักยอดค่าห้องพักเต็มเดือน: ${refundingRoom.baseRent.toLocaleString()} บาท`
-                            }
-                            <span className="block mt-1 font-extrabold text-slate-700 dark:text-slate-300">
-                              ยอดหักสุทธิ: {isRentWaived ? "0.00 บาท (ยกเว้นแล้ว)" : `${calculated.toLocaleString()} บาท`}
-                            </span>
-                          </p>
-                        )
-                      })()}
+
+                      <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Checkout Date Picker */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-550 dark:text-slate-400">วันที่ย้ายออก (Checkout Date)</label>
+                            <input
+                              type="date"
+                              required
+                              value={refundCheckoutDate}
+                              onChange={(e) => setRefundCheckoutDate(e.target.value)}
+                              className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-bold text-slate-800 dark:text-slate-100"
+                            />
+                          </div>
+
+                          {/* Deposit Amount Input */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-550 dark:text-slate-400">จำนวนเงินประกันตั้งต้น (Deposit)</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                required
+                                min={0}
+                                placeholder="กรอกจำนวนเงินประกัน"
+                                value={refundDeposit}
+                                onChange={(e) => setRefundDeposit(Number(e.target.value) || 0)}
+                                className="w-full h-10 pl-3 pr-8 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                              />
+                              <span className="absolute inset-y-0 right-3 flex items-center text-[10px] text-slate-400 font-bold">บ.</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Contract Breach Toggle */}
+                        <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800/60 rounded-xl shadow-sm">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">ระบุการผิดสัญญาเช่า (Breach of Contract)</span>
+                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-bold">ริบเงินประกันทั้งหมด และกระจายสัดส่วนยอดริบเป็นค่าปรับ</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsHistoricalBreach(!isHistoricalBreach)}
+                            className={`h-8 px-3.5 rounded-lg text-[11px] font-extrabold border transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 duration-100 ${
+                              isHistoricalBreach
+                                ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 shadow-sm"
+                                : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border-slate-250 dark:border-slate-850 text-slate-650 dark:text-slate-300 shadow-sm"
+                            }`}
+                          >
+                            {isHistoricalBreach ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-red-500" />
+                                ผิดสัญญาเช่า
+                              </>
+                            ) : (
+                              <>
+                                <X className="w-3.5 h-3.5 text-slate-400" />
+                                ไม่ผิดสัญญาเช่า
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Rent Deduction Input */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-550 dark:text-slate-400">ยอดหักค่าเช่าห้องพัก ม.40(5) (Rent Deduction)</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="กรอกยอดหักค่าเช่าพัก"
+                                value={historicalRentDeduction}
+                                onChange={(e) => setHistoricalRentDeduction(e.target.value === "" ? "" : Number(e.target.value))}
+                                className="w-full h-10 pl-3 pr-8 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                              />
+                              <span className="absolute inset-y-0 right-3 flex items-center text-[10px] text-slate-400 font-bold">บ.</span>
+                            </div>
+                          </div>
+
+                          {/* Utilities Deduction Input */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-550 dark:text-slate-400">ยอดหักค่าน้ำไฟ ม.40(8) (Utilities Deduction)</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="กรอกยอดหักน้ำไฟ"
+                                value={historicalUtilitiesDeduction}
+                                onChange={(e) => setHistoricalUtilitiesDeduction(e.target.value === "" ? "" : Number(e.target.value))}
+                                className="w-full h-10 pl-3 pr-8 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                              />
+                              <span className="absolute inset-y-0 right-3 flex items-center text-[10px] text-slate-400 font-bold">บ.</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setIsRentWaived(!isRentWaived)}
-                      className={`h-9 px-4 rounded-xl text-xs font-extrabold border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 duration-100 ${
-                        isRentWaived 
-                          ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 shadow-sm"
-                          : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border-slate-250 dark:border-slate-850 text-slate-650 dark:text-slate-300 shadow-sm"
-                      }`}
-                    >
-                      {isRentWaived ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                          ยกเว้นค่าเช่าเรียบร้อย
-                        </>
-                      ) : (
-                        <>
-                          <X className="w-4 h-4 text-slate-400" />
-                          ยกเว้นค่าเช่าพัก
-                        </>
-                      )}
-                    </button>
                   </div>
-                </div>
+                ) : (
+                  /* STANDARD ACTIVE ROOM REFUND FORM */
+                  <>
+                    {/* 1. METER READINGS SECTION */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">1</span>
+                        <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">บันทึกเลขมิเตอร์ปลายงวดวันย้ายออก</h4>
+                      </div>
+                      
+                      {loadingMeter ? (
+                        <div className="py-4 text-center text-xs text-slate-400 font-bold flex items-center justify-center gap-2">
+                          <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                          กำลังดึงข้อมูลเลขมิเตอร์ครั้งก่อนหน้า...
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Electricity Meter */}
+                          <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <Zap className="w-4 h-4 text-amber-500" /> มิเตอร์ไฟปลายงวด
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เลขครั้งก่อน: {prevElec}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <input
+                                type="number"
+                                placeholder="กรอกเลขมิเตอร์ไฟวันย้ายออก"
+                                value={finalElec}
+                                onChange={(e) => setFinalElec(e.target.value)}
+                                className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                              />
+                              {(() => {
+                                const units = Math.max(0, Number(finalElec || 0) - prevElec)
+                                const cost = units * (financeSettings?.electric_rate || 7)
+                                return (
+                                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-455 pt-1">
+                                    <span>จำนวนหน่วยที่ใช้: <strong className="font-extrabold text-slate-700 dark:text-slate-300">{units} หน่วย</strong></span>
+                                    <span>คิดเป็นเงิน: <strong className="font-extrabold text-blue-600 dark:text-blue-400">{cost.toLocaleString()} บาท</strong></span>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Water Meter */}
+                          <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <Droplet className="w-4 h-4 text-blue-500" /> มิเตอร์น้ำปลายงวด
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">เลขครั้งก่อน: {prevWater}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <input
+                                type="number"
+                                placeholder="กรอกเลขมิเตอร์น้ำวันย้ายออก"
+                                value={finalWater}
+                                onChange={(e) => setFinalWater(e.target.value)}
+                                className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
+                              />
+                              {(() => {
+                                const units = Math.max(0, Number(finalWater || 0) - prevWater)
+                                const cost = units * (financeSettings?.water_rate || 18)
+                                return (
+                                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-455 pt-1">
+                                    <span>จำนวนหน่วยที่ใช้: <strong className="font-extrabold text-slate-700 dark:text-slate-300">{units} หน่วย</strong></span>
+                                    <span>คิดเป็นเงิน: <strong className="font-extrabold text-blue-600 dark:text-blue-400">{cost.toLocaleString()} บาท</strong></span>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. RENT DEDUCTION SECTION */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">2</span>
+                        <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">คำนวณสัดส่วนค่าเช่าห้องพักกลางเดือน</h4>
+                      </div>
+
+                      <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                              นโยบายหอพัก: {financeSettings?.checkout_policy === "DAILY_PRORATE" ? "คิดเฉลี่ยรายวัน (DAILY_PRORATE)" : "คิดเต็มเดือน (FULL_MONTH)"}
+                            </span>
+                          </div>
+                          {(() => {
+                            const days = new Date(refundCheckoutDate).getDate()
+                            const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
+                            const calculated = policy === "DAILY_PRORATE" 
+                              ? Math.round((refundingRoom.baseRent / 30) * days * 100) / 100
+                              : refundingRoom.baseRent
+                            return (
+                              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                                {policy === "DAILY_PRORATE" 
+                                  ? `คำนวณเฉลี่ย: ${refundingRoom.baseRent.toLocaleString()} บาท / 30 วัน * อยู่จริง ${days} วัน`
+                                  : `หักยอดค่าห้องพักเต็มเดือน: ${refundingRoom.baseRent.toLocaleString()} บาท`
+                                }
+                                <span className="block mt-1 font-extrabold text-slate-700 dark:text-slate-300">
+                                  ยอดหักสุทธิ: {isRentWaived ? "0.00 บาท (ยกเว้นแล้ว)" : `${calculated.toLocaleString()} บาท`}
+                                </span>
+                              </p>
+                            )
+                          })()}
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => setIsRentWaived(!isRentWaived)}
+                          className={`h-9 px-4 rounded-xl text-xs font-extrabold border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 duration-100 ${
+                            isRentWaived 
+                              ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                              : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 border-slate-250 dark:border-slate-850 text-slate-650 dark:text-slate-300 shadow-sm"
+                          }`}
+                        >
+                          {isRentWaived ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              ยกเว้นค่าเช่าเรียบร้อย
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-4 h-4 text-slate-400" />
+                              ยกเว้นค่าเช่าพัก
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* 3. CUSTOM SERVICES & DAMAGES SECTION */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">3</span>
+                      <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">
+                        {editingCancelledContractId !== null ? "2" : "3"}
+                      </span>
                       <h4 className="text-xs font-extrabold text-slate-455 dark:text-slate-400 uppercase tracking-wider">ค่าบริการและค่าเสียหายอื่นๆ (สูงสุด 5 รายการ)</h4>
                     </div>
                     
@@ -4123,21 +4310,32 @@ function RoomsContent() {
                 {/* 4. REAL-TIME ACCOUNTING & TAX SUMMARY SECTION */}
                 <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm">4</span>
+                    <span className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-extrabold border border-blue-100 dark:border-blue-900/30 shadow-sm font-bold">
+                      {editingCancelledContractId !== null ? "3" : "4"}
+                    </span>
                     <h4 className="text-xs font-extrabold text-slate-450 dark:text-slate-400 uppercase tracking-wider">สรุปยอดประเมินสิทธิคืนเงินประกัน และสัดส่วนภาษี</h4>
                   </div>
 
                   {(() => {
+                    const isHistorical = editingCancelledContractId !== null
+
                     // Recalculate utilities
-                    const elecUnits = Math.max(0, Number(finalElec || 0) - prevElec)
-                    const waterUnits = Math.max(0, Number(finalWater || 0) - prevWater)
-                    const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
-                    const waterCost = waterUnits * (financeSettings?.water_rate || 18)
-                    const totalUtilities408 = elecCost + waterCost
+                    let totalUtilities408 = 0
+                    if (isHistorical) {
+                      totalUtilities408 = Number(historicalUtilitiesDeduction || 0)
+                    } else {
+                      const elecUnits = Math.max(0, Number(finalElec || 0) - prevElec)
+                      const waterUnits = Math.max(0, Number(finalWater || 0) - prevWater)
+                      const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
+                      const waterCost = waterUnits * (financeSettings?.water_rate || 18)
+                      totalUtilities408 = elecCost + waterCost
+                    }
                     
                     // Rent deduction
                     let rentDeductionVal = 0
-                    if (!isRentWaived) {
+                    if (isHistorical) {
+                      rentDeductionVal = Number(historicalRentDeduction || 0)
+                    } else if (!isRentWaived) {
                       const days = new Date(refundCheckoutDate).getDate()
                       const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
                       if (policy === "DAILY_PRORATE") {
@@ -4154,7 +4352,7 @@ function RoomsContent() {
                     const totalDeductions = rentDeductionVal + totalUtilities408 + totalCustomDeductions
                     const netRefund = refundDeposit - totalDeductions
                     
-                    const isContractBroken = checkIfBreakContract(refundCheckoutDate, refundingRoom)
+                    const isContractBroken = isHistorical ? isHistoricalBreach : checkIfBreakContract(refundCheckoutDate, refundingRoom)
                     
                     let taxRent405 = rentDeductionVal
                     let taxUtilities408 = totalUtilities408
@@ -4290,12 +4488,12 @@ function RoomsContent() {
                   {refundSubmitting ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      กำลังบันทึกและส่งภาษี...
+                      {editingCancelledContractId !== null ? "กำลังบันทึกการแก้ไข..." : "กำลังบันทึกและส่งภาษี..."}
                     </>
                   ) : (
                     <>
                       <ShieldCheck className="w-4 h-4" />
-                      ยืนยันสรุปคืนเงินประกันและปิดบัญชีภาษี
+                      {editingCancelledContractId !== null ? "ยืนยันบันทึกการแก้ไขข้อมูลประวัติ" : "ยืนยันสรุปคืนเงินประกันและปิดบัญชีภาษี"}
                     </>
                   )}
                 </button>

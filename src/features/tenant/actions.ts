@@ -932,7 +932,7 @@ export async function saveCancelledContract(workspaceId: string, contract: {
 
     const { data, error } = await adminSupabase
       .from("cancelled_contracts")
-      .insert([insertData])
+      .upsert([insertData])
       .select()
 
     if (error) {
