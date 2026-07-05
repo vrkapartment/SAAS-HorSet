@@ -36,6 +36,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
 import { updateUserProfileAction } from "@/features/auth/actions"
 import Sidebar from "./dashboard/Sidebar"
 import SupportModal from "./dashboard/SupportModal"
@@ -1283,7 +1284,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 </div>
               ) : (
                 <p className="text-xs font-bold text-slate-800 dark:text-slate-300">
-                  {t("dashboard.building")} {currentWorkspace.name || "กำลังโหลด..."}
+                  {t("dashboard.building")} <DynamicText>{currentWorkspace.name || "กำลังโหลด..."}</DynamicText>
                 </p>
               )}
               <p className="text-[10px] text-slate-500">{t("dashboard.current_cycle")}</p>

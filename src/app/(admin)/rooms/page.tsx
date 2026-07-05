@@ -69,6 +69,7 @@ import { getFinanceSettings, type FinanceSettings } from "@/features/finance/act
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { packWorkspaceAndRoom } from "@/lib/urlPacker"
+import { DynamicText } from "@/lib/translations/DynamicText"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -2229,7 +2230,7 @@ function RoomsContent() {
                                     {/* Room Type & Base Rent */}
                                     <div className="flex items-center justify-between gap-2 mb-4">
                                       <span className="inline-flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-200/30 dark:border-indigo-800/30 uppercase tracking-wide">
-                                        <Tag className="w-2.5 h-2.5" /> {room.roomTypeName}
+                                        <Tag className="w-2.5 h-2.5" /> <DynamicText>{room.roomTypeName}</DynamicText>
                                       </span>
                                       <span className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-300">
                                         {room.baseRent.toLocaleString()} บ.
@@ -2387,7 +2388,7 @@ function RoomsContent() {
                                       <span className="inline-flex items-center text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">ชั้น {room.floor || getFloorNumber(room)}</span>
                                     </div>
                                     <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded w-max border border-indigo-200/30 dark:border-indigo-800/30">
-                                      <Tag className="w-3.5 h-3.5" /> {room.roomTypeName}
+                                      <Tag className="w-3.5 h-3.5" /> <DynamicText>{room.roomTypeName}</DynamicText>
                                     </span>
                                   </div>
                                 </td>
