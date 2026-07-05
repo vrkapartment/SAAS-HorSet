@@ -372,13 +372,32 @@ export async function getSystemSettingsAction() {
     const { data, error } = await supabaseAdmin.from("system_settings").select("*")
     if (error) throw error
 
-    // Decrypt values safely
-    const decryptedData = data.map(item => ({
-      ...item,
-      value: item.key.includes("KEY") || item.key.includes("SECRET") ? decryptText(item.value) : item.value
-    }))
+    let googleKeyInfo = null
 
-    return { success: true, data: decryptedData }
+    // Decrypt values safely
+    const decryptedData = data.map(item => {
+      let val = item.value
+      if (item.key.includes("KEY") || item.key.includes("SECRET")) {
+        val = decryptText(item.value)
+        if (item.key === "GOOGLE_SERVICE_ACCOUNT_KEY") {
+          try {
+            const parsed = JSON.parse(val)
+            googleKeyInfo = {
+              projectId: parsed.project_id || "",
+              clientEmail: parsed.client_email || ""
+            }
+          } catch (e) {
+            // invalid JSON or not set yet
+          }
+        }
+      }
+      return {
+        ...item,
+        value: val
+      }
+    })
+
+    return { success: true, data: decryptedData, googleKeyInfo }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to fetch settings" }
   }
@@ -403,7 +422,18 @@ export async function updateSystemSettingAction(key: string, value: string) {
     const { error } = await supabaseAdmin.from("system_settings").upsert({ key, value: valueToStore }, { onConflict: "key" })
     if (error) throw error
 
-    return { success: true }
+    let googleKeyInfo = null
+    if (key === "GOOGLE_SERVICE_ACCOUNT_KEY") {
+      try {
+        const parsed = JSON.parse(value)
+        googleKeyInfo = {
+          projectId: parsed.project_id || "",
+          clientEmail: parsed.client_email || ""
+        }
+      } catch (e) {}
+    }
+
+    return { success: true, googleKeyInfo }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to update setting" }
   }

@@ -106,6 +106,7 @@ export default function SuperAdminPage() {
   const [googleProjectId, setGoogleProjectId] = useState("")
   const [googleServiceKey, setGoogleServiceKey] = useState("")
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+  const [googleKeyInfo, setGoogleKeyInfo] = useState<{ projectId: string, clientEmail: string } | null>(null)
 
   // ฟอร์มเพิ่ม Workspace
   const [newWorkspaceName, setNewWorkspaceName] = useState("")
@@ -145,6 +146,9 @@ export default function SuperAdminPage() {
       if (googleServiceKey && googleServiceKey !== "••••••••••••••••••••••••••••••••••••") {
         const res2 = await updateSystemSettingAction("GOOGLE_SERVICE_ACCOUNT_KEY", googleServiceKey)
         if (!res2.success) throw new Error(res2.error)
+        if (res2.googleKeyInfo) {
+          setGoogleKeyInfo(res2.googleKeyInfo)
+        }
       }
       setResultSuccess("บันทึกการตั้งค่าระบบเรียบร้อยแล้ว")
       // Set masked back
@@ -201,6 +205,9 @@ export default function SuperAdminPage() {
           // Hide actual JSON in UI by showing a masked text if it exists
           if (serviceKeySetting && serviceKeySetting.value) {
             setGoogleServiceKey("••••••••••••••••••••••••••••••••••••")
+          }
+          if (settingsRes.googleKeyInfo) {
+            setGoogleKeyInfo(settingsRes.googleKeyInfo)
           }
         }
 
@@ -1343,6 +1350,17 @@ export default function SuperAdminPage() {
                     />
                     <p className="text-xs text-slate-500">
                       * หากมีคีย์เดิมบันทึกไว้อยู่แล้ว จะแสดงเป็น ••••••• เพื่อความปลอดภัย หากต้องการเปลี่ยนให้ลบแล้ววางคีย์ใหม่
+                    </p>
+                    {googleKeyInfo && (
+                      <div className="mt-4 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-slate-300 space-y-2">
+                        <div className="text-teal-400 font-bold flex items-center gap-1.5 mb-1 text-sm">
+                          <CheckCircle2 className="w-4 h-4 text-teal-400 animate-pulse" /> เชื่อมต่อ Google Translation API สำเร็จ
+                        </div>
+                        <p><span className="text-slate-400">ชื่อโปรเจกต์ (Google Project ID):</span> <span className="font-mono font-bold text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 select-all">{googleKeyInfo.projectId}</span></p>
+                        <p><span className="text-slate-400">อีเมลบริการ (Client Email):</span> <span className="font-mono font-bold text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-xs select-all">{googleKeyInfo.clientEmail}</span></p>
+                      </div>
+                    )}
+                    <p className="hidden">
                     </p>
                   </div>
 
