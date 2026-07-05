@@ -70,6 +70,7 @@ interface UnifiedRoomBillingItem {
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
   invoiceId?: string
+  hasNotifiedCheckout?: boolean
 }
 
 function getCookie(name: string): string | undefined {
@@ -481,6 +482,18 @@ function ManageBillsContent() {
         
         const isOccupiedInCycle = resolvedTenantName !== null
 
+        // ตรวจสอบสถานะการแจ้งย้ายออก (เพื่อข้ามการออกบิลแบบปกติ และให้ไปเคลียร์บัญชีที่หน้าจัดการห้องแทน)
+        const cycleActiveTenant = (r.allTenants || []).find((t: any) => {
+          const tIsLatest = sortedTenants[0]?.id === t.id
+          return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle, tIsLatest)
+        })
+        const hasNotifiedCheckout = r.status === "Pending_Refund" || !!(
+          cycleActiveTenant && 
+          cycleActiveTenant.leaseEnd && 
+          typeof cycleActiveTenant.leaseEnd === "string" && 
+          cycleActiveTenant.leaseEnd.startsWith(cycle)
+        )
+
         const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
         const hasPrevMeterWater = !!(prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
@@ -529,6 +542,7 @@ function ManageBillsContent() {
           tenantName: resolvedTenantName,
           baseRent: Number(r.baseRent) || 4500,
           status: isOccupiedInCycle ? "occupied" : "available",
+          hasNotifiedCheckout: !!hasNotifiedCheckout,
           
           meterRecordId: roomMeter?.id || undefined,
           elecPrev,
@@ -1132,6 +1146,7 @@ function ManageBillsContent() {
     }
     const editedItems = unifiedItems.filter(item => {
       if (item.isMeterSaved) return false;
+      if (item.hasNotifiedCheckout) return false; // ข้ามห้องที่แจ้งย้ายออกแล้ว เพราะเราจะไม่ประมวลผลออกบิลปกติอยู่แล้ว
       if (type === "electric") {
         return item.elecCurr !== "";
       } else if (type === "water") {

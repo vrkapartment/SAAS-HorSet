@@ -74,6 +74,7 @@ interface UnifiedRoomBillingItem {
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
   invoiceId?: string
+  hasNotifiedCheckout?: boolean
 }
 
 function getCookie(name: string): string | undefined {
@@ -469,6 +470,18 @@ function UnifiedBillingContent() {
         
         const isOccupiedInCycle = resolvedTenantName !== null
 
+        // ตรวจสอบสถานะการแจ้งย้ายออก (เพื่อข้ามการออกบิลแบบปกติ และให้ไปเคลียร์บัญชีที่หน้าจัดการห้องแทน)
+        const cycleActiveTenant = (r.allTenants || []).find((t: any) => {
+          const tIsLatest = sortedTenants[0]?.id === t.id
+          return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle, tIsLatest)
+        })
+        const hasNotifiedCheckout = r.status === "Pending_Refund" || !!(
+          cycleActiveTenant && 
+          cycleActiveTenant.leaseEnd && 
+          typeof cycleActiveTenant.leaseEnd === "string" && 
+          cycleActiveTenant.leaseEnd.startsWith(cycle)
+        )
+
         // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
         const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
@@ -523,6 +536,7 @@ function UnifiedBillingContent() {
           tenantName: resolvedTenantName,
           baseRent: Number(r.baseRent) || 4500,
           status: isOccupiedInCycle ? "occupied" : "available",
+          hasNotifiedCheckout: !!hasNotifiedCheckout,
           
           meterRecordId: roomMeter?.id || undefined,
           elecPrev,
@@ -1138,6 +1152,9 @@ function UnifiedBillingContent() {
 
     // กรองหาห้องที่กรอกไม่ครบหรือผิดพลาดตามประเภท
     const invalidItems = unifiedItems.filter(item => {
+      if (item.hasNotifiedCheckout) {
+        return false // ข้ามการตรวจสอบห้องที่แจ้งย้ายออกแล้ว เพราะเราจะไม่ประมวลผลออกบิลอยู่แล้ว
+      }
       const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
       const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
       const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
@@ -1193,6 +1210,9 @@ function UnifiedBillingContent() {
       // โหมด Supabase
       for (const item of unifiedItems) {
         currentIdx++
+        if (item.hasNotifiedCheckout) {
+          continue // ข้ามการออกบิลห้องที่แจ้งย้ายออกแล้วอย่างถาวร
+        }
         setSavingProgress({ current: currentIdx, total: unifiedItems.length, currentRoom: item.roomNumber })
 
         const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)

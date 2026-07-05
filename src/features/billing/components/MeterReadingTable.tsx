@@ -709,7 +709,15 @@ export default function MeterReadingTable({
                         }`}>
                           {item.roomNumber}
                         </span>
-                        {mode === "meters" ? (
+                        {item.hasNotifiedCheckout ? (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
+                            isDark 
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}>
+                            แจ้งย้ายออก
+                          </span>
+                        ) : mode === "meters" ? (
                           item.status === "occupied" ? (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                               มีผู้เช่า
@@ -746,627 +754,587 @@ export default function MeterReadingTable({
                         )}
                       </div>
                       {mode !== "meters" && (
-                        <div className={`font-bold mt-2 ${isDark ? "text-slate-300" : "text-slate-800"}`}>
-                          {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
-                        </div>
-                      )}
-                      {mode !== "meters" && activeTab === "all" && (
-                        <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          {item.tenantName ? (
-                            <>
-                              ค่าเช่า {item.baseRent.toLocaleString()}.- | ส่วนกลาง {commonFee}.-
-                              {extraExpenses.map((exp: any, index: number) => (
-                                <span key={index} className="text-indigo-600 dark:text-indigo-400 font-bold">
-                                  {" "}| {exp.name} {Number(exp.amount || 0).toLocaleString()}.-
-                                </span>
-                              ))}
-                              {Number(item.otherServiceAmount || 0) > 0 && (
-                                <span className="text-teal-600 dark:text-teal-400 font-bold">
-                                  {" "}| ค่าบริการอื่นๆ {Number(item.otherServiceAmount).toLocaleString()}.-
-                                </span>
-                              )}
-                            </>
-                          ) : "ห้องว่าง"}
+                        <div className={`text-xs mt-1 font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                          {item.tenantName || <span className="italic opacity-60">ห้องว่าง</span>}
                         </div>
                       )}
                     </div>
-                    
-                    {/* Total Display (Only in Manage Bills Tab) */}
-                    {activeTab === "all" && (
-                      <div className="text-right">
-                        <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวมสุทธิ</div>
-                        {item.tenantName ? (
-                          item.billStatus !== "not_created" ? (
-                            <div className="flex flex-col items-end mt-1">
-                              <div className="flex items-center gap-1 justify-end">
-                                <span className={`font-mono text-sm font-black ${
-                                  isDark ? "text-slate-100" : "text-slate-800"
-                                }`}>
-                                  {Number(item.billAmount !== undefined ? item.billAmount : 0).toLocaleString()}
-                                </span>
-                                <span className={`text-[10px] font-bold ${isDark ? "text-slate-450" : "text-slate-500"}`}>บาท</span>
-                              </div>
-                              {isModified && (
-                                <span className={`inline-block text-[8px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded font-bold mt-1 ${
-                                  isDark ? "text-amber-400" : "text-amber-600"
-                                }`}>
-                                  ยอดเงินเปลี่ยน
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <>
-                              <div className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono">
-                                {displayedTotal.toLocaleString()}.-
-                              </div>
-                              <span className={`inline-block text-[8px] bg-slate-500/10 border border-slate-500/20 px-1 py-0.2 rounded font-bold mt-1 ${
-                                isDark ? "text-slate-450" : "text-slate-500"
-                              }`}>
-                                รอสร้างบิล
-                              </span>
-                            </>
-                          )
-                        ) : (
-                          <div className={`text-sm font-bold ${isDark ? "text-slate-605" : "text-slate-400"}`}>-</div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
-                  <div className={`h-px ${isDark ? "bg-slate-900/60" : "bg-slate-200"}`} />
-
-                  {/* 1. แถบจัดการบิล (อ่านอย่างเดียว ไม่มีแบบกรอก ไม่มีปุ่มเซฟ) */}
-                  {activeTab === "all" && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3.5">
-                        {/* ไฟฟ้า Read-only */}
-                        <div className={`rounded-xl p-3 border ${
-                          isDark ? "bg-blue-950/15 border-blue-900/40" : "bg-blue-50/30 border-blue-100"
-                        }`}>
-                          <div className={`text-xs font-bold flex items-center gap-1 mb-1.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                            <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
-                          </div>
-                          <div className="font-mono text-xs">
-                            <span className="text-slate-400">ก่อน: {item.elecPrev}</span>
-                            <span className="mx-1 text-slate-400">➔</span>
-                            <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.elecCurr || "-"}</span>
-                          </div>
-                          {hasElecCurr && (
-                            <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                              {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
-                              {(() => {
-                                const repl = getReplacement(item.roomNumber, "electric");
-                                if (repl) {
-                                  return (
-                                    <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                                      สูตร: ({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* น้ำประปา Read-only */}
-                        <div className={`rounded-xl p-3 border ${
-                          isDark ? "bg-teal-950/15 border-teal-900/40" : "bg-teal-50/30 border-teal-100"
-                        }`}>
-                          <div className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 mb-1.5">
-                            <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
-                          </div>
-                          <div className="font-mono text-xs">
-                            <span className="text-slate-400">ก่อน: {item.waterPrev}</span>
-                            <span className="mx-1 text-slate-400">➔</span>
-                            <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.waterCurr || "-"}</span>
-                          </div>
-                          {hasWaterCurr && (
-                            <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
-                              {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
-                              {(() => {
-                                const repl = getReplacement(item.roomNumber, "water");
-                                if (repl) {
-                                  return (
-                                    <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                                      สูตร: ({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
-                          )}
-                        </div>
+                  {item.hasNotifiedCheckout ? (
+                    <div className={`p-4 rounded-xl border flex flex-col items-center text-center gap-3 ${
+                      isDark 
+                        ? "bg-amber-950/15 border-amber-500/25 text-amber-400" 
+                        : "bg-amber-50/55 border-amber-200 text-amber-800"
+                    }`}>
+                      <div className={`p-2 rounded-full ${isDark ? "bg-amber-500/10" : "bg-amber-100"}`}>
+                        <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 animate-pulse" />
                       </div>
-
-                      {/* แก้ไขจำนวนวันปรับล่าช้าในโมบาย */}
-                      {item.tenantName && item.billStatus !== "not_created" && (
-                        <div className={`rounded-xl p-3 border flex items-center justify-between gap-3 ${
-                          isDark ? "bg-rose-950/10 border-rose-950/45" : "bg-rose-50/20 border-rose-100/70"
-                        }`}>
-                          <div className="flex flex-col">
-                            <div className="text-xs font-bold text-rose-500 dark:text-rose-400">
-                              ปรับล่าช้า (วัน)
-                            </div>
-                            {latePenaltyRate > 0 && (
-                              <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                วันละ {latePenaltyRate}.-
-                                <span className="ml-1.5 text-rose-500 font-extrabold">
-                                  (+{((item.lateDays || 0) * latePenaltyRate).toLocaleString()}.-)
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              placeholder="0"
-                              disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                              className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
-                                isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                              }`}
-                              value={item.lateDays !== undefined ? item.lateDays : 0}
-                              onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
-                            />
-                            <span className="text-xs font-bold text-slate-500">วัน</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* แก้ไขค่าบริการอื่นๆในโมบาย */}
-                      {item.tenantName && item.billStatus !== "not_created" && (
-                        <div className={`rounded-xl p-3 border flex items-center justify-between gap-3 ${
-                          isDark ? "bg-teal-950/10 border-teal-950/45" : "bg-teal-50/20 border-teal-100/70"
-                        }`}>
-                          <div className="flex flex-col">
-                            <div className="text-xs font-bold text-teal-600 dark:text-teal-400">
-                              ค่าบริการอื่น ๆ (บาท)
-                            </div>
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                              จะรวมอยู่ในยอดบิลสุทธิ
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              placeholder="0"
-                              disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                              className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
-                                isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
-                              }`}
-                              value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
-                              onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
-                            />
-                            <span className="text-xs font-bold text-slate-500">บาท</span>
-                          </div>
-                        </div>
-                      )}
+                      <div className="space-y-1">
+                        <p className="font-extrabold text-xs sm:text-sm">
+                          แจ้งย้ายออกในรอบบิลนี้
+                        </p>
+                        <p className={`text-[10px] sm:text-xs leading-relaxed max-w-[285px] mx-auto ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                          ไม่ต้องออกบิลค่าเช่าปกติ กรุณาไปจัดการเคลียร์บัญชีและคืนเงินประกันที่เมนู <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"จัดการห้อง"</strong> แทน
+                        </p>
+                      </div>
                     </div>
-                  )}
-
-                  {/* 2. แถบมิเตอร์ไฟ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์ไฟ) */}
-                  {activeTab === "electric" && (
-                    <div className="space-y-3">
-                      <div className={`rounded-xl p-3.5 border space-y-3 ${
-                        isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/50 border-blue-100"
-                      }`}>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className={`text-xs font-bold flex items-center gap-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                            <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
-                          </span>
-                          {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>ก่อนหน้า:</span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="กรอก"
-                                className={`w-16 h-6.5 text-center border rounded font-mono text-[10px] font-bold focus:outline-none focus:border-blue-500 transition-all ${
-                                  isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
-                                }`}
-                                value={item.elecPrev}
-                                onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
-                              />
-                            </div>
-                          ) : (
-                            <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
-                              isDark ? "bg-slate-950 border-slate-900 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                  ) : (
+                    <>
+                      {/* 1. แถบจัดการบิล (อ่านอย่างเดียว ไม่มีแบบกรอก ไม่มีปุ่มเซฟ) */}
+                      {activeTab === "all" && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3.5">
+                            {/* ไฟฟ้า Read-only */}
+                            <div className={`rounded-xl p-3 border ${
+                              isDark ? "bg-blue-950/15 border-blue-900/40" : "bg-blue-50/30 border-blue-100"
                             }`}>
-                              ก่อนหน้า: <strong className={isDark ? "text-slate-200" : "text-slate-800"}>{item.elecPrev}</strong>
-                            </span>
+                              <div className={`text-xs font-bold flex items-center gap-1 mb-1.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                                <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
+                              </div>
+                              <div className="font-mono text-xs">
+                                <span className="text-slate-400">ก่อน: {item.elecPrev}</span>
+                                <span className="mx-1 text-slate-400">➔</span>
+                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.elecCurr || "-"}</span>
+                              </div>
+                              {hasElecCurr && (
+                                <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                                  {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                  {(() => {
+                                    const repl = getReplacement(item.roomNumber, "electric");
+                                    if (repl) {
+                                      return (
+                                        <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
+                                          สูตร: ({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* น้ำประปา Read-only */}
+                            <div className={`rounded-xl p-3 border ${
+                              isDark ? "bg-teal-950/15 border-teal-900/40" : "bg-teal-50/30 border-teal-100"
+                            }`}>
+                              <div className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 mb-1.5">
+                                <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
+                              </div>
+                              <div className="font-mono text-xs">
+                                <span className="text-slate-400">ก่อน: {item.waterPrev}</span>
+                                <span className="mx-1 text-slate-400">➔</span>
+                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.waterCurr || "-"}</span>
+                              </div>
+                              {hasWaterCurr && (
+                                <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
+                                  {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                  {(() => {
+                                    const repl = getReplacement(item.roomNumber, "water");
+                                    if (repl) {
+                                      return (
+                                        <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
+                                          สูตร: ({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* แก้ไขจำนวนวันปรับล่าช้าในโมบาย */}
+                          {item.tenantName && item.billStatus !== "not_created" && (
+                            <div className={`rounded-xl p-3 border flex items-center justify-between gap-3 ${
+                              isDark ? "bg-rose-950/10 border-rose-950/45" : "bg-rose-50/20 border-rose-100/70"
+                            }`}>
+                              <div className="flex flex-col">
+                                <div className="text-xs font-bold text-rose-500 dark:text-rose-400">
+                                  ปรับล่าช้า (วัน)
+                                </div>
+                                {latePenaltyRate > 0 && (
+                                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                    วันละ {latePenaltyRate}.-
+                                    <span className="ml-1.5 text-rose-500 font-extrabold">
+                                      (+{((item.lateDays || 0) * latePenaltyRate).toLocaleString()}.-)
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                  className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
+                                    isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                  }`}
+                                  value={item.lateDays !== undefined ? item.lateDays : 0}
+                                  onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
+                                />
+                                <span className="text-xs font-bold text-slate-500">วัน</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* แก้ไขค่าบริการอื่นๆในโมบาย */}
+                          {item.tenantName && item.billStatus !== "not_created" && (
+                            <div className={`rounded-xl p-3 border flex items-center justify-between gap-3 ${
+                              isDark ? "bg-teal-950/10 border-teal-950/45" : "bg-teal-50/20 border-teal-100/70"
+                            }`}>
+                              <div className="flex flex-col">
+                                <div className="text-xs font-bold text-teal-600 dark:text-teal-400">
+                                  ค่าบริการอื่น ๆ (บาท)
+                                </div>
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  จะรวมอยู่ในยอดบิลสุทธิ
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                  className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
+                                    isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
+                                  }`}
+                                  value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
+                                  onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
+                                />
+                                <span className="text-xs font-bold text-slate-500">บาท</span>
+                              </div>
+                            </div>
                           )}
                         </div>
-                        
-                        <div className="relative">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="จดเลขมิเตอร์ไฟฟ้า..."
-                            disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                            className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
-                              isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
-                            }`}
-                            value={item.elecCurr}
-                            onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
-                          />
-                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
-                            kWh
-                          </span>
-                        </div>
-
-                        {/* Replacement Trigger */}
-                        {(() => {
-                          const repl = getReplacement(item.roomNumber, "electric");
-                          const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
-                          if (repl) {
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
-                                disabled={isDisabled}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
-                                  isDark 
-                                    ? "bg-amber-950/20 border-amber-500/30 text-amber-400 hover:bg-amber-950/30" 
-                                    : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100/50"
-                                }`}
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  <Wrench className="w-3.5 h-3.5 animate-bounce" />
-                                  <span>เปลี่ยนมิเตอร์กลางเดือนแล้ว (คลิกเพื่อแก้ไข)</span>
-                                </span>
-                                <span className="font-mono text-[10px]">
-                                  {repl.oldFinalReading} ➔ {repl.newStartReading}
-                                </span>
-                              </button>
-                            );
-                          } else {
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenReplacementModal(item.roomNumber, "electric")}
-                                disabled={isDisabled}
-                                className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
-                                  isDark 
-                                    ? "border-slate-800 text-slate-400 hover:bg-slate-900/50 hover:text-slate-300" 
-                                    : "border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              >
-                                <Wrench className="w-3.5 h-3.5" />
-                                <span>บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)</span>
-                              </button>
-                            );
-                          }
-                        })()}
-
-                        {item.elecCurr !== "" && (() => {
-                          const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
-                          const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
-                          if (units > 3000) {
-                            return (
-                              <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
-                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                <span>ข้อมูลผิดพลาด เกิน 3,000 หน่วย (ล็อกบันทึก)</span>
-                              </div>
-                            );
-                          } else if (isRollover) {
-                            return (
-                              <div className="text-[10px] text-amber-500 font-extrabold flex items-center gap-1 animate-pulse">
-                                <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-
-                        <div className="flex justify-between text-xs font-mono">
-                          <span className="text-slate-500 dark:text-slate-400">หน่วยไฟที่ใช้:</span>
-                          <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
-                            {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
-                          </span>
-                        </div>
-                        {(() => {
-                          const repl = getReplacement(item.roomNumber, "electric");
-                          if (repl && hasElecCurr) {
-                            return (
-                              <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
-                                <span>สูตรคำนวณ:</span>
-                                <span>({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})</span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                        <div className="flex justify-between text-xs font-mono">
-                          <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
-                          <span className="font-bold text-slate-700 dark:text-slate-300">
-                            {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
-                              ? `${elecCost.toLocaleString()}.- ${!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
-                              : "-"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {!isMeterAlreadySaved && (
-                        <button
-                          onClick={async () => {
-                            await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
-                          }}
-                          disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
-                          className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                            (isSaveDisabled || savingRows?.[item.roomNumber])
-                              ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                              : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
-                          }`}
-                        >
-                          {savingRows?.[item.roomNumber] ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>กำลังบันทึก...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4" /> บันทึกมิเตอร์ไฟห้อง {item.roomNumber}
-                            </>
-                          )}
-                        </button>
                       )}
-                    </div>
-                  )}
 
-                  {/* 3. แถบมิเตอร์น้ำ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์น้ำ) */}
-                  {activeTab === "water" && (
-                    <div className="space-y-3">
-                      <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3.5 border border-teal-100 dark:border-teal-500/10 space-y-3">
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
-                            <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
-                          </span>
-                          {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">ก่อนหน้า:</span>
+                      {/* 2. แถบมิเตอร์ไฟ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์ไฟ) */}
+                      {activeTab === "electric" && (
+                        <div className="space-y-3">
+                          <div className={`rounded-xl p-3.5 border space-y-3 ${
+                            isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/50 border-blue-100"
+                          }`}>
+                            <div className="flex justify-between items-center gap-2">
+                              <span className={`text-xs font-bold flex items-center gap-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                                <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
+                              </span>
+                              {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>ก่อนหน้า:</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="กรอก"
+                                    className={`w-16 h-6.5 text-center border rounded font-mono text-[10px] font-bold focus:outline-none focus:border-blue-500 transition-all ${
+                                      isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+                                    }`}
+                                    value={item.elecPrev}
+                                    onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
+                                  />
+                                </div>
+                              ) : (
+                                <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                                  isDark ? "bg-slate-950 border-slate-900 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                                }`}>
+                                  ก่อนหน้า: <strong className={isDark ? "text-slate-200" : "text-slate-800"}>{item.elecPrev}</strong>
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="relative">
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="กรอก"
-                                className="w-16 h-6.5 text-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-slate-800 dark:text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
-                                value={item.waterPrev}
-                                onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
-                              />
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-900">
-                              ก่อนหน้า: <strong className="text-slate-800 dark:text-slate-200">{item.waterPrev}</strong>
-                            </span>
-                          )}
-                        </div>
-                        
-                        <div className="relative">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="จดเลขมิเตอร์น้ำประปา..."
-                            disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
-                            className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
-                            value={item.waterCurr}
-                            onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
-                          />
-                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
-                            m³
-                          </span>
-                        </div>
-
-                        {/* Replacement Trigger */}
-                        {(() => {
-                          const repl = getReplacement(item.roomNumber, "water");
-                          const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
-                          if (repl) {
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenReplacementModal(item.roomNumber, "water", repl)}
-                                disabled={isDisabled}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
-                                  isDark 
-                                    ? "bg-amber-950/20 border-amber-500/30 text-amber-400 hover:bg-amber-950/30" 
-                                    : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100/50"
+                                placeholder="จดเลขมิเตอร์ไฟฟ้า..."
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
+                                  isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
                                 }`}
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  <Wrench className="w-3.5 h-3.5 animate-bounce" />
-                                  <span>เปลี่ยนมิเตอร์กลางเดือนแล้ว (คลิกเพื่อแก้ไข)</span>
-                                </span>
-                                <span className="font-mono text-[10px]">
-                                  {repl.oldFinalReading} ➔ {repl.newStartReading}
-                                </span>
-                              </button>
-                            );
-                          } else {
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenReplacementModal(item.roomNumber, "water")}
-                                disabled={isDisabled}
-                                className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
-                                  isDark 
-                                    ? "border-slate-800 text-slate-400 hover:bg-slate-900/50 hover:text-slate-300" 
-                                    : "border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              >
-                                <Wrench className="w-3.5 h-3.5" />
-                                <span>บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)</span>
-                              </button>
-                            );
-                          }
-                        })()}
+                                value={item.elecCurr}
+                                onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
+                              />
+                              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
+                                kWh
+                              </span>
+                            </div>
 
-                        {item.waterCurr !== "" && (() => {
-                          const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
-                          const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
-                          if (units > 3000) {
-                            return (
-                              <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
-                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                <span>ข้อมูลผิดพลาด เกิน 3,000 หน่วย (ล็อกบันทึก)</span>
-                              </div>
-                            );
-                          } else if (isRollover) {
-                            return (
-                              <div className="text-[10px] text-amber-500 font-extrabold flex items-center gap-1 animate-pulse">
-                                <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
+                            {/* Replacement Trigger */}
+                            {(() => {
+                              const repl = getReplacement(item.roomNumber, "electric");
+                              const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                              if (repl) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
+                                    disabled={isDisabled}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                                      isDark 
+                                        ? "bg-amber-950/20 border-amber-500/30 text-amber-400 hover:bg-amber-950/30" 
+                                        : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100/50"
+                                    }`}
+                                  >
+                                    <span className="flex items-center gap-1.5">
+                                      <Wrench className="w-3.5 h-3.5 animate-bounce" />
+                                      <span>เปลี่ยนมิเตอร์กลางเดือนแล้ว (คลิกเพื่อแก้ไข)</span>
+                                    </span>
+                                    <span className="font-mono text-[10px]">
+                                      {repl.oldFinalReading} ➔ {repl.newStartReading}
+                                    </span>
+                                  </button>
+                                );
+                              } else {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "electric")}
+                                    disabled={isDisabled}
+                                    className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
+                                      isDark 
+                                        ? "border-slate-800 text-slate-400 hover:bg-slate-900/50 hover:text-slate-300" 
+                                        : "border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                  >
+                                    <Wrench className="w-3.5 h-3.5" />
+                                    <span>บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)</span>
+                                  </button>
+                                );
+                              }
+                            })()}
 
-                        <div className="flex justify-between text-xs font-mono">
-                          <span className="text-slate-500 dark:text-slate-400">หน่วยน้ำที่ใช้:</span>
-                          <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
-                            {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
-                          </span>
-                        </div>
-                        {(() => {
-                          const repl = getReplacement(item.roomNumber, "water");
-                          if (repl && hasWaterCurr) {
-                            return (
-                              <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
-                                <span>สูตรคำนวณ:</span>
-                                <span>({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})</span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                        <div className="flex justify-between text-xs font-mono">
-                          <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
-                          <span className="font-bold text-slate-700 dark:text-slate-300">
-                            {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000
-                              ? `${waterCost.toLocaleString()}.- ${!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
-                              : "-"}
-                          </span>
-                        </div>
-                      </div>
+                            {item.elecCurr !== "" && (() => {
+                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
+                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
+                              if (units > 3000) {
+                                return (
+                                  <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>ข้อมูลผิดพลาด เกิน 3,000 หน่วย (ล็อกบันทึก)</span>
+                                  </div>
+                                );
+                              } else if (isRollover) {
+                                return (
+                                  <div className="text-[10px] text-amber-500 font-extrabold flex items-center gap-1 animate-pulse">
+                                    <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
 
-                      {!isMeterAlreadySaved && (
-                        <button
-                          onClick={async () => {
-                            await onSaveRowWithRolloverCheck(item.roomNumber, "water");
-                          }}
-                          disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
-                          className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                            (isSaveDisabled || savingRows?.[item.roomNumber])
-                              ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                              : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
-                          }`}
-                        >
-                          {savingRows?.[item.roomNumber] ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>กำลังบันทึก...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4" /> บันทึกมิเตอร์น้ำห้อง {item.roomNumber}
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  )}
+                            <div className="flex justify-between text-xs font-mono">
+                              <span className="text-slate-500 dark:text-slate-400">หน่วยไฟที่ใช้:</span>
+                              <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
+                                {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                              </span>
+                            </div>
+                            {(() => {
+                              const repl = getReplacement(item.roomNumber, "electric");
+                              if (repl && hasElecCurr) {
+                                return (
+                                  <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
+                                    <span>สูตรคำนวณ:</span>
+                                    <span>({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            <div className="flex justify-between text-xs font-mono">
+                              <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-300">
+                                {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
+                                  ? `${elecCost.toLocaleString()}.- ${!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                  : "-"}
+                              </span>
+                            </div>
+                          </div>
 
-                  {/* Action Buttons Section (เฉพาะแถบจัดการบิลเท่านั้น) */}
-                  {activeTab === "all" && item.billStatus !== "not_created" && (
-                    <div className="pt-2 space-y-2">
-                      {item.isEdited ? (
-                        <button
-                          onClick={async () => {
-                            await handleSaveLateDays?.(item.roomNumber);
-                            if (item.billStatus === "paid") {
-                              setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
-                            }
-                          }}
-                          disabled={savingRows?.[item.roomNumber]}
-                          className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                            savingRows?.[item.roomNumber]
-                              ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                              : "bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/30 text-white shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
-                          }`}
-                        >
-                          {savingRows?.[item.roomNumber] ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>กำลังบันทึก...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4" /> บันทึกบิล
-                            </>
-                          )}
-                        </button>
-                      ) : item.billStatus === "pending" ? (
-                        <button
-                          onClick={() => {
-                            setSelectedBill(item)
-                            setSlipModalOpen(true)
-                          }}
-                          className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/10 cursor-pointer"
-                        >
-                          <Eye className="w-4 h-4" /> ตรวจสอบสลิปโอนเงิน
-                        </button>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* บันทึกชำระเงินค้างชำระ */}
-                          {item.billStatus === "unpaid" && (
+                          {!isMeterAlreadySaved && (
                             <button
-                              onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
-                              disabled={currentUserRole === "staff"}
-                              className={`w-full h-12 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
-                                currentUserRole === "staff"
-                                  ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-400 dark:text-slate-600"
-                                  : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer"
-                              }`}
-                              title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด / บันทึกชำระเงินตรง"}
-                            >
-                              <CheckCircle className={`w-4 h-4 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
-                              <span>รับเงินสด / บันทึกชำระเงินตรง</span>
-                            </button>
-                          )}
-
-                          {/* ปุ่มแก้ไขบิลสำหรับบิลที่ชำระเงินแล้ว */}
-                          {item.billStatus === "paid" && (
-                            <button
-                              onClick={() => {
-                                const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomNumber];
-                                setUnlockedPaidRooms(prev => ({
-                                  ...prev,
-                                  [item.roomNumber]: !isCurrentlyUnlocked
-                                }));
+                              onClick={async () => {
+                                await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
                               }}
+                              disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
                               className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                unlockedPaidRooms[item.roomNumber]
-                                  ? "bg-rose-600 hover:bg-rose-500 border border-rose-500/30 text-white shadow-lg shadow-rose-600/10 active:scale-[0.98]"
+                                (isSaveDisabled || savingRows?.[item.roomNumber])
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
                               }`}
                             >
-                              {unlockedPaidRooms[item.roomNumber] ? (
+                              {savingRows?.[item.roomNumber] ? (
                                 <>
-                                  <X className="w-4 h-4" />
-                                  <span>ยกเลิกแก้ไข</span>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>กำลังบันทึก...</span>
                                 </>
                               ) : (
                                 <>
-                                  <Edit3 className="w-4 h-4" />
-                                  <span>แก้ไขบิล</span>
+                                  <Save className="w-4 h-4" /> บันทึกมิเตอร์ไฟห้อง {item.roomNumber}
                                 </>
                               )}
                             </button>
                           )}
                         </div>
                       )}
-                    </div>
+
+                      {/* 3. แถบมิเตอร์น้ำ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์น้ำ) */}
+                      {activeTab === "water" && (
+                        <div className="space-y-3">
+                          <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3.5 border border-teal-100 dark:border-teal-500/10 space-y-3">
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
+                                <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
+                              </span>
+                              {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">ก่อนหน้า:</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="กรอก"
+                                    className="w-16 h-6.5 text-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-slate-800 dark:text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
+                                    value={item.waterPrev}
+                                    onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-900">
+                                  ก่อนหน้า: <strong className="text-slate-800 dark:text-slate-200">{item.waterPrev}</strong>
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="relative">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="จดเลขมิเตอร์น้ำประปา..."
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                                value={item.waterCurr}
+                                onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
+                              />
+                              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
+                                m³
+                              </span>
+                            </div>
+
+                            {/* Replacement Trigger */}
+                            {(() => {
+                              const repl = getReplacement(item.roomNumber, "water");
+                              const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                              if (repl) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "water", repl)}
+                                    disabled={isDisabled}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                                      isDark 
+                                        ? "bg-amber-950/20 border-amber-500/30 text-amber-400 hover:bg-amber-950/30" 
+                                        : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100/50"
+                                    }`}
+                                  >
+                                    <span className="flex items-center gap-1.5">
+                                      <Wrench className="w-3.5 h-3.5 animate-bounce" />
+                                      <span>เปลี่ยนมิเตอร์กลางเดือนแล้ว (คลิกเพื่อแก้ไข)</span>
+                                    </span>
+                                    <span className="font-mono text-[10px]">
+                                      {repl.oldFinalReading} ➔ {repl.newStartReading}
+                                    </span>
+                                  </button>
+                                );
+                              } else {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "water")}
+                                    disabled={isDisabled}
+                                    className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
+                                      isDark 
+                                        ? "border-slate-800 text-slate-400 hover:bg-slate-900/50 hover:text-slate-300" 
+                                        : "border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                  >
+                                    <Wrench className="w-3.5 h-3.5" />
+                                    <span>บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)</span>
+                                  </button>
+                                );
+                              }
+                            })()}
+
+                            {item.waterCurr !== "" && (() => {
+                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
+                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
+                              if (units > 3000) {
+                                return (
+                                  <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>ข้อมูลผิดพลาด เกิน 3,000 หน่วย (ล็อกบันทึก)</span>
+                                  </div>
+                                );
+                              } else if (isRollover) {
+                                return (
+                                  <div className="text-[10px] text-amber-500 font-extrabold flex items-center gap-1 animate-pulse">
+                                    <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            <div className="flex justify-between text-xs font-mono">
+                              <span className="text-slate-500 dark:text-slate-400">หน่วยน้ำที่ใช้:</span>
+                              <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
+                                {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                              </span>
+                            </div>
+                            {(() => {
+                              const repl = getReplacement(item.roomNumber, "water");
+                              if (repl && hasWaterCurr) {
+                                return (
+                                  <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
+                                    <span>สูตรคำนวณ:</span>
+                                    <span>({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            <div className="flex justify-between text-xs font-mono">
+                              <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-300">
+                                {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000
+                                  ? `${waterCost.toLocaleString()}.- ${!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                  : "-"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {!isMeterAlreadySaved && (
+                            <button
+                              onClick={async () => {
+                                await onSaveRowWithRolloverCheck(item.roomNumber, "water");
+                              }}
+                              disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                              className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                (isSaveDisabled || savingRows?.[item.roomNumber])
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                                  : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
+                              }`}
+                            >
+                              {savingRows?.[item.roomNumber] ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>กำลังบันทึก...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-4 h-4" /> บันทึกมิเตอร์น้ำห้อง {item.roomNumber}
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action Buttons Section (เฉพาะแถบจัดการบิลเท่านั้น) */}
+                      {activeTab === "all" && item.billStatus !== "not_created" && (
+                        <div className="pt-2 space-y-2">
+                          {item.isEdited ? (
+                            <button
+                              onClick={async () => {
+                                await handleSaveLateDays?.(item.roomNumber);
+                                if (item.billStatus === "paid") {
+                                  setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                                }
+                              }}
+                              disabled={savingRows?.[item.roomNumber]}
+                              className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                savingRows?.[item.roomNumber]
+                                  ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                                  : "bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/30 text-white shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
+                              }`}
+                            >
+                              {savingRows?.[item.roomNumber] ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>กำลังบันทึก...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-4 h-4" /> บันทึกบิล
+                                </>
+                              )}
+                            </button>
+                          ) : item.billStatus === "pending" ? (
+                            <button
+                              onClick={() => {
+                                setSelectedBill(item)
+                                setSlipModalOpen(true)
+                              }}
+                              className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/10 cursor-pointer"
+                            >
+                              <Eye className="w-4 h-4" /> ตรวจสอบสลิปโอนเงิน
+                            </button>
+                          ) : (
+                            <div className="space-y-2">
+                              {/* บันทึกชำระเงินค้างชำระ */}
+                              {item.billStatus === "unpaid" && (
+                                <button
+                                  onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
+                                  disabled={currentUserRole === "staff"}
+                                  className={`w-full h-12 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
+                                    currentUserRole === "staff"
+                                      ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-400 dark:text-slate-600"
+                                      : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer"
+                                  }`}
+                                  title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด / บันทึกชำระเงินตรง"}
+                                >
+                                  <CheckCircle className={`w-4 h-4 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
+                                  <span>รับเงินสด / บันทึกชำระเงินตรง</span>
+                                </button>
+                              )}
+
+                              {/* ปุ่มแก้ไขบิลสำหรับบิลที่ชำระเงินแล้ว */}
+                              {item.billStatus === "paid" && (
+                                <button
+                                  onClick={() => {
+                                    const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomNumber];
+                                    setUnlockedPaidRooms(prev => ({
+                                      ...prev,
+                                      [item.roomNumber]: !isCurrentlyUnlocked
+                                    }));
+                                  }}
+                                  className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                    unlockedPaidRooms[item.roomNumber]
+                                      ? "bg-rose-600 hover:bg-rose-500 border border-rose-500/30 text-white shadow-lg shadow-rose-600/10 active:scale-[0.98]"
+                                      : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
+                                  }`}
+                                >
+                                  {unlockedPaidRooms[item.roomNumber] ? (
+                                    <>
+                                      <X className="w-4 h-4" />
+                                      <span>ยกเลิกแก้ไข</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Edit3 className="w-4 h-4" />
+                                      <span>แก้ไขบิล</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );
@@ -1506,7 +1474,23 @@ export default function MeterReadingTable({
                         )}
                       </td>
 
-                      {/* --- 1. แถบจัดการบิล (อ่านอย่างเดียว) --- */}
+                      {item.hasNotifiedCheckout ? (
+                        <td colSpan={colSpanVal - 2} className="py-4 px-4">
+                          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+                            isDark ? "bg-amber-950/15 border-amber-500/25 text-amber-400" : "bg-amber-50/55 border-amber-200 text-amber-800"
+                          }`}>
+                            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 animate-pulse" />
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                              <span className="font-extrabold text-xs xl:text-sm">แจ้งย้ายออกในรอบบิลนี้:</span>
+                              <span className={`text-[11px] xl:text-xs font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                                ไม่ต้องออกบิลค่าเช่าปกติ กรุณาไปจัดการเคลียร์บัญชีและคืนเงินประกันที่เมนู <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"จัดการห้อง"</strong> แทน
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      ) : (
+                        <>
+                          {/* --- 1. แถบจัดการบิล (อ่านอย่างเดียว) --- */}
                       {activeTab === "all" && (
                         <>
                           {/* มิเตอร์ไฟฟ้า (kWh) - อ่านอย่างเดียว */}
@@ -2099,7 +2083,9 @@ export default function MeterReadingTable({
                           </td>
                         </>
                       )}
-                    </tr>
+                    </>
+                  )}
+                </tr>
                   )
                 })
               ) : (
