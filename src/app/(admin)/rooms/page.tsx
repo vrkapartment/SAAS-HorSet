@@ -3863,7 +3863,7 @@ function RoomsContent() {
                   <button
                     type="submit"
                     disabled={checkoutSubmitting}
-                    className="order-1 sm:order-2 w-full sm:flex-1 h-11 bg-red-650 hover:bg-red-550 active:bg-red-755 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 text-xs shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
+                    className="order-1 sm:order-2 w-full sm:flex-1 h-11 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 text-xs shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
                   >
                     {checkoutSubmitting ? (
                       <>
