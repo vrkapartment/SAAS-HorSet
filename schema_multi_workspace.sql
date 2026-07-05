@@ -598,4 +598,57 @@ create index if not exists idx_rooms_room_type_id on public.rooms (room_type_id)
  B E F O R E   U P D A T E   O N   p u b l i c . s y s t e m _ s e t t i n g s  
  F O R   E A C H   R O W  
  E X E C U T E   F U N C T I O N   p u b l i c . h a n d l e _ u p d a t e d _ a t ( ) ;  
- 
+ -- Create system_settings table
+CREATE TABLE IF NOT EXISTS public.system_settings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  key text NOT NULL UNIQUE,
+  value text NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+
+-- Only super admins can manage system_settings
+CREATE POLICY "Super admins can manage system settings" ON public.system_settings
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'super_admin'
+    )
+  );
+
+-- Create trigger for updated_at
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_system_settings_updated_at ON public.system_settings;
+CREATE TRIGGER set_system_settings_updated_at
+BEFORE UPDATE ON public.system_settings
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_updated_at();
+-- Create cached_translations table
+CREATE TABLE IF NOT EXISTS public.cached_translations (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  source_text text NOT NULL,
+  target_language varchar(10) NOT NULL,
+  translated_text text NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(source_text, target_language)
+);
+
+-- Enable RLS
+ALTER TABLE public.cached_translations ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to read from cached_translations
+CREATE POLICY "Authenticated users can read cached translations" ON public.cached_translations
+  FOR SELECT USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
+
+-- Let service role handle insert, or we can use anon/auth depending on how we insert.
+-- We will use the service role key from the API route to bypass RLS for insertions.
