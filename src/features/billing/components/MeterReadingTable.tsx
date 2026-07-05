@@ -796,7 +796,7 @@ Thank you 🙏`
                   isDark ? "bg-slate-950/35 border-slate-900/60" : "bg-white border-slate-200"
                 }`}>
                   {/* Card Header: Room, Tenant, Status */}
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start gap-4">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`text-lg font-black px-3 py-1 rounded-xl border ${
@@ -837,7 +837,7 @@ Thank you 🙏`
                               item.billStatus === "paid" ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-200") :
                               item.billStatus === "pending" ? (isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse") :
                               item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
-                              (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-200")
+                              (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border-slate-200")
                             }`}
                             title={item.billStatus === "pending" ? (locale === "en" ? "Click to verify transfer slip" : "คลิกเพื่อตรวจสอบสลิปโอนเงิน") : undefined}
                           >
@@ -854,6 +854,50 @@ Thank you 🙏`
                         </div>
                       )}
                     </div>
+
+                    {/* Right Block: Total Bill */}
+                    {mode !== "meters" && item.tenantName && (
+                      <div className="text-right flex flex-col items-end shrink-0">
+                        <span className={`text-[10px] font-extrabold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-450"}`}>
+                          {t("billing.total_bill")}
+                        </span>
+                        <div className="flex items-baseline gap-0.5 mt-0.5">
+                          {item.billStatus !== "not_created" ? (
+                            <>
+                              <span className={`text-base font-black ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                                {Number(item.billAmount !== undefined ? item.billAmount : 0).toLocaleString()}
+                              </span>
+                              <span className={`text-[10px] font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                                {t("billing.baht_unit")}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className={`text-base font-black ${isDark ? "text-slate-450" : "text-slate-500"}`}>
+                                {displayedTotal.toLocaleString()}
+                              </span>
+                              <span className={`text-[10px] font-bold ${isDark ? "text-slate-550" : "text-slate-400"}`}>
+                                .-
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {isModified && item.billStatus !== "not_created" && (
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold mt-1 bg-amber-500/10 border border-amber-500/20 ${
+                            isDark ? "text-amber-400" : "text-amber-600"
+                          }`}>
+                            {t("billing.amount_changed")}
+                          </span>
+                        )}
+                        {item.billStatus === "not_created" && (
+                          <span className={`inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold mt-1 bg-slate-500/10 border border-slate-500/20 ${
+                            isDark ? "text-slate-450" : "text-slate-500"
+                          }`}>
+                            {t("billing.awaiting_bill_creation")}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {item.hasNotifiedCheckout ? (

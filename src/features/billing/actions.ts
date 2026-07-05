@@ -180,7 +180,7 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
       if (status === "paid") {
         // หากเปลี่ยนเป็นสถานะชำระแล้ว และก่อนหน้านี้ยังไม่ใช่ paid
         if (billData.status !== "paid") {
-          if (hasExistingPenalty) {
+          if (hasExistingPenalty && billData.status !== "unpaid") {
             // หากมีค่าปรับเดิมอยู่แล้ว (รวมถึงกรณีเป็น 0 ที่จงใจตั้งค่าไว้) ให้เกียรติและใช้ค่าเดิม ห้ามคำนวณใหม่ทับเด็ดขาด
             updateData.penalty_amount = Number(billData.penalty_amount)
             updateData.late_days = billData.late_days !== null && billData.late_days !== undefined ? Number(billData.late_days) : 0
@@ -245,7 +245,7 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
           }
         }
       } else if (status === "pending") {
-        if (hasExistingPenalty) {
+        if (hasExistingPenalty && billData.status !== "unpaid") {
           // หากมีค่าปรับเดิมอยู่แล้ว ให้ใช้ค่าเดิม ไม่คำนวณใหม่
           updateData.penalty_amount = Number(billData.penalty_amount)
           updateData.late_days = billData.late_days !== null && billData.late_days !== undefined ? Number(billData.late_days) : 0
