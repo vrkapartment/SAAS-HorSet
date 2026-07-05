@@ -2136,7 +2136,7 @@ export default function MeterReadingTable({
       {/* โมดอลสำหรับส่ง LINE OA แบบกลุ่ม */}
       {bulkSendModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className={`w-full max-w-2xl max-h-[85vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl border flex flex-col ${
+          <div className={`w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 md:p-7 rounded-3xl relative shadow-2xl border flex flex-col ${
             isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
           }`}>
             {/* ปุ่มปิด */}
@@ -2158,11 +2158,11 @@ export default function MeterReadingTable({
 
             {/* ส่วนหัวโมดอล */}
             <div className="mb-4">
-              <h3 className={`text-base font-black flex items-center gap-2 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                <MessageSquare className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} />
+              <h3 className={`text-lg md:text-xl font-black flex items-center gap-2.5 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                <MessageSquare className={`w-5 h-5 md:w-6 md:h-6 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} />
                 <span>ส่ง LINE OA และบิลค่าเช่าประจำเดือน</span>
               </h3>
-              <p className={`text-xs mt-1.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              <p className={`text-xs md:text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                 ส่งแจ้งเตือนยอดบิลพรีเมียมและลิงก์ออนไลน์เข้าแชท LINE OA ของผู้เช่าทุกคนพร้อมกัน
               </p>
             </div>
@@ -2172,20 +2172,20 @@ export default function MeterReadingTable({
               <div className={`p-3 rounded-xl border text-center ${
                 isDark ? "bg-slate-950/40 border-slate-850" : "bg-slate-50 border-slate-150"
               }`}>
-                <div className={`text-[10px] font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>ผู้เช่าที่มีบิล</div>
-                <div className={`text-sm md:text-lg font-black mt-1 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                <div className={`text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>ผู้เช่าที่มีบิล</div>
+                <div className={`text-sm md:text-xl font-black mt-1 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
                   {activeRooms.length} <span className="text-xs font-medium">ห้อง</span>
                 </div>
               </div>
               <div className={`p-3 rounded-xl border text-center bg-emerald-500/5 border-emerald-500/20`}>
-                <div className="text-[10px] font-bold text-emerald-500">ผูก LINE แล้ว</div>
-                <div className="text-sm md:text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                <div className="text-xs font-bold text-emerald-500">ผูก LINE แล้ว</div>
+                <div className="text-sm md:text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
                   {connectedRooms.length} <span className="text-xs font-medium">ห้อง</span>
                 </div>
               </div>
               <div className={`p-3 rounded-xl border text-center bg-amber-500/5 border-amber-500/20`}>
-                <div className="text-[10px] font-bold text-amber-500">ยังไม่ผูก LINE</div>
-                <div className="text-sm md:text-lg font-black text-amber-600 dark:text-amber-400 mt-1">
+                <div className="text-xs font-bold text-amber-500">ยังไม่ผูก LINE</div>
+                <div className="text-sm md:text-xl font-black text-amber-600 dark:text-amber-400 mt-1">
                   {unconnectedRooms.length} <span className="text-xs font-medium">ห้อง</span>
                 </div>
               </div>
@@ -2197,7 +2197,7 @@ export default function MeterReadingTable({
             }`}>
               <button
                 onClick={() => setModalActiveTab("connected")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                className={`px-4.5 py-2 rounded-lg text-sm font-extrabold transition-all cursor-pointer ${
                   modalActiveTab === "connected"
                     ? (isDark ? "bg-slate-900 text-emerald-400 border border-slate-800" : "bg-white text-emerald-600 border border-slate-200 shadow-sm")
                     : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
@@ -2207,7 +2207,7 @@ export default function MeterReadingTable({
               </button>
               <button
                 onClick={() => setModalActiveTab("unconnected")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                className={`px-4.5 py-2 rounded-lg text-sm font-extrabold transition-all cursor-pointer ${
                   modalActiveTab === "unconnected"
                     ? (isDark ? "bg-slate-900 text-amber-400 border border-slate-800" : "bg-white text-amber-600 border border-slate-200 shadow-sm")
                     : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
@@ -2229,19 +2229,19 @@ export default function MeterReadingTable({
                     connectedRooms.map(item => {
                       const result = bulkSendResults[item.roomNumber]
                       return (
-                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border text-xs gap-3 transition-all ${
+                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`font-black px-2 py-0.5 rounded-lg border shrink-0 ${
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`font-black text-sm px-2.5 py-1 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>
                               ห้อง {item.roomNumber}
                             </span>
-                            <span className={`font-bold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                            <span className={`font-extrabold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                               {item.tenantName}
                             </span>
-                            <span className={`text-xs font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                            <span className={`text-sm font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                               ({item.billAmount?.toLocaleString()}.-)
                             </span>
                           </div>
@@ -2257,7 +2257,7 @@ export default function MeterReadingTable({
                                   handleSendLine(item.roomNumber)
                                 }}
                                 disabled={!permissions.billing_send_line}
-                                className={`h-7 px-2.5 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                                className={`h-8 px-3 rounded-lg text-sm font-black flex items-center justify-center gap-1.5 transition-all shadow-sm ${
                                   !permissions.billing_send_line
                                     ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
                                     : item.billStatus === "paid"
@@ -2273,23 +2273,23 @@ export default function MeterReadingTable({
                               </button>
                             )}
                             {bulkSendingStatus === "sending" && bulkSendingProgress.currentRoom === item.roomNumber && (
-                              <span className="text-xs font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 animate-pulse whitespace-nowrap">
+                              <span className="text-sm font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 animate-pulse whitespace-nowrap">
                                 กำลังส่ง...
                               </span>
                             )}
                             {bulkSendingStatus === "sending" && !result && bulkSendingProgress.currentRoom !== item.roomNumber && (
-                              <span className="text-xs font-semibold text-slate-450 dark:text-slate-500 whitespace-nowrap">
+                              <span className="text-sm font-semibold text-slate-450 dark:text-slate-500 whitespace-nowrap">
                                 รอคิว...
                               </span>
                             )}
                             {result && (
                               result.success ? (
-                                <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
+                                <span className="text-sm font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
                                   สำเร็จแล้ว ✅
                                 </span>
                               ) : (
                                 <span 
-                                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                                  className={`text-sm font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
                                     result.error === "ชำระเงินแล้ว"
                                       ? "text-blue-500 bg-blue-500/10 border-blue-500/20"
                                       : "text-red-500 bg-red-500/10 border-red-500/20"
@@ -2305,7 +2305,7 @@ export default function MeterReadingTable({
                       )
                     })
                   ) : (
-                    <div className="py-12 text-center text-slate-500 text-xs">
+                    <div className="py-12 text-center text-slate-500 text-sm">
                       ไม่มีห้องที่มีผู้เช่าและเชื่อมต่อ LINE ในรอบบิลนี้
                     </div>
                   )}
@@ -2315,10 +2315,10 @@ export default function MeterReadingTable({
               {/* แถบผู้ที่ยังไม่ได้เชื่อมต่อ LINE */}
               {modalActiveTab === "unconnected" && (
                 <div className="space-y-3">
-                  <div className={`p-3 rounded-xl border text-[11px] font-medium leading-relaxed mb-1 flex gap-2 ${
+                  <div className={`p-3.5 rounded-xl border text-xs md:text-sm font-medium leading-relaxed mb-1 flex gap-2.5 ${
                     isDark ? "bg-amber-500/5 border-amber-500/10 text-amber-400" : "bg-amber-50/50 border-amber-100 text-amber-700"
                   }`}>
-                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <AlertCircle className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
                     <span>
                       <strong>คำแนะนำ:</strong> เนื่องจากผู้เช่ายังไม่ได้ลงทะเบียนผูกบัญชี LINE OA คุณสามารถคลิกปุ่ม <strong>"คัดลอกสรุปบิล"</strong> หรือ <strong>"ดาวน์โหลด PDF"</strong> เพื่อนำสรุปยอดบิลและลิงก์ออนไลน์ หรือดาวน์โหลดไฟล์ PDF ไปส่งในแชทปกติ (เช่น LINE, Facebook, SMS) ได้ทันที
                     </span>
@@ -2328,19 +2328,19 @@ export default function MeterReadingTable({
                     unconnectedRooms.map(item => {
                       const isCopied = copiedRooms[item.roomNumber]
                       return (
-                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border text-xs gap-3 transition-all ${
+                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`font-black px-2 py-0.5 rounded-lg border shrink-0 ${
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`font-black text-sm px-2.5 py-1 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>
                               ห้อง {item.roomNumber}
                             </span>
-                            <span className={`font-bold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                            <span className={`font-extrabold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                               {item.tenantName}
                             </span>
-                            <span className={`text-xs font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                            <span className={`text-sm font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                               ({item.billAmount?.toLocaleString()}.-)
                             </span>
                           </div>
@@ -2350,7 +2350,7 @@ export default function MeterReadingTable({
                             <button
                               onClick={() => handleDownloadBillPdf(item)}
                               disabled={downloadingPdfId !== null || !permissions.billing_download_pdf}
-                              className={`h-8 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                              className={`h-9 px-3.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
                                 !permissions.billing_download_pdf
                                   ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
                                   : downloadingPdfId !== null
@@ -2375,7 +2375,7 @@ export default function MeterReadingTable({
                             <button
                               onClick={() => handleCopySummary(item)}
                               disabled={!permissions.billing_copy_summary}
-                              className={`h-8 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                              className={`h-9 px-3.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
                                 !permissions.billing_copy_summary
                                   ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
                                   : isCopied
@@ -2403,7 +2403,7 @@ export default function MeterReadingTable({
                       )
                     })
                   ) : (
-                    <div className="py-12 text-center text-slate-500 text-xs">
+                    <div className="py-12 text-center text-slate-500 text-sm">
                       ผู้เช่าทุกห้องผูก LINE OA ครบแล้ว ไม่มีห้องคงค้างในส่วนนี้
                     </div>
                   )}
@@ -2413,10 +2413,10 @@ export default function MeterReadingTable({
 
             {/* แถบแจ้งเตือนความคืบหน้าขณะกำลังส่ง (Progress bar) */}
             {bulkSendingStatus === "sending" && (
-              <div className={`p-4 rounded-2xl border mb-5 space-y-2 ${
+              <div className={`p-4 rounded-2xl border mb-5 space-y-2.5 ${
                 isDark ? "bg-slate-950 border-slate-850" : "bg-blue-50/30 border-blue-100"
               }`}>
-                <div className="flex justify-between text-xs font-bold font-mono">
+                <div className="flex justify-between text-sm font-bold font-mono">
                   <span className={isDark ? "text-slate-300" : "text-slate-700"}>
                     กำลังส่ง: ห้อง {bulkSendingProgress.currentRoom}
                   </span>
@@ -2430,7 +2430,7 @@ export default function MeterReadingTable({
                     style={{ width: `${(bulkSendingProgress.current / bulkSendingProgress.total) * 100}%` }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center animate-pulse">
+                <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center animate-pulse">
                   กรุณาอย่าปิดหน้านี้ขณะที่กำลังดำเนินการส่งข้อมูล...
                 </p>
               </div>
@@ -2442,8 +2442,8 @@ export default function MeterReadingTable({
                 isDark ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
               }`}>
                 <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                <h4 className="text-xs font-black">ส่งบิลเข้า LINE OA กลุ่มเรียบร้อย!</h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                <h4 className="text-sm font-black">ส่งบิลเข้า LINE OA กลุ่มเรียบร้อย!</h4>
+                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                   ส่งยอดค่าเช่าเข้าแชท LINE OA สำเร็จทั้งหมด{" "}
                   {Object.values(bulkSendResults).filter(r => r.success).length} ห้อง จากทั้งหมด {connectedRooms.length} ห้อง
                 </p>
@@ -2451,11 +2451,11 @@ export default function MeterReadingTable({
             )}
 
             {/* ส่วนควบคุมท้ายสุด */}
-            <div className="flex justify-end gap-2 text-xs font-bold pt-2 border-t dark:border-slate-800">
+            <div className="flex justify-end gap-2.5 text-sm font-bold pt-3.5 border-t dark:border-slate-800">
               <button
                 onClick={() => setBulkSendModalOpen(false)}
                 disabled={bulkSendingStatus === "sending"}
-                className={`px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                className={`px-5 py-3 rounded-xl border cursor-pointer transition-all ${
                   isDark ? "bg-slate-950 border-slate-850 text-slate-400 hover:text-white" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                 } ${bulkSendingStatus === "sending" ? "opacity-30 cursor-not-allowed" : ""}`}
               >
@@ -2466,7 +2466,7 @@ export default function MeterReadingTable({
                 <button
                   onClick={startBulkSend}
                   disabled={bulkSendingStatus === "sending" || !permissions.billing_send_line}
-                  className={`px-6 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-md active:scale-[0.98] ${
+                  className={`px-6 py-3 rounded-xl flex items-center gap-1.5 transition-all shadow-md active:scale-[0.98] ${
                     !permissions.billing_send_line
                       ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-800 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed shadow-none"
                       : bulkSendingStatus === "sending"
