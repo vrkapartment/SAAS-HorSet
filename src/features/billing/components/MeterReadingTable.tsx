@@ -1599,7 +1599,7 @@ Thank you 🙏`
                             <div className={`text-xs xl:text-sm 2xl:text-base mt-0.5 font-mono ${isDark ? "text-slate-450" : "text-slate-500"}`}>
                               {item.tenantName ? (
                                 <>
-                                  {locale === "en" ? "Rent" : "ค่าเช่า"} ${item.baseRent.toLocaleString()} ${t("billing.baht_unit")}
+                                  {locale === "en" ? "Rent" : "ค่าเช่า"} {item.baseRent.toLocaleString()} {t("billing.baht_unit")}
                                   {extraExpenses.map((exp: any, index: number) => (
                                     <div key={index} className="text-[10px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-440 font-medium mt-0.5">
                                       {exp.name} +{Number(exp.amount || 0).toLocaleString()}.-
@@ -1607,7 +1607,7 @@ Thank you 🙏`
                                   ))}
                                   {Number(item.otherServiceAmount || 0) > 0 && (
                                     <div className="text-[10px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-440 font-medium mt-0.5">
-                                      {locale === "en" ? "Other Services" : "ค่าบริการอื่นๆ"} +${Number(item.otherServiceAmount).toLocaleString()} ${t("billing.baht_unit")}
+                                      {locale === "en" ? "Other Services" : "ค่าบริการอื่นๆ"} +{Number(item.otherServiceAmount).toLocaleString()} {t("billing.baht_unit")}
                                     </div>
                                   )}
                                 </>
