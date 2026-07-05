@@ -4,11 +4,11 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const { lineUserId, workspaceId, roomNumber, tenantName, tenantPhone } = body
+    const { lineUserId, workspaceId, roomId, roomNumber, tenantName, tenantPhone } = body
 
     // 1. ตรวจสอบค่าพารามิเตอร์เบื้องต้นที่ส่งมาจากหน้าลงทะเบียนผู้เช่า
-    if (!roomNumber || typeof roomNumber !== "string") {
-      return NextResponse.json({ success: false, error: "กรุณาระบุหมายเลขห้องพัก" }, { status: 400 })
+    if ((!roomId || typeof roomId !== "string") && (!roomNumber || typeof roomNumber !== "string")) {
+      return NextResponse.json({ success: false, error: "กรุณาระบุหมายเลขห้องพักหรือรหัสห้องพัก" }, { status: 400 })
     }
     if (!tenantName || typeof tenantName !== "string" || !tenantName.trim()) {
       return NextResponse.json({ success: false, error: "กรุณากรอกชื่อและนามสกุลจริงของคุณ" }, { status: 400 })
@@ -47,13 +47,19 @@ export async function POST(request: Request) {
       }
     })
 
-    // 2. ค้นหาค่า id (UUID ของห้อง) จากตาราง rooms โดยระบุเงื่อนไขห้องและอพาร์ทเมนท์ตามสั่ง
-    const { data: room, error: roomError } = await supabaseAdmin
+    // 2. ค้นหาค่า id (UUID ของห้อง) จากตาราง rooms โดยระบุเงื่อนไขห้องและอพาร์ทเมนท์ตามสั่ง (รองรับทั้ง roomId UUID และ roomNumber)
+    let roomQuery = supabaseAdmin
       .from("rooms")
-      .select("id")
-      .eq("room_number", roomNumber.trim())
+      .select("id, room_number")
       .eq("workspace_id", workspaceId)
-      .maybeSingle()
+
+    if (roomId && roomId.trim() !== "") {
+      roomQuery = roomQuery.eq("id", roomId)
+    } else {
+      roomQuery = roomQuery.eq("room_number", roomNumber!.trim())
+    }
+
+    const { data: room, error: roomError } = await roomQuery.maybeSingle()
 
     if (roomError) {
       console.error("Query room ID error:", roomError)
@@ -62,7 +68,7 @@ export async function POST(request: Request) {
 
     // หากไม่พบห้องพักตามที่ระบุในเงื่อนไข ให้ตอบกลับ HTTP Status 400 ทันทีตามเงื่อนไขที่กำหนด
     if (!room) {
-      return NextResponse.json({ success: false, error: `ไม่พบข้อมูลห้องพักหมายเลข ${roomNumber} ในอาคารนี้` }, { status: 400 })
+      return NextResponse.json({ success: false, error: "ไม่พบข้อมูลห้องพักที่ระบุในอาคารนี้" }, { status: 400 })
     }
 
     // ตรวจสอบว่าห้องนี้มีผู้เช่าอยู่เดิมหรือไม่
@@ -195,9 +201,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const workspaceId = searchParams.get("workspaceId")
+    const roomId = searchParams.get("roomId")
     const roomNumber = searchParams.get("roomNumber")
 
-    if (!workspaceId || !roomNumber) {
+    if (!workspaceId || (!roomId && !roomNumber)) {
       return NextResponse.json({ success: false, error: "กรุณาระบุพารามิเตอร์ที่ครบถ้วน" }, { status: 400 })
     }
 
@@ -218,13 +225,19 @@ export async function GET(request: Request) {
       }
     })
 
-    // 1. ค้นหาห้องพัก
-    const { data: room, error: roomError } = await supabaseAdmin
+    // 1. ค้นหาห้องพัก (รองรับทั้ง roomId UUID และ roomNumber)
+    let roomQuery = supabaseAdmin
       .from("rooms")
-      .select("id")
-      .eq("room_number", roomNumber.trim())
+      .select("id, room_number")
       .eq("workspace_id", workspaceId)
-      .maybeSingle()
+
+    if (roomId && roomId.trim() !== "null" && roomId.trim() !== "") {
+      roomQuery = roomQuery.eq("id", roomId)
+    } else {
+      roomQuery = roomQuery.eq("room_number", roomNumber!.trim())
+    }
+
+    const { data: room, error: roomError } = await roomQuery.maybeSingle()
 
     if (roomError || !room) {
       return NextResponse.json({ success: false, registered: false, error: "ไม่พบห้องพักที่ระบุ" })
@@ -247,6 +260,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       registered: isRegistered,
+      roomNumber: room.room_number,
       tenant: tenant ? {
         name: tenant.tenant_name,
         phone: tenant.tenant_phone

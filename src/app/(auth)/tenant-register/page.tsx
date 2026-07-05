@@ -9,6 +9,7 @@ function TenantRegisterContent() {
   const [profile, setProfile] = useState<any>(null)
   const [lineUserId, setLineUserId] = useState("")
   const [workspaceId, setWorkspaceId] = useState("")
+  const [roomId, setRoomId] = useState("")
   const [roomNumber, setRoomNumber] = useState("")
   const [phone, setPhone] = useState("")
   const [tenantName, setTenantName] = useState("")
@@ -101,6 +102,9 @@ function TenantRegisterContent() {
       const wsId = getUrlParam("workspace_id")
       setWorkspaceId(wsId)
 
+      const rId = getUrlParam("room_id")
+      setRoomId(rId)
+
       const rNum = getUrlParam("room_number")
       setRoomNumber(rNum)
 
@@ -156,9 +160,9 @@ function TenantRegisterContent() {
       setLineUserId(userProfile.userId)
 
       // ตรวจสอบว่าลิงก์นี้เปิดลงทะเบียนได้อีกหรือไม่ (สมัครได้ครั้งเดียวเท่านั้น)
-      if (wsId && rNum) {
+      if (wsId && (rId || rNum)) {
         try {
-          const checkRes = await fetch(`/api/register-tenant?workspaceId=${wsId}&roomNumber=${rNum}`)
+          const checkRes = await fetch(`/api/register-tenant?workspaceId=${wsId}&roomId=${rId}&roomNumber=${rNum}`)
           const checkData = await checkRes.json()
           if (checkData.success) {
             if (checkData.registered) {
@@ -166,6 +170,9 @@ function TenantRegisterContent() {
             } else if (checkData.tenant) {
               setTenantName(checkData.tenant.name || "")
               setPhone(checkData.tenant.phone || "")
+            }
+            if (checkData.roomNumber) {
+              setRoomNumber(checkData.roomNumber)
             }
           }
         } catch (e) {
@@ -194,8 +201,8 @@ function TenantRegisterContent() {
     e.preventDefault()
     setError("")
 
-    if (!roomNumber.trim()) {
-      setError("ไม่พบข้อมูลหมายเลขห้องพักจากลิงก์ กรุณาติดต่อแอดมินเพื่อขอลิงก์ใหม่")
+    if (!roomId && !roomNumber.trim()) {
+      setError("ไม่พบข้อมูลรหัสห้องพักจากลิงก์ กรุณาติดต่อแอดมินเพื่อขอลิงก์ใหม่")
       return
     }
     if (!tenantName.trim()) {
@@ -224,6 +231,7 @@ function TenantRegisterContent() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          roomId,
           roomNumber,
           tenantName,
           tenantPhone: phone,
@@ -314,7 +322,7 @@ function TenantRegisterContent() {
             <div className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-2xl shadow-emerald-950/5 relative">
               
               {/* ตรวจสอบพารามิเตอร์ URL ว่าครบถ้วนหรือไม่ */}
-              {!workspaceId || !roomNumber ? (
+              {!workspaceId || (!roomId && !roomNumber) ? (
                 <div className="text-center py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
                   <div className="inline-flex items-center justify-center p-4 bg-rose-500/10 text-rose-400 rounded-full border border-rose-500/20 shadow-lg shadow-rose-500/5 animate-pulse">
                     <AlertCircle className="w-14 h-14" />

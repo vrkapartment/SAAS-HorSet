@@ -980,13 +980,13 @@ function RoomsContent() {
     setLineLinkModalOpen(true)
   }
 
-  const getLiffRegistrationLink = (roomNum: string) => {
+  const getLiffRegistrationLink = (roomId: string) => {
     const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
-    return `https://liff.line.me/${workspaceLiffId}?workspace_id=${wsId}&room_number=${roomNum}`
+    return `https://liff.line.me/${workspaceLiffId}?workspace_id=${wsId}&room_id=${roomId}`
   }
 
-  const handleCopyLinkToClipboard = (roomNum: string) => {
-    const link = getLiffRegistrationLink(roomNum)
+  const handleCopyLinkToClipboard = (roomId: string, roomNum: string) => {
+    const link = getLiffRegistrationLink(roomId)
     navigator.clipboard.writeText(link)
     showToast(`✓ คัดลอกลิงก์ LINE LIFF ของห้อง ${roomNum} สำเร็จ! สามารถส่งแชทให้ผู้เช่าลงทะเบียนได้เลย`, "success")
   }
@@ -3273,10 +3273,10 @@ function RoomsContent() {
                         type="text"
                         readOnly
                         className="flex-1 h-11 px-3.5 bg-slate-100 dark:bg-slate-950 border border-slate-250 dark:border-slate-900 rounded-xl text-slate-500 text-[11px] select-all focus:outline-none font-mono"
-                        value={getLiffRegistrationLink(selectedRoom.roomNumber)}
+                        value={getLiffRegistrationLink(selectedRoom.id)}
                       />
                       <button
-                        onClick={() => handleCopyLinkToClipboard(selectedRoom.roomNumber)}
+                        onClick={() => handleCopyLinkToClipboard(selectedRoom.id, selectedRoom.roomNumber)}
                         className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer shrink-0"
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -3502,10 +3502,10 @@ function RoomsContent() {
                       type="text"
                       readOnly
                       className="flex-1 h-11 px-3.5 bg-slate-100 dark:bg-slate-950 border border-slate-250 dark:border-slate-900 rounded-xl text-slate-500 text-[11px] select-all focus:outline-none font-mono"
-                      value={getLiffRegistrationLink(selectedRoom.roomNumber)}
+                      value={getLiffRegistrationLink(selectedRoom.id)}
                     />
                     <button
-                      onClick={() => handleCopyLinkToClipboard(selectedRoom.roomNumber)}
+                      onClick={() => handleCopyLinkToClipboard(selectedRoom.id, selectedRoom.roomNumber)}
                       className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
