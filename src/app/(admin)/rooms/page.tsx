@@ -68,6 +68,7 @@ import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
+import { packWorkspaceAndRoom } from "@/lib/urlPacker"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -982,6 +983,10 @@ function RoomsContent() {
 
   const getLiffRegistrationLink = (roomId: string) => {
     const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const packed = packWorkspaceAndRoom(wsId, roomId)
+    if (packed) {
+      return `https://liff.line.me/${workspaceLiffId}?p=${packed}`
+    }
     return `https://liff.line.me/${workspaceLiffId}?workspace_id=${wsId}&room_id=${roomId}`
   }
 

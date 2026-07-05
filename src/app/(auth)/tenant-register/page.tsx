@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react"
 import Script from "next/script"
 import { Sparkles, MessageSquare, Phone, Home, Loader2, CheckCircle2, AlertCircle, User } from "lucide-react"
+import { unpackWorkspaceAndRoom } from "@/lib/urlPacker"
 
 function TenantRegisterContent() {
   const [liffLoaded, setLiffLoaded] = useState(false)
@@ -99,13 +100,21 @@ function TenantRegisterContent() {
       }
 
       // ดักจับค่าและเซ็ตพารามิเตอร์ที่ส่งมาจากลิงก์แอดมินก่อน เพื่อหา liff_id ไดนามิก
-      const wsId = getUrlParam("workspace_id")
+      let wsId = getUrlParam("workspace_id")
+      let rId = getUrlParam("room_id")
+      let rNum = getUrlParam("room_number")
+
+      const packed = getUrlParam("p")
+      if (packed) {
+        const unpacked = unpackWorkspaceAndRoom(packed)
+        if (unpacked) {
+          wsId = unpacked.workspaceId
+          rId = unpacked.roomId
+        }
+      }
+
       setWorkspaceId(wsId)
-
-      const rId = getUrlParam("room_id")
       setRoomId(rId)
-
-      const rNum = getUrlParam("room_number")
       setRoomNumber(rNum)
 
       // เรียกดึง LIFF ID ที่ถูกต้องจากตารางฐานข้อมูลแยกราย Workspace
