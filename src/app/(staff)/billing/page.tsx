@@ -470,17 +470,7 @@ function UnifiedBillingContent() {
         
         const isOccupiedInCycle = resolvedTenantName !== null
 
-        // ตรวจสอบสถานะการแจ้งย้ายออก (เพื่อข้ามการออกบิลแบบปกติ และให้ไปเคลียร์บัญชีที่หน้าจัดการห้องแทน)
-        const cycleActiveTenant = (r.allTenants || []).find((t: any) => {
-          const tIsLatest = sortedTenants[0]?.id === t.id
-          return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle, tIsLatest)
-        })
-        const hasNotifiedCheckout = r.status === "Pending_Refund" || !!(
-          cycleActiveTenant && 
-          cycleActiveTenant.leaseEnd && 
-          typeof cycleActiveTenant.leaseEnd === "string" && 
-          cycleActiveTenant.leaseEnd.startsWith(cycle)
-        )
+        const hasNotifiedCheckout = r.status === "Pending_Refund"
 
         // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
         const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
