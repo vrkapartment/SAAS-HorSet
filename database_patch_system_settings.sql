@@ -14,8 +14,8 @@ ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Super admins can manage system settings" ON public.system_settings
   FOR ALL USING (
     EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid() AND user_profiles.role = 'super_admin'
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'super_admin'
     )
   );
 
