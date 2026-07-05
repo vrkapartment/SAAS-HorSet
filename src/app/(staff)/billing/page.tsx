@@ -33,6 +33,8 @@ import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 
 import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISSIONS } from "@/features/permissions/types"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
 
 // Extracted Billing Sub-components
 import BillingSummaryStats from "@/features/billing/components/BillingSummaryStats"
@@ -85,17 +87,25 @@ function getCookie(name: string): string | undefined {
   return undefined
 }
 
-function formatBillingCycleThai(cycleStr: string): string {
+function formatBillingCycle(cycleStr: string, locale: string = "th"): string {
   if (!cycleStr) return ""
   if (cycleStr.includes("-")) {
     const [year, month] = cycleStr.split("-")
-    const monthsThai = [
-      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-    ]
     const monthIdx = parseInt(month, 10) - 1
     if (monthIdx >= 0 && monthIdx < 12) {
-      return `${monthsThai[monthIdx]} ${year}`
+      if (locale === "en") {
+        const monthsEng = [
+          "January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"
+        ]
+        return `${monthsEng[monthIdx]} ${year}`
+      } else {
+        const monthsThai = [
+          "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+          "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+        ]
+        return `${monthsThai[monthIdx]} ${year}`
+      }
     }
   }
   return cycleStr
@@ -120,7 +130,7 @@ function getCycleFromTimestamp(timestampStr: string): string {
   }
 }
 
-function getBillingCycleOptions(registrationCycle?: string): { value: string; label: string }[] {
+function getBillingCycleOptions(locale: string = "th", registrationCycle?: string): { value: string; label: string }[] {
   const options = []
   const d = new Date()
   // เจนรอบบิลล่วงหน้า 1 เดือน, เดือนปัจจุบัน และย้อนหลัง 11 เดือน (รวม 13 ตัวเลือก)
@@ -137,7 +147,7 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
 
     options.push({
       value: val,
-      label: `รอบบิล ${formatBillingCycleThai(val)}`
+      label: locale === "en" ? `Cycle: ${formatBillingCycle(val, "en")}` : `รอบบิล ${formatBillingCycle(val, "th")}`
     })
   }
   return options
@@ -148,6 +158,7 @@ function UnifiedBillingContent() {
   const verifyBillId = searchParams.get("verify_bill_id")
   const targetCycle = searchParams.get("cycle")
 
+  const { t, locale } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -1412,8 +1423,8 @@ function UnifiedBillingContent() {
       const result = await sendLineBillNotificationAction({
         lineUserId,
         roomNumber: item.roomNumber,
-        tenantName: item.tenantName || "ผู้เช่า",
-        billingCycle: formatBillingCycleThai(billingCycle),
+        tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
+        billingCycle: formatBillingCycle(billingCycle, locale),
         baseRent: item.baseRent,
         electricUnits: elecUnitsUsed,
         electricAmount: elecCost,
@@ -1450,8 +1461,8 @@ function UnifiedBillingContent() {
 
       const blob = await generateBillPdf({
         roomNumber: item.roomNumber,
-        tenantName: item.tenantName || "ผู้เช่า",
-        billingCycle: formatBillingCycleThai(billingCycle),
+        tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
+        billingCycle: formatBillingCycle(billingCycle, locale),
         baseRent: item.baseRent,
         electricUnits: elecUnitsUsed,
         electricRate: elecRate,
@@ -1530,8 +1541,8 @@ function UnifiedBillingContent() {
 
         const blob = await generateBillPdf({
           roomNumber: item.roomNumber,
-          tenantName: item.tenantName || "ผู้เช่า",
-          billingCycle: formatBillingCycleThai(billingCycle),
+          tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
+          billingCycle: formatBillingCycle(billingCycle, locale),
           baseRent: item.baseRent,
           electricUnits: elecUnitsUsed,
           electricRate: elecRate,
@@ -1664,10 +1675,10 @@ function UnifiedBillingContent() {
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
             <Gauge className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-            จดมิเตอร์ และดูบิล
+            {t("billing.title")}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            ระบบบันทึกจดเลขมิเตอร์ไฟฟ้า มิเตอร์น้ำประปา และตรวจสอบสรุปยอดบิลอย่างง่ายประจำหอพัก
+            {t("billing.subtitle")}
           </p>
         </div>
         
@@ -1680,7 +1691,7 @@ function UnifiedBillingContent() {
             value={billingCycle}
             onChange={(e) => setBillingCycle(e.target.value)}
           >
-            {getBillingCycleOptions(registrationCycle).map(opt => (
+            {getBillingCycleOptions(locale, registrationCycle).map(opt => (
               <option key={opt.value} value={opt.value} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{opt.label}</option>
             ))}
           </select>
@@ -1708,7 +1719,7 @@ function UnifiedBillingContent() {
           }`}
         >
           <Gauge className="w-5 h-5 xl:w-6 xl:h-6 2xl:w-7 2xl:h-7 text-blue-500" />
-          <span>จดเลขมิเตอร์</span>
+          <span>{t("billing.meters_tab")}</span>
         </button>
         <button
           onClick={() => setPageActiveTab("summary")}
@@ -1719,7 +1730,7 @@ function UnifiedBillingContent() {
           }`}
         >
           <FileText className="w-5 h-5 xl:w-6 xl:h-6 2xl:w-7 2xl:h-7 text-teal-500" />
-          <span>สรุปบิล</span>
+          <span>{t("billing.summary_tab")}</span>
         </button>
       </div>
 
@@ -1777,13 +1788,13 @@ function UnifiedBillingContent() {
             <table className="w-full text-left text-sm sm:text-base border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold bg-slate-50/50 dark:bg-slate-900/10 text-xs sm:text-sm xl:text-base 2xl:text-lg">
-                  <th className="py-3.5 xl:py-4 2xl:py-5 pl-3 xl:pl-4 2xl:pl-5 w-20 xl:w-24 2xl:w-28">เลขห้อง</th>
-                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center w-28 xl:w-32 2xl:w-36">สถานะห้อง</th>
-                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right w-28 xl:w-32 2xl:w-36">ค่าเช่าห้อง</th>
-                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 xl:w-52 2xl:w-60 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">มิเตอร์ไฟฟ้า</th>
-                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 xl:w-52 2xl:w-60 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">มิเตอร์น้ำ</th>
-                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right w-28 xl:w-32 2xl:w-36">ค่าส่วนกลาง</th>
-                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right pr-4 xl:pr-5 2xl:pr-6 w-44 xl:w-52 2xl:w-60 font-bold">ยอดบิลรวม</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 pl-3 xl:pl-4 2xl:pl-5 w-20 xl:w-24 2xl:w-28">{t("billing.room_number")}</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center w-28 xl:w-32 2xl:w-36">{t("billing.room_status")}</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right w-28 xl:w-32 2xl:w-36">{t("billing.room_rent")}</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center bg-blue-50/40 dark:bg-blue-500/5 rounded-t-xl w-44 xl:w-52 2xl:w-60 border-l border-slate-200 dark:border-slate-800/40 text-blue-600 dark:text-blue-400 font-bold">{t("billing.elec_meter")}</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-center bg-teal-50/40 dark:bg-teal-500/5 rounded-t-xl w-44 xl:w-52 2xl:w-60 border-l border-r border-slate-200 dark:border-slate-800/40 text-teal-600 dark:text-teal-400 font-bold">{t("billing.water_meter")}</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right w-28 xl:w-32 2xl:w-36">{t("billing.common_fee")}</th>
+                  <th className="py-3.5 xl:py-4 2xl:py-5 text-right pr-4 xl:pr-5 2xl:pr-6 w-44 xl:w-52 2xl:w-60 font-bold">{t("billing.total_bill")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -1792,7 +1803,7 @@ function UnifiedBillingContent() {
                     <td colSpan={7} className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <RefreshCw className="w-6 h-6 xl:w-7 xl:h-7 2xl:w-8 2xl:h-8 text-blue-500 animate-spin" />
-                        <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg">กำลังโหลดข้อมูลรวม...</span>
+                        <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg">{t("billing.loading_summary")}</span>
                       </div>
                     </td>
                   </tr>
@@ -1820,11 +1831,11 @@ function UnifiedBillingContent() {
                         <td className="py-4 xl:py-5 2xl:py-6 text-center">
                           {item.status === "occupied" ? (
                             <span className="inline-flex items-center px-2.5 py-1 xl:px-3.5 xl:py-1.5 2xl:px-4 2xl:py-2 rounded-full text-xs sm:text-sm xl:text-base 2xl:text-lg font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                              มีผู้เช่า
+                              {t("billing.occupied")}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-1 xl:px-3.5 xl:py-1.5 2xl:px-4 2xl:py-2 rounded-full text-xs sm:text-sm xl:text-base 2xl:text-lg font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
-                              ว่าง
+                              {t("billing.vacant")}
                             </span>
                           )}
                         </td>
@@ -1842,11 +1853,11 @@ function UnifiedBillingContent() {
                                 {elecCost.toLocaleString()}.-
                               </div>
                               <div className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 font-semibold mt-0.5 xl:mt-1">
-                                {item.elecPrev} ➔ {item.elecCurr} (ใช้ไป {elecUnitsUsed} หน่วย)
+                                {item.elecPrev} ➔ {item.elecCurr} ({t("billing.used_units").replace("{units}", String(elecUnitsUsed))})
                               </div>
                             </div>
                           ) : (
-                            <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
+                            <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 italic">{t("billing.no_meter_data")}</span>
                           )}
                         </td>
 
@@ -1858,11 +1869,11 @@ function UnifiedBillingContent() {
                                 {waterCost.toLocaleString()}.-
                               </div>
                               <div className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 font-semibold mt-0.5 xl:mt-1">
-                                {item.waterPrev} ➔ {item.waterCurr} (ใช้ไป {waterUnitsUsed} หน่วย)
+                                {item.waterPrev} ➔ {item.waterCurr} ({t("billing.used_units").replace("{units}", String(waterUnitsUsed))})
                               </div>
                             </div>
                           ) : (
-                            <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 italic">ยังไม่มีข้อมูลจดเลข</span>
+                            <span className="text-xs sm:text-sm xl:text-base 2xl:text-lg text-slate-400 dark:text-slate-500 italic">{t("billing.no_meter_data")}</span>
                           )}
                         </td>
 
@@ -1892,7 +1903,7 @@ function UnifiedBillingContent() {
                 ) : (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-slate-500">
-                      ไม่มีรายการห้องพัก
+                      {t("billing.no_rooms")}
                     </td>
                   </tr>
                 )}
@@ -1905,7 +1916,7 @@ function UnifiedBillingContent() {
             {loading ? (
               <div className="py-12 text-center text-slate-500">
                 <RefreshCw className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
-                <span>กำลังโหลดข้อมูล...</span>
+                <span>{t("billing.loading")}</span>
               </div>
             ) : unifiedItems.length > 0 ? (
               unifiedItems.map((item) => {
@@ -1936,18 +1947,18 @@ function UnifiedBillingContent() {
                         </span>
                         {item.status === "occupied" ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                            มีผู้เช่า
+                            {t("billing.occupied")}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400">
-                            ว่าง
+                            {t("billing.vacant")}
                           </span>
                         )}
                       </div>
                       
                       {item.tenantName && (
                         <div className="text-right">
-                          <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>ยอดรวม (เช่า+ไฟ+น้ำ+ส่วนกลาง)</div>
+                          <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>{t("billing.total_breakdown_label")}</div>
                           <div className="text-base font-black text-teal-600 dark:text-teal-400 font-mono">
                             {simplifiedTotal.toLocaleString()}.-
                           </div>
@@ -1966,7 +1977,7 @@ function UnifiedBillingContent() {
                         isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50/50 border-slate-100"
                       }`}>
                         <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
-                          <Home className="w-3 h-3 text-amber-500" /> ค่าเช่าห้อง
+                          <Home className="w-3 h-3 text-amber-500" /> {t("billing.room_rent")}
                         </div>
                         <div className={`text-sm font-black font-mono ${isDark ? "text-slate-200" : "text-slate-800"}`}>
                           {item.tenantName ? `${item.baseRent.toLocaleString()}.-` : "-"}
@@ -1978,7 +1989,7 @@ function UnifiedBillingContent() {
                         isDark ? "bg-slate-900/40 border-slate-800/60" : "bg-slate-50/50 border-slate-100"
                       }`}>
                         <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-slate-450" : "text-slate-500"}`}>
-                          <ShieldAlert className="w-3 h-3 text-indigo-500" /> ค่าส่วนกลาง
+                          <ShieldAlert className="w-3 h-3 text-indigo-500" /> {t("billing.common_fee")}
                         </div>
                         <div className={`text-sm font-black font-mono ${isDark ? "text-slate-200" : "text-slate-800"}`}>
                           {item.tenantName ? `${commonFee.toLocaleString()}.-` : "-"}
@@ -1990,7 +2001,7 @@ function UnifiedBillingContent() {
                         isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/30 border-blue-100"
                       }`}>
                         <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                          <Zap className="w-3 h-3" /> ไฟฟ้า (kWh)
+                          <Zap className="w-3 h-3" /> {t("billing.elec_meter")}
                         </div>
                         {hasElecCurr ? (
                           <div>
@@ -1998,11 +2009,11 @@ function UnifiedBillingContent() {
                               {elecCost.toLocaleString()}.-
                             </div>
                             <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
-                              {item.elecPrev} ➔ {item.elecCurr} ({elecUnitsUsed} หน่วย)
+                              {item.elecPrev} ➔ {item.elecCurr} ({t("billing.used_units").replace("{units}", String(elecUnitsUsed))})
                             </div>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400 italic">ไม่มีข้อมูล</span>
+                          <span className="text-xs text-slate-400 italic">{t("billing.no_meter_data")}</span>
                         )}
                       </div>
 
@@ -2011,7 +2022,7 @@ function UnifiedBillingContent() {
                         isDark ? "bg-teal-500/5 border-teal-500/10" : "bg-teal-50/30 border-teal-100"
                       }`}>
                         <div className={`text-xs font-bold flex items-center gap-1 mb-1 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
-                          <Droplet className="w-3 h-3" /> น้ำประปา (m³)
+                          <Droplet className="w-3 h-3" /> {t("billing.water_meter")}
                         </div>
                         {hasWaterCurr ? (
                           <div>
@@ -2019,11 +2030,11 @@ function UnifiedBillingContent() {
                               {waterCost.toLocaleString()}.-
                             </div>
                             <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
-                              {item.waterPrev} ➔ {item.waterCurr} ({waterUnitsUsed} หน่วย)
+                              {item.waterPrev} ➔ {item.waterCurr} ({t("billing.used_units").replace("{units}", String(waterUnitsUsed))})
                             </div>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400 italic">ไม่มีข้อมูล</span>
+                          <span className="text-xs text-slate-400 italic">{t("billing.no_meter_data")}</span>
                         )}
                       </div>
                     </div>
@@ -2032,7 +2043,7 @@ function UnifiedBillingContent() {
               })
             ) : (
               <div className="py-8 text-center text-slate-500 bg-white dark:bg-slate-950/10 border border-slate-200 dark:border-slate-900/60 rounded-2xl">
-                ไม่มีรายการห้องพัก
+                {t("billing.no_rooms")}
               </div>
             )}
           </div>

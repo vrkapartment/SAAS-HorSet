@@ -206,8 +206,9 @@ export default function SuperAdminPage() {
           if (serviceKeySetting && serviceKeySetting.value) {
             setGoogleServiceKey("••••••••••••••••••••••••••••••••••••")
           }
-          if (settingsRes.googleKeyInfo) {
-            setGoogleKeyInfo(settingsRes.googleKeyInfo)
+          const googleKeyInfo = (settingsRes as any).googleKeyInfo
+          if (googleKeyInfo) {
+            setGoogleKeyInfo(googleKeyInfo)
           }
         }
 

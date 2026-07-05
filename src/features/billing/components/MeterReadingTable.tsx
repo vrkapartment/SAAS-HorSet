@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
@@ -90,6 +91,7 @@ export default function MeterReadingTable({
 }: MeterReadingTableProps) {
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const hasEdit = hasEditPermission !== undefined ? hasEditPermission : permissions.manage_meters_bills_edit
+  const { t, locale } = useLanguage()
   const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">(
     mode === "meters" ? "electric" : "all"
   )
@@ -178,12 +180,12 @@ export default function MeterReadingTable({
     if (!item) return;
 
     if (!permissions.manage_meters_bills) {
-      alert("คุณไม่มีสิทธิ์ในการจัดการข้อมูลมิเตอร์ กรุณาติดต่อผู้ดูแลระบบ");
+      alert(locale === "en" ? "You do not have permission to manage meter data. Please contact Admin." : "คุณไม่มีสิทธิ์ในการจัดการข้อมูลมิเตอร์ กรุณาติดต่อผู้ดูแลระบบ");
       return;
     }
 
     if (item.billStatus === "paid" && !unlockedPaidRooms[roomNumber]) {
-      alert("ไม่สามารถบันทึกหรือเปลี่ยนมิเตอร์ได้ เนื่องจากบิลของห้องนี้ได้รับการชำระเงินเรียบร้อยแล้วและยังไม่ได้ปลดล็อกแก้ไข");
+      alert(locale === "en" ? "Cannot record or replace meter because the bill for this room has been paid and not unlocked for editing." : "ไม่สามารถบันทึกหรือเปลี่ยนมิเตอร์ได้ เนื่องจากบิลของห้องนี้ได้รับการชำระเงินเรียบร้อยแล้วและยังไม่ได้ปลดล็อกแก้ไข");
       return;
     }
 
@@ -206,11 +208,11 @@ export default function MeterReadingTable({
     const newNum = Number(newStartReading);
 
     if (oldFinalReading === "" || isNaN(oldNum)) {
-      alert("กรุณากรอกเลขมิเตอร์เครื่องเดิมครั้งสุดท้ายให้ถูกต้อง");
+      alert(locale === "en" ? "Please fill in the old meter's final reading correctly." : "กรุณากรอกเลขมิเตอร์เครื่องเดิมครั้งสุดท้ายให้ถูกต้อง");
       return;
     }
     if (newStartReading === "" || isNaN(newNum)) {
-      alert("กรุณากรอกเลขมิเตอร์เครื่องใหม่เริ่มต้นให้ถูกต้อง");
+      alert(locale === "en" ? "Please fill in the new meter's starting reading correctly." : "กรุณากรอกเลขมิเตอร์เครื่องใหม่เริ่มต้นให้ถูกต้อง");
       return;
     }
 
@@ -232,11 +234,11 @@ export default function MeterReadingTable({
         }
         setReplacementModal(null);
       } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+        alert(res.error || (locale === "en" ? "An error occurred while saving data." : "เกิดข้อผิดพลาดในการบันทึกข้อมูล"));
         setReplacementModal(prev => prev ? { ...prev, loading: false } : null);
       }
     } catch (e: any) {
-      alert(e?.message || "เกิดข้อผิดพลาดระบบ");
+      alert(e?.message || (locale === "en" ? "System error occurred." : "เกิดข้อผิดพลาดระบบ"));
       setReplacementModal(prev => prev ? { ...prev, loading: false } : null);
     }
   };
@@ -245,7 +247,7 @@ export default function MeterReadingTable({
     if (!replacementModal) return;
     const { roomNumber, meterType } = replacementModal;
 
-    if (!confirm("คุณต้องการลบข้อมูลการเปลี่ยนมิเตอร์กลางเดือนนี้ใช่หรือไม่? ระบบจะกลับไปคิดแบบปกติ")) {
+    if (!confirm(locale === "en" ? "Are you sure you want to delete this mid-month meter replacement record? The system will revert to normal calculation." : "คุณต้องการลบข้อมูลการเปลี่ยนมิเตอร์กลางเดือนนี้ใช่หรือไม่? ระบบจะกลับไปคิดแบบปกติ")) {
       return;
     }
 
@@ -259,7 +261,7 @@ export default function MeterReadingTable({
         }
         setReplacementModal(null);
       } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการลบข้อมูล");
+        alert(res.error || (locale === "en" ? "An error occurred while deleting data." : "เกิดข้อผิดพลาดในการลบข้อมูล"));
         setReplacementModal(prev => prev ? { ...prev, loading: false } : null);
       }
     } catch (e: any) {
@@ -339,7 +341,7 @@ export default function MeterReadingTable({
   }
 
 
-  // กรองห้องที่มีผู้เช่าและออกบิลประจำรอบนั้นแล้ว (ไม่รวมห้องว่าง หรือยังไม่ออกบิล)
+  // กรองห้องที่{t("billing.occupied")}และออกบิลประจำรอบนั้นแล้ว (ไม่รวมห้อง{t("billing.vacant")} หรือยังไม่ออกบิล)
   const activeRooms = unifiedItems.filter(item => item.tenantName && item.billStatus !== "not_created")
 
   const connectedRooms = activeRooms.filter(item => {
@@ -352,18 +354,26 @@ export default function MeterReadingTable({
     return !roomInfo?.lineUserId
   })
 
-  // ฟังก์ชันจัดรูปแบบภาษาไทยรอบบิลสำหรับใช้ในหน้านี้
-  function formatBillingCycleThaiLocal(cycleStr: string): string {
+  // ฟังก์ชันจัดรูปแบบรอบบิลสำหรับใช้ในหน้านี้ (Bilingual)
+  function formatBillingCycleLocal(cycleStr: string, currentLocale: string): string {
     if (!cycleStr) return ""
     if (cycleStr.includes("-")) {
       const [year, month] = cycleStr.split("-")
-      const monthsThai = [
-        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-      ]
       const monthIdx = parseInt(month, 10) - 1
       if (monthIdx >= 0 && monthIdx < 12) {
-        return `${monthsThai[monthIdx]} ${year}`
+        if (currentLocale === "en") {
+          const monthsEng = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+          ]
+          return `${monthsEng[monthIdx]} ${year}`
+        } else {
+          const monthsThai = [
+            "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+            "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+          ]
+          return `${monthsThai[monthIdx]} ${year}`
+        }
       }
     }
     return cycleStr
@@ -372,7 +382,7 @@ export default function MeterReadingTable({
   // ฟังก์ชันสำหรับคัดลอกข้อมูลใบแจ้งหนี้แบบสรุป เพื่ออำนวยความสะดวกในห้องที่ไม่ได้ผูก LINE UID
   const handleCopySummary = async (item: any) => {
     if (!permissions.billing_copy_summary) {
-      alert("คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(locale === "en" ? "You do not have permission to copy summary. Please contact Admin." : "คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
       return
     }
     const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
@@ -399,23 +409,43 @@ export default function MeterReadingTable({
     const extraExpenses = roomInfo?.extraExpenses || []
     const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
-    const thaiCycle = formatBillingCycleThaiLocal(billingCycle)
+    const cycleText = formatBillingCycleLocal(billingCycle, locale)
     const otherServiceAmt = Number(item.otherServiceAmount || 0)
     const penaltyAmt = Number(item.penaltyAmount || 0)
     const totalAmount = item.billAmount || (item.baseRent + elecCost + waterCost + commonFee + otherServiceAmt + penaltyAmt + extraExpensesSum)
 
     const extraExpensesText = extraExpenses && extraExpenses.length > 0
-      ? extraExpenses.map((exp: any) => `\n• ${exp.name || "ค่าใช้จ่ายเสริม"}: ${Number(exp.amount || 0).toLocaleString()} บาท`).join("")
+      ? extraExpenses.map((exp: any) => {
+          const name = exp.name || (locale === "en" ? "Extra Expense" : "ค่าใช้จ่ายเสริม")
+          const unit = locale === "en" ? "THB" : "บาท"
+          return `\n• ${name}: ${Number(exp.amount || 0).toLocaleString()} ${unit}`
+        }).join("")
       : ""
 
-    const text = `🏠 ${workspaceName || "หอพัก"} - ใบแจ้งค่าใช้จ่ายประจำเดือน ${thaiCycle}
+    const text = locale === "en"
+      ? `🏠 ${workspaceName || "Dormitory"} - Monthly Billing Summary ${cycleText}
+Room No.: ${item.roomNumber}
+Tenant: ${item.tenantName || "Tenant"}
+----------------------------------
+• Room Rent: ${item.baseRent.toLocaleString()} THB
+• Electricity: ${elecCost.toLocaleString()} THB (used ${elecUnitsUsed} units)
+• Water: ${waterCost.toLocaleString()} THB (used ${waterUnitsUsed} units)
+• Common Fee: ${commonFee.toLocaleString()} THB${otherServiceAmt > 0 ? `\n• Other Services: ${otherServiceAmt.toLocaleString()} THB` : ""}${penaltyAmt > 0 ? `\n• Late Penalty: ${penaltyAmt.toLocaleString()} THB` : ""}${extraExpensesText}
+----------------------------------
+💰 Total Net Payment: ${totalAmount.toLocaleString()} THB
+
+You can view your bill online and upload the transfer slip here:
+🔗 ${portalLink}
+
+Thank you 🙏`
+      : `🏠 ${workspaceName || "หอพัก"} - ใบแจ้งค่าใช้จ่ายประจำเดือน ${cycleText}
 เลขห้อง: ${item.roomNumber}
 ผู้เช่า: ${item.tenantName || "ผู้เช่า"}
 ----------------------------------
 • ค่าเช่าห้อง: ${item.baseRent.toLocaleString()} บาท
 • ค่าไฟฟ้า: ${elecCost.toLocaleString()} บาท (ใช้ไป ${elecUnitsUsed} หน่วย)
 • ค่าน้ำประปา: ${waterCost.toLocaleString()} บาท (ใช้ไป ${waterUnitsUsed} หน่วย)
-• ค่าส่วนกลาง: ${commonFee.toLocaleString()} บาท${otherServiceAmt > 0 ? `\n• ค่าบริการอื่น ๆ: ${otherServiceAmt.toLocaleString()} บาท` : ""}${penaltyAmt > 0 ? `\n• ค่าปรับจ่ายล่าช้า: ${penaltyAmt.toLocaleString()} บาท` : ""}
+• ค่าส่วนกลาง: ${commonFee.toLocaleString()} บาท${otherServiceAmt > 0 ? `\n• ค่าบริการอื่น ๆ: ${otherServiceAmt.toLocaleString()} บาท` : ""}${penaltyAmt > 0 ? `\n• ค่าปรับจ่ายล่าช้า: ${penaltyAmt.toLocaleString()} บาท` : ""}${extraExpensesText}
 ----------------------------------
 💰 ยอดสุทธิที่ต้องชำระ: ${totalAmount.toLocaleString()} บาท
 
@@ -458,14 +488,14 @@ export default function MeterReadingTable({
         setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: false }))
       }, 3500)
     } else {
-      alert("เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง")
+      alert(locale === "en" ? "Your device or browser does not support automatic copying. Please copy the text manually." : "เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง");
     }
   }
 
   // ฟังก์ชันสำหรับคัดลอกเฉพาะลิงก์ portal
   const handleCopyPortalLink = async (item: any) => {
     if (!permissions.billing_copy_summary) {
-      alert("คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(locale === "en" ? "You do not have permission to copy the portal link. Please contact Admin to request access." : "คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
       return
     }
 
@@ -517,14 +547,14 @@ export default function MeterReadingTable({
         setCopiedLinks(prev => ({ ...prev, [item.roomNumber]: false }))
       }, 3500)
     } else {
-      alert("เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง")
+      alert(locale === "en" ? "Your device or browser does not support automatic copying. Please copy the text manually." : "เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง");
     }
   }
 
   // ฟังก์ชันเริ่มส่ง LINE OA แบบกลุ่มทีละห้อง
   const startBulkSend = async () => {
     if (!permissions.billing_send_line) {
-      alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(locale === "en" ? "You do not have permission to send LINE OA. Please contact Admin to request access." : "คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
       return
     }
     if (connectedRooms.length === 0) return
@@ -541,7 +571,7 @@ export default function MeterReadingTable({
         setBulkSendingProgress({ current: i + 1, total: connectedRooms.length, currentRoom: item.roomNumber })
         
         if (item.billStatus === "paid") {
-          results[item.roomNumber] = { success: false, error: "ชำระเงินแล้ว" }
+          results[item.roomNumber] = { success: false, error: locale === "en" ? "Paid" : "ชำระเงินแล้ว" }
           continue
         }
 
@@ -549,7 +579,7 @@ export default function MeterReadingTable({
         const lineUserId = roomInfo?.lineUserId
 
         if (!lineUserId) {
-          results[item.roomNumber] = { success: false, error: "ไม่พบข้อมูลรหัส LINE User ID" }
+          results[item.roomNumber] = { success: false, error: locale === "en" ? "LINE User ID not found" : "ไม่พบข้อมูลรหัส LINE User ID" }
           continue
         }
 
@@ -566,8 +596,8 @@ export default function MeterReadingTable({
           const result = await sendLineBillNotificationAction({
             lineUserId,
             roomNumber: item.roomNumber,
-            tenantName: item.tenantName || "ผู้เช่า",
-            billingCycle: formatBillingCycleThaiLocal(billingCycle),
+            tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
+            billingCycle: formatBillingCycleLocal(billingCycle, locale),
             baseRent: item.baseRent,
             electricUnits: elecUnitsUsed,
             electricAmount: elecCost,
@@ -575,7 +605,7 @@ export default function MeterReadingTable({
             waterAmount: waterCost,
             commonFee: commonFee,
             totalAmount: item.billAmount || (item.baseRent + elecCost + waterCost + commonFee + Number(item.otherServiceAmount || 0) + Number(item.penaltyAmount || 0) + extraExpensesSum),
-            workspaceName: workspaceName || "หอพักของเรา",
+            workspaceName: workspaceName || (locale === "en" ? "Our Dormitory" : "หอพักของเรา"),
             workspaceId: currentWorkspaceId,
             extraExpenses,
           })
@@ -583,7 +613,7 @@ export default function MeterReadingTable({
           results[item.roomNumber] = { success: result.success, error: result.error }
         } catch (err: any) {
           console.error(`Error sending LINE to room ${item.roomNumber}:`, err)
-          results[item.roomNumber] = { success: false, error: err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ" }
+          results[item.roomNumber] = { success: false, error: err.message || (locale === "en" ? "Connection error" : "เกิดข้อผิดพลาดในการเชื่อมต่อ") }
         }
       }
 
@@ -592,7 +622,7 @@ export default function MeterReadingTable({
     } catch (err: any) {
       console.error("Bulk Send Action failed:", err)
       setBulkSendingStatus("idle")
-      alert("เกิดข้อผิดพลาดในการเรียกใช้ระบบส่งข้อความแจ้งเตือน LINE")
+      alert(locale === "en" ? "An error occurred while invoking the LINE notification system." : "เกิดข้อผิดพลาดในการเรียกใช้ระบบส่งข้อความแจ้งเตือน LINE")
     }
   }
 
@@ -607,8 +637,8 @@ export default function MeterReadingTable({
         <Sparkles className={`w-4 h-4 shrink-0 ${isDark ? "text-blue-400" : "text-blue-500"}`} />
         <span>
           {mode === "billing" 
-            ? "ระบบจัดการบิลค่าเช่าหอพัก ใช้สำหรับตรวจสอบการชำระเงิน ตรวจสอบสลิป ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดค่าใช้จ่ายเพิ่มเติม"
-            : "ระบบบันทึกจดเลขมิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา กรุณาเลือกแถบมิเตอร์ไฟหรือมิเตอร์น้ำเพื่อระบุค่าปัจจุบันและคลิกบันทึก"}
+            ? t("billing.billing_tab_desc")
+            : t("billing.meters_tab_desc")}
         </span>
       </div>
 
@@ -634,7 +664,7 @@ export default function MeterReadingTable({
                 }`}
               >
                 <Zap className={`w-3.5 h-3.5 shrink-0 ${activeTab === "electric" ? (isDark ? "text-blue-400" : "text-blue-600") : "text-blue-500"}`} />
-                <span>มิเตอร์ไฟ</span>
+                <span>{t("billing.elec_meter")}</span>
               </button>
               <button
                 type="button"
@@ -648,12 +678,12 @@ export default function MeterReadingTable({
                 }`}
               >
                 <Droplet className={`w-3.5 h-3.5 shrink-0 ${activeTab === "water" ? (isDark ? "text-teal-400" : "text-teal-600") : "text-teal-500"}`} />
-                <span>มิเตอร์น้ำ</span>
+                <span>{t("billing.water_meter")}</span>
               </button>
             </div>
           ) : (
             <div className={`text-xs xl:text-xs 2xl:text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-              รายการบิลค่าเช่าประจำรอบบิล
+              {t("billing.rental_bills_cycle")}
             </div>
           )}
           
@@ -664,7 +694,7 @@ export default function MeterReadingTable({
               <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
                 activeTab === "all" ? "bg-teal-500" : activeTab === "electric" ? "bg-blue-500" : "bg-teal-500"
               }`} />
-              <span>รอบบิล: {formatBillingCycleThaiLocal(billingCycle)}</span>
+              <span>{locale === "en" ? "Cycle: " : "รอบบิล: "}{formatBillingCycleLocal(billingCycle, locale)}</span>
             </div>
 
             {activeTab === "all" && unifiedItems.length > 0 && (
@@ -684,12 +714,12 @@ export default function MeterReadingTable({
                     {downloadingAllPdf ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>บีบอัด ZIP...</span>
+                        <span>{t("billing.zipping_pdf")}</span>
                       </>
                     ) : (
                       <>
                         <Download className="w-3.5 h-3.5 shrink-0" />
-                        <span>เซฟบิล PDF ทุกห้องพร้อมกัน</span>
+                        <span>{t("billing.download_all_pdf")}</span>
                       </>
                     )}
                   </button>
@@ -713,10 +743,10 @@ export default function MeterReadingTable({
                       ? "bg-slate-400 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-200 dark:text-slate-500 opacity-50 cursor-not-allowed"
                       : "bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20"
                   }`}
-                  title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
+                  title={!permissions.billing_send_line ? (locale === "en" ? "You do not have permission to send LINE OA" : "คุณไม่มีสิทธิ์ในการส่ง LINE OA") : undefined}
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>ส่ง LINE OA ทุกห้องพร้อมกัน</span>
+                  <span>{t("billing.send_line_all")}</span>
                 </button>
               </div>
             )}
@@ -729,7 +759,7 @@ export default function MeterReadingTable({
             <div className="py-12 text-center text-slate-500 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-sm">
               <div className="flex flex-col items-center justify-center gap-3">
                 <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
-                <span>กำลังโหลดข้อมูลรวม...</span>
+                <span>{t("billing.loading_summary")}</span>
               </div>
             </div>
           ) : unifiedItems.length > 0 ? (
@@ -809,18 +839,18 @@ export default function MeterReadingTable({
                               item.billStatus === "unpaid" ? (isDark ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-rose-50 text-rose-600 border-rose-200") :
                               (isDark ? "bg-slate-900 text-slate-400 border border-slate-800" : "bg-slate-100 text-slate-500 border border-slate-200")
                             }`}
-                            title={item.billStatus === "pending" ? "คลิกเพื่อตรวจสอบสลิปโอนเงิน" : undefined}
+                            title={item.billStatus === "pending" ? (locale === "en" ? "Click to verify transfer slip" : "คลิกเพื่อตรวจสอบสลิปโอนเงิน") : undefined}
                           >
-                            {!item.tenantName ? "ห้องว่าง" :
-                             item.billStatus === "paid" ? "ชำระเงินแล้ว" :
-                             item.billStatus === "pending" ? "รอตรวจสอบ" :
-                             item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
+                            {!item.tenantName ? t("billing.vacant_room") :
+                             item.billStatus === "paid" ? t("billing.paid") :
+                             item.billStatus === "pending" ? t("billing.awaiting_verify") :
+                             item.billStatus === "unpaid" ? t("billing.unpaid") : t("billing.not_created")}
                           </span>
                         )}
                       </div>
                       {mode !== "meters" && (
                         <div className={`text-xs mt-1 font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          {item.tenantName || <span className="italic opacity-60">ห้องว่าง</span>}
+                          {item.tenantName || <span className="italic opacity-60">{t("billing.vacant_room")}</span>}
                         </div>
                       )}
                     </div>
@@ -837,10 +867,14 @@ export default function MeterReadingTable({
                       </div>
                       <div className="space-y-1">
                         <p className="font-extrabold text-xs sm:text-sm">
-                          แจ้งย้ายออกในรอบบิลนี้
+                          {t("billing.notify_checkout_title")}
                         </p>
                         <p className={`text-[10px] sm:text-xs leading-relaxed max-w-[285px] mx-auto ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                          ไม่ต้องออกบิลค่าเช่าปกติ กรุณาไปจัดการเคลียร์บัญชีและคืนเงินประกันที่เมนู <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"จัดการห้อง"</strong> แทน
+                          {locale === "en" ? (
+                          <>No regular rent billing required. Please settle accounts and return deposit in <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"Manage Rooms"</strong> menu instead.</>
+                        ) : (
+                          <>ไม่ต้องออกบิลค่าเช่าปกติ กรุณาไปจัดการเคลียร์บัญชีและคืนเงินประกันที่เมนู <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"จัดการห้อง"</strong> แทน</>
+                        )}
                         </p>
                       </div>
                     </div>
@@ -855,22 +889,22 @@ export default function MeterReadingTable({
                               isDark ? "bg-blue-950/15 border-blue-900/40" : "bg-blue-50/30 border-blue-100"
                             }`}>
                               <div className={`text-xs font-bold flex items-center gap-1 mb-1.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                                <Zap className="w-3.5 h-3.5" /> ไฟฟ้า (kWh)
+                                <Zap className="w-3.5 h-3.5" /> {locale === "en" ? "Electricity (kWh)" : "ไฟฟ้า (kWh)"}
                               </div>
                               <div className="font-mono text-xs">
-                                <span className="text-slate-400">ก่อน: {item.elecPrev}</span>
+                                <span className="text-slate-400">{locale === "en" ? "Prev: " : "ก่อน: "}{item.elecPrev}</span>
                                 <span className="mx-1 text-slate-400">➔</span>
-                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.elecCurr || "-"}</span>
+                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{locale === "en" ? "Curr: " : "รอบนี้: "}{item.elecCurr || "-"}</span>
                               </div>
                               {hasElecCurr && (
                                 <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                                  {elecUnitsUsed >= 0 ? `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                  {elecUnitsUsed >= 0 ? (locale === "en" ? `Used ${elecUnitsUsed} units (${elecCost.toLocaleString()} THB)` : `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)`) : (locale === "en" ? "Error" : "ผิดพลาด")}
                                   {(() => {
                                     const repl = getReplacement(item.roomNumber, "electric");
                                     if (repl) {
                                       return (
                                         <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                                          สูตร: ({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})
+                                          {locale === "en" ? "Formula" : "สูตร"}: ({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})
                                         </div>
                                       );
                                     }
@@ -885,22 +919,22 @@ export default function MeterReadingTable({
                               isDark ? "bg-teal-950/15 border-teal-900/40" : "bg-teal-50/30 border-teal-100"
                             }`}>
                               <div className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 mb-1.5">
-                                <Droplet className="w-3.5 h-3.5" /> น้ำประปา (m³)
+                                <Droplet className="w-3.5 h-3.5" /> {locale === "en" ? "Water (m³)" : "น้ำประปา (m³)"}
                               </div>
                               <div className="font-mono text-xs">
-                                <span className="text-slate-400">ก่อน: {item.waterPrev}</span>
+                                <span className="text-slate-400">{locale === "en" ? "Prev: " : "ก่อน: "}{item.waterPrev}</span>
                                 <span className="mx-1 text-slate-400">➔</span>
-                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>รอบนี้: {item.waterCurr || "-"}</span>
+                                <span className={`font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{locale === "en" ? "Curr: " : "รอบนี้: "}{item.waterCurr || "-"}</span>
                               </div>
                               {hasWaterCurr && (
                                 <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
-                                  {waterUnitsUsed >= 0 ? `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                  {waterUnitsUsed >= 0 ? (locale === "en" ? `Used ${waterUnitsUsed} units (${waterCost.toLocaleString()} THB)` : `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)`) : (locale === "en" ? "Error" : "ผิดพลาด")}
                                   {(() => {
                                     const repl = getReplacement(item.roomNumber, "water");
                                     if (repl) {
                                       return (
                                         <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                                          สูตร: ({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})
+                                          {locale === "en" ? "Formula" : "สูตร"}: ({repl.oldFinalReading} - {item.waterPrev}) + ({item.waterCurr || 0} - {repl.newStartReading})
                                         </div>
                                       );
                                     }
@@ -918,11 +952,11 @@ export default function MeterReadingTable({
                             }`}>
                               <div className="flex flex-col">
                                 <div className="text-xs font-bold text-rose-500 dark:text-rose-400">
-                                  ปรับล่าช้า (วัน)
+                                  {t("billing.late_penalty_days")}
                                 </div>
                                 {latePenaltyRate > 0 && (
                                   <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                    วันละ {latePenaltyRate}.-
+                                    {locale === "en" ? `${latePenaltyRate} THB/Day` : `วันละ ${latePenaltyRate}.-`}
                                     <span className="ml-1.5 text-rose-500 font-extrabold">
                                       (+{((item.lateDays || 0) * latePenaltyRate).toLocaleString()}.-)
                                     </span>
@@ -941,7 +975,7 @@ export default function MeterReadingTable({
                                   value={item.lateDays !== undefined ? item.lateDays : 0}
                                   onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
                                 />
-                                <span className="text-xs font-bold text-slate-500">วัน</span>
+                                <span className="text-xs font-bold text-slate-500">{t("billing.days_unit")}</span>
                               </div>
                             </div>
                           )}
@@ -953,10 +987,10 @@ export default function MeterReadingTable({
                             }`}>
                               <div className="flex flex-col">
                                 <div className="text-xs font-bold text-teal-600 dark:text-teal-400">
-                                  ค่าบริการอื่น ๆ (บาท)
+                                  {t("billing.other_services_label")}
                                 </div>
                                 <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                                  จะรวมอยู่ในยอดบิลสุทธิ
+                                  {t("billing.other_services_desc")}
                                 </div>
                               </div>
                               <div className="flex items-center gap-1.5">
@@ -971,7 +1005,7 @@ export default function MeterReadingTable({
                                   value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
                                   onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
                                 />
-                                <span className="text-xs font-bold text-slate-500">บาท</span>
+                                <span className="text-xs font-bold text-slate-500">{t("billing.baht_unit")}</span>
                               </div>
                             </div>
                           )}
@@ -990,7 +1024,7 @@ export default function MeterReadingTable({
                               </span>
                               {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isElecPrevEditable ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>ก่อนหน้า:</span>
+                                  <span className={`text-[10px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>{locale === "en" ? "Previous:" : "ก่อนหน้า:"}</span>
                                   <input
                                     type="text"
                                     inputMode="decimal"
@@ -1006,7 +1040,7 @@ export default function MeterReadingTable({
                                 <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
                                   isDark ? "bg-slate-950 border-slate-900 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
                                 }`}>
-                                  ก่อนหน้า: <strong className={isDark ? "text-slate-200" : "text-slate-800"}>{item.elecPrev}</strong>
+                                  {locale === "en" ? "Prev: " : "ก่อนหน้า: "}<strong className={isDark ? "text-slate-200" : "text-slate-800"}>{item.elecPrev}</strong>
                                 </span>
                               )}
                             </div>
@@ -1015,7 +1049,7 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="จดเลขมิเตอร์ไฟฟ้า..."
+                                placeholder={t("billing.elec_curr_placeholder")}
                                 disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                 className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
@@ -1046,7 +1080,7 @@ export default function MeterReadingTable({
                                   >
                                     <span className="flex items-center gap-1.5">
                                       <Wrench className="w-3.5 h-3.5 animate-bounce" />
-                                      <span>เปลี่ยนมิเตอร์กลางเดือนแล้ว (คลิกเพื่อแก้ไข)</span>
+                                      <span>{t("billing.meter_replaced_mid_month")}</span>
                                     </span>
                                     <span className="font-mono text-[10px]">
                                       {repl.oldFinalReading} ➔ {repl.newStartReading}
@@ -1066,7 +1100,7 @@ export default function MeterReadingTable({
                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                                   >
                                     <Wrench className="w-3.5 h-3.5" />
-                                    <span>บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)</span>
+                                    <span>{t("billing.record_mid_month_replacement")}</span>
                                   </button>
                                 );
                               }
@@ -1079,13 +1113,13 @@ export default function MeterReadingTable({
                                 return (
                                   <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>ข้อมูลผิดพลาด เกิน 3,000 หน่วย (ล็อกบันทึก)</span>
+                                    <span>{t("billing.invalid_data_limit")}</span>
                                   </div>
                                 );
                               } else if (isRollover) {
                                 return (
                                   <div className="text-[10px] text-amber-500 font-extrabold flex items-center gap-1 animate-pulse">
-                                    <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
+                                    <span>{t("billing.meter_rollover_msg").replace("{units}", String(units))}</span>
                                   </div>
                                 );
                               }
@@ -1093,9 +1127,9 @@ export default function MeterReadingTable({
                             })()}
 
                             <div className="flex justify-between text-xs font-mono">
-                              <span className="text-slate-500 dark:text-slate-400">หน่วยไฟที่ใช้:</span>
+                              <span className="text-slate-500 dark:text-slate-400">{locale === "en" ? "Units Elec Used:" : "หน่วยไฟที่ใช้:"}</span>
                               <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
-                                {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                                {hasElecCurr ? (elecUnitsUsed > 3000 ? (locale === "en" ? "Invalid" : "ข้อมูลผิดพลาด") : elecUnitsUsed >= 0 ? `${elecUnitsUsed} ${t("billing.units_unit")}` : (locale === "en" ? "Error" : "ผิดพลาด")) : (locale === "en" ? "Awaiting" : "รอจด")}
                               </span>
                             </div>
                             {(() => {
@@ -1103,7 +1137,7 @@ export default function MeterReadingTable({
                               if (repl && hasElecCurr) {
                                 return (
                                   <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
-                                    <span>สูตรคำนวณ:</span>
+                                    <span>{t("billing.calculation_formula")}</span>
                                     <span>({repl.oldFinalReading} - {item.elecPrev}) + ({item.elecCurr || 0} - {repl.newStartReading})</span>
                                   </div>
                                 );
@@ -1111,10 +1145,10 @@ export default function MeterReadingTable({
                               return null;
                             })()}
                             <div className="flex justify-between text-xs font-mono">
-                              <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าไฟ:</span>
+                              <span className="text-slate-500 dark:text-slate-400">{t("billing.total_elec_cost")}</span>
                               <span className="font-bold text-slate-700 dark:text-slate-300">
                                 {hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000
-                                  ? `${elecCost.toLocaleString()}.- ${!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                  ? `${elecCost.toLocaleString()} ${t("billing.baht_unit")} ${!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? `(${t("billing.min_charge")})` : ""}` 
                                   : "-"}
                               </span>
                             </div>
@@ -1135,11 +1169,11 @@ export default function MeterReadingTable({
                               {savingRows?.[item.roomNumber] ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 animate-spin" />
-                                  <span>กำลังบันทึก...</span>
+                                  <span>{t("billing.saving")}</span>
                                 </>
                               ) : (
                                 <>
-                                  <Save className="w-4 h-4" /> บันทึกมิเตอร์ไฟห้อง {item.roomNumber}
+                                  <Save className="w-4 h-4" /> {t("billing.save_elec_room").replace("{roomNumber}", item.roomNumber)}
                                 </>
                               )}
                             </button>
@@ -1157,7 +1191,7 @@ export default function MeterReadingTable({
                               </span>
                               {(item.billStatus === "not_created" || item.billStatus === "unpaid") && item.isWaterPrevEditable ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">ก่อนหน้า:</span>
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">{locale === "en" ? "Previous:" : "ก่อนหน้า:"}</span>
                                   <input
                                     type="text"
                                     inputMode="decimal"
@@ -1169,7 +1203,7 @@ export default function MeterReadingTable({
                                 </div>
                               ) : (
                                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-900">
-                                  ก่อนหน้า: <strong className="text-slate-800 dark:text-slate-200">{item.waterPrev}</strong>
+                                  {locale === "en" ? "Prev: " : "ก่อนหน้า: "}<strong className="text-slate-800 dark:text-slate-200">{item.waterPrev}</strong>
                                 </span>
                               )}
                             </div>
@@ -1178,7 +1212,7 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="จดเลขมิเตอร์น้ำประปา..."
+                                placeholder={t("billing.water_curr_placeholder")}
                                 disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                 className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
                                 value={item.waterCurr}
@@ -1254,9 +1288,9 @@ export default function MeterReadingTable({
                             })()}
 
                             <div className="flex justify-between text-xs font-mono">
-                              <span className="text-slate-500 dark:text-slate-400">หน่วยน้ำที่ใช้:</span>
+                              <span className="text-slate-500 dark:text-slate-400">{locale === "en" ? "Units Water Used:" : "หน่วยน้ำที่ใช้:"}</span>
                               <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
-                                {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
+                                {hasWaterCurr ? (waterUnitsUsed > 3000 ? (locale === "en" ? "Invalid" : "ข้อมูลผิดพลาด") : waterUnitsUsed >= 0 ? `${waterUnitsUsed} ${t("billing.units_unit")}` : (locale === "en" ? "Error" : "ผิดพลาด")) : (locale === "en" ? "Awaiting" : "รอจด")}
                               </span>
                             </div>
                             {(() => {
@@ -1272,10 +1306,10 @@ export default function MeterReadingTable({
                               return null;
                             })()}
                             <div className="flex justify-between text-xs font-mono">
-                              <span className="text-slate-500 dark:text-slate-400">รวมเงินค่าน้ำ:</span>
+                              <span className="text-slate-500 dark:text-slate-400">{t("billing.total_water_cost")}</span>
                               <span className="font-bold text-slate-700 dark:text-slate-300">
                                 {hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000
-                                  ? `${waterCost.toLocaleString()}.- ${!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? "(ขั้นต่ำ)" : ""}` 
+                                  ? `${waterCost.toLocaleString()} ${t("billing.baht_unit")} ${!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? `(${t("billing.min_charge")})` : ""}` 
                                   : "-"}
                               </span>
                             </div>
@@ -1300,7 +1334,7 @@ export default function MeterReadingTable({
                                 </>
                               ) : (
                                 <>
-                                  <Save className="w-4 h-4" /> บันทึกมิเตอร์น้ำห้อง {item.roomNumber}
+                                  <Save className="w-4 h-4" /> {t("billing.save_water_room").replace("{roomNumber}", item.roomNumber)}
                                 </>
                               )}
                             </button>
@@ -1333,7 +1367,7 @@ export default function MeterReadingTable({
                                 </>
                               ) : (
                                 <>
-                                  <Save className="w-4 h-4" /> บันทึกบิล
+                                  <Save className="w-4 h-4" /> {t("billing.save_bill")}
                                 </>
                               )}
                             </button>
@@ -1345,7 +1379,7 @@ export default function MeterReadingTable({
                               }}
                               className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/10 cursor-pointer"
                             >
-                              <Eye className="w-4 h-4" /> ตรวจสอบสลิปโอนเงิน
+                              <Eye className="w-4 h-4" /> {t("billing.check_slip")}
                             </button>
                           ) : (
                             <div className="space-y-2">
@@ -1359,10 +1393,10 @@ export default function MeterReadingTable({
                                       ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-400 dark:text-slate-600"
                                       : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/10 dark:hover:bg-emerald-600/20 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer"
                                   }`}
-                                  title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด / บันทึกชำระเงินตรง"}
+                                  title={currentUserRole === "staff" ? t("billing.admin_only_cash") : t("billing.cash_payment")}
                                 >
                                   <CheckCircle className={`w-4 h-4 ${currentUserRole === "staff" ? "text-slate-400 dark:text-slate-600" : "text-emerald-500"}`} />
-                                  <span>รับเงินสด / บันทึกชำระเงินตรง</span>
+                                  <span>{t("billing.cash_payment")}</span>
                                 </button>
                               )}
 
@@ -1385,12 +1419,12 @@ export default function MeterReadingTable({
                                   {unlockedPaidRooms[item.roomNumber] ? (
                                     <>
                                       <X className="w-4 h-4" />
-                                      <span>ยกเลิกแก้ไข</span>
+                                      <span>{t("billing.cancel_edit")}</span>
                                     </>
                                   ) : (
                                     <>
                                       <Edit3 className="w-4 h-4" />
-                                      <span>แก้ไขบิล</span>
+                                      <span>{t("billing.edit_bill")}</span>
                                     </>
                                   )}
                                 </button>
@@ -1406,7 +1440,7 @@ export default function MeterReadingTable({
             })
           ) : (
             <div className="py-12 text-center text-slate-500 bg-white dark:bg-slate-950/10 border border-slate-200 dark:border-slate-900/60 rounded-2xl shadow-sm">
-              ไม่มีรายการห้องพักที่ใช้งานหรือจ้างเช่าอยู่ในขณะนี้
+              {t("billing.no_rooms")}
             </div>
           )}
         </div>
@@ -1416,43 +1450,43 @@ export default function MeterReadingTable({
           <table className="w-full text-left text-xs xl:text-sm 2xl:text-base border-collapse">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] xl:text-xs 2xl:text-sm font-semibold text-slate-500 dark:text-slate-450 uppercase tracking-wider bg-transparent">
-                <th className="py-3.5 pl-3 w-16 xl:w-20 2xl:w-24">ห้อง</th>
+                <th className="py-3.5 pl-3 w-16 xl:w-20 2xl:w-24">{locale === "en" ? "Room" : "ห้อง"}</th>
                 {mode === "meters" ? (
-                  <th className="py-3.5 w-40 xl:w-48 2xl:w-56">สถานะห้อง</th>
+                  <th className="py-3.5 w-40 xl:w-48 2xl:w-56">{t("billing.room_status")}</th>
                 ) : (
-                  <th className="py-3.5 w-40 xl:w-48 2xl:w-56">ผู้เช่า / ค่าเช่า</th>
+                  <th className="py-3.5 w-40 xl:w-48 2xl:w-56">{t("billing.tenant_rent")}</th>
                 )}
                 
                 {/* 1. แถบจัดการบิล */}
                 {activeTab === "all" && (
                   <>
-                    <th className="py-3.5 text-center w-44 xl:w-52 2xl:w-60 text-slate-500 dark:text-slate-450">มิเตอร์ไฟฟ้า (kWh)</th>
-                    <th className="py-3.5 text-center w-44 xl:w-52 2xl:w-60 text-slate-500 dark:text-slate-450">มิเตอร์น้ำ (m³)</th>
-                    <th className="py-3.5 text-center w-36 xl:w-44 2xl:w-48 text-slate-500 dark:text-slate-450">ค่าบริการอื่น ๆ (บาท)</th>
-                    <th className="py-3.5 text-center w-36 xl:w-44 2xl:w-48 text-slate-500 dark:text-slate-450">ปรับล่าช้า (วัน)</th>
-                    <th className="py-3.5 text-right pr-4 w-32 xl:w-36 2xl:w-40">ยอดรวมบิล</th>
-                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36">สถานะ</th>
-                    <th className="py-3.5 text-center w-52 xl:w-60 2xl:w-68 pr-2">การจัดการบิล</th>
+                    <th className="py-3.5 text-center w-44 xl:w-52 2xl:w-60 text-slate-500 dark:text-slate-450">{t("billing.elec_meter")} (kWh)</th>
+                    <th className="py-3.5 text-center w-44 xl:w-52 2xl:w-60 text-slate-500 dark:text-slate-450">{t("billing.water_meter")} (m³)</th>
+                    <th className="py-3.5 text-center w-36 xl:w-44 2xl:w-48 text-slate-500 dark:text-slate-450">{t("billing.other_services_label")}</th>
+                    <th className="py-3.5 text-center w-36 xl:w-44 2xl:w-48 text-slate-500 dark:text-slate-450">{t("billing.late_penalty_days")}</th>
+                    <th className="py-3.5 text-right pr-4 w-32 xl:w-36 2xl:w-40">{t("billing.total_bill")}</th>
+                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36">{locale === "en" ? "Status" : "สถานะ"}</th>
+                    <th className="py-3.5 text-center w-52 xl:w-60 2xl:w-68 pr-2">{t("billing.billing_management")}</th>
                   </>
                 )}
 
                 {/* 2. แถบมิเตอร์ไฟ */}
                 {activeTab === "electric" && (
                   <>
-                    <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">ไฟก่อนหน้า</th>
-                    <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">ไฟรอบนี้</th>
-                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">หน่วย/ยอดไฟ</th>
-                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">บันทึกข้อมูล</th>
+                    <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">{t("billing.elec_prev")}</th>
+                    <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">{t("billing.elec_curr")}</th>
+                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">{t("billing.units_elec_amount")}</th>
+                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">{t("billing.save_data")}</th>
                   </>
                 )}
 
                 {/* 3. แถบมิเตอร์น้ำ */}
                 {activeTab === "water" && (
                   <>
-                    <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">น้ำก่อนหน้า</th>
-                    <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">น้ำรอบนี้</th>
-                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">หน่วย/ยอดน้ำ</th>
-                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">บันทึกข้อมูล</th>
+                    <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">{t("billing.water_prev")}</th>
+                    <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">{t("billing.water_curr")}</th>
+                    <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">{t("billing.units_water_amount")}</th>
+                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">{t("billing.save_data")}</th>
                   </>
                 )}
               </tr>
@@ -1463,7 +1497,7 @@ export default function MeterReadingTable({
                   <td colSpan={colSpanVal} className="py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
-                      <span>กำลังโหลดข้อมูลรวม...</span>
+                      <span>{t("billing.loading_summary")}</span>
                     </div>
                   </td>
                 </tr>
@@ -1515,13 +1549,13 @@ export default function MeterReadingTable({
                           )
                         ) : (
                           <>
-                            <div className={`font-medium text-sm xl:text-base 2xl:text-lg truncate max-w-[160px] xl:max-w-[200px] 2xl:max-w-[240px] ${isDark ? "text-slate-200" : "text-slate-700"}`} title={item.tenantName || "ไม่มีผู้เช่า"}>
-                              {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>ไม่มีข้อมูลผู้เช่า</span>}
+                            <div className={`font-medium text-sm xl:text-base 2xl:text-lg truncate max-w-[160px] xl:max-w-[200px] 2xl:max-w-[240px] ${isDark ? "text-slate-200" : "text-slate-700"}`} title={item.tenantName || (locale === "en" ? "No tenant info" : "ไม่มีผู้เช่า")}>
+                              {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>{t("billing.no_tenant_info")}</span>}
                             </div>
                             <div className={`text-xs xl:text-sm 2xl:text-base mt-0.5 font-mono ${isDark ? "text-slate-450" : "text-slate-500"}`}>
                               {item.tenantName ? (
                                 <>
-                                  ค่าเช่า {item.baseRent.toLocaleString()}.-
+                                  {locale === "en" ? "Rent" : "ค่าเช่า"} ${item.baseRent.toLocaleString()} ${t("billing.baht_unit")}
                                   {extraExpenses.map((exp: any, index: number) => (
                                     <div key={index} className="text-[10px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-440 font-medium mt-0.5">
                                       {exp.name} +{Number(exp.amount || 0).toLocaleString()}.-
@@ -1529,11 +1563,11 @@ export default function MeterReadingTable({
                                   ))}
                                   {Number(item.otherServiceAmount || 0) > 0 && (
                                     <div className="text-[10px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-440 font-medium mt-0.5">
-                                      ค่าบริการอื่นๆ +{Number(item.otherServiceAmount).toLocaleString()}.-
+                                      {locale === "en" ? "Other Services" : "ค่าบริการอื่นๆ"} +${Number(item.otherServiceAmount).toLocaleString()} ${t("billing.baht_unit")}
                                     </div>
                                   )}
                                 </>
-                              ) : "ห้องว่าง"}
+                              ) : t("billing.vacant_room")}
                             </div>
                           </>
                         )}
@@ -1546,9 +1580,13 @@ export default function MeterReadingTable({
                           }`}>
                             <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 animate-pulse" />
                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                              <span className="font-extrabold text-xs xl:text-sm">แจ้งย้ายออกในรอบบิลนี้:</span>
+                              <span className="font-extrabold text-xs xl:text-sm">{t("billing.notify_checkout_title")}:</span>
                               <span className={`text-[11px] xl:text-xs font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                                ไม่ต้องออกบิลค่าเช่าปกติ กรุณาไปจัดการเคลียร์บัญชีและคืนเงินประกันที่เมนู <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"จัดการห้อง"</strong> แทน
+                                {locale === "en" ? (
+                          <>No regular rent billing required. Please settle accounts and return deposit in <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"Manage Rooms"</strong> menu instead.</>
+                        ) : (
+                          <>ไม่ต้องออกบิลค่าเช่าปกติ กรุณาไปจัดการเคลียร์บัญชีและคืนเงินประกันที่เมนู <strong className={isDark ? "text-amber-300" : "text-amber-900"}>"จัดการห้อง"</strong> แทน</>
+                        )}
                               </span>
                             </div>
                           </div>
@@ -1572,10 +1610,10 @@ export default function MeterReadingTable({
                                     ? "bg-rose-500/10 text-rose-600 dark:text-rose-450" 
                                     : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400"
                                 }`}>
-                                  {elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                  {elecUnitsUsed >= 0 ? `${elecUnitsUsed} ${t("billing.units_unit")} (${elecCost.toLocaleString()} ${t("billing.baht_unit")})` : (locale === "en" ? "Error" : "ผิดพลาด")}
                                 </span>
                               ) : (
-                                <span className="text-[10px] xl:text-xs 2xl:text-sm text-slate-400 dark:text-slate-500 italic font-medium">รอจดในแถบไฟ</span>
+                                <span className="text-[10px] xl:text-xs 2xl:text-sm text-slate-400 dark:text-slate-500 italic font-medium">{t("billing.awaiting_elec")}</span>
                               )}
                             </div>
                           </td>
@@ -1594,10 +1632,10 @@ export default function MeterReadingTable({
                                     ? "bg-rose-500/10 text-rose-600 dark:text-rose-450" 
                                     : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                 }`}>
-                                  {waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)` : "ผิดพลาด"}
+                                  {waterUnitsUsed >= 0 ? `${waterUnitsUsed} ${t("billing.units_unit")} (${waterCost.toLocaleString()} ${t("billing.baht_unit")})` : (locale === "en" ? "Error" : "ผิดพลาด")}
                                 </span>
                               ) : (
-                                <span className="text-[10px] xl:text-xs 2xl:text-sm text-slate-400 dark:text-slate-500 italic font-medium">รอจดในแถบน้ำ</span>
+                                <span className="text-[10px] xl:text-xs 2xl:text-sm text-slate-400 dark:text-slate-500 italic font-medium">{t("billing.awaiting_water")}</span>
                               )}
                             </div>
                           </td>
@@ -1617,7 +1655,7 @@ export default function MeterReadingTable({
                                   value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
                                   onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
                                 />
-                                <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>บาท</span>
+                                <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>{t("billing.baht_unit")}</span>
                               </div>
                             ) : (
                               <span className="text-xs xl:text-sm 2xl:text-base text-slate-400 dark:text-slate-500 font-medium">-</span>
@@ -1640,10 +1678,10 @@ export default function MeterReadingTable({
                                     value={item.lateDays !== undefined ? item.lateDays : 0}
                                     onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
                                   />
-                                  <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>วัน</span>
+                                  <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>{t("billing.days_unit")}</span>
                                 </div>
                                 {latePenaltyRate > 0 && (
-                                  <span className={`text-[10px] xl:text-xs 2xl:text-sm mt-1 font-medium ${isDark ? "text-rose-400" : "text-rose-600"}`} title={`ค่าปรับวันละ ${latePenaltyRate} บาท`}>
+                                  <span className={`text-[10px] xl:text-xs 2xl:text-sm mt-1 font-medium ${isDark ? "text-rose-400" : "text-rose-600"}`} title={t("billing.penalty_rate_per_day").replace("{rate}", String(latePenaltyRate))}>
                                     +{((item.lateDays || 0) * latePenaltyRate).toLocaleString()}.-
                                   </span>
                                 )}
@@ -1664,13 +1702,13 @@ export default function MeterReadingTable({
                                     }`}>
                                       {Number(item.billAmount !== undefined ? item.billAmount : 0).toLocaleString()}
                                     </span>
-                                    <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>บาท</span>
+                                    <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>{t("billing.baht_unit")}</span>
                                   </div>
                                   {isModified && (
                                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] xl:text-xs 2xl:text-sm font-medium mt-1 bg-amber-500/10 border border-amber-500/20 ${
                                       isDark ? "text-amber-400" : "text-amber-600"
                                     }`}>
-                                      ยอดเงินเปลี่ยน
+                                      {t("billing.amount_changed")}
                                     </span>
                                   )}
                                 </div>
@@ -1682,7 +1720,7 @@ export default function MeterReadingTable({
                                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] xl:text-xs 2xl:text-sm font-medium mt-1 bg-slate-500/10 border border-slate-500/20 ${
                                     isDark ? "text-slate-450" : "text-slate-500"
                                   }`}>
-                                    รอสร้างบิล
+                                    {t("billing.awaiting_bill_creation")}
                                   </span>
                                 </div>
                               )
@@ -1713,10 +1751,10 @@ export default function MeterReadingTable({
                               }`}
                               title={item.billStatus === "pending" ? "คลิกเพื่อตรวจสอบสลิปโอนเงิน" : undefined}
                             >
-                              {!item.tenantName ? "ห้องว่าง" :
-                               item.billStatus === "paid" ? "ชำระเงินแล้ว" :
-                               item.billStatus === "pending" ? "รอตรวจสอบ" :
-                               item.billStatus === "unpaid" ? "ค้างชำระ" : "ยังไม่ออกบิล"}
+                              {!item.tenantName ? t("billing.vacant_room") :
+                             item.billStatus === "paid" ? t("billing.paid") :
+                             item.billStatus === "pending" ? t("billing.awaiting_verify") :
+                             item.billStatus === "unpaid" ? t("billing.unpaid") : t("billing.not_created")}
                             </span>
                           </td>
 
@@ -1739,7 +1777,7 @@ export default function MeterReadingTable({
                                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
                                         : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100")
                                   }`}
-                                  title="บันทึกจำนวนวันปรับล่าช้าลงระบบ"
+                                  title={locale === "en" ? "Save late penalty days to system" : "บันทึกจำนวนวันปรับล่าช้าลงระบบ"}
                                 >
                                   {savingRows?.[item.roomNumber] ? (
                                     <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
@@ -1747,7 +1785,7 @@ export default function MeterReadingTable({
                                     <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                   )}
                                   <span>
-                                    {savingRows?.[item.roomNumber] ? "กำลังบันทึก" : "บันทึกบิล"}
+                                    {savingRows?.[item.roomNumber] ? (locale === "en" ? "Saving..." : "กำลังบันทึก") : t("billing.save_bill")}
                                   </span>
                                 </button>
                               ) : item.billStatus === "pending" ? (
@@ -1761,7 +1799,7 @@ export default function MeterReadingTable({
                                   }`}
                                 >
                                   <Eye className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-                                  <span>ตรวจสลิป</span>
+                                  <span>{t("billing.check_slip")}</span>
                                 </button>
                               ) : item.billStatus !== "not_created" ? (
                                 <>
@@ -1777,11 +1815,11 @@ export default function MeterReadingTable({
                                       } ${
                                         isDark ? "bg-slate-900 border-slate-800 text-slate-400" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                                       }`}
-                                      title={currentUserRole === "staff" ? "เฉพาะแอดมินเท่านั้นที่มีสิทธิ์รับเงิน" : "รับเงินสด/บันทึกชำระเงินตรง"}
+                                      title={currentUserRole === "staff" ? t("billing.admin_only_cash") : t("billing.cash_payment")}
                                     >
                                       <CheckCircle className={`w-3.5 h-3.5 xl:w-4 xl:h-4 ${currentUserRole === "staff" ? "text-slate-500 dark:text-slate-600" : "text-emerald-500"}`} />
                                       <span className="text-xs xl:text-sm 2xl:text-base font-medium">
-                                        รับเงินแล้ว
+                                        {t("billing.cash_payment_received")}
                                       </span>
                                     </button>
                                   )}
@@ -1805,24 +1843,24 @@ export default function MeterReadingTable({
                                             ? "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-850"
                                             : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                                       }`}
-                                      title={unlockedPaidRooms[item.roomNumber] ? "ล็อกการแก้ไขบิล" : "ปลดล็อกเพื่อแก้ไขรายละเอียดบิล"}
+                                      title={unlockedPaidRooms[item.roomNumber] ? t("billing.lock_edit_bill") : t("billing.unlock_edit_bill")}
                                     >
                                       {unlockedPaidRooms[item.roomNumber] ? (
                                         <>
                                           <X className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-                                          <span>ยกเลิกแก้ไข</span>
+                                          <span>{t("billing.cancel_edit")}</span>
                                         </>
                                       ) : (
                                         <>
                                           <Edit3 className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-                                          <span>แก้ไขบิล</span>
+                                          <span>{t("billing.edit_bill")}</span>
                                         </>
                                       )}
                                     </button>
                                   )}
                                 </>
                               ) : (
-                                <span className="text-xs xl:text-sm 2xl:text-base text-slate-400 dark:text-slate-500 font-medium">ยังไม่ออกบิล</span>
+                                <span className="text-xs xl:text-sm 2xl:text-base text-slate-400 dark:text-slate-500 font-medium">{t("billing.not_created")}</span>
                               )}
                             </div>
                           </td>
@@ -1838,7 +1876,7 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="กรอกเลข"
+                                placeholder={t("billing.fill_number")}
                                 className={`w-20 xl:w-24 2xl:w-28 text-center px-1.5 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors ${
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                 }`}
@@ -1859,7 +1897,7 @@ export default function MeterReadingTable({
                             <div className="relative inline-block">
                               <input
                                 type="text"
-                                placeholder="กรอกเลข"
+                                placeholder={t("billing.fill_number")}
                                 disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                 className={`w-24 xl:w-28 2xl:w-32 text-left pl-2 pr-8 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
@@ -1879,13 +1917,13 @@ export default function MeterReadingTable({
                               if (units > 3000) {
                                   return (
                                     <div className="text-[11px] xl:text-xs 2xl:text-sm text-rose-600 dark:text-rose-450 font-medium flex items-center justify-center gap-1 mt-1">
-                                      <span>⚠️ เกิน 3,000 หน่วย</span>
+                                      <span>{t("billing.over_3000_warning")}</span>
                                     </div>
                                   );
                               } else if (isRollover) {
                                   return (
                                     <div className="text-[11px] xl:text-xs 2xl:text-sm text-amber-600 dark:text-amber-400 font-medium flex items-center justify-center gap-1 mt-1">
-                                      <span>🔄 หมุนครบรอบ (+{units})</span>
+                                      <span>{t("billing.rollover_short").replace("{units}", String(units))}</span>
                                     </div>
                                   );
                               }
@@ -1901,7 +1939,7 @@ export default function MeterReadingTable({
                                       type="button"
                                       onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
                                       disabled={isDisabled}
-                                      title={`เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
+                                      title={locale === "en" ? `Meter replaced mid-month: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (Click to edit/delete)` : `เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
                                       className={`inline-flex items-center gap-1 px-2 py-0.5 xl:px-2.5 xl:py-1 rounded border text-[11px] xl:text-xs 2xl:text-sm font-medium transition-colors ${
                                         isDark 
                                           ? "bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20" 
@@ -1909,7 +1947,7 @@ export default function MeterReadingTable({
                                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                       <Wrench className="w-3 h-3" />
-                                      <span>เปลี่ยนแล้ว ({repl.oldFinalReading}➔{repl.newStartReading})</span>
+                                      <span>{t("billing.replaced")} ({repl.oldFinalReading}➔{repl.newStartReading})</span>
                                     </button>
                                   );
                                 } else {
@@ -1925,7 +1963,7 @@ export default function MeterReadingTable({
                                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                       <Wrench className="w-3 h-3" />
-                                      <span>เปลี่ยนมิเตอร์</span>
+                                      <span>{locale === "en" ? "Replace Meter" : "เปลี่ยนมิเตอร์"}</span>
                                     </button>
                                   );
                                 }
@@ -1951,7 +1989,7 @@ export default function MeterReadingTable({
                                       className={`mt-1 text-[10px] xl:text-xs 2xl:text-sm leading-tight px-1.5 py-0.5 rounded font-medium max-w-[130px] xl:max-w-[160px] mx-auto cursor-help ${
                                         isDark ? "bg-slate-800/40 text-slate-400" : "bg-slate-50 text-slate-500 border border-slate-100"
                                       }`}
-                                      title={`สูตรคำนวณมิเตอร์เสียกลางเดือน:\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.elecPrev}) + (จดรอบนี้: ${item.elecCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
+                                      title={locale === "en" ? `Mid-month replaced meter calculation formula:\n(Old meter final: ${repl.oldFinalReading} - Prev: ${item.elecPrev}) + (Current: ${item.elecCurr || 0} - New meter start: ${repl.newStartReading})` : `{t("billing.replacement_formula_desc")}\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.elecPrev}) + (จดรอบนี้: ${item.elecCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
                                     >
                                       ({repl.oldFinalReading}-{item.elecPrev}) + ({item.elecCurr || 0}-{repl.newStartReading})
                                     </div>
@@ -1979,7 +2017,7 @@ export default function MeterReadingTable({
                               ) : (
                                 <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                               )}
-                              <span>บันทึกมิเตอร์ไฟ</span>
+                              <span>{t("billing.save_elec_meter")}</span>
                             </button>
                           </td>
                         </>
@@ -1994,7 +2032,7 @@ export default function MeterReadingTable({
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="กรอกเลข"
+                                placeholder={t("billing.fill_number")}
                                 className={`w-28 xl:w-32 2xl:w-36 h-11 text-center font-mono text-sm xl:text-base 2xl:text-lg font-semibold rounded-xl border transition-all focus:outline-none focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 ${
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-250 text-slate-800"
                                 }`}
@@ -2015,7 +2053,7 @@ export default function MeterReadingTable({
                             <div className="relative inline-block">
                               <input
                                 type="text"
-                                placeholder="กรอกเลข"
+                                placeholder={t("billing.fill_number")}
                                 disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
                                 className={`w-32 xl:w-36 2xl:w-40 h-11 text-center font-mono text-sm xl:text-base 2xl:text-lg font-semibold rounded-xl border transition-all focus:outline-none focus:ring-4 disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark 
@@ -2037,13 +2075,13 @@ export default function MeterReadingTable({
                               if (units > 3000) {
                                   return (
                                     <div className="text-[11px] xl:text-xs 2xl:text-sm text-rose-600 dark:text-rose-450 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
-                                      <span>⚠️ เกิน 3,000 หน่วย</span>
+                                      <span>{t("billing.over_3000_warning")}</span>
                                     </div>
                                   );
                               } else if (isRollover) {
                                   return (
                                     <div className="text-[11px] xl:text-xs 2xl:text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
-                                      <span>🔄 หมุนรอบ (+{units})</span>
+                                      <span>{t("billing.rollover_short").replace("{units}", String(units))}</span>
                                     </div>
                                   );
                               }
@@ -2083,7 +2121,7 @@ export default function MeterReadingTable({
                                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                       <Wrench className="w-3 h-3" />
-                                      <span>เปลี่ยนมิเตอร์</span>
+                                      <span>{locale === "en" ? "Replace Meter" : "เปลี่ยนมิเตอร์"}</span>
                                     </button>
                                   );
                                 }
@@ -2115,7 +2153,7 @@ export default function MeterReadingTable({
                                       className={`mt-1.5 text-[10px] xl:text-xs 2xl:text-sm leading-tight px-1.5 py-0.5 rounded font-medium max-w-[130px] mx-auto cursor-help ${
                                         isDark ? "bg-slate-800/40 text-slate-400" : "bg-slate-50 text-slate-500 border border-slate-100"
                                       }`}
-                                      title={`สูตรคำนวณมิเตอร์เสียกลางเดือน:\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.waterPrev}) + (จดรอบนี้: ${item.waterCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
+                                      title={locale === "en" ? `Mid-month replaced meter calculation formula:\n(Old meter final: ${repl.oldFinalReading} - Prev: ${item.waterPrev}) + (Current: ${item.waterCurr || 0} - New meter start: ${repl.newStartReading})` : `สูตรคำนวณมิเตอร์เสียกลางเดือน:\n(มิเตอร์เก่าเสีย: ${repl.oldFinalReading} - ก่อนหน้า: ${item.waterPrev}) + (จดรอบนี้: ${item.waterCurr || 0} - มิเตอร์ใหม่เริ่ม: ${repl.newStartReading})`}
                                     >
                                       ({repl.oldFinalReading}-{item.waterPrev}) + ({item.waterCurr || 0}-{repl.newStartReading})
                                     </div>
@@ -2143,7 +2181,7 @@ export default function MeterReadingTable({
                               ) : (
                                 <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                               )}
-                              <span>บันทึกมิเตอร์น้ำ</span>
+                              <span>{t("billing.save_water_meter")}</span>
                             </button>
                           </td>
                         </>
@@ -2222,10 +2260,10 @@ export default function MeterReadingTable({
             <div className="mb-4">
               <h3 className={`text-lg md:text-xl font-black flex items-center gap-2.5 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
                 <MessageSquare className={`w-5 h-5 md:w-6 md:h-6 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} />
-                <span>ส่ง LINE OA และบิลค่าเช่าประจำเดือน</span>
+                <span>{t("billing.bulk_send_title")}</span>
               </h3>
               <p className={`text-xs md:text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                ส่งแจ้งเตือนยอดบิลพรีเมียมและลิงก์ออนไลน์เข้าแชท LINE OA ของผู้เช่าทุกคนพร้อมกัน
+                {t("billing.bulk_send_subtitle")}
               </p>
             </div>
 
@@ -2234,19 +2272,19 @@ export default function MeterReadingTable({
               <div className={`p-3 rounded-xl border text-center ${
                 isDark ? "bg-slate-950/40 border-slate-850" : "bg-slate-50 border-slate-150"
               }`}>
-                <div className={`text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>ผู้เช่าที่มีบิล</div>
+                <div className={`text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-400"}`}>{t("billing.tenants_with_bills")}</div>
                 <div className={`text-sm md:text-xl font-black mt-1 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                  {activeRooms.length} <span className="text-xs font-medium">ห้อง</span>
+                  {activeRooms.length} <span className="text-xs font-medium">{t("billing.rooms_count_unit")}</span>
                 </div>
               </div>
               <div className={`p-3 rounded-xl border text-center bg-emerald-500/5 border-emerald-500/20`}>
-                <div className="text-xs font-bold text-emerald-500">ผูก LINE แล้ว</div>
+                <div className="text-xs font-bold text-emerald-500">{t("billing.line_connected")}</div>
                 <div className="text-sm md:text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
                   {connectedRooms.length} <span className="text-xs font-medium">ห้อง</span>
                 </div>
               </div>
               <div className={`p-3 rounded-xl border text-center bg-amber-500/5 border-amber-500/20`}>
-                <div className="text-xs font-bold text-amber-500">ยังไม่ผูก LINE</div>
+                <div className="text-xs font-bold text-amber-500">{t("billing.line_unconnected")}</div>
                 <div className="text-sm md:text-xl font-black text-amber-600 dark:text-amber-400 mt-1">
                   {unconnectedRooms.length} <span className="text-xs font-medium">ห้อง</span>
                 </div>
@@ -2265,7 +2303,7 @@ export default function MeterReadingTable({
                     : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
                 }`}
               >
-                พร้อมส่งอัตโนมัติ ({connectedRooms.length})
+                {t("billing.ready_auto_send").replace("{count}", String(connectedRooms.length))}
               </button>
               <button
                 onClick={() => setModalActiveTab("unconnected")}
@@ -2275,7 +2313,7 @@ export default function MeterReadingTable({
                     : (isDark ? "text-slate-500 hover:text-slate-400" : "text-slate-500 hover:text-slate-700")
                 }`}
               >
-                ส่งบิล Manual ({unconnectedRooms.length})
+                {t("billing.manual_send").replace("{count}", String(unconnectedRooms.length))}
               </button>
             </div>
 
@@ -2299,7 +2337,7 @@ export default function MeterReadingTable({
                             <span className={`font-black text-sm px-2.5 py-1 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>
-                              ห้อง {item.roomNumber}
+                              {t("billing.room_label").replace("{roomNumber}", item.roomNumber)}
                             </span>
                             <span className={`font-extrabold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                               {item.tenantName}
@@ -2323,17 +2361,17 @@ export default function MeterReadingTable({
                                       ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
                                       : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
                               }`}
-                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal" : undefined}
+                              title={!permissions.billing_copy_summary ? (locale === "en" ? "You do not have permission to copy portal link" : "คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal") : undefined}
                             >
                               {copiedLinks[item.roomNumber] ? (
                                 <>
                                   <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                  <span className="whitespace-nowrap">คัดลอกแล้ว!</span>
+                                  <span className="whitespace-nowrap">{t("billing.copied_success")}</span>
                                 </>
                               ) : (
                                 <>
                                   <Link className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                                  <span className="whitespace-nowrap">คัดลอกลิงก์ portal</span>
+                                  <span className="whitespace-nowrap">{t("billing.copy_portal_link")}</span>
                                 </>
                               )}
                             </button>
@@ -2342,7 +2380,7 @@ export default function MeterReadingTable({
                               <button
                                 onClick={() => {
                                   if (item.billStatus === "paid") {
-                                    alert(`ห้อง ${item.roomNumber} ชำระเงินแล้ว`)
+                                    alert(locale === "en" ? `Room ${item.roomNumber} is already paid` : `ห้อง ${item.roomNumber} ชำระเงินแล้ว`)
                                     return
                                   }
                                   handleSendLine(item.roomNumber)
@@ -2357,37 +2395,37 @@ export default function MeterReadingTable({
                                         ? "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/30 hover:text-emerald-300 cursor-pointer" 
                                         : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800 cursor-pointer"
                                 }`}
-                                title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : item.billStatus === "paid" ? `ห้อง ${item.roomNumber} ชำระเงินแล้ว` : undefined}
+                                title={!permissions.billing_send_line ? (locale === "en" ? "You do not have permission to send LINE OA" : "คุณไม่มีสิทธิ์ในการส่ง LINE OA") : item.billStatus === "paid" ? (locale === "en" ? `Room ${item.roomNumber} is paid` : `ห้อง ${item.roomNumber} ชำระเงินแล้ว`) : undefined}
                               >
                                 <Send className="w-3 h-3" />
-                                <span className="whitespace-nowrap">ส่ง LINE OA</span>
+                                <span className="whitespace-nowrap">{t("billing.send_line_oa")}</span>
                               </button>
                             )}
                             {bulkSendingStatus === "sending" && bulkSendingProgress.currentRoom === item.roomNumber && (
                               <span className="text-sm font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 animate-pulse whitespace-nowrap">
-                                กำลังส่ง...
+                                {t("billing.sending")}
                               </span>
                             )}
                             {bulkSendingStatus === "sending" && !result && bulkSendingProgress.currentRoom !== item.roomNumber && (
                               <span className="text-sm font-semibold text-slate-450 dark:text-slate-500 whitespace-nowrap">
-                                รอคิว...
+                                {t("billing.queueing")}
                               </span>
                             )}
                             {result && (
                               result.success ? (
                                 <span className="text-sm font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
-                                  สำเร็จแล้ว ✅
+                                  {t("billing.success_tick")}
                                 </span>
                               ) : (
                                 <span 
                                   className={`text-sm font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
-                                    result.error === "ชำระเงินแล้ว"
+                                    result.error === (locale === "en" ? "Paid" : "ชำระเงินแล้ว")
                                       ? "text-blue-500 bg-blue-500/10 border-blue-500/20"
                                       : "text-red-500 bg-red-500/10 border-red-500/20"
                                   }`} 
                                   title={result.error}
                                 >
-                                  {result.error === "ชำระเงินแล้ว" ? "ชำระเงินแล้ว 💰" : "ล้มเหลว ❌"}
+                                  {result.error === (locale === "en" ? "Paid" : "ชำระเงินแล้ว") ? t("billing.paid_money_bag") : t("billing.failed_cross")}
                                 </span>
                               )
                             )}
@@ -2397,7 +2435,7 @@ export default function MeterReadingTable({
                     })
                   ) : (
                     <div className="py-12 text-center text-slate-500 text-sm">
-                      ไม่มีห้องที่มีผู้เช่าและเชื่อมต่อ LINE ในรอบบิลนี้
+                      {t("billing.no_connected_tenants_cycle")}
                     </div>
                   )}
                 </div>
@@ -2411,7 +2449,7 @@ export default function MeterReadingTable({
                   }`}>
                     <AlertCircle className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
                     <span>
-                      <strong>คำแนะนำ:</strong> เนื่องจากผู้เช่ายังไม่ได้ลงทะเบียนผูกบัญชี LINE OA คุณสามารถคลิกปุ่ม <strong>"คัดลอกสรุปบิล"</strong> หรือ <strong>"ดาวน์โหลด PDF"</strong> เพื่อนำสรุปยอดบิลและลิงก์ออนไลน์ หรือดาวน์โหลดไฟล์ PDF ไปส่งในแชทปกติ (เช่น LINE, Facebook, SMS) ได้ทันที
+                      <strong>{t("billing.advice_label")}</strong> {t("billing.unconnected_advice_desc")}
                     </span>
                   </div>
 
@@ -2450,14 +2488,14 @@ export default function MeterReadingTable({
                                       ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 hover:text-blue-400 cursor-pointer" 
                                       : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 hover:text-blue-600 cursor-pointer"
                               }`}
-                              title={!permissions.billing_download_pdf ? "คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF" : undefined}
+                              title={!permissions.billing_download_pdf ? (locale === "en" ? "You do not have permission to download PDF" : "คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF") : undefined}
                             >
                               {downloadingPdfId === item.roomNumber ? (
                                 <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
                               ) : (
                                 <>
                                   <Download className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-                                  <span className="whitespace-nowrap">ดาวน์โหลด PDF</span>
+                                  <span className="whitespace-nowrap">{t("billing.download_pdf")}</span>
                                 </>
                               )}
                             </button>
@@ -2475,17 +2513,17 @@ export default function MeterReadingTable({
                                       ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
                                       : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
                               }`}
-                              title={!permissions.billing_copy_summary ? "คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล" : undefined}
+                              title={!permissions.billing_copy_summary ? (locale === "en" ? "You do not have permission to copy summary" : "คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล") : undefined}
                             >
                               {isCopied ? (
                                 <>
                                   <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                  <span className="whitespace-nowrap">คัดลอกสรุปบิลแล้ว!</span>
+                                  <span className="whitespace-nowrap">{t("billing.copied_summary_success")}</span>
                                 </>
                               ) : (
                                 <>
                                   <Copy className="w-3.5 h-3.5" />
-                                  <span className="whitespace-nowrap">คัดลอกสรุปบิล</span>
+                                  <span className="whitespace-nowrap">{t("billing.copy_summary")}</span>
                                 </>
                               )}
                             </button>
@@ -2496,7 +2534,7 @@ export default function MeterReadingTable({
                     })
                   ) : (
                     <div className="py-12 text-center text-slate-500 text-sm">
-                      ผู้เช่าทุกห้องผูก LINE OA ครบแล้ว ไม่มีห้องคงค้างในส่วนนี้
+                      {t("billing.all_connected_no_pending")}
                     </div>
                   )}
                 </div>
@@ -2510,10 +2548,10 @@ export default function MeterReadingTable({
               }`}>
                 <div className="flex justify-between text-sm font-bold font-mono">
                   <span className={isDark ? "text-slate-300" : "text-slate-700"}>
-                    กำลังส่ง: ห้อง {bulkSendingProgress.currentRoom}
+                    {t("billing.sending_room").replace("{roomNumber}", bulkSendingProgress.currentRoom)}
                   </span>
                   <span className="text-blue-500">
-                    {bulkSendingProgress.current} / {bulkSendingProgress.total} ห้อง
+                    {bulkSendingProgress.current} / {bulkSendingProgress.total} {t("billing.rooms_count_unit")}
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
@@ -2523,7 +2561,7 @@ export default function MeterReadingTable({
                   />
                 </div>
                 <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center animate-pulse">
-                  กรุณาอย่าปิดหน้านี้ขณะที่กำลังดำเนินการส่งข้อมูล...
+                  {t("billing.do_not_close_page")}
                 </p>
               </div>
             )}
@@ -2534,10 +2572,9 @@ export default function MeterReadingTable({
                 isDark ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
               }`}>
                 <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                <h4 className="text-sm font-black">ส่งบิลเข้า LINE OA กลุ่มเรียบร้อย!</h4>
+                <h4 className="text-sm font-black">{t("billing.bulk_send_completed_title")}</h4>
                 <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                  ส่งยอดค่าเช่าเข้าแชท LINE OA สำเร็จทั้งหมด{" "}
-                  {Object.values(bulkSendResults).filter(r => r.success).length} ห้อง จากทั้งหมด {connectedRooms.length} ห้อง
+                  {t("billing.bulk_send_completed_desc").replace("{successCount}", String(Object.values(bulkSendResults).filter(r => r.success).length)).replace("{totalCount}", String(connectedRooms.length))}
                 </p>
               </div>
             )}
@@ -2551,7 +2588,7 @@ export default function MeterReadingTable({
                   isDark ? "bg-slate-950 border-slate-850 text-slate-400 hover:text-white" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                 } ${bulkSendingStatus === "sending" ? "opacity-30 cursor-not-allowed" : ""}`}
               >
-                {bulkSendingStatus === "completed" ? "ปิดหน้าต่าง" : "ยกเลิก"}
+                {bulkSendingStatus === "completed" ? t("billing.close_window") : (locale === "en" ? "Cancel" : "ยกเลิก")}
               </button>
 
               {modalActiveTab === "connected" && bulkSendingStatus !== "completed" && connectedRooms.length > 0 && (
@@ -2568,7 +2605,7 @@ export default function MeterReadingTable({
                   title={!permissions.billing_send_line ? "คุณไม่มีสิทธิ์ในการส่ง LINE OA" : undefined}
                 >
                   <Send className="w-4 h-4" />
-                  <span>เริ่มส่งเข้า LINE OA ({connectedRooms.length} ห้อง)</span>
+                  <span>{t("billing.start_bulk_send").replace("{count}", String(connectedRooms.length))}</span>
                 </button>
               )}
             </div>
@@ -2604,11 +2641,11 @@ export default function MeterReadingTable({
               
               <div className="space-y-2">
                 <h3 className="text-lg font-black tracking-tight">
-                  🔄 ยืนยันมิเตอร์หมุนครบรอบ
+                  {t("billing.rollover_confirm_title")}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 px-2 leading-relaxed">
-                  คุณกำลังบันทึกเลขมิเตอร์ที่มีค่าน้อยกว่าเลขครั้งก่อนหน้า สำหรับ{" "}
-                  <strong className="text-amber-500 font-extrabold">{rolloverConfirm.isBulk ? "ทุกห้องที่มีการหมุนครบรอบ" : `ห้อง ${rolloverConfirm.roomNumber}`}</strong>
+                  {t("billing.rollover_confirm_subtitle_prefix")}{" "}
+                  <strong className="text-amber-500 font-extrabold">{rolloverConfirm.isBulk ? t("billing.all_rollover_rooms") : t("billing.room_label").replace("{roomNumber}", rolloverConfirm.roomNumber)}</strong>
                 </p>
               </div>
 
@@ -2617,12 +2654,12 @@ export default function MeterReadingTable({
               }`}>
                 <p className="font-bold flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  โปรดตรวจสอบข้อมูลเพื่อความถูกต้อง:
+                  {t("billing.rollover_check_info_label")}
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
-                  <li>ระบบจะคิดสูตร: (10000 - เลขเก่า) + เลขใหม่</li>
-                  <li>ยอดหน่วยที่คำนวณได้จริงต้องมีค่าไม่เกิน 3,000 หน่วย</li>
-                  <li>กดยืนยันหากตรวจสอบแล้วว่ามิเตอร์มีการหมุนครบรอบจริง</li>
+                  <li>{t("billing.rollover_rule1")}</li>
+                  <li>{t("billing.rollover_rule2")}</li>
+                  <li>{t("billing.rollover_rule3")}</li>
                 </ul>
               </div>
 
@@ -2635,7 +2672,7 @@ export default function MeterReadingTable({
                       : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                   }`}
                 >
-                  ยกเลิก
+                  {locale === "en" ? "Cancel" : "ยกเลิก"}
                 </button>
                 <button
                   onClick={() => {
@@ -2644,7 +2681,7 @@ export default function MeterReadingTable({
                   }}
                   className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all"
                 >
-                  ยืนยันหมุนครบรอบ
+                  {t("billing.confirm_rollover")}
                 </button>
               </div>
             </div>
@@ -2680,10 +2717,10 @@ export default function MeterReadingTable({
                 </div>
                 <div>
                   <h3 className="text-lg font-black tracking-tight">
-                    {replacementModal.isEdit ? "🔧 แก้ไขบันทึกเปลี่ยนมิเตอร์" : "🔧 บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)"}
+                    {replacementModal.isEdit ? t("billing.edit_replacement_title") : t("billing.record_replacement_title")}
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    ห้อง {replacementModal.roomNumber} ({replacementModal.meterType === "electric" ? "มิเตอร์ไฟฟ้า" : "มิเตอร์น้ำประปา"})
+                    {t("billing.room_label").replace("{roomNumber}", replacementModal.roomNumber)} ({replacementModal.meterType === "electric" ? t("billing.elec_meter") : t("billing.water_meter_with_tap")})
                   </p>
                 </div>
               </div>
@@ -2696,19 +2733,19 @@ export default function MeterReadingTable({
                   สูตรคำนวณมิเตอร์เสียกลางเดือน:
                 </p>
                 <div className="font-mono bg-white dark:bg-slate-950 p-2 rounded border border-slate-200 dark:border-slate-800/80 text-center text-xs font-black text-amber-600 dark:text-amber-400">
-                  (มิเตอร์เก่า - ก่อนหน้า) + (จดรอบนี้ - มิเตอร์ใหม่)
+                  {locale === "en" ? "(Old meter - Prev) + (Current - New meter)" : "(มิเตอร์เก่า - ก่อนหน้า) + (จดรอบนี้ - มิเตอร์ใหม่)"}
                 </div>
               </div>
 
               <div className="space-y-4 pt-2">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                    เลขสุดท้ายของมิเตอร์เครื่องเดิม (ที่เสีย):
+                    {t("billing.old_meter_final_label")}
                   </label>
                   <input
                     type="text"
                     inputMode="decimal"
-                    placeholder="เช่น 1234"
+                    placeholder={t("billing.example_old_meter")}
                     disabled={replacementModal.loading}
                     className={`w-full h-11 px-3.5 rounded-xl border font-mono font-bold focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 transition-all ${
                       isDark ? "bg-slate-950 border-slate-850 text-slate-100" : "bg-white border-slate-300 text-slate-800"
@@ -2720,12 +2757,12 @@ export default function MeterReadingTable({
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                    เลขเริ่มต้นของมิเตอร์เครื่องใหม่:
+                    {t("billing.new_meter_start_label")}
                   </label>
                   <input
                     type="text"
                     inputMode="decimal"
-                    placeholder="เช่น 0"
+                    placeholder={t("billing.example_new_meter")}
                     disabled={replacementModal.loading}
                     className={`w-full h-11 px-3.5 rounded-xl border font-mono font-bold focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 transition-all ${
                       isDark ? "bg-slate-950 border-slate-850 text-slate-100" : "bg-white border-slate-300 text-slate-800"
@@ -2747,14 +2784,14 @@ export default function MeterReadingTable({
                         : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                     }`}
                   >
-                    ยกเลิก
+                    {locale === "en" ? "Cancel" : "ยกเลิก"}
                   </button>
                   <button
                     onClick={handleSaveReplacement}
                     disabled={replacementModal.loading}
                     className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
                   >
-                    {replacementModal.loading ? "กำลังบันทึก..." : "บันทึกเปลี่ยนมิเตอร์"}
+                    {replacementModal.loading ? (locale === "en" ? "Saving..." : "กำลังบันทึก...") : t("billing.save_replacement")}
                   </button>
                 </div>
 
@@ -2764,7 +2801,7 @@ export default function MeterReadingTable({
                     disabled={replacementModal.loading}
                     className="w-full h-10 mt-1 text-xs font-bold rounded-xl border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 transition-all disabled:opacity-50"
                   >
-                    {replacementModal.loading ? "กำลังลบ..." : "ลบบันทึกเปลี่ยนมิเตอร์ (กลับไปคิดแบบปกติ)"}
+                    {replacementModal.loading ? (locale === "en" ? "Deleting..." : "กำลังลบ...") : t("billing.delete_replacement")}
                   </button>
                 )}
               </div>
