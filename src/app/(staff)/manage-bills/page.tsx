@@ -1625,7 +1625,6 @@ function ManageBillsContent() {
             value={billingCycle}
             onChange={(e) => {
               const val = e.target.value
-              setBillingCycle(val)
               
               const parts = val.split('-')
               if (parts.length === 2) {
