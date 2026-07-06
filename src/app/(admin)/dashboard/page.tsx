@@ -109,6 +109,14 @@ function AdminDashboardContent() {
         const params = new URLSearchParams(window.location.search)
         params.set("month", cachedMonth)
         router.replace(`?${params.toString()}`, { scroll: false })
+      } else {
+        const d = new Date()
+        const currentMonth = String(d.getMonth() + 1).padStart(2, "0")
+        setSelectedMonth(currentMonth)
+        sessionStorage.setItem("dashboard_month", currentMonth)
+        const params = new URLSearchParams(window.location.search)
+        params.set("month", currentMonth)
+        router.replace(`?${params.toString()}`, { scroll: false })
       }
     }
 
@@ -122,6 +130,14 @@ function AdminDashboardContent() {
         setSelectedYear(cachedYear)
         const params = new URLSearchParams(window.location.search)
         params.set("year", cachedYear)
+        router.replace(`?${params.toString()}`, { scroll: false })
+      } else {
+        const d = new Date()
+        const currentYearStr = String(d.getFullYear())
+        setSelectedYear(currentYearStr)
+        sessionStorage.setItem("dashboard_year", currentYearStr)
+        const params = new URLSearchParams(window.location.search)
+        params.set("year", currentYearStr)
         router.replace(`?${params.toString()}`, { scroll: false })
       }
     }
@@ -185,7 +201,9 @@ function AdminDashboardContent() {
 
   const calculateStats = (rooms: any[], tenants: any[], bills: any[], expenses: any[], cycle: string, oldTenants: any[] = []) => {
     const totalRooms = rooms.length
-    
+    const activeRoomSet = new Set(rooms.map((r: any) => r.roomNumber))
+    const currentMonthBills = bills.filter((b: any) => b.billingCycle === cycle && activeRoomSet.has(b.roomNumber))
+
     // Helper function to check if a lease overlaps with the selected cycle month
     const isLeaseOverlappingCycle = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined) => {
       if (!leaseStart || !leaseEnd) return false
@@ -207,44 +225,84 @@ function AdminDashboardContent() {
       return startD <= cycleEnd && endD >= cycleStart
     }
 
-    const currentMonthBills = bills.filter((b: any) => b.billingCycle === cycle)
-
-    // ตรวจสอบห้องพักที่มีผู้เช่าพักอยู่จริงในช่วงเดือนที่เลือก (cycle)
-    const occupiedRooms = rooms.filter((r: any) => {
-      // 1. ตรวจสอบจากบิลที่มีในเดือนนั้น
-      const hasBillInCycle = currentMonthBills.some((b: any) => b.roomNumber === r.roomNumber)
-      if (hasBillInCycle) return true
-
-      // 2. ตรวจสอบจากระยะเวลาผู้เช่าปัจจุบัน
-      const hasMatchingTenant = tenants.some((t: any) => {
-        if (t.roomNumber !== r.roomNumber) return false
-        return isLeaseOverlappingCycle(t.contractStart, t.contractEnd)
+    // compile rooms state exactly matching manage-bills page compilation logic
+    const compiledRooms = rooms.map((r: any) => {
+      const roomBill = currentMonthBills.find((b: any) => b.roomNumber === r.roomNumber)
+      
+      let resolvedTenantName: string | null = null
+      const sortedTenants = [...(r.allTenants || [])].sort((a: any, b: any) => {
+        const aTime = a.leaseStart ? new Date(a.leaseStart).getTime() : 0
+        const bTime = b.leaseStart ? new Date(b.leaseStart).getTime() : 0
+        return bTime - aTime
       })
-      if (hasMatchingTenant) return true
 
-      // 3. ตรวจสอบจากระยะเวลาผู้เช่าเก่า (tenants_old)
-      const hasMatchingOldTenant = oldTenants.some((t: any) => {
-        if (t.roomNumber !== r.roomNumber) return false
-        return isLeaseOverlappingCycle(t.contractStart, t.contractEnd)
-      })
-      if (hasMatchingOldTenant) return true
+      const checkTenantActive = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined, isLatest = true) => {
+        if (!leaseStart) return false
+        
+        const [cYear, cMonth] = cycle.split("-").map(Number)
+        const cycleStart = new Date(cYear, cMonth - 1, 1)
+        const cycleEnd = new Date(cYear, cMonth, 0, 23, 59, 59, 999)
+        
+        const start = new Date(leaseStart)
+        start.setHours(0, 0, 0, 0)
+        
+        if (start > cycleEnd) return false
+        
+        if (leaseEnd && !isLatest) {
+          const end = new Date(leaseEnd)
+          end.setHours(23, 59, 59, 999)
+          if (end < cycleStart) return false
+        }
+        
+        return true
+      }
 
-      // 4. ตรวจสอบจากระยะเวลาเช่าที่ติดมากับห้องพัก (ถ้ามี)
-      const hasRoomLeaseOverlap = isLeaseOverlappingCycle(r.leaseStart, r.leaseEnd)
-      if (hasRoomLeaseOverlap) return true
+      if (roomBill && roomBill.tenantName) {
+        const matchingTenant = (r.allTenants || []).find((t: any) => t.tenantName === roomBill.tenantName)
+        if (matchingTenant) {
+          const matchingTenantIsLatest = sortedTenants[0]?.id === matchingTenant.id
+          const isActive = checkTenantActive(matchingTenant.leaseStart, matchingTenant.leaseEnd, matchingTenantIsLatest)
+          if (isActive) {
+            resolvedTenantName = roomBill.tenantName
+          } else {
+            const actualActiveTenant = (r.allTenants || []).find((t: any) => {
+              const tIsLatest = sortedTenants[0]?.id === t.id
+              return checkTenantActive(t.leaseStart, t.leaseEnd, tIsLatest)
+            })
+            resolvedTenantName = actualActiveTenant ? actualActiveTenant.tenantName : null
+          }
+        } else {
+          resolvedTenantName = roomBill.tenantName
+        }
+      } else {
+        const activeTenant = (r.allTenants || []).find((t: any) => {
+          const tIsLatest = sortedTenants[0]?.id === t.id
+          return checkTenantActive(t.leaseStart, t.leaseEnd, tIsLatest)
+        })
+        resolvedTenantName = activeTenant ? activeTenant.tenantName : null
+      }
 
-      return false
-    }).length
+      return {
+        roomNumber: r.roomNumber,
+        tenantName: resolvedTenantName,
+        billId: roomBill?.id,
+        billAmount: roomBill ? Number(roomBill.amount || 0) : 0,
+        billStatus: roomBill ? (roomBill.status as "unpaid" | "pending" | "paid" | "not_created") : "not_created"
+      }
+    })
 
+    const occupiedRooms = compiledRooms.filter(item => item.tenantName).length
     const availableRooms = totalRooms - occupiedRooms
-    const paidBills = currentMonthBills.filter((b: any) => b.status === "paid")
-    const unpaidBills = currentMonthBills.filter((b: any) => b.status === "unpaid" || b.status === "pending")
-    const pendingBills = currentMonthBills.filter((b: any) => b.status === "pending")
-    const unpaidBillsCount = unpaidBills.length
+    
+    const paidBills = compiledRooms.filter(item => item.billStatus === "paid")
+    const unpaidBills = compiledRooms.filter(item => item.billStatus === "unpaid" || item.billStatus === "pending")
+    const pendingBills = compiledRooms.filter(item => item.billStatus === "pending")
+    
+    const unpaidBillsCount = compiledRooms.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length
 
-    const totalRevenue = paidBills.reduce((sum, b) => sum + Number(b.amount), 0)
-    const unpaidAmount = unpaidBills.reduce((sum, b) => sum + Number(b.amount), 0)
-    const totalBilled = currentMonthBills.reduce((sum, b) => sum + Number(b.amount), 0)
+    const totalRevenue = paidBills.reduce((sum, item) => sum + item.billAmount, 0)
+    const unpaidAmount = unpaidBills.reduce((sum, item) => sum + item.billAmount, 0)
+    const totalBilled = compiledRooms.reduce((sum, item) => sum + item.billAmount, 0)
 
     // Calculate Expenses for this month cycle
     const currentMonthExpenses = expenses.filter((e: any) => e.created_at && e.created_at.substring(0, 7) === cycle)
@@ -737,7 +795,7 @@ function AdminDashboardContent() {
 
           {/* ปุ่ม "ออกบิลเดือนนี้" */}
           <button
-            onClick={() => router.push(`/billing?month=${selectedMonth}&year=${selectedYear}`)}
+            onClick={() => router.push(`/billing?month=${selectedMonth}&year=${selectedYear}&cycle=${selectedYear}-${selectedMonth}`)}
             className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
             <Receipt className="w-4 h-4" />
@@ -793,7 +851,7 @@ function AdminDashboardContent() {
                   onClick={() => {
                     if (stat.path) {
                       const connector = stat.path.includes("?") ? "&" : "?"
-                      router.push(`${stat.path}${connector}month=${selectedMonth}&year=${selectedYear}`)
+                      router.push(`${stat.path}${connector}month=${selectedMonth}&year=${selectedYear}&cycle=${selectedYear}-${selectedMonth}`)
                     } else {
                       router.push("/")
                     }
@@ -958,7 +1016,10 @@ function AdminDashboardContent() {
                 return (
                   <button
                     key={idx}
-                    onClick={() => router.push(`${act.path}?month=${selectedMonth}&year=${selectedYear}`)}
+                    onClick={() => {
+                      const connector = act.path.includes("?") ? "&" : "?"
+                      router.push(`${act.path}${connector}month=${selectedMonth}&year=${selectedYear}&cycle=${selectedYear}-${selectedMonth}`)
+                    }}
                     className={`
                       cursor-pointer border text-left rounded-2xl transition-all duration-300 group
                       /* Mobile layout design */
@@ -1049,7 +1110,7 @@ function AdminDashboardContent() {
                   <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" /> สถานะบิลและการรับเงินล่าสุด
                 </h3>
                 <button 
-                  onClick={() => router.push(`/manage-bills?month=${selectedMonth}&year=${selectedYear}`)}
+                  onClick={() => router.push(`/manage-bills?month=${selectedMonth}&year=${selectedYear}&cycle=${selectedYear}-${selectedMonth}`)}
                   className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline cursor-pointer py-2 px-3"
                   style={{ minHeight: "36px" }}
                 >

@@ -156,7 +156,9 @@ function getBillingCycleOptions(locale: string = "th", registrationCycle?: strin
 function UnifiedBillingContent() {
   const searchParams = useSearchParams()
   const verifyBillId = searchParams.get("verify_bill_id")
-  const targetCycle = searchParams.get("cycle")
+  const paramMonth = searchParams.get("month")
+  const paramYear = searchParams.get("year")
+  const targetCycle = searchParams.get("cycle") || (paramYear && paramMonth ? `${paramYear}-${paramMonth}` : null)
 
   const { t, locale } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()

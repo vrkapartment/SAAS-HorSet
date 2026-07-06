@@ -157,7 +157,9 @@ function ManageBillsContent() {
   const { resolvedTheme } = useTheme()
   const searchParams = useSearchParams()
   const verifyBillId = searchParams.get("verify_bill_id")
-  const targetCycle = searchParams.get("cycle")
+  const paramMonth = searchParams.get("month")
+  const paramYear = searchParams.get("year")
+  const targetCycle = searchParams.get("cycle") || (paramYear && paramMonth ? `${paramYear}-${paramMonth}` : null)
   const initialFilter = searchParams.get("filter")
   const [statusFilter, setStatusFilter] = useState<"all" | "unpaid" | "pending" | "paid">(
     initialFilter === "unpaid" || initialFilter === "pending" || initialFilter === "paid"
