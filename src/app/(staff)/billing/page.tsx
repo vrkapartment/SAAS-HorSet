@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import {
@@ -154,6 +154,7 @@ function getBillingCycleOptions(locale: string = "th", registrationCycle?: strin
 }
 
 function UnifiedBillingContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const verifyBillId = searchParams.get("verify_bill_id")
   const paramMonth = searchParams.get("month")
@@ -1702,7 +1703,24 @@ function UnifiedBillingContent() {
               isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-850" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-50"
             }`}
             value={billingCycle}
-            onChange={(e) => setBillingCycle(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value
+              setBillingCycle(val)
+              
+              const parts = val.split('-')
+              if (parts.length === 2) {
+                sessionStorage.setItem("dashboard_year", parts[0])
+                sessionStorage.setItem("dashboard_month", parts[1])
+              }
+              
+              const params = new URLSearchParams(window.location.search)
+              params.set("cycle", val)
+              if (parts.length === 2) {
+                params.set("year", parts[0])
+                params.set("month", parts[1])
+              }
+              router.replace(`?${params.toString()}`, { scroll: false })
+            }}
           >
             {getBillingCycleOptions(locale, registrationCycle).map(opt => (
               <option key={opt.value} value={opt.value} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{opt.label}</option>
