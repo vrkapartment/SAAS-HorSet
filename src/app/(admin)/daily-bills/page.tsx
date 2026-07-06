@@ -526,12 +526,12 @@ export default function DailyBillsPage() {
 
         {/* ตัวเลือกปีภาษีและปุ่มเพิ่ม (สลับปุ่มเพิ่มเป็นซ่อนบนมือถือเพราะมี Sticky Bottom แทน) */}
         <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto shrink-0 pt-1 md:pt-0">
-          <div className="relative flex-1 md:flex-initial">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-extrabold text-slate-400 dark:text-slate-550 uppercase tracking-wider">ปีภาษี</span>
+          <div className="flex items-center gap-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus-within:border-teal-500 focus-within:ring-1 focus-within:ring-teal-500/30 transition-all h-11 md:h-9 shadow-sm flex-1 md:flex-initial">
+            <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-550 uppercase tracking-wider shrink-0 select-none">ปีภาษี</span>
             <select
               value={taxYear}
               onChange={(e) => setTaxYear(e.target.value)}
-              className="w-full md:w-auto pl-14 pr-8 py-2.5 md:py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 transition-all cursor-pointer h-11 md:h-9 shadow-sm"
+              className="w-full md:w-auto bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer h-full p-0 pr-6"
             >
               <option value="2026">2026 (พ.ศ. 2569)</option>
               <option value="2025">2025 (พ.ศ. 2568)</option>
