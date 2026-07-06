@@ -469,6 +469,14 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
 
     const notifications: AppNotification[] = []
 
+    // Fetch active rooms in workspace to filter out notifications of deleted rooms
+    const { data: activeRooms } = await supabase
+      .from("rooms")
+      .select("room_number")
+      .eq("workspace_id", workspaceId)
+
+    const activeRoomSet = new Set(activeRooms?.map((r: any) => r.room_number) || [])
+
     // 2. Query Bills pending verification (Slips waiting)
     // ใช้ Try-Catch / Fallback เผื่อไว้กรณีผู้ใช้ยังไม่ได้รัน SQL Patch เพิ่มคอลัมน์ updated_at
     let pendingBillsResult = await supabase
@@ -493,6 +501,7 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
 
     if (!billsError && pendingBills) {
       pendingBills.forEach((b: any) => {
+        if (!activeRoomSet.has(b.room_number)) return // skip deleted rooms
         // หากมี updated_at (เวลาผู้เช่าอัปโหลดสลิปเข้ามาล่าสุด) ให้ใช้เป็นลำดับแรกเพื่อให้เป็นแบบ Real-Time ตรงกับการโอนจริง
         const timestamp = b.updated_at 
           ? new Date(b.updated_at).getTime() 
@@ -519,15 +528,26 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
 
     if (!unpaidError && unpaidBills) {
       unpaidBills.forEach((b: any) => {
+        if (!activeRoomSet.has(b.room_number)) return // skip deleted rooms
         const lateDays = calculateLateDays(b.billing_cycle)
         if (lateDays > 0) {
+          // Calculate exact deadline time to use as timestamp for accurate "X hours/days ago" display
+          const [yearStr, monthStr] = b.billing_cycle.split("-")
+          const year = parseInt(yearStr, 10)
+          const dueMonth = parseInt(monthStr, 10)
+          const tempDueDate = new Date(Date.UTC(year, dueMonth, 5))
+          const dueYearWrapped = tempDueDate.getUTCFullYear()
+          const dueMonthWrapped = tempDueDate.getUTCMonth()
+          const dueDateWrapped = tempDueDate.getUTCDate()
+          const dueTimeUTC = Date.UTC(dueYearWrapped, dueMonthWrapped, dueDateWrapped, 16, 59, 59, 999)
+
           notifications.push({
             id: `overdue_${b.id}`,
             type: "overdue",
             title: "บิลค้างชำระเกินกำหนด",
             message: `ห้อง ${b.room_number} ค้างชำระค่าเช่ารอบ ${b.billing_cycle} เกินกำหนดส่งมาแล้ว ${lateDays} วัน`,
             link: "/billing",
-            timestamp: b.created_at ? new Date(b.created_at).getTime() : Date.now(),
+            timestamp: dueTimeUTC,
             roomNumber: b.room_number
           })
         }
@@ -577,6 +597,7 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
 
         tenants.forEach((t: any) => {
           if (!t.lease_end) return
+          if (t.room_number && !activeRoomSet.has(t.room_number)) return // skip deleted rooms
 
           const leaseEnd = new Date(t.lease_end)
           leaseEnd.setHours(0, 0, 0, 0)
