@@ -179,6 +179,29 @@ function UnifiedBillingContent() {
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
   useEffect(() => {
+    // หากมี targetCycle จาก URL อยู่แล้ว ให้ข้ามการโหลดจาก sessionStorage เพื่อให้เกียรติ URL
+    if (targetCycle) return
+
+    if (typeof window !== "undefined") {
+      const cachedMonth = sessionStorage.getItem("dashboard_month")
+      const cachedYear = sessionStorage.getItem("dashboard_year")
+      
+      if (cachedMonth && cachedYear) {
+        const cachedCycle = `${cachedYear}-${cachedMonth}`
+        if (!registrationCycle || cachedCycle >= registrationCycle) {
+          setBillingCycle(cachedCycle)
+          
+          // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
+          const params = new URLSearchParams(window.location.search)
+          params.set("cycle", cachedCycle)
+          params.set("year", cachedYear)
+          params.set("month", cachedMonth)
+          router.replace(`?${params.toString()}`, { scroll: false })
+          return
+        }
+      }
+    }
+
     // ปรับรอบบิลตามเดือนปฏิทินปัจจุบันเมื่อเรนเดอร์ฝั่ง Client สำเร็จเพื่อความไหลลื่นและป้องกัน Hydration Mismatch
     const current = getCurrentBillingCycle()
     if (registrationCycle && current < registrationCycle) {
@@ -186,7 +209,7 @@ function UnifiedBillingContent() {
     } else {
       setBillingCycle(current)
     }
-  }, [registrationCycle])
+  }, [registrationCycle, targetCycle])
 
   useEffect(() => {
     if (registrationCycle && billingCycle < registrationCycle) {
