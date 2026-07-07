@@ -446,139 +446,144 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   // โหลดสิทธิ์, ข้อมูลผู้ใช้, รายการ Workspace และสิทธิ์การช่วยเหลือระบบทั้งหมดในรอบเดียวเพื่อความเสถียรและเร็วสูงสุด
   useEffect(() => {
     const initUserData = async () => {
-      // 1. ตรวจสอบบทบาทเบื้องต้นจาก cookie ก่อนเพื่อให้ปรับ state ได้อย่างรวดเร็ว
-      const mockRole = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("horset_user_role="))
-        ?.split("=")[1];
-      
-      let initialRole = role
-      if (mockRole === "admin" || mockRole === "staff" || mockRole === "super_admin") {
-        initialRole = mockRole as any
-        setUserRole(initialRole)
-      }
+      try {
+        // 1. ตรวจสอบบทบาทเบื้องต้นจาก cookie ก่อนเพื่อให้ปรับ state ได้อย่างรวดเร็ว
+        const mockRole = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("horset_user_role="))
+          ?.split("=")[1];
+        
+        let initialRole = role
+        if (mockRole === "admin" || mockRole === "staff" || mockRole === "super_admin") {
+          initialRole = mockRole as any
+          setUserRole(initialRole)
+        }
 
-      let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
-      let currentRole = initialRole
-      let profileWsId: string | null = null
+        let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
+        let currentRole = initialRole
+        let profileWsId: string | null = null
 
-      if (!isDemo) {
-        try {
-          const res = await getCurrentUserProfileClient()
-          if (res.success && res.data) {
-            const profileData = res.data
-            setFullName(profileData.full_name || profileData.email || "ผู้ดูแลระบบ")
-            setProfileName(profileData.full_name || "")
-            setProfilePhone(profileData.phone || "")
-            
-            if (profileData.role) {
-              currentRole = profileData.role
-              setUserRole(profileData.role as any)
-            }
-
-            profileWsId = profileData.workspace_id || null
-
-            // โหลดสิทธิ์การเข้าถึงแบบละเอียด (Permissions)
-            const isUserAdminOrSuper = profileData.role === "admin" || profileData.role === "super_admin"
-            const defaultPerms = isUserAdminOrSuper ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS
-
-            if (isUserAdminOrSuper) {
-              setUserPermissions(ADMIN_DEFAULT_PERMISSIONS)
-            } else if (profileData.permissions) {
-              let perms = profileData.permissions
-              if (typeof perms === "string") {
-                try {
-                  perms = JSON.parse(perms)
-                } catch {
-                  perms = defaultPerms
-                }
+        if (!isDemo) {
+          try {
+            const res = await getCurrentUserProfileClient()
+            if (res.success && res.data) {
+              const profileData = res.data
+              setFullName(profileData.full_name || profileData.email || "ผู้ดูแลระบบ")
+              setProfileName(profileData.full_name || "")
+              setProfilePhone(profileData.phone || "")
+              
+              if (profileData.role) {
+                currentRole = profileData.role
+                setUserRole(profileData.role as any)
               }
-              setUserPermissions({
-                ...defaultPerms,
-                ...perms
-              })
-            } else {
-              setUserPermissions(defaultPerms)
+
+              profileWsId = profileData.workspace_id || null
+
+              // โหลดสิทธิ์การเข้าถึงแบบละเอียด (Permissions)
+              const isUserAdminOrSuper = profileData.role === "admin" || profileData.role === "super_admin"
+              const defaultPerms = isUserAdminOrSuper ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS
+
+              if (isUserAdminOrSuper) {
+                setUserPermissions(ADMIN_DEFAULT_PERMISSIONS)
+              } else if (profileData.permissions) {
+                let perms = profileData.permissions
+                if (typeof perms === "string") {
+                  try {
+                    perms = JSON.parse(perms)
+                  } catch {
+                    perms = defaultPerms
+                  }
+                }
+                setUserPermissions({
+                  ...defaultPerms,
+                  ...perms
+                })
+              } else {
+                setUserPermissions(defaultPerms)
+              }
             }
+          } catch (err) {
+            console.error("Error loading user profile in DashboardLayout:", err)
+          } finally {
+            setIsProfileLoaded(true)
           }
-        } catch (err) {
-          console.error("Error loading user profile in DashboardLayout:", err)
-        } finally {
+        } else {
+          // โหมด Demo
+          const savedName = getCookie(`horset_demo_profile_name_${currentRole}`)
+          const savedPhone = getCookie(`horset_demo_profile_phone_${currentRole}`)
+          
+          const defaultName = currentRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : currentRole === "admin" ? "คุณสมเจตน์" : "สมชาย"
+          const defaultPhone = "089-999-9999"
+
+          setFullName(savedName || defaultName)
+          setProfileName(savedName || defaultName)
+          setProfilePhone(savedPhone || defaultPhone)
+          setUserPermissions(currentRole === "super_admin" || currentRole === "admin" ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS)
           setIsProfileLoaded(true)
         }
-      } else {
-        // โหมด Demo
-        const savedName = getCookie(`horset_demo_profile_name_${currentRole}`)
-        const savedPhone = getCookie(`horset_demo_profile_phone_${currentRole}`)
-        
-        const defaultName = currentRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : currentRole === "admin" ? "คุณสมเจตน์" : "สมชาย"
-        const defaultPhone = "089-999-9999"
 
-        setFullName(savedName || defaultName)
-        setProfileName(savedName || defaultName)
-        setProfilePhone(savedPhone || defaultPhone)
-        setUserPermissions(currentRole === "super_admin" || currentRole === "admin" ? ADMIN_DEFAULT_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS)
-        setIsProfileLoaded(true)
-      }
-
-      // 2. จัดการเรื่องคุกกี้ Workspace
-      if (currentRole !== "super_admin" && profileWsId) {
-        activeWsId = profileWsId
-        setCookie("horset_current_workspace_id", activeWsId)
-      } else {
-        const savedWsId = getCookie("horset_current_workspace_id")
-        if (savedWsId) {
-          activeWsId = savedWsId
-        } else {
+        // 2. จัดการเรื่องคุกกี้ Workspace
+        if (currentRole !== "super_admin" && profileWsId) {
+          activeWsId = profileWsId
           setCookie("horset_current_workspace_id", activeWsId)
-        }
-      }
-
-      // 3. โหลด Workspaces และ Support Access Status
-      if (!isDemo) {
-        try {
-          const supabase = createClient()
-          
-          const { data: wsData, error: wsError } = await supabase
-            .from("workspaces")
-            .select("id, name")
-          
-          if (wsData && wsData.length > 0) {
-            setWorkspaces(wsData)
-            const matched = wsData.find((w) => w.id === activeWsId)
-            if (matched) {
-              setCurrentWorkspace(matched)
-            } else {
-              setCurrentWorkspace(wsData[0])
-              activeWsId = wsData[0].id
-              setCookie("horset_current_workspace_id", activeWsId)
-            }
-          }
-
-          const { data: grantData } = await supabase
-            .from("support_access_grants")
-            .select("status")
-            .eq("workspace_id", activeWsId)
-            .single()
-
-          if (grantData) {
-            setSupportStatus(grantData.status)
-            setCookie(`horset_support_status_${activeWsId}`, grantData.status)
-            if (grantData.status === "pending" && currentRole === "admin") {
-              setShowSupportModal(true)
-            }
+        } else {
+          const savedWsId = getCookie("horset_current_workspace_id")
+          if (savedWsId) {
+            activeWsId = savedWsId
           } else {
-            setSupportStatus("none")
-            setCookie(`horset_support_status_${activeWsId}`, "none")
+            setCookie("horset_current_workspace_id", activeWsId)
           }
-        } catch (err) {
-          console.error("Supabase load error inside DashboardLayout init:", err)
-          fallbackMock(activeWsId, currentRole)
-        } finally {
-          setWorkspaceLoading(false)
         }
-      } else {
+
+        // 3. โหลด Workspaces และ Support Access Status
+        if (!isDemo) {
+          try {
+            const supabase = createClient()
+            
+            const { data: wsData, error: wsError } = await supabase
+              .from("workspaces")
+              .select("id, name")
+            
+            if (wsData && wsData.length > 0) {
+              setWorkspaces(wsData)
+              const matched = wsData.find((w) => w.id === activeWsId)
+              if (matched) {
+                setCurrentWorkspace(matched)
+              } else {
+                setCurrentWorkspace(wsData[0])
+                activeWsId = wsData[0].id
+                setCookie("horset_current_workspace_id", activeWsId)
+              }
+            }
+
+            const { data: grantData } = await supabase
+              .from("support_access_grants")
+              .select("status")
+              .eq("workspace_id", activeWsId)
+              .single()
+
+            if (grantData) {
+              setSupportStatus(grantData.status)
+              setCookie(`horset_support_status_${activeWsId}`, grantData.status)
+              if (grantData.status === "pending" && currentRole === "admin") {
+                setShowSupportModal(true)
+              }
+            } else {
+              setSupportStatus("none")
+              setCookie(`horset_support_status_${activeWsId}`, "none")
+            }
+          } catch (err) {
+            console.error("Supabase load error inside DashboardLayout init:", err)
+            fallbackMock(activeWsId, currentRole)
+          }
+        } else {
+          fallbackMock(activeWsId, currentRole)
+        }
+      } catch (globalErr) {
+        console.error("Global error in initUserData:", globalErr)
         fallbackMock(activeWsId, currentRole)
+      } finally {
+        setIsProfileLoaded(true)
         setWorkspaceLoading(false)
       }
     }
