@@ -30,6 +30,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRole, setSelectedRole] = useState<"admin" | "staff" | "tenant" | "super_admin" | null>(null)
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const turnstileContainerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | null>(null)
@@ -179,19 +180,17 @@ export default function LoginPage() {
           const role = res.data.role as "admin" | "staff" | "tenant" | "super_admin"
           setSelectedRole(role)
           
+          // บันทึก workspace_id ลงใน state เพื่อใช้เขียนคุกกี้หลังยืนยัน 2FA หรือใช้งานทันที
+          if (res.data.workspaceId) {
+            setWorkspaceId(res.data.workspaceId)
+          }
+
           if (role === "admin" && res.data.tfaEnabled && !show2FA) {
             setShow2FA(true)
           } else {
-            // ดึง workspace_id ล่าสุดของผู้ใช้ที่ล็อกอินจริงมาเก็บใน cookie
-            const supabase = createClient()
-            const { data: profData } = await supabase
-              .from("profiles")
-              .select("workspace_id")
-              .eq("id", res.data.userId)
-              .single()
-            
-            if (profData?.workspace_id) {
-              document.cookie = `horset_current_workspace_id=${profData.workspace_id}; path=/; max-age=86400`
+            // เขียนคุกกี้ Workspace ปัจจุบันจากข้อมูลที่ส่งตรงจากเซิร์ฟเวอร์ โดยไม่ต้อง Query ซ้ำที่หน้าบ้าน
+            if (res.data.workspaceId) {
+              document.cookie = `horset_current_workspace_id=${res.data.workspaceId}; path=/; max-age=86400`
             }
             
             navigateToDashboardWithRole(role)
@@ -227,10 +226,15 @@ export default function LoginPage() {
           document.cookie = `horset_user_role=${selectedRole}; path=/; max-age=86400`
         }
         
-        // ถ้าเป็น Demo Mode ให้เซ็ต workspace_id ใน cookie เป็นแสนสุข แมนชั่น
         if (isDemo) {
+          // ถ้าเป็น Demo Mode ให้เซ็ต workspace_id ใน cookie เป็นแสนสุข แมนชั่น
           const defaultWs = "d290f1ee-6c54-4b01-90e6-d701748f0851"
           document.cookie = `horset_current_workspace_id=${defaultWs}; path=/; max-age=86400`
+        } else {
+          // ถ้าเป็นโหมดใช้งานจริง ให้เขียนคุกกี้ workspace_id จากสเตตที่เราได้รับจาก Server Action มาบันทึกคุกกี้
+          if (workspaceId) {
+            document.cookie = `horset_current_workspace_id=${workspaceId}; path=/; max-age=86400`
+          }
         }
         
         navigateToDashboardWithRole(selectedRole)

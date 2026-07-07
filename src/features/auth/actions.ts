@@ -42,10 +42,10 @@ export async function loginAction(email: string, password: string, captchaToken?
       return { success: false, error: authError.message }
     }
 
-    // ดึงบทบาทผู้ใช้งาน (role) จากตาราง profiles ในฐานข้อมูล
+    // ดึงบทบาทผู้ใช้งาน (role) และ workspace_id จากตาราง profiles ในฐานข้อมูล
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role, full_name, phone, tfa_enabled")
+      .select("role, full_name, phone, tfa_enabled, workspace_id")
       .eq("id", authData.user.id)
       .single()
 
@@ -66,6 +66,16 @@ export async function loginAction(email: string, password: string, captchaToken?
       httpOnly: false, // ต้องการอ่านค่านี้ที่ client-side ใน UI บางส่วน
     })
 
+    // ตั้งค่าคุกกี้ Workspace ปัจจุบันของผู้ใช้เพื่อใช้ทำ Tenant Isolation ทันที
+    if (profile.workspace_id) {
+      cookieStore.set("horset_current_workspace_id", profile.workspace_id, {
+        path: "/",
+        maxAge: 86400, // 1 วัน
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: false, // ต้องการอ่านค่านี้ฝั่ง client-side และ middleware
+      })
+    }
+
     return { 
       success: true, 
       data: {
@@ -73,7 +83,8 @@ export async function loginAction(email: string, password: string, captchaToken?
         email: authData.user.email,
         role: profile.role,
         fullName: profile.full_name,
-        tfaEnabled: profile.tfa_enabled
+        tfaEnabled: profile.tfa_enabled,
+        workspaceId: profile.workspace_id
       } 
     }
   } catch (error) {
