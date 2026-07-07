@@ -28,6 +28,7 @@ export interface FinanceSettings {
   lease_expiry_action?: "renew" | "original"
   slip_retention_months?: number
   checkout_policy?: "DAILY_PRORATE" | "FULL_MONTH"
+  logo_url?: string
 }
 
 /**
@@ -160,6 +161,21 @@ export async function getFinanceSettings(workspaceId: string) {
       console.warn("Column checkout_policy not available in workspaces. Defaulting to DAILY_PRORATE.")
     }
 
+    // 8. ดึงข้อมูลรูปภาพ Logo ของหอพัก (แยกดึงเพื่อความปลอดภัย)
+    let logoUrl = ""
+    try {
+      const { data: logoData, error: logoError } = await supabase
+        .from("workspaces")
+        .select("logo_url")
+        .eq("id", workspaceId)
+        .single()
+      if (!logoError && logoData) {
+        logoUrl = logoData.logo_url || ""
+      }
+    } catch (e) {
+      console.warn("Column logo_url not available in workspaces. Defaulting to empty string.")
+    }
+
     const merged = {
       ...coreData,
       ...(utilityData || {
@@ -206,7 +222,8 @@ export async function getFinanceSettings(workspaceId: string) {
         lease_duration: Number(merged.lease_duration !== null && merged.lease_duration !== undefined ? merged.lease_duration : 6),
         lease_expiry_action: (merged.lease_expiry_action as "renew" | "original") || "renew",
         slip_retention_months: Number(merged.slip_retention_months !== null && merged.slip_retention_months !== undefined ? merged.slip_retention_months : 0),
-        checkout_policy: merged.checkout_policy || "DAILY_PRORATE"
+        checkout_policy: merged.checkout_policy || "DAILY_PRORATE",
+        logo_url: logoUrl
       } as FinanceSettings 
     }
   } catch (error) {
@@ -456,6 +473,60 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
     console.error("Cleanup expired slips error:", err)
     const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการล้างไฟล์สลิป"
     return { success: false, error: errMsg }
+  }
+}
+
+/**
+ * บันทึก URL รูป Logo ของหอพักลงในตาราง workspaces
+ */
+export async function savePropertyLogoUrl(workspaceId: string, logoUrl: string) {
+  try {
+    const supabase = await createClient()
+
+    // 1. ตรวจสอบสิทธิ์ผู้ใช้
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, workspace_id")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return { success: false, error: "ไม่พบข้อมูลสิทธิ์ผู้ใช้งาน" }
+    }
+
+    const isAdmin = profile.role === "admin" || profile.role === "super_admin"
+    const isSameWorkspace = profile.workspace_id === workspaceId || profile.role === "super_admin"
+
+    if (!isAdmin || !isSameWorkspace) {
+      return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
+    }
+
+    // 2. อัปเดตคอลัมน์ logo_url
+    const { error: updateError } = await supabase
+      .from("workspaces")
+      .update({ logo_url: logoUrl })
+      .eq("id", workspaceId)
+
+    if (updateError) {
+      // ตรวจสอบว่าเกิดจากไม่มีคอลัมน์ logo_url หรือไม่
+      if (updateError.code === "42703" || updateError.message.includes("logo_url")) {
+        return { 
+          success: false, 
+          error: "ตารางฐานข้อมูลไม่มีคอลัมน์ logo_url กรุณาติดต่อผู้พัฒนา หรือติดตั้ง SQL Patch (database_patch_workspace_logo.sql) ในระบบหลังบ้าน" 
+        }
+      }
+      throw updateError
+    }
+
+    return { success: true }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกภาพ Logo"
+    return { success: false, error: errorMessage }
   }
 }
 

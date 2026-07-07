@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Building, Save, ShieldCheck, Check, AlertTriangle, AlertCircle, Loader2, Droplet, Zap, Sliders, Clock, FileText } from "lucide-react"
-import { getFinanceSettings, saveFinanceSettings, FinanceSettings, cleanupExpiredSlipsAction } from "@/features/finance/actions"
+import { Building, Save, ShieldCheck, Check, AlertTriangle, AlertCircle, Loader2, Droplet, Zap, Sliders, Clock, FileText, UploadCloud, Trash2, Image } from "lucide-react"
+import { getFinanceSettings, saveFinanceSettings, FinanceSettings, cleanupExpiredSlipsAction, savePropertyLogoUrl } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
@@ -73,6 +73,9 @@ export default function PropertySettingsTab() {
   const [isDatabaseBacked, setIsDatabaseBacked] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [hasEditPermission, setHasEditPermission] = useState(true)
+
+  const [logoUrl, setLogoUrl] = useState<string>("")
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
   // โหลดค่าเริ่มต้นจาก Database
   useEffect(() => {
@@ -147,6 +150,7 @@ export default function PropertySettingsTab() {
             setPromptPayType(cached.promptpay_type || "phone")
             setPromptPayId(cached.promptpay_id || "")
             setPromptPayName(cached.promptpay_name || "")
+            setLogoUrl(cached.logo_url || "")
 
             // ตั้งค่าฟิลด์หอพัก
             setCommonFee(cached.common_fee !== undefined ? cached.common_fee : 50)
@@ -178,6 +182,7 @@ export default function PropertySettingsTab() {
               setPromptPayType(res.data.promptpay_type || "phone")
               setPromptPayId(res.data.promptpay_id || "")
               setPromptPayName(res.data.promptpay_name || "")
+              setLogoUrl(res.data.logo_url || "")
 
               // ตั้งค่าฟิลด์หอพัก
               setCommonFee(res.data.common_fee !== undefined ? res.data.common_fee : 50)
@@ -320,7 +325,8 @@ export default function PropertySettingsTab() {
         lease_duration: leaseDuration,
         lease_expiry_action: leaseExpiryAction,
         slip_retention_months: slipRetentionMonths,
-        checkout_policy: checkoutPolicy
+        checkout_policy: checkoutPolicy,
+        logo_url: logoUrl
       }
 
       const res = await saveFinanceSettings(workspaceId, payload)
@@ -354,6 +360,99 @@ export default function PropertySettingsTab() {
     setTimeout(() => {
       setToastMessage(null)
     }, 3000)
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // ตรวจสอบขนาดไม่เกิน 1MB
+    if (file.size > 1024 * 1024) {
+      showToast("ขนาดรูปภาพโลโก้ต้องไม่เกิน 1MB")
+      return
+    }
+
+    setIsUploadingLogo(true)
+    try {
+      const supabase = createClient()
+      
+      const fileExt = file.name.split('.').pop() || 'png'
+      const fileName = `logos/workspace_${workspaceId}_logo_${Date.now()}.${fileExt}`
+
+      // อัปโหลดขึ้น bucket payment-slips ที่เปิด public อยู่แล้ว
+      const { data, error: uploadError } = await supabase.storage
+        .from("payment-slips")
+        .upload(fileName, file, {
+          contentType: file.type,
+          cacheControl: "3600",
+          upsert: true,
+        })
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      // ขอ URL สาธารณะ
+      const { data: { publicUrl } } = supabase.storage
+        .from("payment-slips")
+        .getPublicUrl(fileName)
+
+      // บันทึก URL ลงในระบบ database workspaces
+      const dbRes = await savePropertyLogoUrl(workspaceId, publicUrl)
+      if (dbRes.success) {
+        setLogoUrl(publicUrl)
+        
+        // อัปเดต Cache
+        const cacheKey = "finance_settings"
+        const cached = getCachedData<FinanceSettings>(workspaceId, cacheKey)
+        if (cached) {
+          setCachedData(workspaceId, cacheKey, {
+            ...cached,
+            logo_url: publicUrl
+          })
+        }
+        
+        showToast("อัปโหลดและบันทึกโลโก้หอพักเรียบร้อยแล้ว!")
+      } else {
+        showToast(dbRes.error || "เกิดข้อผิดพลาดในการบันทึกภาพโลโก้")
+      }
+    } catch (err: any) {
+      console.error("Logo upload error:", err)
+      showToast(err?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเพื่ออัปโหลดโลโก้")
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    if (!confirm("คุณแน่ใจหรือไม่ที่จะลบรูปภาพโลโก้ประจำหอพักนี้?")) return
+    
+    setIsUploadingLogo(true)
+    try {
+      const dbRes = await savePropertyLogoUrl(workspaceId, "")
+      if (dbRes.success) {
+        setLogoUrl("")
+        
+        // อัปเดต Cache
+        const cacheKey = "finance_settings"
+        const cached = getCachedData<FinanceSettings>(workspaceId, cacheKey)
+        if (cached) {
+          setCachedData(workspaceId, cacheKey, {
+            ...cached,
+            logo_url: ""
+          })
+        }
+        
+        showToast("ลบรูปภาพโลโก้ประจำหอพักสำเร็จ!")
+      } else {
+        showToast(dbRes.error || "เกิดข้อผิดพลาดในการลบรูปภาพโลโก้")
+      }
+    } catch (err: any) {
+      console.error("Remove logo error:", err)
+      showToast(err?.message || "เกิดข้อผิดพลาดในขั้นตอนการลบโลโก้")
+    } finally {
+      setIsUploadingLogo(false)
+    }
   }
 
   return (
@@ -734,6 +833,84 @@ export default function PropertySettingsTab() {
           {/* คอลัมน์ขวา: อัตราค่าสาธารณูปโภค */}
           <div className="flex flex-col gap-6">
             
+            {/* กล่องโลโก้หอพัก (Property Logo) */}
+            <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-5 shadow-xl">
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3 font-sans">
+                <Image className="w-5 h-5 text-teal-500" /> โลโก้ประจำหอพัก (Property Logo)
+              </h3>
+              
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                {/* Logo Preview Container */}
+                <div className="relative w-28 h-28 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800/80 flex items-center justify-center group shrink-0 shadow-inner">
+                  {logoUrl ? (
+                    <>
+                      <img src={logoUrl} alt="Property Logo" className="w-full h-full object-contain p-2" />
+                      {hasEditPermission && (
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={handleRemoveLogo}
+                            disabled={isUploadingLogo}
+                            className="p-2 bg-rose-600 hover:bg-rose-500 rounded-full text-white transition-transform duration-200 hover:scale-110 cursor-pointer shadow-md"
+                            title="ลบโลโก้"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
+                      <Building className="w-8 h-8 text-slate-300 dark:text-slate-850" />
+                      <span className="text-[10px] mt-1.5 text-slate-400 font-bold">ไม่มีโลโก้</span>
+                    </div>
+                  )}
+                  {isUploadingLogo && (
+                    <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[1px] flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 text-teal-400 animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Action Description */}
+                <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+                  <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-black leading-normal">
+                    อัปโหลดตราสัญลักษณ์ประจำหอพัก
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-slate-450 dark:text-slate-500">
+                    รูปภาพจะถูกนำไปฝังไว้ตรงกึ่งกลางของ QR Code ในหน้าชำระเงินของฝั่งผู้เช่าเพื่อให้ความสวยงามระดับพรีเมียมและยกระดับความน่าเชื่อถือ (ไฟล์ PNG, JPG หรือ WEBP ขนาดไม่เกิน 1MB)
+                  </p>
+                  
+                  {hasEditPermission && (
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-2 pt-1.5">
+                      <label className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-800 transition-all cursor-pointer shadow-sm active:scale-95 ${isUploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <UploadCloud className="w-4 h-4 text-teal-500" />
+                        <span>{logoUrl ? "เปลี่ยนโลโก้" : "อัปโหลดรูปภาพ"}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg, image/png, image/webp"
+                          className="hidden"
+                          onChange={handleLogoUpload}
+                          disabled={isUploadingLogo}
+                        />
+                      </label>
+                      {logoUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          disabled={isUploadingLogo}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold rounded-xl border border-rose-500/20 transition-all cursor-pointer shadow-sm active:scale-95"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          ลบโลโก้
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* กล่อง 3: อัตราค่าสาธารณูปโภค (ค่าน้ำประปาและค่าไฟฟ้า) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">

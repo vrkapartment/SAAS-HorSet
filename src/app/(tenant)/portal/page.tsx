@@ -129,7 +129,9 @@ export default function TenantPortal() {
   const [waiveElectricMin, setWaiveElectricMin] = useState(false)
   const [waiveWaterMin, setWaiveWaterMin] = useState(false)
   const [extraExpenses, setExtraExpenses] = useState<any[]>([])
-
+  const [workspaceLogo, setWorkspaceLogo] = useState<string>("")
+  const [combinedQrUrl, setCombinedQrUrl] = useState<string>("")
+  const [isQrLoading, setIsQrLoading] = useState<boolean>(false)
 
 
   const formatCycle = (cycleStr: string) => {
@@ -216,6 +218,11 @@ export default function TenantPortal() {
           setWaiveWaterMin(!!data.waiveWaterMin)
         }
         setExtraExpenses(data.extraExpenses || [])
+        if (data.workspaceLogo) {
+          setWorkspaceLogo(data.workspaceLogo)
+        } else {
+          setWorkspaceLogo("")
+        }
 
         const activeBills = data.bills as any[]
         if (activeBills && activeBills.length > 0) {
@@ -350,6 +357,95 @@ export default function TenantPortal() {
   const totalAmount = bill 
     ? Number(bill.amount) 
     : (baseRent + elecAmount + waterAmount + commonAreaFee + otherServiceAmount + extraExpensesSum)
+
+  useEffect(() => {
+    if (!promptPayId) return
+
+    const qrPayload = generatePromptPayPayload(promptPayId, totalAmount)
+    const qrRawUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrPayload)}&size=500x500`
+
+    setIsQrLoading(true)
+
+    const qrImg = new Image()
+    qrImg.crossOrigin = "anonymous"
+    qrImg.src = qrRawUrl
+
+    qrImg.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 500
+      canvas.height = 500
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        setCombinedQrUrl(qrRawUrl)
+        setIsQrLoading(false)
+        return
+      }
+
+      // Draw base QR code
+      ctx.drawImage(qrImg, 0, 0, 500, 500)
+
+      if (workspaceLogo) {
+        const logoImg = new Image()
+        logoImg.crossOrigin = "anonymous"
+        logoImg.src = workspaceLogo
+
+        logoImg.onload = () => {
+          try {
+            // Draw white rounded background for logo overlay to keep it scan-friendly
+            const bgSize = 110
+            const logoSize = 84
+            const radius = 16
+            const x = 250 - bgSize / 2
+            const y = 250 - bgSize / 2
+
+            ctx.fillStyle = "#ffffff"
+            ctx.beginPath()
+            ctx.moveTo(x + radius, y)
+            ctx.arcTo(x + bgSize, y, x + bgSize, y + bgSize, radius)
+            ctx.arcTo(x + bgSize, y + bgSize, x, y + bgSize, radius)
+            ctx.arcTo(x, y + bgSize, x, y, radius)
+            ctx.arcTo(x, y, x + bgSize, y, radius)
+            ctx.closePath()
+            ctx.fill()
+
+            // Draw logo centered
+            const lx = 250 - logoSize / 2
+            const ly = 250 - logoSize / 2
+            ctx.drawImage(logoImg, lx, ly, logoSize, logoSize)
+
+            setCombinedQrUrl(canvas.toDataURL("image/png"))
+          } catch (err) {
+            console.error("Error drawing logo on QR canvas:", err)
+            setCombinedQrUrl(qrRawUrl)
+          } finally {
+            setIsQrLoading(false)
+          }
+        }
+
+        logoImg.onerror = (err) => {
+          console.error("Error loading logo image for QR:", err)
+          try {
+            setCombinedQrUrl(canvas.toDataURL("image/png"))
+          } catch (e) {
+            setCombinedQrUrl(qrRawUrl)
+          }
+          setIsQrLoading(false)
+        }
+      } else {
+        try {
+          setCombinedQrUrl(canvas.toDataURL("image/png"))
+        } catch (e) {
+          setCombinedQrUrl(qrRawUrl)
+        }
+        setIsQrLoading(false)
+      }
+    }
+
+    qrImg.onerror = () => {
+      setCombinedQrUrl(qrRawUrl)
+      setIsQrLoading(false)
+    }
+  }, [promptPayId, totalAmount, workspaceLogo])
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
@@ -690,11 +786,18 @@ export default function TenantPortal() {
               
               {/* รูป QR code ที่สามารถสแกนได้จริง */}
               <div className="w-44 h-44 bg-white p-2 rounded-lg flex flex-col justify-center items-center relative shadow-lg">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=200x200`}
-                  alt="PromptPay QR Code"
-                  className="w-40 h-40 object-contain"
-                />
+                {isQrLoading ? (
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                    <span className="text-[9px] text-slate-400 font-medium">กำลังโหลด...</span>
+                  </div>
+                ) : (
+                  <img
+                    src={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=200x200`}
+                    alt="PromptPay QR Code"
+                    className="w-40 h-40 object-contain"
+                  />
+                )}
               </div>
 
               <div className="text-center space-y-1">
@@ -710,9 +813,8 @@ export default function TenantPortal() {
               </div>
 
               <a
-                href={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500`}
-                target="_blank"
-                rel="noreferrer"
+                href={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500`}
+                download={`qr_payment_room${roomNumber}.png`}
                 className="text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" /> บันทึกรูปภาพ QR ขนาดใหญ่

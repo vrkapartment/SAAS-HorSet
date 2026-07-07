@@ -435,6 +435,7 @@ export async function getTenantPortalData() {
     let electricRate = 7
 
     let latePenaltyRate = 0
+    let workspaceLogo = ""
     if (tenant && tenant.workspace_id) {
       const { data: ws } = await supabase
         .from("workspaces")
@@ -451,6 +452,20 @@ export async function getTenantPortalData() {
         if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
         if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
         if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
+
+        // ดึงโลโก้ประจำหอพักแบบปลอดภัย เผื่อตารางยังไม่ได้เพิ่มคอลัมน์ logo_url
+        try {
+          const { data: wsLogoData } = await supabase
+            .from("workspaces")
+            .select("logo_url")
+            .eq("id", tenant.workspace_id)
+            .maybeSingle()
+          if (wsLogoData && wsLogoData.logo_url) {
+            workspaceLogo = wsLogoData.logo_url
+          }
+        } catch (logoErr) {
+          console.warn("Could not query logo_url from workspaces:", logoErr)
+        }
       }
 
       // ดึงข้อมูล late_penalty_rate แบบปลอดภัย เผื่อคอลัมน์ยังไม่มีในตาราง
@@ -586,7 +601,8 @@ export async function getTenantPortalData() {
         commonFee,
         waterRate,
         electricRate,
-        latePenaltyRate
+        latePenaltyRate,
+        workspaceLogo
       }
     }
   } catch (error) {
@@ -701,6 +717,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     let electricRate = 7
     let latePenaltyRate = 0
 
+    let workspaceLogo = ""
     if (ws) {
       promptPayId = ws.promptpay_id || ""
       promptPayName = ws.promptpay_name || ""
@@ -711,6 +728,20 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
       if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
       if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
+
+      // ดึงโลโก้ประจำหอพักแบบปลอดภัย เผื่อตารางยังไม่ได้เพิ่มคอลัมน์ logo_url
+      try {
+        const { data: wsLogoData } = await supabase
+          .from("workspaces")
+          .select("logo_url")
+          .eq("id", workspaceId)
+          .maybeSingle()
+        if (wsLogoData && wsLogoData.logo_url) {
+          workspaceLogo = wsLogoData.logo_url
+        }
+      } catch (logoErr) {
+        console.warn("Could not query logo_url from workspaces (NoLogin):", logoErr)
+      }
     }
 
     // ดึงข้อมูล late_penalty_rate แบบปลอดภัย เผื่อคอลัมน์ยังไม่มีในตาราง
@@ -812,7 +843,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         commonFee,
         waterRate,
         electricRate,
-        latePenaltyRate
+        latePenaltyRate,
+        workspaceLogo
       }
     }
   } catch (error) {
