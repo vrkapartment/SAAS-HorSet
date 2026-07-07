@@ -557,11 +557,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               }
             }
 
-            const { data: grantData } = await supabase
+            const { data: grantData, error: grantError } = await supabase
               .from("support_access_grants")
               .select("status")
               .eq("workspace_id", activeWsId)
-              .single()
+              .maybeSingle()
 
             if (grantData) {
               setSupportStatus(grantData.status)

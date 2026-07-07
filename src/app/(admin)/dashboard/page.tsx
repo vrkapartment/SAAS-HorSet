@@ -91,9 +91,14 @@ function AdminDashboardContent() {
 
   // Sync state from URL parameters or sessionStorage on mount and whenever searchParams change
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     const monthParam = searchParams.get("month")
     const yearParam = searchParams.get("year")
     const tabParam = searchParams.get("tab")
+
+    let needsReplace = false
+    const params = new URLSearchParams(window.location.search)
 
     // 1. Handle Month Context
     if (monthParam) {
@@ -101,20 +106,11 @@ function AdminDashboardContent() {
       sessionStorage.setItem("dashboard_month", monthParam)
     } else {
       const cachedMonth = sessionStorage.getItem("dashboard_month")
-      if (cachedMonth) {
-        setSelectedMonth(cachedMonth)
-        const params = new URLSearchParams(window.location.search)
-        params.set("month", cachedMonth)
-        router.replace(`?${params.toString()}`, { scroll: false })
-      } else {
-        const d = new Date()
-        const currentMonth = String(d.getMonth() + 1).padStart(2, "0")
-        setSelectedMonth(currentMonth)
-        sessionStorage.setItem("dashboard_month", currentMonth)
-        const params = new URLSearchParams(window.location.search)
-        params.set("month", currentMonth)
-        router.replace(`?${params.toString()}`, { scroll: false })
-      }
+      const finalMonth = cachedMonth || String(new Date().getMonth() + 1).padStart(2, "0")
+      setSelectedMonth(finalMonth)
+      sessionStorage.setItem("dashboard_month", finalMonth)
+      params.set("month", finalMonth)
+      needsReplace = true
     }
 
     // 2. Handle Year Context
@@ -123,20 +119,11 @@ function AdminDashboardContent() {
       sessionStorage.setItem("dashboard_year", yearParam)
     } else {
       const cachedYear = sessionStorage.getItem("dashboard_year")
-      if (cachedYear) {
-        setSelectedYear(cachedYear)
-        const params = new URLSearchParams(window.location.search)
-        params.set("year", cachedYear)
-        router.replace(`?${params.toString()}`, { scroll: false })
-      } else {
-        const d = new Date()
-        const currentYearStr = String(d.getFullYear())
-        setSelectedYear(currentYearStr)
-        sessionStorage.setItem("dashboard_year", currentYearStr)
-        const params = new URLSearchParams(window.location.search)
-        params.set("year", currentYearStr)
-        router.replace(`?${params.toString()}`, { scroll: false })
-      }
+      const finalYear = cachedYear || String(new Date().getFullYear())
+      setSelectedYear(finalYear)
+      sessionStorage.setItem("dashboard_year", finalYear)
+      params.set("year", finalYear)
+      needsReplace = true
     }
 
     // 3. Handle Active Tab Context
@@ -144,13 +131,14 @@ function AdminDashboardContent() {
       setActiveTab(tabParam)
       sessionStorage.setItem("dashboard_tab", tabParam)
     } else {
-      const cachedTab = sessionStorage.getItem("dashboard_tab") as "transactions" | "activities"
-      if (cachedTab === "transactions" || cachedTab === "activities") {
-        setActiveTab(cachedTab)
-        const params = new URLSearchParams(window.location.search)
-        params.set("tab", cachedTab)
-        router.replace(`?${params.toString()}`, { scroll: false })
-      }
+      const cachedTab = sessionStorage.getItem("dashboard_tab")
+      const finalTab = (cachedTab === "transactions" || cachedTab === "activities") ? cachedTab : "transactions"
+      setActiveTab(finalTab as "transactions" | "activities")
+      sessionStorage.setItem("dashboard_tab", finalTab)
+    }
+
+    if (needsReplace) {
+      router.replace(`?${params.toString()}`, { scroll: false })
     }
   }, [searchParams, router])
 
