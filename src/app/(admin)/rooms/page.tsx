@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { 
   Home, 
@@ -129,6 +129,7 @@ interface CsvRoomItem {
 function RoomsContent() {
   const { t } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
+  const fetchCounterRef = useRef(0)
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeItem[]>([])
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
@@ -523,7 +524,9 @@ function RoomsContent() {
   }
 
   // โหลดข้อมูลทั้งหมดจาก Supabase ร่วมกับการใช้งาน Cache ความเร็วสูง
+  // โหลดข้อมูลทั้งหมดจาก Supabase ร่วมกับการใช้งาน Cache ความเร็วสูง
   const loadData = async (forceRefresh = false) => {
+    const currentFetchId = ++fetchCounterRef.current
     setLoading(true)
     setError(null)
     try {
@@ -533,6 +536,7 @@ function RoomsContent() {
       fetch(`/api/workspace-liff?workspace_id=${wsId}`)
         .then(res => res.json())
         .then(data => {
+          if (currentFetchId !== fetchCounterRef.current) return
           if (data.success && data.liffId) {
             setWorkspaceLiffId(data.liffId)
           }
@@ -558,10 +562,12 @@ function RoomsContent() {
       if (hasLocalCancellations && tempCancellations.length > 0) {
         // ย้ายข้อมูลไปยัง Supabase
         const migrated = await migrateLocalStorageCancelledContracts(wsId, tempCancellations)
+        if (currentFetchId !== fetchCounterRef.current) return
         if (migrated.success) {
           localStorage.removeItem(`cancelled_contracts_${wsId}`)
           console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
           const res = await getCancelledContracts(wsId)
+          if (currentFetchId !== fetchCounterRef.current) return
           if (res.success && res.data) {
             loadedCancellations = res.data
           }
@@ -571,6 +577,7 @@ function RoomsContent() {
         }
       } else {
         const res = await getCancelledContracts(wsId)
+        if (currentFetchId !== fetchCounterRef.current) return
         if (res.success && res.data) {
           loadedCancellations = res.data
         } else if (res.error === "table_not_found") {
@@ -582,6 +589,7 @@ function RoomsContent() {
 
       // ดึงข้อมูลตั้งค่าการเงินและบัญชีรับเงิน (เพื่อใช้แสดงค่ามัดจำ/ค่าเช่าล่วงหน้าในโมดอลลิงก์)
       getFinanceSettings(wsId).then(res => {
+        if (currentFetchId !== fetchCounterRef.current) return
         if (res.success && res.data) {
           setFinanceSettings(res.data)
         }
@@ -604,8 +612,10 @@ function RoomsContent() {
         setRooms(roomsData)
         setRoomTypes(typesData)
       } else {
-        const [roomsRes, typesRes] = await Promise.all([getRooms(), getRoomTypes()])
+        const [roomsRes, typesRes] = await Promise.all([getRooms(wsId), getRoomTypes(wsId)])
         
+        if (currentFetchId !== fetchCounterRef.current) return
+
         if (roomsRes.success && roomsRes.data) {
           roomsData = roomsRes.data as RoomItem[]
           setRooms(roomsData)
@@ -622,12 +632,18 @@ function RoomsContent() {
       }
 
       // LAZY CLEANUP: เรียกทำงานผ่าน Server Action ครั้งเดียวแบบรวมศูนย์ ลด Race Conditions และการส่งคำสั่งเขียน DB ซ้ำซ้อนจาก Client
-      if (roomsData.length > 0 && loadedCancellations.length > 0 && wsId) {
+      if (roomsData.length > 0 && wsId) {
         const cleanupRes = await lazyCleanupPastDueTenants(wsId)
+        
+        if (currentFetchId !== fetchCounterRef.current) return
+
         if (cleanupRes.success && cleanupRes.count && cleanupRes.count > 0) {
           console.log(`Lazy cleanup success: Removed ${cleanupRes.count} past-due tenants server-side. Refreshing view...`)
           clearWorkspaceCache(wsId)
-          const [roomsResNew, typesResNew] = await Promise.all([getRooms(), getRoomTypes()])
+          const [roomsResNew, typesResNew] = await Promise.all([getRooms(wsId), getRoomTypes(wsId)])
+          
+          if (currentFetchId !== fetchCounterRef.current) return
+
           if (roomsResNew.success && roomsResNew.data) {
             const finalRooms = roomsResNew.data as RoomItem[]
             setRooms(finalRooms)
@@ -643,7 +659,9 @@ function RoomsContent() {
     } catch (err) {
       setError("เกิดข้อผิดพลาดในการโหลดข้อมูลระบบห้องพัก")
     } finally {
-      setLoading(false)
+      if (currentFetchId === fetchCounterRef.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -771,7 +789,7 @@ function RoomsContent() {
         const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
         clearWorkspaceCache(wsId)
         showToast("✓ ลบประเภทห้องพักสำเร็จแล้ว", "success")
-        const typesRes = await getRoomTypes()
+        const typesRes = await getRoomTypes(wsId)
         if (typesRes.success && typesRes.data) {
           const typesData = typesRes.data as RoomTypeItem[]
           setRoomTypes(typesData)
@@ -861,7 +879,7 @@ function RoomsContent() {
         setEditingType(null)
         clearWorkspaceCache(wsId)
         // โหลดข้อมูลประเภทห้องใหม่
-        const typesRes = await getRoomTypes()
+        const typesRes = await getRoomTypes(wsId)
         if (typesRes.success && typesRes.data) {
           const typesData = typesRes.data as RoomTypeItem[]
           setRoomTypes(typesData)
@@ -877,7 +895,7 @@ function RoomsContent() {
         setNewTypeName("")
         setNewTypeRent(4000)
         clearWorkspaceCache(wsId)
-        const typesRes = await getRoomTypes()
+        const typesRes = await getRoomTypes(wsId)
         if (typesRes.success && typesRes.data) {
           const typesData = typesRes.data as RoomTypeItem[]
           setRoomTypes(typesData)

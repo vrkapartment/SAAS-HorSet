@@ -6,13 +6,16 @@ import { createClient } from "@/lib/supabase/server"
 // 1. Room Types Actions (จัดการประเภทห้องพัก แอร์/พัดลม)
 // =========================================================================
 
-export async function getRoomTypes() {
+export async function getRoomTypes(workspaceId?: string) {
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
-      .from("room_types")
-      .select("*")
-      .order("name", { ascending: true })
+    let query = supabase.from("room_types").select("*")
+    
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
+    
+    const { data, error } = await query.order("name", { ascending: true })
 
     if (error) throw error
     return { success: true, data }
@@ -75,10 +78,10 @@ export async function deleteRoomType(id: string) {
 // 2. Rooms Actions (เชื่อมโยงกับ Room Types)
 // =========================================================================
 
-export async function getRooms() {
+export async function getRooms(workspaceId?: string) {
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
+    let query = supabase
       .from("rooms")
       .select(`
         *,
@@ -96,7 +99,12 @@ export async function getRooms() {
           lease_end
         )
       `)
-      .order("room_number", { ascending: true })
+
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
+
+    const { data, error } = await query.order("room_number", { ascending: true })
 
     if (error) throw error
 
