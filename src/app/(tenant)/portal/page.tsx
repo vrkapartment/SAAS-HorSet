@@ -31,7 +31,9 @@ import {
   QrCode,
   Image as ImageIcon,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  X,
+  Share2
 } from "lucide-react"
 import { generatePromptPayPayload } from "@/lib/promptpay"
 import { getTenantPortalData, getTenantPortalDataNoLoginAction } from "@/features/tenant/actions"
@@ -132,6 +134,15 @@ export default function TenantPortal() {
   const [workspaceLogo, setWorkspaceLogo] = useState<string>("")
   const [combinedQrUrl, setCombinedQrUrl] = useState<string>("")
   const [isQrLoading, setIsQrLoading] = useState<boolean>(false)
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [canShare, setCanShare] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof navigator.share === "function") {
+      setCanShare(true)
+    }
+  }, [])
+
 
 
   const formatCycle = (cycleStr: string) => {
@@ -446,6 +457,34 @@ export default function TenantPortal() {
       setIsQrLoading(false)
     }
   }, [promptPayId, totalAmount, workspaceLogo])
+
+  const handleShare = async () => {
+    try {
+      if (!combinedQrUrl) return
+      
+      const response = await fetch(combinedQrUrl)
+      const blob = await response.blob()
+      const file = new File([blob], `qr_payment_room${roomNumber}.png`, { type: "image/png" })
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `QR ชำระเงิน ห้อง ${roomNumber}`,
+          text: `QR Code สำหรับชำระเงินค่าเช่าห้องพักห้อง ${roomNumber} ยอดชำระ ${totalAmount.toLocaleString()} บาท`,
+        })
+      } else {
+        // Fallback text share if files are not shareable but text is
+        await navigator.share({
+          title: `QR ชำระเงิน ห้อง ${roomNumber}`,
+          text: `QR Code ชำระเงิน ห้อง ${roomNumber} ยอดชำระ ${totalAmount.toLocaleString()} บาท`,
+          url: window.location.href
+        })
+      }
+    } catch (error) {
+      console.error("Error sharing QR code:", error)
+    }
+  }
+
 
   const handleDownloadBillPdf = async () => {
     setDownloadingPdf(true)
@@ -812,13 +851,12 @@ export default function TenantPortal() {
                 <p className="text-[9px] text-slate-500 font-medium">(มีจำนวนระบุยอดโอนให้อัตโนมัติ ไม่ต้องกรอกราคาเอง)</p>
               </div>
 
-              <a
-                href={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500`}
-                download={`qr_payment_room${roomNumber}.png`}
-                className="text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer bg-transparent border-none outline-none"
               >
                 <Download className="w-3.5 h-3.5" /> บันทึกรูปภาพ QR ขนาดใหญ่
-              </a>
+              </button>
             </div>
 
             {/* ฟอร์มอัปโหลดส่งสลิป */}
@@ -903,6 +941,88 @@ export default function TenantPortal() {
             ))}
           </div>
         </div>
+
+        {/* QR Code Save & Share Modal */}
+        {showQrModal && (
+          <div className="fixed inset-0 bg-[#020408]/95 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all animate-in fade-in duration-200">
+            <div className="bg-[#0b1324] border border-slate-900/80 rounded-3xl w-full max-w-sm p-6 relative flex flex-col items-center gap-5 shadow-2xl animate-in zoom-in-95 duration-200">
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-100 rounded-full hover:bg-slate-900/80 transition-colors"
+                title="ปิดหน้าต่าง"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="text-center space-y-1.5 mt-2">
+                <h3 className="text-base font-bold text-slate-100 flex items-center justify-center gap-2">
+                  <QrCode className="w-5 h-5 text-blue-400" />
+                  บันทึกรูปภาพ QR Code
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  ห้องพัก {roomNumber} • ยอดชำระ {totalAmount.toLocaleString()} บาท
+                </p>
+              </div>
+
+              {/* QR Image with Instruction overlay */}
+              <div className="relative group">
+                <div className="w-64 h-64 bg-white p-3 rounded-2xl flex justify-center items-center shadow-lg relative overflow-hidden">
+                  <img
+                    src={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500`}
+                    alt="PromptPay QR Code"
+                    className="w-full h-full object-contain pointer-events-auto cursor-pointer"
+                    style={{ WebkitTouchCallout: "default" }}
+                  />
+                  
+                  {/* Subtle watermarked instruction on the image card */}
+                  <div className="absolute inset-0 bg-slate-950/5 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <span className="bg-slate-900/80 text-white text-[10px] font-bold px-3 py-1.5 rounded-full backdrop-blur-sm">
+                      แตะค้างที่รูปเพื่อบันทึก
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Guide Box */}
+              <div className="w-full bg-slate-900/50 border border-slate-800/60 p-4 rounded-2xl space-y-2 text-center">
+                <p className="text-xs font-bold text-amber-400 flex items-center justify-center gap-1.5 animate-pulse">
+                  <span>💡 วิธีการบันทึกภาพลงเครื่อง</span>
+                </p>
+                <p className="text-[11px] text-slate-300 leading-relaxed max-w-xs mx-auto">
+                  แตะค้างที่รูป QR Code ด้านบน <br />
+                  แล้วเลือก <span className="font-bold text-blue-400">"บันทึกรูปภาพ" (Save Image)</span> <br />
+                  หรือ <span className="font-bold text-blue-400">"แชร์"</span> เพื่อส่งภาพบันทึกลงแกลเลอรีโดยตรง
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="w-full space-y-2 pt-1">
+                {canShare && (
+                  <button
+                    onClick={handleShare}
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-all shadow-md active:scale-[0.98]"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>แชร์ภาพ / บันทึกลงเครื่อง</span>
+                  </button>
+                )}
+
+                {/* PC Fallback Download Button */}
+                <a
+                  href={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500`}
+                  download={`qr_payment_room${roomNumber}.png`}
+                  className="w-full py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-semibold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
+                >
+                  <Download className="w-4 h-4 text-blue-400" />
+                  <span>ดาวน์โหลดไฟล์โดยตรง (คอมพิวเตอร์)</span>
+                </a>
+              </div>
+
+            </div>
+          </div>
+        )}
 
       </main>
       </div>
