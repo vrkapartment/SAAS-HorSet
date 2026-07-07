@@ -446,6 +446,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   // โหลดสิทธิ์, ข้อมูลผู้ใช้, รายการ Workspace และสิทธิ์การช่วยเหลือระบบทั้งหมดในรอบเดียวเพื่อความเสถียรและเร็วสูงสุด
   useEffect(() => {
     const initUserData = async () => {
+      let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      let currentRole: "admin" | "staff" | "super_admin" = role
       try {
         // 1. ตรวจสอบบทบาทเบื้องต้นจาก cookie ก่อนเพื่อให้ปรับ state ได้อย่างรวดเร็ว
         const mockRole = document.cookie
@@ -459,8 +461,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           setUserRole(initialRole)
         }
 
-        let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
-        let currentRole = initialRole
+        currentRole = initialRole
         let profileWsId: string | null = null
 
         if (!isDemo) {
