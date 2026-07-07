@@ -921,6 +921,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       return true
     }
 
+    // แอดมินหลัก (admin) จะได้รับสิทธิ์เข้าถึงครบถ้วน 100% ตลอดเวลาในทุกเมนู โดยไม่มีการบล็อกสิทธิ์
+    if (userRole === "admin") {
+      return true
+    }
+
     if (path === "/super-admin") {
       return false
     }
@@ -968,6 +973,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   const isPathAllowed = () => {
     if (!pathname) return true
+    
+    // ดึงบทบาทจากคุกกี้โดยตรงแบบ Synchronous เพื่อให้ตรวจจับได้ทันทีใน Render Frame แรกสุด
+    const mockRole = typeof document !== "undefined"
+      ? document.cookie.split("; ").find((row) => row.startsWith("horset_user_role="))?.split("=")[1]
+      : null;
+    
+    const activeRole = mockRole || userRole;
+    
+    // แอดมินหลัก และ Super Admin จะได้รับสิทธิ์ผ่านฉลุยในทุกหน้าจอทันที ไม่ถูกจำกัดด้วยระบบสิทธิ์พนักงาน (Staff)
+    if (activeRole === "admin" || activeRole === "super_admin") {
+      return true
+    }
+
     // หากโปรไฟล์ยังโหลดไม่เสร็จ ให้สิทธิ์ผ่านไปก่อน (เพื่อป้องกันการแสดงผล Access Denied กระพริบขึ้นมาก่อนโหลดเสร็จ)
     if (!isProfileLoaded) return true
     return hasPermissionForPath(pathname)
