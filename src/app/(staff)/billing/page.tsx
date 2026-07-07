@@ -1759,6 +1759,7 @@ function UnifiedBillingContent() {
         paidCount={paidCount}
         pendingCount={pendingCount}
         unpaidCount={unpaidCount}
+        showOnlyMeterSaved={true}
       />
 
       {/* Tab Switcher */}
