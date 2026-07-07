@@ -240,14 +240,26 @@ export default function LoginPage() {
 
   const navigateToDashboardWithRole = (role: "admin" | "staff" | "tenant" | "super_admin" | null) => {
     const targetRole = role || selectedRole
-    if (targetRole === "super_admin") {
-      router.push("/super-admin")
-    } else if (targetRole === "admin") {
-      router.push("/dashboard")
-    } else if (targetRole === "staff") {
-      router.push("/meter")
+    if (typeof window !== "undefined") {
+      if (targetRole === "super_admin") {
+        window.location.href = "/super-admin"
+      } else if (targetRole === "admin") {
+        window.location.href = "/dashboard"
+      } else if (targetRole === "staff") {
+        window.location.href = "/meter"
+      } else {
+        window.location.href = "/portal"
+      }
     } else {
-      router.push("/portal")
+      if (targetRole === "super_admin") {
+        router.push("/super-admin")
+      } else if (targetRole === "admin") {
+        router.push("/dashboard")
+      } else if (targetRole === "staff") {
+        router.push("/meter")
+      } else {
+        router.push("/portal")
+      }
     }
   }
 
