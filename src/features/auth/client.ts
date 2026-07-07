@@ -5,6 +5,7 @@ import { getCurrentUserProfileAction } from "./actions"
 // In-memory global profile cache in the browser's JavaScript runtime.
 // This persists across client-side page transitions in Next.js (SPA mode).
 let cachedProfile: any = null
+let activeProfilePromise: Promise<any> | null = null
 
 /**
  * ดึงข้อมูลโปรไฟล์ผู้ใช้ปัจจุบันแบบประหยัดทรัพยากร (มีระบบ In-Memory Caching)
@@ -15,11 +16,28 @@ export async function getCurrentUserProfileClient(forceRefresh = false) {
     return { success: true, data: cachedProfile }
   }
 
-  const res = await getCurrentUserProfileAction()
-  if (res.success && res.data) {
-    cachedProfile = res.data
+  // ดึงโปรไฟล์แบบแชร์ Promise ตัวเดียวกันสำหรับสายเรียกสตรีมขนาน เพื่อความเสถียรและไร้รอยต่อ (Deduplication)
+  if (typeof window !== "undefined" && !forceRefresh && activeProfilePromise) {
+    return activeProfilePromise
   }
-  return res
+
+  const fetchPromise = (async () => {
+    try {
+      const res = await getCurrentUserProfileAction()
+      if (res.success && res.data) {
+        cachedProfile = res.data
+      }
+      return res
+    } finally {
+      activeProfilePromise = null
+    }
+  })()
+
+  if (typeof window !== "undefined" && !forceRefresh) {
+    activeProfilePromise = fetchPromise
+  }
+
+  return fetchPromise
 }
 
 /**

@@ -70,7 +70,7 @@ const YEARS = [
 ]
 
 function AdminDashboardContent() {
-  const isFetchingRef = useRef(false)
+  const fetchCounterRef = useRef(0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t } = useLanguage()
@@ -412,10 +412,12 @@ function AdminDashboardContent() {
   }
 
   const loadDashboardData = async (forceRefresh = false) => {
-    if (isFetchingRef.current) return
-    isFetchingRef.current = true
+    // เพิ่มลำดับครั้งการ Fetch เพื่อตรวจจับและตัดการตอบกลับของตัวเก่าที่ล่าช้ากว่า (Stale Responses)
+    const currentFetchId = ++fetchCounterRef.current
+    
     setLoading(true)
     setDbError(null)
+    
     try {
       // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
       let userProfile = getCachedData("global", "profile")
@@ -428,6 +430,9 @@ function AdminDashboardContent() {
           throw new Error(userRes.error || "เกิดข้อผิดพลาดในการดึงข้อมูลโปรไฟล์ผู้ใช้")
         }
       }
+
+      // หากมีการเริ่ม Fetch รอบใหม่หลังตัวนี้ไปแล้ว ให้ยุติการทำงานของตัวเก่าทันที
+      if (currentFetchId !== fetchCounterRef.current) return
 
       let wsId = ""
       if (userProfile) {
@@ -442,6 +447,10 @@ function AdminDashboardContent() {
           if (!wsId && typeof window !== "undefined") {
             for (let i = 0; i < 15; i++) {
               await new Promise(resolve => setTimeout(resolve, 100))
+              
+              // เช็คอีกครั้งว่าระหว่างทางมีการเริ่ม Fetch รอบใหม่หรือไม่
+              if (currentFetchId !== fetchCounterRef.current) return
+
               const updatedCookie = getCookie("horset_current_workspace_id")
               if (updatedCookie) {
                 wsId = updatedCookie
@@ -469,6 +478,9 @@ function AdminDashboardContent() {
             }
           }
         }
+
+        // เช็คอีกครั้งว่าระหว่างทางมีการเริ่ม Fetch รอบใหม่หรือไม่
+        if (currentFetchId !== fetchCounterRef.current) return
 
         // ดึงข้อมูลชื่อ Workspace แบบไดนามิก
         let wsName = "แสนสุข แมนชั่น"
@@ -536,6 +548,9 @@ function AdminDashboardContent() {
       const needsFetch = !rooms || !tenants || !bills || !expenses || !oldTenants || forceRefresh
 
       if (needsFetch) {
+        // ตรวจสอบเช็คอีกครั้ง
+        if (currentFetchId !== fetchCounterRef.current) return
+
         const res = await getDashboardData(currentYear, wsId || "")
         if (res && res.success === false) {
           throw new Error(res.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลแดชบอร์ดได้")
@@ -556,6 +571,9 @@ function AdminDashboardContent() {
         }
       }
 
+      // ตรวจสอบเช็คอีกครั้ง
+      if (currentFetchId !== fetchCounterRef.current) return
+
       const isRealSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
       if (isRealSupabase) {
@@ -572,6 +590,9 @@ function AdminDashboardContent() {
         setupDemoFallback(`${selectedYear}-${selectedMonth}`)
       }
     } catch (e) {
+      // ตรวจสอบเช็คอีกครั้ง
+      if (currentFetchId !== fetchCounterRef.current) return
+
       console.error("Failed to load dashboard data:", e)
       const isRealSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
       if (isRealSupabase) {
@@ -588,8 +609,10 @@ function AdminDashboardContent() {
         setupDemoFallback(`${selectedYear}-${selectedMonth}`)
       }
     } finally {
-      setLoading(false)
-      isFetchingRef.current = false
+      // อัปเดตสถานะ loading เฉพาะเมื่อตัวนี้เป็นการ fetch ล่าสุดเท่านั้น
+      if (currentFetchId === fetchCounterRef.current) {
+        setLoading(false)
+      }
     }
   }
 
