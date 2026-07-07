@@ -913,6 +913,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       return false
     }
 
+    // เฉพาะบทบาท Super Admin เท่านั้นที่มีสิทธิ์ในหน้าแผงควบคุมหลัก
+    if (path === "/super-admin" || path.startsWith("/super-admin/")) {
+      return userRole === "super_admin"
+    }
+
     // Super Admin เข้าได้หมดทุกอย่าง เฉพาะเมื่อได้รับอนุมัติสิทธิ์ Support ใน Workspace นั้นแล้ว เท่านั้น
     if (userRole === "super_admin") {
       if (supportStatus !== "approved") {
@@ -924,10 +929,6 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     // แอดมินหลัก (admin) จะได้รับสิทธิ์เข้าถึงครบถ้วน 100% ตลอดเวลาในทุกเมนู โดยไม่มีการบล็อกสิทธิ์
     if (userRole === "admin") {
       return true
-    }
-
-    if (path === "/super-admin") {
-      return false
     }
 
     if (path === "#profile" || path === "/login" || path === "/settings" || path.startsWith("/settings")) {
@@ -981,8 +982,15 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     
     const activeRole = mockRole || userRole;
     
-    // แอดมินหลัก และ Super Admin จะได้รับสิทธิ์ผ่านฉลุยในทุกหน้าจอทันที ไม่ถูกจำกัดด้วยระบบสิทธิ์พนักงาน (Staff)
-    if (activeRole === "admin" || activeRole === "super_admin") {
+    // แอดมินหลัก และ Super Admin จะได้รับสิทธิ์ผ่านฉลุยในทุกหน้าจอส่วนใหญ่ ยกเว้นหน้า Super Admin ที่ห้ามแอดมินทั่วไปเข้าถึง
+    if (activeRole === "admin") {
+      if (pathname === "/super-admin" || pathname.startsWith("/super-admin/")) {
+        return false
+      }
+      return true
+    }
+
+    if (activeRole === "super_admin") {
       return true
     }
 
