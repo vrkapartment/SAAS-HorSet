@@ -26,10 +26,7 @@ import {
   Zap,
   Check
 } from "lucide-react"
-import { getRooms } from "@/features/room/actions"
-import { getTenants, getOldTenants } from "@/features/tenant/actions"
-import { getBills } from "@/features/billing/actions"
-import { getExpenses } from "@/features/expenses/actions"
+import { getDashboardData } from "@/features/dashboard/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { createClient } from "@/lib/supabase/client"
@@ -499,9 +496,7 @@ function AdminDashboardContent() {
         clearWorkspaceCache(wsId)
       }
 
-      // โหลดข้อมูลแบบคู่ขนาน (Parallel Fetching) เพื่อประสิทธิภาพสูงสุด
-      const fetchPromises = [];
-
+      // โหลดข้อมูลด้วยสถาปัตยกรรมรวมศูนย์ดึงผ่าน Server Action ตัวเดียวเพื่อประสิทธิภาพสูงสุด (ลด Round-trip เหลือ 1 ครั้ง)
       const currentYear = selectedYear
       let rooms = wsId ? getCachedData(wsId, "rooms") : null
       let tenants = wsId ? getCachedData(wsId, "tenants") : null
@@ -509,67 +504,27 @@ function AdminDashboardContent() {
       let expenses = wsId ? getCachedData(wsId, `expenses_year_${currentYear}`) : null
       let oldTenants = wsId ? getCachedData(wsId, "oldTenants") : null
 
-      if (!rooms || forceRefresh) {
-        fetchPromises.push(
-          getRooms().then(roomsRes => {
-            if (roomsRes && roomsRes.success === false) {
-              throw new Error(roomsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลห้องพักได้")
-            }
-            rooms = roomsRes.success && roomsRes.data ? roomsRes.data : []
-            if (wsId) setCachedData(wsId, "rooms", rooms)
-          })
-        );
-      }
+      const needsFetch = !rooms || !tenants || !bills || !expenses || !oldTenants || forceRefresh
 
-      if (!tenants || forceRefresh) {
-        fetchPromises.push(
-          getTenants().then(tenantsRes => {
-            if (tenantsRes && tenantsRes.success === false) {
-              throw new Error(tenantsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลผู้เช่าได้")
-            }
-            tenants = tenantsRes.success && tenantsRes.data ? tenantsRes.data : []
-            if (wsId) setCachedData(wsId, "tenants", tenants)
-          })
-        );
-      }
+      if (needsFetch) {
+        const res = await getDashboardData(currentYear, wsId || "")
+        if (res && res.success === false) {
+          throw new Error(res.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลแดชบอร์ดได้")
+        }
 
-      if (!bills || forceRefresh) {
-        fetchPromises.push(
-          getBills(undefined, currentYear).then(billsRes => {
-            if (billsRes && billsRes.success === false) {
-              throw new Error(billsRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลบิลได้")
-            }
-            bills = billsRes.success && billsRes.data ? billsRes.data : []
-            if (wsId) setCachedData(wsId, `bills_year_${currentYear}`, bills)
-          })
-        );
-      }
+        rooms = res.rooms || []
+        tenants = res.tenants || []
+        bills = res.bills || []
+        expenses = res.expenses || []
+        oldTenants = res.oldTenants || []
 
-      if (!expenses || forceRefresh) {
-        fetchPromises.push(
-          getExpenses(currentYear, wsId).then(expensesRes => {
-            if (expensesRes && expensesRes.success === false) {
-              throw new Error(expensesRes.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลค่าใช้จ่ายได้")
-            }
-            expenses = expensesRes.success && expensesRes.data ? expensesRes.data : []
-            if (wsId) setCachedData(wsId, `expenses_year_${currentYear}`, expenses)
-          })
-        );
-      }
-
-      if (!oldTenants || forceRefresh) {
-        fetchPromises.push(
-          getOldTenants().then(oldTenantsRes => {
-            oldTenants = oldTenantsRes.success && oldTenantsRes.data ? oldTenantsRes.data : []
-            if (wsId) setCachedData(wsId, "oldTenants", oldTenants)
-          }).catch(() => {
-            oldTenants = []
-          })
-        );
-      }
-
-      if (fetchPromises.length > 0) {
-        await Promise.all(fetchPromises)
+        if (wsId) {
+          setCachedData(wsId, "rooms", rooms)
+          setCachedData(wsId, "tenants", tenants)
+          setCachedData(wsId, `bills_year_${currentYear}`, bills)
+          setCachedData(wsId, `expenses_year_${currentYear}`, expenses)
+          setCachedData(wsId, "oldTenants", oldTenants)
+        }
       }
 
       const isRealSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
