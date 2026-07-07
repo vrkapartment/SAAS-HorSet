@@ -866,8 +866,17 @@ export default function TenantPortal() {
 
             {/* ฟอร์มอัปโหลดส่งสลิป */}
             {billStatus === "unpaid" ? (
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-slate-400">อัปโหลดภาพใบสลิปโอนเงิน</h4>
+              <div className="space-y-3.5 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-blue-400" />
+                    <span>อัปโหลดภาพใบสลิปโอนเงินเพื่อยืนยัน</span>
+                  </h4>
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                  </span>
+                </div>
                 
                 <input
                   type="file"
@@ -880,15 +889,29 @@ export default function TenantPortal() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="w-full py-6 bg-slate-900/40 border border-dashed border-slate-800 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-all"
+                  className="w-full py-8 bg-gradient-to-b from-blue-950/20 to-slate-950/40 border border-dashed border-blue-500/35 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-3 text-xs text-slate-300 hover:text-white transition-all shadow-lg hover:shadow-blue-500/5 group cursor-pointer"
                 >
                   {uploading ? (
-                    <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-8 h-8 border-3 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                      <span className="text-[11px] text-slate-400 font-medium">กำลังประมวลผลและอัปโหลดไฟล์...</span>
+                    </div>
                   ) : (
                     <>
-                      <Upload className="w-6 h-6 text-blue-400" />
-                      <span>กดเลือกไฟล์สลิป หรือลากไฟล์มาวางที่นี่</span>
-                      <span className="text-[9px] text-slate-500 font-medium">รองรับเฉพาะ .jpg, .png, .webp (บีบอัดและย่อรูปภาพให้อัตโนมัติ)</span>
+                      <div className="p-3 bg-blue-500/10 rounded-full group-hover:scale-110 group-hover:bg-blue-500/20 transition-all duration-300">
+                        <ImageIcon className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <div className="space-y-1 text-center">
+                        <p className="font-semibold text-[13px] text-slate-200 group-hover:text-blue-400 transition-colors">
+                          กดเลือกสลิป หรือแตะที่นี่เพื่อถ่ายรูป
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          ระบบจะส่งสลิปให้หอพักตรวจสอบเพื่ออัปเดตบิล
+                        </p>
+                      </div>
+                      <span className="text-[9px] text-slate-500 font-medium bg-slate-950/60 px-3 py-1 rounded-full border border-slate-900">
+                        รองรับ .jpg, .png, .webp (บีบอัดภาพอัตโนมัติ)
+                      </span>
                     </>
                   )}
                 </button>
