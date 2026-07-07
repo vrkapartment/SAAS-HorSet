@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   TrendingUp,
@@ -40,6 +40,13 @@ function getCookie(name: string): string | undefined {
   return undefined
 }
 
+function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return
+  const expires = new Date()
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`
+}
+
 const THAI_MONTHS = [
   { value: "01", label: "มกราคม" },
   { value: "02", label: "กุมภาพันธ์" },
@@ -63,6 +70,7 @@ const YEARS = [
 ]
 
 function AdminDashboardContent() {
+  const isFetchingRef = useRef(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t } = useLanguage()
@@ -404,6 +412,8 @@ function AdminDashboardContent() {
   }
 
   const loadDashboardData = async (forceRefresh = false) => {
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
     setLoading(true)
     setDbError(null)
     try {
@@ -427,6 +437,37 @@ function AdminDashboardContent() {
         } else {
           const cookieWsId = typeof window !== "undefined" ? getCookie("horset_current_workspace_id") : undefined
           wsId = cookieWsId || userProfile.workspace_id || ""
+
+          // Smart polling: รอให้ DashboardLayout เขียนคุกกี้สูงสุด 1.5 วินาที (ตรวจเช็คทุก ๆ 100ms)
+          if (!wsId && typeof window !== "undefined") {
+            for (let i = 0; i < 15; i++) {
+              await new Promise(resolve => setTimeout(resolve, 100))
+              const updatedCookie = getCookie("horset_current_workspace_id")
+              if (updatedCookie) {
+                wsId = updatedCookie
+                break
+              }
+            }
+          }
+
+          // Fallback: หากท้ายที่สุดยังไม่มีค่าคุกกี้จริง ๆ ให้สืบค้น Workspace ID ตัวแรกที่ระบบตรวจเจอจาก Supabase เสมอ
+          if (!wsId) {
+            try {
+              const supabase = createClient()
+              const { data: workspaces, error: wsError } = await supabase
+                .from("workspaces")
+                .select("id")
+                .limit(1)
+              if (!wsError && workspaces && workspaces.length > 0) {
+                wsId = workspaces[0].id
+                if (typeof window !== "undefined") {
+                  setCookie("horset_current_workspace_id", wsId)
+                }
+              }
+            } catch (err) {
+              console.error("Failed to query fallback workspace in loadDashboardData:", err)
+            }
+          }
         }
 
         // ดึงข้อมูลชื่อ Workspace แบบไดนามิก
@@ -548,6 +589,7 @@ function AdminDashboardContent() {
       }
     } finally {
       setLoading(false)
+      isFetchingRef.current = false
     }
   }
 
