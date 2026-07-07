@@ -373,7 +373,7 @@ export default function TenantPortal() {
     if (!promptPayId) return
 
     const qrPayload = generatePromptPayPayload(promptPayId, totalAmount)
-    const qrRawUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrPayload)}&size=500x500`
+    const qrRawUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrPayload)}&size=500x500&ecc=H`
 
     setIsQrLoading(true)
 
@@ -403,9 +403,9 @@ export default function TenantPortal() {
         logoImg.onload = () => {
           try {
             // Draw white rounded background for logo overlay to keep it scan-friendly
-            const bgSize = 110
-            const logoSize = 84
-            const radius = 16
+            const bgSize = 86
+            const logoSize = 64
+            const radius = 12
             const x = 250 - bgSize / 2
             const y = 250 - bgSize / 2
 
@@ -832,7 +832,7 @@ export default function TenantPortal() {
                   </div>
                 ) : (
                   <img
-                    src={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=200x200`}
+                    src={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=200x200&ecc=H`}
                     alt="PromptPay QR Code"
                     className="w-40 h-40 object-contain"
                   />
@@ -970,7 +970,7 @@ export default function TenantPortal() {
               <div className="relative group">
                 <div className="w-64 h-64 bg-white p-3 rounded-2xl flex justify-center items-center shadow-lg relative overflow-hidden">
                   <img
-                    src={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500`}
+                    src={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500&ecc=H`}
                     alt="PromptPay QR Code"
                     className="w-full h-full object-contain pointer-events-auto cursor-pointer"
                     style={{ WebkitTouchCallout: "default" }}
@@ -1011,7 +1011,7 @@ export default function TenantPortal() {
 
                 {/* PC Fallback Download Button */}
                 <a
-                  href={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500`}
+                  href={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500&ecc=H`}
                   download={`qr_payment_room${roomNumber}.png`}
                   className="w-full py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-semibold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
                 >
