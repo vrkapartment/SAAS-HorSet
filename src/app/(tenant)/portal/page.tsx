@@ -851,8 +851,8 @@ export default function TenantPortal() {
               </div>
 
               {/* Action Buttons for QR Code */}
-              <div className="w-full max-w-[280px] flex flex-col gap-2 pt-1">
-                {canShare && (
+              {canShare && (
+                <div className="w-full max-w-[280px] pt-1">
                   <button
                     onClick={handleShare}
                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-all shadow-md active:scale-[0.98]"
@@ -860,17 +860,8 @@ export default function TenantPortal() {
                     <Share2 className="w-3.5 h-3.5" />
                     <span>แชร์ภาพ / บันทึกลงเครื่อง</span>
                   </button>
-                )}
-
-                <a
-                  href={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=500x500&ecc=H`}
-                  download={`qr_payment_room${roomNumber}.png`}
-                  className="w-full py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-semibold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5 text-blue-400" />
-                  <span>ดาวน์โหลดภาพ QR Code</span>
-                </a>
-              </div>
+                </div>
+              )}
             </div>
 
             {/* ฟอร์มอัปโหลดส่งสลิป */}
