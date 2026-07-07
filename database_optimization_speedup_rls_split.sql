@@ -8,20 +8,167 @@
 
 -- 1. ตรวจสอบและอัปเกรดฟังก์ชัน Security Definer ให้ทำงานเร็วที่สุด (STABLE, PARALLEL SAFE)
 -- =========================================================================
+-- Trigger ฟังก์ชันเพื่อซิงค์ข้อมูลโปรไฟล์ไปยัง auth.users.raw_user_meta_data
+create or replace function public.sync_profile_to_user_metadata()
+returns trigger as $$
+begin
+  update auth.users
+  set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || 
+    jsonb_build_object(
+      'role', coalesce(new.role, 'tenant'),
+      'workspace_id', new.workspace_id,
+      'phone', new.phone
+    )
+  where id = new.id;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- ติดตั้ง Trigger เข้ากับตาราง profiles (ทำงานเมื่อมีการแก้ไข role หรือ workspace_id หรือ phone)
+drop trigger if exists on_profile_change_sync_metadata on public.profiles;
+create trigger on_profile_change_sync_metadata
+after insert or update of role, workspace_id, phone on public.profiles
+for each row execute function public.sync_profile_to_user_metadata();
+
+-- รันซิงค์ข้อมูลผู้ใช้งานเดิมในระบบย้อนหลัง (Retroactive Sync) เพื่อป้องกันสิทธิ์ตกหล่น
+update auth.users u
+set raw_user_meta_data = coalesce(u.raw_user_meta_data, '{}'::jsonb) || 
+  jsonb_build_object(
+    'role', coalesce(p.role, 'tenant'),
+    'workspace_id', p.workspace_id,
+    'phone', p.phone
+  )
+from public.profiles p
+where u.id = p.id;
+
+-- ฟังก์ชันดึง workspace_id โดยใช้ระบบ Transaction Cache, JWT claims และ auth.users (เลี่ยง Recursion 100%)
 create or replace function public.get_current_user_workspace_id()
 returns uuid as $$
-  select workspace_id from public.profiles where id = auth.uid();
-$$ language sql stable security definer parallel safe;
+declare
+  _cached_ws_id text;
+  _claims_text text;
+  _claims json;
+  _ws_id text;
+begin
+  _cached_ws_id := current_setting('horset.cache_workspace_id', true);
+  if _cached_ws_id is not null and _cached_ws_id <> '' then
+    return _cached_ws_id::uuid;
+  end if;
 
+  _claims_text := current_setting('request.jwt.claims', true);
+  if _claims_text is not null and _claims_text <> '' then
+    begin
+      _claims := _claims_text::json;
+      _ws_id := nullif(_claims->'user_metadata'->>'workspace_id', '');
+      if _ws_id is not null then
+        perform set_config('horset.cache_workspace_id', _ws_id, true);
+        return _ws_id::uuid;
+      end if;
+    exception when others then
+    end;
+  end if;
+
+  begin
+    select nullif(raw_user_meta_data->>'workspace_id', '') into _ws_id 
+    from auth.users 
+    where id = auth.uid();
+    
+    if _ws_id is not null then
+      perform set_config('horset.cache_workspace_id', _ws_id, true);
+      return _ws_id::uuid;
+    end if;
+  exception when others then
+  end;
+
+  return null;
+end;
+$$ language plpgsql stable security definer parallel safe;
+
+-- ฟังก์ชันดึงสิทธิ์การใช้งาน (role) โดยเลี่ยง Recursion 100%
 create or replace function public.get_current_user_role()
 returns text as $$
-  select role from public.profiles where id = auth.uid();
-$$ language sql stable security definer parallel safe;
+declare
+  _cached_role text;
+  _claims_text text;
+  _claims json;
+  _role text;
+begin
+  _cached_role := current_setting('horset.cache_role', true);
+  if _cached_role is not null and _cached_role <> '' then
+    return _cached_role;
+  end if;
 
+  _claims_text := current_setting('request.jwt.claims', true);
+  if _claims_text is not null and _claims_text <> '' then
+    begin
+      _claims := _claims_text::json;
+      _role := nullif(_claims->'user_metadata'->>'role', '');
+      if _role is not null then
+        perform set_config('horset.cache_role', _role, true);
+        return _role;
+      end if;
+    exception when others then
+    end;
+  end if;
+
+  begin
+    select nullif(raw_user_meta_data->>'role', '') into _role 
+    from auth.users 
+    where id = auth.uid();
+    
+    if _role is not null then
+      perform set_config('horset.cache_role', _role, true);
+      return _role;
+    end if;
+  exception when others then
+  end;
+
+  return 'tenant';
+end;
+$$ language plpgsql stable security definer parallel safe;
+
+-- ฟังก์ชันดึงเบอร์โทรศัพท์ (phone) โดยเลี่ยง Recursion 100%
 create or replace function public.get_current_user_phone()
 returns text as $$
-  select phone from public.profiles where id = auth.uid();
-$$ language sql stable security definer parallel safe;
+declare
+  _cached_phone text;
+  _claims_text text;
+  _claims json;
+  _phone text;
+begin
+  _cached_phone := current_setting('horset.cache_phone', true);
+  if _cached_phone is not null and _cached_phone <> '' then
+    return _cached_phone;
+  end if;
+
+  _claims_text := current_setting('request.jwt.claims', true);
+  if _claims_text is not null and _claims_text <> '' then
+    begin
+      _claims := _claims_text::json;
+      _phone := nullif(_claims->'user_metadata'->>'phone', '');
+      if _phone is not null then
+        perform set_config('horset.cache_phone', _phone, true);
+        return _phone;
+      end if;
+    exception when others then
+    end;
+  end if;
+
+  begin
+    select nullif(raw_user_meta_data->>'phone', '') into _phone 
+    from auth.users 
+    where id = auth.uid();
+    
+    if _phone is not null then
+      perform set_config('horset.cache_phone', _phone, true);
+      return _phone;
+    end if;
+  exception when others then
+  end;
+
+  return null;
+end;
+$$ language plpgsql stable security definer parallel safe;
 
 
 -- 2. เคลียร์และแยกนโยบาย RLS (SELECT / MANAGE) บนตาราง PROFILES
