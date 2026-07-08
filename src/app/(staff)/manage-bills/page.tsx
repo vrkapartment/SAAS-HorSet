@@ -127,10 +127,10 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
     const m = String(targetDate.getMonth() + 1).padStart(2, "0")
     const val = `${y}-${m}`
     
-    // ลบการกรองข้อจำกัดตามเดือนสมัครใช้งาน เพื่อให้สามารถเลือกเดือนย้อนหลัง/สลับเดือนได้อิสระ
-    // if (registrationCycle && val < registrationCycle) {
-    //   continue
-    // }
+    // กรองไม่ให้แสดงรอบบิลก่อนเดือนที่สมัครใช้งาน
+    if (registrationCycle && val < registrationCycle) {
+      continue
+    }
 
     options.push({
       value: val,
@@ -193,7 +193,21 @@ function ManageBillsContent() {
 
   useEffect(() => {
     // หากมี targetCycle จาก URL อยู่แล้ว ให้ข้ามการโหลดจาก sessionStorage เพื่อให้เกียรติ URL
-    if (targetCycle) return
+    if (targetCycle) {
+      // ตรวจสอบความถูกต้องว่า targetCycle ต่ำกว่าเดือนที่ลงทะเบียนหรือไม่ หากต่ำกว่า ให้ดีดกลับมาลงทะเบียน
+      if (registrationCycle && targetCycle < registrationCycle) {
+        setBillingCycle(registrationCycle)
+        const parts = registrationCycle.split('-')
+        const params = new URLSearchParams(window.location.search)
+        params.set("cycle", registrationCycle)
+        if (parts.length === 2) {
+          params.set("year", parts[0])
+          params.set("month", parts[1])
+        }
+        router.replace(`?${params.toString()}`, { scroll: false })
+      }
+      return
+    }
 
     if (typeof window !== "undefined") {
       const cachedMonth = sessionStorage.getItem("dashboard_month")
@@ -201,21 +215,33 @@ function ManageBillsContent() {
       
       if (cachedMonth && cachedYear) {
         const cachedCycle = `${cachedYear}-${cachedMonth}`
-        setBillingCycle(cachedCycle)
-        
-        // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
-        const params = new URLSearchParams(window.location.search)
-        params.set("cycle", cachedCycle)
-        params.set("year", cachedYear)
-        params.set("month", cachedMonth)
-        router.replace(`?${params.toString()}`, { scroll: false })
-        return
+        if (!registrationCycle || cachedCycle >= registrationCycle) {
+          setBillingCycle(cachedCycle)
+          
+          // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
+          const params = new URLSearchParams(window.location.search)
+          params.set("cycle", cachedCycle)
+          params.set("year", cachedYear)
+          params.set("month", cachedMonth)
+          router.replace(`?${params.toString()}`, { scroll: false })
+          return
+        }
       }
     }
 
     const current = getCurrentBillingCycle()
-    setBillingCycle(current)
-  }, [targetCycle])
+    if (registrationCycle && current < registrationCycle) {
+      setBillingCycle(registrationCycle)
+    } else {
+      setBillingCycle(current)
+    }
+  }, [registrationCycle, targetCycle, router])
+
+  useEffect(() => {
+    if (registrationCycle && billingCycle < registrationCycle) {
+      setBillingCycle(registrationCycle)
+    }
+  }, [registrationCycle, billingCycle])
 
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
@@ -245,12 +271,24 @@ function ManageBillsContent() {
   const [createBillModalOpen, setCreateBillModalOpen] = useState(false)
   const [savingRows, setSavingRows] = useState<Record<string, boolean>>({})
 
-  // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ
+  // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ โดยระวังไม่ให้ต่ำกว่า registrationCycle เพื่อป้องกัน infinite loop ของการอัปเดต State
   useEffect(() => {
     if (targetCycle && targetCycle !== billingCycle) {
-      setBillingCycle(targetCycle)
+      if (registrationCycle && targetCycle < registrationCycle) {
+        setBillingCycle(registrationCycle)
+        const parts = registrationCycle.split('-')
+        const params = new URLSearchParams(window.location.search)
+        params.set("cycle", registrationCycle)
+        if (parts.length === 2) {
+          params.set("year", parts[0])
+          params.set("month", parts[1])
+        }
+        router.replace(`?${params.toString()}`, { scroll: false })
+      } else {
+        setBillingCycle(targetCycle)
+      }
     }
-  }, [targetCycle, billingCycle])
+  }, [targetCycle, billingCycle, registrationCycle, router])
 
   // เคลียร์/เปิดโมดอลสลิปตาม Query Parameter verify_bill_id อัตโนมัติ
   useEffect(() => {
