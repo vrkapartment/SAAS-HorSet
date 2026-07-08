@@ -144,7 +144,8 @@ export default function TenantsPage() {
   const handleDownloadTemplate = async () => {
     try {
       showToast("⏳ กำลังจัดเตรียมข้อมูลเทมเพลต...", "info")
-      const roomsRes = await getRooms()
+      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      const roomsRes = await getRooms(wsId)
       let sortedRooms: any[] = []
       
       if (roomsRes.success && roomsRes.data) {
@@ -390,7 +391,7 @@ export default function TenantsPage() {
         getTenants(),
         getOldTenants(),
         getFinanceSettings(wsId).catch(() => ({ success: false, data: null })),
-        getRooms().catch(() => ({ success: false, data: [] }))
+        getRooms(wsId).catch(() => ({ success: false, data: [] }))
       ])
 
       if (roomsRes?.success && roomsRes.data) {

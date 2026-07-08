@@ -21,7 +21,12 @@ export async function getTenants() {
     const { data, error } = await supabase
       .from("tenants")
       .select(`
-        *,
+        id,
+        tenant_name,
+        tenant_phone,
+        line_user_id,
+        lease_start,
+        lease_end,
         rooms (
           room_number
         )
@@ -273,9 +278,14 @@ export async function getOldTenants() {
 
   try {
     const supabase = await createClient()
+
+    // จำกัดประวัติผู้เช่าเก่าไว้แค่ 365 วันล่าสุด เพื่อไม่ให้ query ช้าลงเรื่อยๆ ตามอายุการใช้งานของหอ
+    const cutoffDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()
+
     const { data, error } = await supabase
       .from("tenants_old")
-      .select("*")
+      .select("id, tenant_id, room_number, tenant_name, tenant_phone, line_user_id, lease_start, lease_end, moved_out_at")
+      .gte("moved_out_at", cutoffDate)
       .order("moved_out_at", { ascending: false })
 
     if (error) {
