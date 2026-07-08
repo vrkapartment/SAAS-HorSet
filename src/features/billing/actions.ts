@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { verifyPortalToken } from "@/features/tenant/actions"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { calculateLateDays } from "./utils"
 import { getRooms } from "@/features/room/actions"
@@ -194,7 +195,13 @@ export async function createBill(
 
 
 
-export async function updateBillStatus(id: string, status: "unpaid" | "pending" | "paid", slipUrl?: string | null, amount?: number) {
+export async function updateBillStatus(
+  id: string,
+  status: "unpaid" | "pending" | "paid",
+  slipUrl?: string | null,
+  amount?: number,
+  portalAuth?: { workspaceId: string; roomNumber: string; token: string }
+) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
@@ -203,10 +210,47 @@ export async function updateBillStatus(id: string, status: "unpaid" | "pending" 
     const supabase = await createClient()
     let activeClient = supabase
 
-    // ความปลอดภัยสูงมาก (High Security): 
-    // - หากผู้เช่ากดส่งสลิปเพื่อขอตรวจสอบ (สถานะเป็น "pending") อนุญาตให้ใช้ Admin Client บายพาส RLS ได้ 
+    // ความปลอดภัยสูงมาก (High Security):
+    // - หากผู้เช่ากดส่งสลิปเพื่อขอตรวจสอบ (สถานะเป็น "pending") อนุญาตให้ใช้ Admin Client บายพาส RLS ได้
     // - หากเป็นค่ายอดชำระจริง ("paid" หรือ "unpaid") ที่ต้องการสิทธิ์แอดมิน ให้ใช้สิทธิ์คุกกี้ผู้ใช้ตาม RLS ทั่วไป เพื่อป้องกันการแฮกเปลี่ยนสถานะบิลของตนเอง
     if (status === "pending") {
+      // ต้องพิสูจน์ก่อนว่าผู้เรียกเป็นเจ้าของบิลนี้จริง ก่อนอนุญาตให้บายพาส RLS
+      // ไม่เช่นนั้นใครก็สามารถส่ง bill id ของ workspace/ห้องอื่นเข้ามาแก้ไขได้ (IDOR)
+      let isOwner = false
+
+      // เส้นทางที่ 1: ผู้เช่าที่ login ปกติ - ถ้า session ปัจจุบันมองเห็นบิลนี้ผ่าน RLS ปกติได้
+      // (นโยบาย "Read bills for tenants" อนุญาตเฉพาะบิลของห้องตัวเองเท่านั้น) แปลว่าเป็นเจ้าของจริง
+      const { data: visibleBill } = await supabase.from("bills").select("id").eq("id", id).maybeSingle()
+      if (visibleBill) {
+        isOwner = true
+      }
+
+      // เส้นทางที่ 2: หน้า Portal แบบไม่ต้อง Login (ไม่มี session ให้ RLS ตรวจ) - ตรวจสอบผ่าน token เซ็นชื่อแทน
+      if (!isOwner && portalAuth?.workspaceId && portalAuth?.roomNumber && portalAuth?.token) {
+        const tokenValid = await verifyPortalToken(portalAuth.workspaceId, portalAuth.roomNumber, portalAuth.token)
+        if (tokenValid) {
+          const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+          if (url && serviceKey && !serviceKey.includes("placeholder")) {
+            const checkClient = createSupabaseClient(url, serviceKey, {
+              auth: { persistSession: false, autoRefreshToken: false }
+            })
+            const { data: scopedBill } = await checkClient
+              .from("bills")
+              .select("id")
+              .eq("id", id)
+              .eq("workspace_id", portalAuth.workspaceId)
+              .eq("room_number", portalAuth.roomNumber)
+              .maybeSingle()
+            if (scopedBill) isOwner = true
+          }
+        }
+      }
+
+      if (!isOwner) {
+        return { success: false, error: "คุณไม่มีสิทธิ์แก้ไขบิลนี้" }
+      }
+
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
       if (url && serviceKey && !serviceKey.includes("placeholder")) {

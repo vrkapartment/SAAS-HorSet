@@ -600,7 +600,17 @@ export default function TenantPortal() {
           .getPublicUrl(fileName)
 
         // 4. Update Database Bill Status
-        const res = await updateBillStatus(bill.id, "pending", publicUrl, totalAmount)
+        let portalAuth: { workspaceId: string; roomNumber: string; token: string } | undefined
+        if (typeof window !== "undefined") {
+          const searchParams = new URLSearchParams(window.location.search)
+          const wsId = searchParams.get("workspace_id") || ""
+          const rNum = searchParams.get("room_number") || ""
+          const token = searchParams.get("token") || ""
+          if (wsId && rNum && token) {
+            portalAuth = { workspaceId: wsId, roomNumber: rNum, token }
+          }
+        }
+        const res = await updateBillStatus(bill.id, "pending", publicUrl, totalAmount, portalAuth)
         setUploading(false)
 
         if (res.success) {

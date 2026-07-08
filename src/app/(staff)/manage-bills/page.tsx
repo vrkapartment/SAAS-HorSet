@@ -1041,8 +1041,10 @@ function ManageBillsContent() {
       return (10000 - prev) + curr
     }
 
-    let eUnits = 0
-    let wUnits = 0
+    // เริ่มต้นด้วยหน่วยที่บันทึกไว้เดิมในบิล (ถ้ามี) ไม่ใช่ 0 เสมอ
+    // เพราะถ้ากดบันทึกแค่ไฟหรือแค่น้ำอย่างเดียว จะได้ไม่ไปเขียนทับอีกค่าที่เคยบันทึกไว้แล้วให้กลายเป็น 0
+    let eUnits = Number(item.electricUnits) || 0
+    let wUnits = Number(item.waterUnits) || 0
 
     if (type === "electric" || type === "all") {
       if (elecVal === "" || isNaN(elecVal as number)) {
