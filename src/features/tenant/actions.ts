@@ -213,7 +213,7 @@ export async function lazyCleanupPastDueTenants(workspaceId: string) {
     // 2. ดึงรายชื่อผู้เช่าที่ต้องการทำความสะอาดและตรวจสอบความถูกต้องของสิทธิ์ผู้ใช้
     const { data: tenants, error: fetchTenantsError } = await supabase
       .from("tenants")
-      .select("id, room_id, rooms(room_number)")
+      .select("id, room_id, tenant_name, tenant_phone, line_user_id, lease_start, lease_end, rooms(room_number)")
       .in("id", tenantIdsToCleanup)
       .eq("workspace_id", workspaceId)
 
@@ -223,16 +223,39 @@ export async function lazyCleanupPastDueTenants(workspaceId: string) {
       return { success: true, count: 0 }
     }
 
-    let cleanedCount = 0
+    // 1. Archive ทั้งหมดในครั้งเดียว (bulk insert)
+    const archiveRows = tenants.map(t => ({
+      workspace_id: workspaceId,
+      tenant_id: t.id,
+      room_id: t.room_id,
+      room_number: (t.rooms as any)?.room_number || "",
+      tenant_name: t.tenant_name,
+      tenant_phone: t.tenant_phone,
+      line_user_id: t.line_user_id,
+      lease_start: t.lease_start,
+      lease_end: t.lease_end,
+      moved_out_at: new Date().toISOString()
+    }))
+    const { error: archiveError } = await supabase.from("tenants_old").insert(archiveRows)
+    if (archiveError) {
+      console.error("Failed to bulk archive tenants:", archiveError)
+    }
 
-    // 3. ทยอยประมวลผลล้างสัญญาผู้เช่าและบันทึกข้อมูลประวัติผู้เช่าเก่า
-    for (const t of tenants) {
-      const roomNumber = (t.rooms as any)?.room_number || ""
-      const res = await deleteTenant(t.id, roomNumber)
-      if (res.success) {
-        cleanedCount++
+    // 2. ลบ tenants ทั้งหมดในครั้งเดียว (bulk delete)
+    const tenantIds = tenants.map(t => t.id)
+    const { error: deleteError } = await supabase.from("tenants").delete().in("id", tenantIds)
+    if (deleteError) throw deleteError
+
+    // 3. อัปเดตห้องเป็น available ทั้งหมดในครั้งเดียว (bulk update)
+    const roomIds = tenants.map(t => t.room_id).filter(Boolean) as string[]
+    if (roomIds.length > 0) {
+      const { error: roomUpdateError } = await supabase.from("rooms").update({ status: "available" }).in("id", roomIds)
+      if (roomUpdateError) {
+        console.error("Failed to bulk update rooms to available:", roomUpdateError)
       }
     }
+
+    const cleanedCount = tenants.length
 
     return { success: true, count: cleanedCount }
   } catch (error) {

@@ -559,34 +559,42 @@ function RoomsContent() {
         }
       }
 
+      let cachedCancellations = forceRefresh ? null : getCachedData(wsId, "cancelled_contracts")
       let loadedCancellations: any[] = []
-      if (hasLocalCancellations && tempCancellations.length > 0) {
-        // ย้ายข้อมูลไปยัง Supabase
-        const migrated = await migrateLocalStorageCancelledContracts(wsId, tempCancellations)
-        if (currentFetchId !== fetchCounterRef.current) return
-        if (migrated.success) {
-          localStorage.removeItem(`cancelled_contracts_${wsId}`)
-          console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
+      
+      if (cachedCancellations) {
+        loadedCancellations = cachedCancellations
+        setCancelledContracts(loadedCancellations)
+      } else {
+        if (hasLocalCancellations && tempCancellations.length > 0) {
+          // ย้ายข้อมูลไปยัง Supabase
+          const migrated = await migrateLocalStorageCancelledContracts(wsId, tempCancellations)
+          if (currentFetchId !== fetchCounterRef.current) return
+          if (migrated.success) {
+            localStorage.removeItem(`cancelled_contracts_${wsId}`)
+            console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
+            const res = await getCancelledContracts(wsId)
+            if (currentFetchId !== fetchCounterRef.current) return
+            if (res.success && res.data) {
+              loadedCancellations = res.data
+            }
+          } else if (migrated.error === "table_not_found") {
+            loadedCancellations = tempCancellations
+            console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
+          }
+        } else {
           const res = await getCancelledContracts(wsId)
           if (currentFetchId !== fetchCounterRef.current) return
           if (res.success && res.data) {
             loadedCancellations = res.data
+          } else if (res.error === "table_not_found") {
+            console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
+            loadedCancellations = []
           }
-        } else if (migrated.error === "table_not_found") {
-          loadedCancellations = tempCancellations
-          console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
         }
-      } else {
-        const res = await getCancelledContracts(wsId)
-        if (currentFetchId !== fetchCounterRef.current) return
-        if (res.success && res.data) {
-          loadedCancellations = res.data
-        } else if (res.error === "table_not_found") {
-          console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
-          loadedCancellations = []
-        }
+        setCancelledContracts(loadedCancellations)
+        if (wsId) setCachedData(wsId, "cancelled_contracts", loadedCancellations)
       }
-      setCancelledContracts(loadedCancellations)
 
       // ดึงข้อมูลตั้งค่าการเงินและบัญชีรับเงิน (เพื่อใช้แสดงค่ามัดจำ/ค่าเช่าล่วงหน้าในโมดอลลิงก์)
       getFinanceSettings(wsId).then(res => {
@@ -632,30 +640,28 @@ function RoomsContent() {
         }
       }
 
-      // LAZY CLEANUP: เรียกทำงานผ่าน Server Action ครั้งเดียวแบบรวมศูนย์ ลด Race Conditions และการส่งคำสั่งเขียน DB ซ้ำซ้อนจาก Client
+      // LAZY CLEANUP: เรียกทำงานเบื้องหลัง (fire-and-forget) ไม่บล็อกการโหลดหน้าหลัก
       if (roomsData.length > 0 && wsId) {
-        const cleanupRes = await lazyCleanupPastDueTenants(wsId)
-        
-        if (currentFetchId !== fetchCounterRef.current) return
-
-        if (cleanupRes.success && cleanupRes.count && cleanupRes.count > 0) {
-          console.log(`Lazy cleanup success: Removed ${cleanupRes.count} past-due tenants server-side. Refreshing view...`)
-          clearWorkspaceCache(wsId)
-          const [roomsResNew, typesResNew] = await Promise.all([getRooms(wsId), getRoomTypes(wsId)])
-          
+        lazyCleanupPastDueTenants(wsId).then(cleanupRes => {
           if (currentFetchId !== fetchCounterRef.current) return
-
-          if (roomsResNew.success && roomsResNew.data) {
-            const finalRooms = roomsResNew.data as RoomItem[]
-            setRooms(finalRooms)
-            setCachedData(wsId, "rooms", finalRooms)
+          if (cleanupRes.success && cleanupRes.count && cleanupRes.count > 0) {
+            console.log(`Lazy cleanup success: Removed ${cleanupRes.count} past-due tenants server-side. Refreshing view in background...`)
+            clearWorkspaceCache(wsId)
+            Promise.all([getRooms(wsId), getRoomTypes(wsId)]).then(([roomsResNew, typesResNew]) => {
+              if (currentFetchId !== fetchCounterRef.current) return
+              if (roomsResNew.success && roomsResNew.data) {
+                const finalRooms = roomsResNew.data as RoomItem[]
+                setRooms(finalRooms)
+                setCachedData(wsId, "rooms", finalRooms)
+              }
+              if (typesResNew.success && typesResNew.data) {
+                const finalTypes = typesResNew.data as RoomTypeItem[]
+                setRoomTypes(finalTypes)
+                setCachedData(wsId, "room_types", finalTypes)
+              }
+            }).catch(err => console.error("Refreshing rooms after lazy cleanup failed:", err))
           }
-          if (typesResNew.success && typesResNew.data) {
-            const finalTypes = typesResNew.data as RoomTypeItem[]
-            setRoomTypes(finalTypes)
-            setCachedData(wsId, "room_types", finalTypes)
-          }
-        }
+        }).catch(err => console.error("Lazy cleanup failed:", err))
       }
     } catch (err) {
       setError("เกิดข้อผิดพลาดในการโหลดข้อมูลระบบห้องพัก")
@@ -1534,6 +1540,7 @@ function RoomsContent() {
     if (res.success || res.error === "table_not_found") {
       const updated = cancelledContracts.filter(c => c.id !== id)
       setCancelledContracts(updated)
+      if (wsId) setCachedData(wsId, "cancelled_contracts", updated)
       showToast("✓ ลบประวัติการยกเลิกสัญญาเรียบร้อยแล้ว", "success")
     } else {
       showToast(`✗ ไม่สามารถลบข้อมูลได้: ${res.error}`, "error")
