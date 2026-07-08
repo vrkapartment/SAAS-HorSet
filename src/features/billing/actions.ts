@@ -458,7 +458,12 @@ export async function updateBillStatus(
       }
     }
 
-    if (status === "pending" && finalData) {
+    // ถ้าไม่มีบิลไหนถูกอัปเดตจริง (id ผิด, บิลถูกลบไปแล้ว, หรือไม่มีสิทธิ์แก้ไข) ห้ามคืนค่าสำเร็จหลอกๆ
+    if (!finalData) {
+      return { success: false, error: "ไม่พบบิลที่ต้องการอัปเดต หรือคุณไม่มีสิทธิ์แก้ไขบิลนี้" }
+    }
+
+    if (status === "pending") {
       const workspaceId = finalData.workspace_id || billData?.workspace_id;
       if (workspaceId) {
         // Dynamically import to avoid circular dependencies
@@ -490,6 +495,48 @@ export async function deleteBill(id: string) {
 
   try {
     const supabase = await createClient()
+
+    // 1. ดึงข้อมูลบิลก่อนลบ เพื่อสำรองไว้ที่ bills_deleted ก่อนลบจริง (ห้ามลบข้อมูลการเงินถาวรโดยไม่มีสำรอง)
+    const { data: bill, error: fetchError } = await supabase
+      .from("bills")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error("Error fetching bill before deletion:", fetchError)
+    }
+
+    if (bill) {
+      const { error: archiveError } = await supabase
+        .from("bills_deleted")
+        .insert([{
+          original_bill_id: bill.id,
+          workspace_id: bill.workspace_id,
+          room_number: bill.room_number,
+          tenant_name: bill.tenant_name,
+          amount: bill.amount,
+          status: bill.status,
+          billing_cycle: bill.billing_cycle,
+          slip_url: bill.slip_url,
+          electric_units: bill.electric_units,
+          water_units: bill.water_units,
+          penalty_amount: bill.penalty_amount,
+          late_days: bill.late_days,
+          other_service_amount: bill.other_service_amount,
+          invoice_id: bill.invoice_id,
+          bill_created_at: bill.created_at,
+          bill_updated_at: bill.updated_at
+        }])
+
+      if (archiveError) {
+        console.error("Failed to archive bill to bills_deleted:", archiveError)
+        // หยุดทันทีถ้าสำรองข้อมูลไม่สำเร็จ ห้ามลบบิลจริงทิ้งแบบไม่มีการสำรอง
+        return { success: false, error: `ไม่สามารถสำรองข้อมูลบิลได้ก่อนลบ (${archiveError.message}) ระบบยกเลิกการลบเพื่อป้องกันข้อมูลสูญหาย` }
+      }
+    }
+
+    // 2. ลบบิลจริง
     const { error } = await supabase
       .from("bills")
       .delete()

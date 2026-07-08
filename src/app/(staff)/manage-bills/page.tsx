@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useTheme } from "next-themes"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
@@ -155,6 +155,7 @@ export default function ManageBillsPage() {
 
 function ManageBillsContent() {
   const router = useRouter()
+  const loadDataSeqRef = useRef(0)
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const searchParams = useSearchParams()
@@ -372,8 +373,11 @@ function ManageBillsContent() {
   }
 
   const loadData = async (cycle = billingCycle, forceRefresh = false, silent = false) => {
+    // กันไม่ให้คำตอบของรอบบิลเก่าที่โหลดช้ากว่ามาทับข้อมูลของรอบบิลใหม่ที่โหลดเสร็จก่อน
+    // (เช่น สลับ dropdown เดือนเร็วๆ ติดกัน) โดยยึดเฉพาะคำตอบของการเรียกครั้งล่าสุดเท่านั้น
+    const seq = ++loadDataSeqRef.current
     if (!silent) setLoading(true)
-    
+
     try {
       let userProfile = getCachedData("global", "profile")
       if (!userProfile || forceRefresh) {
@@ -474,6 +478,11 @@ function ManageBillsContent() {
           dbReplacements = dbReplacements || []
           dbPrevMeters = dbPrevMeters || []
         }
+      }
+
+      // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอบนี้กำลังโหลดอยู่ ให้ทิ้งผลลัพธ์รอบนี้ทั้งหมด
+      if (loadDataSeqRef.current !== seq) {
+        return
       }
 
       setRoomsList(rooms)
