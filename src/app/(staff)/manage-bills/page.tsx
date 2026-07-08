@@ -127,10 +127,10 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
     const m = String(targetDate.getMonth() + 1).padStart(2, "0")
     const val = `${y}-${m}`
     
-    // กรองไม่ให้แสดงรอบบิลก่อนเดือนที่สมัครใช้งาน
-    if (registrationCycle && val < registrationCycle) {
-      continue
-    }
+    // ลบการกรองข้อจำกัดตามเดือนสมัครใช้งาน เพื่อให้สามารถเลือกเดือนย้อนหลัง/สลับเดือนได้อิสระ
+    // if (registrationCycle && val < registrationCycle) {
+    //   continue
+    // }
 
     options.push({
       value: val,
@@ -201,33 +201,21 @@ function ManageBillsContent() {
       
       if (cachedMonth && cachedYear) {
         const cachedCycle = `${cachedYear}-${cachedMonth}`
-        if (!registrationCycle || cachedCycle >= registrationCycle) {
-          setBillingCycle(cachedCycle)
-          
-          // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
-          const params = new URLSearchParams(window.location.search)
-          params.set("cycle", cachedCycle)
-          params.set("year", cachedYear)
-          params.set("month", cachedMonth)
-          router.replace(`?${params.toString()}`, { scroll: false })
-          return
-        }
+        setBillingCycle(cachedCycle)
+        
+        // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
+        const params = new URLSearchParams(window.location.search)
+        params.set("cycle", cachedCycle)
+        params.set("year", cachedYear)
+        params.set("month", cachedMonth)
+        router.replace(`?${params.toString()}`, { scroll: false })
+        return
       }
     }
 
     const current = getCurrentBillingCycle()
-    if (registrationCycle && current < registrationCycle) {
-      setBillingCycle(registrationCycle)
-    } else {
-      setBillingCycle(current)
-    }
-  }, [registrationCycle, targetCycle])
-
-  useEffect(() => {
-    if (registrationCycle && billingCycle < registrationCycle) {
-      setBillingCycle(registrationCycle)
-    }
-  }, [registrationCycle, billingCycle])
+    setBillingCycle(current)
+  }, [targetCycle])
 
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
