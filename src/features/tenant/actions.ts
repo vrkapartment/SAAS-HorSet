@@ -148,7 +148,8 @@ export async function deleteTenant(id: string, roomNumber: string) {
 
       if (archiveError) {
         console.error("Failed to archive tenant to tenants_old:", archiveError)
-        // ดำเนินการต่อแม้ว่าการบันทึกประวัติล้มเหลว (เช่น ตารางยังไม่ได้รับการ Patch) เพื่อไม่ให้ระบบค้าง
+        // หยุดทันทีถ้าสำรองประวัติไม่สำเร็จ ห้ามลบข้อมูลผู้เช่าจริงทิ้งแบบไม่มีการสำรอง (violates soft-delete policy)
+        return { success: false, error: `ไม่สามารถสำรองประวัติผู้เช่าได้ก่อนลบ (${archiveError.message}) ระบบยกเลิกการลบเพื่อป้องกันข้อมูลสูญหาย` }
       }
     }
 
@@ -244,6 +245,8 @@ export async function lazyCleanupPastDueTenants(workspaceId: string) {
     const { error: archiveError } = await supabase.from("tenants_old").insert(archiveRows)
     if (archiveError) {
       console.error("Failed to bulk archive tenants:", archiveError)
+      // หยุดทันทีถ้าสำรองประวัติไม่สำเร็จ ห้ามลบข้อมูลผู้เช่าจริงทิ้งแบบไม่มีการสำรอง (violates soft-delete policy)
+      return { success: false, error: `ไม่สามารถสำรองประวัติผู้เช่าได้ก่อนลบ (${archiveError.message})`, count: 0 }
     }
 
     // 2. ลบ tenants ทั้งหมดในครั้งเดียว (bulk delete)
