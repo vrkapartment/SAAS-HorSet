@@ -26,7 +26,7 @@ import {
   Home,
   ShieldAlert
 } from "lucide-react"
-import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
+import { getBills, createBill, updateBillStatus, getBillingPageData, saveAllBillsForCycle, type BulkBillItem } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
@@ -1237,115 +1237,45 @@ function UnifiedBillingContent() {
     }
 
     setSavingAll(true)
-    setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: "" })
+    setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: "กำลังบันทึกทั้งหมด..." })
 
     try {
-      let currentIdx = 0
-      const updatedMetersList: any[] = []
-      const updatedBillsList: any[] = []
+      const items: BulkBillItem[] = unifiedItems.map(item => ({
+        roomNumber: item.roomNumber,
+        tenantName: item.tenantName || null,
+        elecPrev: item.elecPrev === "" ? 0 : Number(item.elecPrev),
+        elecCurr: item.elecCurr === "" ? "" : Number(item.elecCurr),
+        waterPrev: item.waterPrev === "" ? 0 : Number(item.waterPrev),
+        waterCurr: item.waterCurr === "" ? "" : Number(item.waterCurr),
+        otherServiceAmount: Number(item.otherServiceAmount || 0),
+        status: item.billStatus === "not_created" ? "unpaid" : item.billStatus as "unpaid" | "pending" | "paid",
+        hasNotifiedCheckout: !!item.hasNotifiedCheckout
+      }))
+
+      const result = await saveAllBillsForCycle(billingCycle, items)
+
+      if (!result.success) {
+        alert(`เกิดข้อผิดพลาดในการบันทึก: ${result.error}`)
+        setSavingAll(false)
+        return
+      }
+
+      const updatedMetersList = (result.data?.meters || []).map((m: any) => formatDbMeterToCamelCase(m))
+      const updatedBillsList = (result.data?.bills || []).map((b: any) => formatDbBillToCamelCase(b))
+
       const stateUpdates: { [roomNumber: string]: { formattedMeter: any; formattedBill?: any } } = {}
 
-      // โหมด Supabase
-      for (const item of unifiedItems) {
-        currentIdx++
-        if (item.hasNotifiedCheckout) {
-          continue // ข้ามการออกบิลห้องที่แจ้งย้ายออกแล้วอย่างถาวร
+      updatedMetersList.forEach((m: any) => {
+        stateUpdates[m.roomNumber] = { formattedMeter: m }
+      })
+
+      updatedBillsList.forEach((b: any) => {
+        if (stateUpdates[b.roomNumber]) {
+          stateUpdates[b.roomNumber].formattedBill = b
+        } else {
+          stateUpdates[b.roomNumber] = { formattedMeter: undefined, formattedBill: b }
         }
-        setSavingProgress({ current: currentIdx, total: unifiedItems.length, currentRoom: item.roomNumber })
-
-        const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
-        const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
-        const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
-        const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
-
-        const repElec = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "electric")
-        const repWater = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "water")
-
-        let eUnits = 0
-        if (elecVal !== "") {
-          if (repElec) {
-            const oldUnits = getUnits(repElec.oldFinalReading, elecPrevVal)
-            const newUnits = getUnits(Number(elecVal), repElec.newStartReading)
-            eUnits = oldUnits + newUnits
-          } else {
-            eUnits = getUnits(Number(elecVal), elecPrevVal)
-          }
-        }
-
-        let wUnits = 0
-        if (waterVal !== "") {
-          if (repWater) {
-            const oldUnits = getUnits(repWater.oldFinalReading, waterPrevVal)
-            const newUnits = getUnits(Number(waterVal), repWater.newStartReading)
-            wUnits = oldUnits + newUnits
-          } else {
-            wUnits = getUnits(Number(waterVal), waterPrevVal)
-          }
-        }
-        
-        const elecCost = elecVal === "" 
-          ? 0 
-          : (!item.waiveElectricMin && electricMinChecked && eUnits <= electricMinUnit
-              ? electricMinUnit * elecRate
-              : eUnits * elecRate)
-
-        const waterCost = waterVal === "" 
-          ? 0 
-          : (!item.waiveWaterMin && waterMinChecked && wUnits <= waterMinUnit
-              ? waterMinUnit * waterRate
-              : wUnits * waterRate)
-              
-        const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
-        const extraExpenses = roomInfo?.extraExpenses || []
-        const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
-
-        const otherServiceVal = Number(item.otherServiceAmount || 0)
-        const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal + extraExpensesSum
-
-        // 1. บันทึกเลขมิเตอร์
-        const meterRes = await saveMeterRecord(
-          item.roomNumber,
-          billingCycle,
-          elecPrevVal,
-          elecVal,
-          waterPrevVal,
-          waterVal
-        )
-        if (!meterRes.success) {
-          alert(`เกิดข้อผิดพลาดในการบันทึกมิเตอร์ห้อง ${item.roomNumber}: ${meterRes.error}`)
-          setSavingAll(false)
-          return
-        }
-
-        const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
-        updatedMetersList.push(formattedMeter)
-        stateUpdates[item.roomNumber] = { formattedMeter }
-
-        // 2. บันทึกและออกบิล (เฉพาะกรณีมีผู้เช่าเท่านั้น)
-        if (!item.tenantName) {
-          continue
-        }
-
-        const billRes = await createBill(
-          item.roomNumber,
-          item.tenantName || "ผู้เช่า",
-          totalAmount,
-          item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
-          billingCycle,
-          eUnits,
-          wUnits,
-          otherServiceVal
-        )
-        if (!billRes.success) {
-          alert(`เกิดข้อผิดพลาดในการสร้างบิลห้อง ${item.roomNumber}: ${billRes.error}`)
-          setSavingAll(false)
-          return
-        }
-
-        const formattedBill = formatDbBillToCamelCase(billRes.data)
-        updatedBillsList.push(formattedBill)
-        stateUpdates[item.roomNumber].formattedBill = formattedBill
-      }
+      })
 
       // ปลุกพลัง Optimistic UI: อัปเดต React State ทันทีแบบไม่ต้องพึ่งการโหลดเน็ตเวิร์ก
       setUnifiedItems(prev => prev.map(i => {

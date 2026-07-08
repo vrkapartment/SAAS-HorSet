@@ -670,3 +670,116 @@ export async function getBillingPageData(cycle: string, prevCycle: string, works
   }
 }
 
+export interface BulkBillItem {
+  roomNumber: string
+  tenantName: string | null
+  elecPrev: number
+  elecCurr: number | ""
+  waterPrev: number
+  waterCurr: number | ""
+  otherServiceAmount: number
+  status: "unpaid" | "pending" | "paid"
+  hasNotifiedCheckout: boolean
+}
+
+export async function saveAllBillsForCycle(billingCycle: string, items: BulkBillItem[]) {
+  if (!isSupabaseConfigured) return { success: false, fallback: true }
+
+  try {
+    const supabase = await createClient()
+
+    // 1. ดึง context ที่ใช้ร่วมกันทุกห้อง "ครั้งเดียว" (แทนที่จะดึงซ้ำทุกห้องเหมือนเดิม)
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || !profileRes.data) {
+      return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
+    }
+    const workspaceId = profileRes.data.workspace_id
+
+    const financeRes = await getFinanceSettings(workspaceId)
+    if (!financeRes.success || !financeRes.data) {
+      return { success: false, error: "ไม่สามารถดึงข้อมูลตั้งค่าการเงินได้" }
+    }
+    const settings = financeRes.data
+
+    const { data: roomsData, error: roomsError } = await supabase
+      .from("rooms")
+      .select(`*, room_types (default_rent)`)
+      .eq("workspace_id", workspaceId)
+    if (roomsError) throw roomsError
+    const roomsMap = new Map(roomsData.map(r => [r.room_number, r]))
+
+    // 2. คำนวณทุกห้องใน memory (ไม่มี await ในลูปนี้เลย)
+    const meterRows: any[] = []
+    const billRows: any[] = []
+    const skippedRooms: string[] = []
+
+    for (const item of items) {
+      if (item.hasNotifiedCheckout) { skippedRooms.push(item.roomNumber); continue }
+
+      const elecVal = item.elecCurr === "" ? null : Number(item.elecCurr)
+      const waterVal = item.waterCurr === "" ? null : Number(item.waterCurr)
+
+      meterRows.push({
+        workspace_id: workspaceId,
+        room_number: item.roomNumber,
+        billing_cycle: billingCycle,
+        elec_prev: item.elecPrev,
+        elec_curr: elecVal,
+        water_prev: item.waterPrev,
+        water_curr: waterVal
+      })
+
+      if (!item.tenantName) continue  // ไม่มีผู้เช่า ไม่ต้องออกบิล (ตาม logic เดิม)
+
+      const roomData = roomsMap.get(item.roomNumber)
+      if (!roomData) { skippedRooms.push(item.roomNumber); continue }
+
+      const eUnits = elecVal !== null ? Math.max(0, elecVal - item.elecPrev) : 0
+      const wUnits = waterVal !== null ? Math.max(0, waterVal - item.waterPrev) : 0
+      const baseRent = roomData.room_types ? Number(roomData.room_types.default_rent) : Number(roomData.base_rent || 0)
+      const extraExpensesSum = (roomData.extra_expenses || []).reduce((a: number, c: any) => a + Number(c.amount || 0), 0)
+
+      // ใช้ calculateBillTotal ตัวเดียวกับที่ createBill ใช้อยู่ (ห้ามเขียนสูตรซ้ำ)
+      const { total } = calculateBillTotal({
+        baseRent, electricUnitsUsed: eUnits, waterUnitsUsed: wUnits,
+        electricRate: settings.electric_rate, waterRate: settings.water_rate,
+        commonFee: settings.common_fee, otherServiceAmount: item.otherServiceAmount,
+        extraExpensesSum,
+        waiveWaterMin: !!roomData.waive_water_min, waterMinChecked: settings.water_min_checked, waterMinUnit: settings.water_min_unit,
+        waiveElectricMin: !!roomData.waive_electric_min, electricMinChecked: settings.electric_min_checked, electricMinUnit: settings.electric_min_unit
+      })
+
+      billRows.push({
+        workspace_id: workspaceId,
+        room_number: item.roomNumber,
+        tenant_name: item.tenantName,
+        amount: total,
+        status: item.status,
+        billing_cycle: billingCycle,
+        electric_units: eUnits,
+        water_units: wUnits,
+        other_service_amount: item.otherServiceAmount,
+        invoice_id: `INV-${billingCycle.replace(/-/g, "")}-${item.roomNumber}`
+      })
+    }
+
+    // 3. บันทึกเป็น bulk upsert 2 ครั้ง (แทน N×2 ครั้ง)
+    const { data: savedMeters, error: meterErr } = await supabase
+      .from("meter_records")
+      .upsert(meterRows, { onConflict: "workspace_id,room_number,billing_cycle" })
+      .select()
+    if (meterErr) throw meterErr
+
+    const { data: savedBills, error: billErr } = await supabase
+      .from("bills")
+      .upsert(billRows, { onConflict: "workspace_id,invoice_id" })
+      .select()
+    if (billErr) throw billErr
+
+    return { success: true, data: { meters: savedMeters, bills: savedBills, skippedRooms } }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูลทั้งหมด"
+    return { success: false, error: errorMessage }
+  }
+}
+
