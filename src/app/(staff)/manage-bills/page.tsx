@@ -188,7 +188,7 @@ function ManageBillsContent() {
 
   const isDark = mounted ? resolvedTheme === "dark" : true
 
-  const [billingCycle, setBillingCycle] = useState("2026-06")
+  const [billingCycle, setBillingCycle] = useState(getCurrentBillingCycle)
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
   useEffect(() => {

@@ -174,7 +174,7 @@ function UnifiedBillingContent() {
 
   const isDark = mounted ? resolvedTheme === "dark" : true
 
-  const [billingCycle, setBillingCycle] = useState("2026-06")
+  const [billingCycle, setBillingCycle] = useState(getCurrentBillingCycle)
   const [pageActiveTab, setPageActiveTab] = useState<"meters" | "summary">("meters")
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
