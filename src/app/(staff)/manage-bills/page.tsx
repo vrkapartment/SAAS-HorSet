@@ -36,7 +36,6 @@ import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISS
 
 // Extracted Billing Sub-components
 import BillingSummaryStats from "@/features/billing/components/BillingSummaryStats"
-import SavingProgressOverlay from "@/features/billing/components/SavingProgressOverlay"
 import SlipVerificationModal from "@/features/billing/components/SlipVerificationModal"
 import CreateBillModal from "@/features/billing/components/CreateBillModal"
 import MeterReadingTable from "@/features/billing/components/MeterReadingTable"
@@ -256,6 +255,7 @@ function ManageBillsContent() {
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [slipModalOpen, setSlipModalOpen] = useState(false)
   const [createBillModalOpen, setCreateBillModalOpen] = useState(false)
+  const [savingRows, setSavingRows] = useState<Record<string, boolean>>({})
 
   // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ
   useEffect(() => {
@@ -282,9 +282,6 @@ function ManageBillsContent() {
   const [elecUnitsManual, setElecUnitsManual] = useState(80)
   const [waterUnitsManual, setWaterUnitsManual] = useState(10)
   const [otherServiceAmountManual, setOtherServiceAmountManual] = useState(0)
-
-  const [savingAll, setSavingAll] = useState(false)
-  const [savingProgress, setSavingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
 
   const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
   const selectedManualRoom = roomsList.find(r => r.roomNumber === newRoomNumber)
@@ -889,8 +886,7 @@ function ManageBillsContent() {
       otherServiceAmount: item.otherServiceAmount || 0
     })
     
-    setSavingAll(true)
-    setSavingProgress({ current: 1, total: 1, currentRoom: roomNumber })
+    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
     
     try {
       const { updateBillPenalty } = await import("@/features/billing/actions")
@@ -922,7 +918,7 @@ function ManageBillsContent() {
       console.error("💥 [Client] Exception caught in handleSaveLateDays:", err)
       alert(`💥 เกิดข้อผิดพลาดร้ายแรงในการบันทึกค่าปรับ:\n${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setSavingAll(false)
+      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
       console.log("🏁 [Client] handleSaveLateDays finished execution flow")
     }
   }
@@ -1077,7 +1073,7 @@ function ManageBillsContent() {
       return
     }
 
-    setSavingAll(true)
+    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
     try {
       const activeElecCurr = elecVal === "" ? 0 : Number(elecVal)
       const activeWaterCurr = waterVal === "" ? 0 : Number(waterVal)
@@ -1095,7 +1091,7 @@ function ManageBillsContent() {
 
       if (!meterResult.success) {
         alert(meterResult.error || "บันทึกข้อมูลมิเตอร์ไม่สำเร็จ")
-        setSavingAll(false)
+        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
         return
       }
 
@@ -1136,7 +1132,7 @@ function ManageBillsContent() {
 
         if (!billResult.success) {
           alert(billResult.error || "สร้างบิลไม่สำเร็จ แต่บันทึกมิเตอร์สำเร็จแล้ว")
-          setSavingAll(false)
+          setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
           return
         }
         createdBillObj = billResult.data
@@ -1150,144 +1146,10 @@ function ManageBillsContent() {
       console.error(e)
       alert("เกิดข้อผิดพลาดไม่คาดคิด")
     } finally {
-      setSavingAll(false)
+      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
     }
   }
 
-  const handleSaveAll = async (type?: "electric" | "water") => {
-    if (!userPermissions.manage_bills_edit) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
-      return
-    }
-    const editedItems = unifiedItems.filter(item => {
-      if (item.isMeterSaved) return false;
-      if (item.hasNotifiedCheckout) return false; // ข้ามห้องที่แจ้งย้ายออกแล้ว เพราะเราจะไม่ประมวลผลออกบิลปกติอยู่แล้ว
-      if (type === "electric") {
-        return item.elecCurr !== "";
-      } else if (type === "water") {
-        return item.waterCurr !== "";
-      } else {
-        return item.elecCurr !== "" && item.waterCurr !== "";
-      }
-    })
-
-    if (editedItems.length === 0) {
-      const typeText = type === "electric" ? "ไฟฟ้า" : type === "water" ? "ประปา" : "ไฟฟ้าและประปา"
-      alert(`ไม่มีห้องที่ต้องการบันทึก (กรุณากรอกตัวเลขมิเตอร์${typeText}ให้ครบถ้วนในแถวที่แก้ไข)`)
-      return
-    }
-
-    setSavingAll(true)
-    setSavingProgress({ current: 0, total: editedItems.length, currentRoom: "" })
-
-    const getUnits = (curr: number, prev: number) => {
-      if (curr >= prev) return curr - prev
-      return (10000 - prev) + curr
-    }
-
-    try {
-      for (let i = 0; i < editedItems.length; i++) {
-        const item = editedItems[i]
-        setSavingProgress({ current: i + 1, total: editedItems.length, currentRoom: item.roomNumber })
-
-        const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
-        const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
-        const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
-        const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
-
-        const repElec = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "electric")
-        const repWater = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "water")
-
-        let eUnits = 0
-        if (elecVal !== "") {
-          if (repElec) {
-            const oldUnits = getUnits(repElec.oldFinalReading, elecPrevVal)
-            const newUnits = getUnits(Number(elecVal), repElec.newStartReading)
-            eUnits = oldUnits + newUnits
-          } else {
-            eUnits = getUnits(Number(elecVal), elecPrevVal)
-          }
-        }
-
-        let wUnits = 0
-        if (waterVal !== "") {
-          if (repWater) {
-            const oldUnits = getUnits(repWater.oldFinalReading, waterPrevVal)
-            const newUnits = getUnits(Number(waterVal), repWater.newStartReading)
-            wUnits = oldUnits + newUnits
-          } else {
-            wUnits = getUnits(Number(waterVal), waterPrevVal)
-          }
-        }
-
-        if (eUnits > 3000 || wUnits > 3000) {
-          continue
-        }
-
-        const activeElecCurr = elecVal === "" ? 0 : Number(elecVal)
-        const activeWaterCurr = waterVal === "" ? 0 : Number(waterVal)
-        const activeElecPrev = elecPrevVal
-        const activeWaterPrev = waterPrevVal
-
-        const meterResult = await saveMeterRecord(
-          item.roomNumber,
-          billingCycle,
-          activeElecPrev,
-          activeElecCurr,
-          activeWaterPrev,
-          activeWaterCurr
-        )
-
-        if (!meterResult.success) {
-          continue
-        }
-
-        if (item.tenantName) {
-          const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
-          const extraExpenses = roomInfo?.extraExpenses || []
-          const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
-
-          const { total: billTotalAmount } = calculateBillTotal({
-            baseRent: item.baseRent,
-            electricUnitsUsed: eUnits,
-            waterUnitsUsed: wUnits,
-            electricRate: elecRate,
-            waterRate: waterRate,
-            commonFee: commonFee,
-            otherServiceAmount: item.otherServiceAmount || 0,
-            extraExpensesSum,
-            waiveWaterMin: !!item.waiveWaterMin,
-            waterMinChecked,
-            waterMinUnit,
-            waiveElectricMin: !!item.waiveElectricMin,
-            electricMinChecked,
-            electricMinUnit,
-            penaltyAmount: item.penaltyAmount || 0
-          })
-
-          await createBill(
-            item.roomNumber,
-            item.tenantName,
-            billTotalAmount,
-            item.billStatus === "not_created" ? "unpaid" : item.billStatus,
-            billingCycle,
-            eUnits,
-            wUnits,
-            item.otherServiceAmount || 0
-          )
-        }
-      }
-
-      const successText = type === "electric" ? "มิเตอร์ไฟ" : type === "water" ? "มิเตอร์น้ำ" : "มิเตอร์น้ำไฟ"
-      showToast(`บันทึก${successText}และสร้างบิลสำเร็จทั้งหมด ${editedItems.length} ห้อง!`)
-      await loadData(billingCycle, true)
-    } catch (e) {
-      console.error(e)
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลทั้งหมด")
-    } finally {
-      setSavingAll(false)
-    }
-  }
 
   // ส่งข้อมูลเข้า LINE OA ของจริง
   const handleSendLine = async (roomNumber: string) => {
@@ -1789,7 +1651,6 @@ function ManageBillsContent() {
         handleDownloadBillPdf={handleDownloadBillPdf}
         handleSendLine={handleSendLine}
         handleMarkAsPaid={handleMarkAsPaid}
-        handleSaveAll={handleSaveAll}
         roomsList={roomsList}
         billingCycle={billingCycle}
         workspaceName={workspaceName}
@@ -1805,6 +1666,7 @@ function ManageBillsContent() {
         }}
         handleDownloadAllBillsPdf={handleDownloadAllBillsPdf}
         downloadingAllPdf={downloadingAllPdf}
+        savingRows={savingRows}
       />
 
       {/* Modal ตรวจสอบสลิปโอนเงินธนาคาร */}
@@ -1846,11 +1708,7 @@ function ManageBillsContent() {
       />
 
       {/* Saving Overlay */}
-      <SavingProgressOverlay
-        isDark={isDark}
-        savingAll={savingAll}
-        savingProgress={savingProgress}
-      />
+      {/* Removed dead SavingProgressOverlay because handleSaveAll is unreachable in billing mode */}
     </>
   )
 }

@@ -28,7 +28,7 @@ interface MeterReadingTableProps {
   handleDownloadBillPdf: (item: any) => Promise<void>
   handleSendLine: (roomNumber: string) => void | Promise<void>
   handleMarkAsPaid: (billId: string, roomNumber: string) => Promise<void>
-  handleSaveAll: (type: "electric" | "water") => Promise<void>
+  handleSaveAll?: (type: "electric" | "water") => Promise<void>
   // New props for bulk LINE OA feature
   roomsList: any[]
   billingCycle: string
@@ -307,6 +307,7 @@ export default function MeterReadingTable({
   }
 
   const onSaveAllWithRolloverCheck = async (type: "electric" | "water") => {
+    if (!handleSaveAll) return;
     const itemsToSave = unifiedItems.filter(item => {
       if (type === "electric") {
         return item.elecCurr !== "" && !item.isMeterSaved;
