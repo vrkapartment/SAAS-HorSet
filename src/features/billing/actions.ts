@@ -8,6 +8,8 @@ import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, getMeterReplacements } from "@/features/meter/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 
+import { calculateBillTotal } from "./bill-calculator"
+
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
   process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
@@ -68,6 +70,69 @@ export async function createBill(
   try {
     const supabase = await createClient()
     
+    // 1. Get workspace_id from current profile
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || !profileRes.data) {
+      return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
+    }
+    const workspaceId = profileRes.data.workspace_id
+
+    // 2. Fetch workspace finance settings
+    const financeRes = await getFinanceSettings(workspaceId)
+    if (!financeRes.success || !financeRes.data) {
+      return { success: false, error: "ไม่สามารถดึงข้อมูลตั้งค่าการเงินได้" }
+    }
+    const settings = financeRes.data
+
+    // 3. Fetch room details
+    const { data: roomData, error: roomError } = await supabase
+      .from("rooms")
+      .select(`
+        *,
+        room_types (
+          default_rent
+        )
+      `)
+      .eq("room_number", roomNumber)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (roomError) throw roomError
+    if (!roomData) {
+      return { success: false, error: `ไม่พบข้อมูลห้องพักเลขที่ ${roomNumber}` }
+    }
+
+    const baseRent = roomData.room_types ? Number(roomData.room_types.default_rent) : Number(roomData.base_rent || 0)
+    const waiveElectricMin = !!roomData.waive_electric_min
+    const waiveWaterMin = !!roomData.waive_water_min
+    const extraExpenses = roomData.extra_expenses || []
+    const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
+    // 4. Calculate total on Server
+    const { elecCost, waterCost, total: serverCalculatedTotal } = calculateBillTotal({
+      baseRent,
+      electricUnitsUsed: electricUnits,
+      waterUnitsUsed: waterUnits,
+      electricRate: settings.electric_rate,
+      waterRate: settings.water_rate,
+      commonFee: settings.common_fee,
+      otherServiceAmount,
+      extraExpensesSum,
+      waiveWaterMin,
+      waterMinChecked: settings.water_min_checked,
+      waterMinUnit: settings.water_min_unit,
+      waiveElectricMin,
+      electricMinChecked: settings.electric_min_checked,
+      electricMinUnit: settings.electric_min_unit
+    })
+
+    // Log warning if client is sending different amount
+    if (Math.abs(serverCalculatedTotal - amount) > 0.01) {
+      console.warn(`⚠️ [createBill] Amount mismatch for room ${roomNumber}. Client: ${amount}, Server computed: ${serverCalculatedTotal}. Using server amount.`);
+    }
+
+    const finalBillAmount = serverCalculatedTotal
+
     // Check if a bill already exists for this room and cycle
     const { data: existing } = await supabase
       .from("bills")
@@ -80,7 +145,7 @@ export async function createBill(
     if (existing) {
       // ป้องกันยอดเงินรวมโดนทับ หากมีค่าปรับบันทึกไว้อยู่แล้ว
       const existingPenalty = Number(existing.penalty_amount || 0)
-      const finalAmount = amount + existingPenalty
+      const finalAmount = finalBillAmount + existingPenalty
       
       const invoiceId = (existing as any).invoice_id || `INV-${billingCycle.replace('-', '')}-${roomNumber}`
 
@@ -103,7 +168,7 @@ export async function createBill(
         .insert([{
           room_number: roomNumber,
           tenant_name: tenantName,
-          amount,
+          amount: finalBillAmount,
           status,
           billing_cycle: billingCycle,
           electric_units: electricUnits,
@@ -438,12 +503,90 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
       console.log("🖥️ [Server Action] No Service Role Key found. Using default User Client...")
     }
 
+    // 3. Fetch current bill data
+    const { data: billData, error: billFetchError } = await activeClient
+      .from("bills")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (billFetchError) {
+      console.error("🖥️ [Server Action] Bill fetch error:", billFetchError)
+      throw billFetchError
+    }
+    if (!billData) {
+      return { success: false, error: "ไม่พบข้อมูลบิลที่ระบุ" }
+    }
+
+    // 4. Fetch finance settings
+    const workspaceId = billData.workspace_id || profileRes.data.workspace_id
+    const financeRes = await getFinanceSettings(workspaceId)
+    if (!financeRes.success || !financeRes.data) {
+      return { success: false, error: "ไม่สามารถดึงข้อมูลตั้งค่าการเงินได้" }
+    }
+    const settings = financeRes.data
+
+    const latePenaltyRate = settings.late_penalty_rate
+    const calculatedPenaltyAmount = lateDays * latePenaltyRate
+
+    // 5. Fetch room details
+    const { data: roomData, error: roomError } = await activeClient
+      .from("rooms")
+      .select(`
+        *,
+        room_types (
+          default_rent
+        )
+      `)
+      .eq("room_number", billData.room_number)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (roomError) {
+      console.error("🖥️ [Server Action] Room fetch error:", roomError)
+      throw roomError
+    }
+    if (!roomData) {
+      return { success: false, error: `ไม่พบข้อมูลห้องพักเลขที่ ${billData.room_number}` }
+    }
+
+    const baseRent = roomData.room_types ? Number(roomData.room_types.default_rent) : Number(roomData.base_rent || 0)
+    const waiveElectricMin = !!roomData.waive_electric_min
+    const waiveWaterMin = !!roomData.waive_water_min
+    const extraExpenses = roomData.extra_expenses || []
+    const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
+    // 6. Recalculate bill total (excluding penalty) and then add calculated penalty
+    const { total: baseBillTotal } = calculateBillTotal({
+      baseRent,
+      electricUnitsUsed: Number(billData.electric_units || 0),
+      waterUnitsUsed: Number(billData.water_units || 0),
+      electricRate: settings.electric_rate,
+      waterRate: settings.water_rate,
+      commonFee: settings.common_fee,
+      otherServiceAmount: otherServiceAmount !== undefined ? otherServiceAmount : Number(billData.other_service_amount || 0),
+      extraExpensesSum,
+      waiveWaterMin,
+      waterMinChecked: settings.water_min_checked,
+      waterMinUnit: settings.water_min_unit,
+      waiveElectricMin,
+      electricMinChecked: settings.electric_min_checked,
+      electricMinUnit: settings.electric_min_unit
+    })
+
+    const finalAmount = baseBillTotal + calculatedPenaltyAmount
+
+    // Check mismatch and log
+    if (Math.abs(finalAmount - amount) > 0.01) {
+      console.warn(`⚠️ [updateBillPenalty] Amount mismatch for bill ${id}. Client: ${amount}, Server computed: ${finalAmount}. Using server amount.`);
+    }
+
     console.log("🖥️ [Server Action] Executing UPDATE query on 'bills' for ID:", id)
     
     const updatePayload: any = {
       late_days: lateDays,
-      penalty_amount: penaltyAmount,
-      amount: amount
+      penalty_amount: calculatedPenaltyAmount,
+      amount: finalAmount
     }
     if (otherServiceAmount !== undefined) {
       updatePayload.other_service_amount = otherServiceAmount

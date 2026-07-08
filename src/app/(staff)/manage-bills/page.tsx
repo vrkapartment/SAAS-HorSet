@@ -29,6 +29,8 @@ import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
+import { calculateLateDays } from "@/features/billing/utils"
+import { calculateBillTotal, calculateLatePenalty } from "@/features/billing/bill-calculator"
 
 import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISSIONS } from "@/features/permissions/types"
 
@@ -289,15 +291,23 @@ function ManageBillsContent() {
   const isElecWaived = selectedManualRoom?.waiveElectricMin ?? false
   const isWaterWaived = selectedManualRoom?.waiveWaterMin ?? false
 
-  const computedElecCost = !isElecWaived && electricMinChecked && elecUnitsManual <= electricMinUnit
-    ? electricMinUnit * elecRate
-    : elecUnitsManual * elecRate
-  const computedWaterCost = !isWaterWaived && waterMinChecked && waterUnitsManual <= waterMinUnit
-    ? waterMinUnit * waterRate
-    : waterUnitsManual * waterRate
-
   const selectedManualRoomExtraExpensesSum = selectedManualRoom?.extraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
-  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual + selectedManualRoomExtraExpensesSum
+  const { elecCost: computedElecCost, waterCost: computedWaterCost, total: computedTotal } = calculateBillTotal({
+    baseRent: rentPrice,
+    electricUnitsUsed: elecUnitsManual,
+    waterUnitsUsed: waterUnitsManual,
+    electricRate: elecRate,
+    waterRate: waterRate,
+    commonFee: commonFee,
+    otherServiceAmount: otherServiceAmountManual,
+    extraExpensesSum: selectedManualRoomExtraExpensesSum,
+    waiveWaterMin: isWaterWaived,
+    waterMinChecked,
+    waterMinUnit,
+    waiveElectricMin: isElecWaived,
+    electricMinChecked,
+    electricMinUnit
+  })
 
   const getPreviousCycle = (cycle: string) => {
     const [year, month] = cycle.split("-").map(Number)
@@ -316,39 +326,6 @@ function ManageBillsContent() {
     }
   }
 
-  const calculateLateDays = (cycleStr: string): number => {
-    if (!cycleStr || !cycleStr.includes("-")) return 0
-    const [yearStr, monthStr] = cycleStr.split("-")
-    const year = parseInt(yearStr, 10)
-    const dueMonth = parseInt(monthStr, 10) // e.g. "06" -> 6 (July in 0-indexed Date)
-
-    // Construct due date elements wrapping safely
-    const tempDueDate = new Date(Date.UTC(year, dueMonth, 5))
-    const dueYearWrapped = tempDueDate.getUTCFullYear()
-    const dueMonthWrapped = tempDueDate.getUTCMonth()
-    const dueDateWrapped = tempDueDate.getUTCDate()
-
-    // 23:59:59.999 in Bangkok (UTC+7) is 16:59:59.999 UTC
-    const dueTimeUTC = Date.UTC(dueYearWrapped, dueMonthWrapped, dueDateWrapped, 16, 59, 59, 999)
-    const now = new Date()
-
-    if (now.getTime() <= dueTimeUTC) return 0
-
-    // Calculate local calendar day difference in Bangkok (UTC+7)
-    const bangkokNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
-    const nowYear = bangkokNow.getUTCFullYear()
-    const nowMonth = bangkokNow.getUTCMonth()
-    const nowDate = bangkokNow.getUTCDate()
-
-    const dueMidnightUTC = Date.UTC(dueYearWrapped, dueMonthWrapped, dueDateWrapped)
-    const nowMidnightUTC = Date.UTC(nowYear, nowMonth, nowDate)
-
-    const diffTime = nowMidnightUTC - dueMidnightUTC
-    if (diffTime <= 0) return 0
-
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays > 0 ? diffDays : 0
-  }
 
   const isTenantActiveInCycle = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined, cycle: string, isLatest = true): boolean => {
     if (!leaseStart) return false
@@ -1124,17 +1101,27 @@ function ManageBillsContent() {
 
       let createdBillObj = undefined;
       if (item.tenantName) {
-        const finalElecUnits = !item.waiveElectricMin && electricMinChecked && eUnits <= electricMinUnit ? electricMinUnit : eUnits
-        const finalWaterUnits = !item.waiveWaterMin && waterMinChecked && wUnits <= waterMinUnit ? waterMinUnit : wUnits
-
-        const elecCost = finalElecUnits * elecRate
-        const waterCost = finalWaterUnits * waterRate
-
         const roomInfo = roomsList?.find((r: any) => r.roomNumber === roomNumber)
         const extraExpenses = roomInfo?.extraExpenses || []
         const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
-        const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0) + extraExpensesSum
+        const { elecCost, waterCost, total: billTotalAmount } = calculateBillTotal({
+          baseRent: item.baseRent,
+          electricUnitsUsed: eUnits,
+          waterUnitsUsed: wUnits,
+          electricRate: elecRate,
+          waterRate: waterRate,
+          commonFee: commonFee,
+          otherServiceAmount: item.otherServiceAmount || 0,
+          extraExpensesSum: extraExpensesSum,
+          waiveWaterMin: !!item.waiveWaterMin,
+          waterMinChecked,
+          waterMinUnit,
+          waiveElectricMin: !!item.waiveElectricMin,
+          electricMinChecked,
+          electricMinUnit,
+          penaltyAmount: item.penaltyAmount || 0
+        })
 
         const billResult = await createBill(
           roomNumber,
@@ -1256,17 +1243,27 @@ function ManageBillsContent() {
         }
 
         if (item.tenantName) {
-          const finalElecUnits = !item.waiveElectricMin && electricMinChecked && eUnits <= electricMinUnit ? electricMinUnit : eUnits
-          const finalWaterUnits = !item.waiveWaterMin && waterMinChecked && wUnits <= waterMinUnit ? waterMinUnit : wUnits
-
-          const elecCost = finalElecUnits * elecRate
-          const waterCost = finalWaterUnits * waterRate
-
           const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
           const extraExpenses = roomInfo?.extraExpenses || []
           const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
-          const billTotalAmount = item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + (item.penaltyAmount || 0) + extraExpensesSum
+          const { total: billTotalAmount } = calculateBillTotal({
+            baseRent: item.baseRent,
+            electricUnitsUsed: eUnits,
+            waterUnitsUsed: wUnits,
+            electricRate: elecRate,
+            waterRate: waterRate,
+            commonFee: commonFee,
+            otherServiceAmount: item.otherServiceAmount || 0,
+            extraExpensesSum,
+            waiveWaterMin: !!item.waiveWaterMin,
+            waterMinChecked,
+            waterMinUnit,
+            waiveElectricMin: !!item.waiveElectricMin,
+            electricMinChecked,
+            electricMinUnit,
+            penaltyAmount: item.penaltyAmount || 0
+          })
 
           await createBill(
             item.roomNumber,
@@ -1333,8 +1330,27 @@ function ManageBillsContent() {
         ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr))
         : 0
 
-      const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-      const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
+      const roomInfoForSum = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+      const extraExpenses = roomInfoForSum?.extraExpenses || []
+      const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+
+      const { elecCost, waterCost } = calculateBillTotal({
+        baseRent: item.baseRent,
+        electricUnitsUsed: elecUnitsUsed,
+        waterUnitsUsed: waterUnitsUsed,
+        electricRate: elecRate,
+        waterRate: waterRate,
+        commonFee: commonFee,
+        otherServiceAmount: item.otherServiceAmount || 0,
+        extraExpensesSum,
+        waiveWaterMin: !!item.waiveWaterMin,
+        waterMinChecked,
+        waterMinUnit,
+        waiveElectricMin: !!item.waiveElectricMin,
+        electricMinChecked,
+        electricMinUnit,
+        penaltyAmount: item.penaltyAmount || 0
+      })
 
       const { sendLineBillNotificationAction } = await import("@/features/notification/actions")
       const result = await sendLineBillNotificationAction({
@@ -1394,12 +1410,27 @@ function ManageBillsContent() {
         electricMinChecked,
         electricMinUnit,
         amount: item.billAmount || (() => {
-          const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-          const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
           const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
           const extraExpenses = roomInfo?.extraExpenses || []
           const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
-          return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + extraExpensesSum
+          const { total } = calculateBillTotal({
+            baseRent: item.baseRent,
+            electricUnitsUsed: elecUnitsUsed,
+            waterUnitsUsed: waterUnitsUsed,
+            electricRate: elecRate,
+            waterRate: waterRate,
+            commonFee,
+            otherServiceAmount: item.otherServiceAmount || 0,
+            extraExpensesSum,
+            waiveWaterMin: !!item.waiveWaterMin,
+            waterMinChecked,
+            waterMinUnit,
+            waiveElectricMin: !!item.waiveElectricMin,
+            electricMinChecked,
+            electricMinUnit,
+            penaltyAmount: item.penaltyAmount || 0
+          })
+          return total
         })(),
         extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
         waiveElectricMin: item.waiveElectricMin,
@@ -1476,12 +1507,27 @@ function ManageBillsContent() {
           electricMinChecked,
           electricMinUnit,
           amount: item.billAmount || (() => {
-            const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
-            const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
             const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
             const extraExpenses = roomInfo?.extraExpenses || []
             const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
-            return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + extraExpensesSum
+            const { total } = calculateBillTotal({
+              baseRent: item.baseRent,
+              electricUnitsUsed: elecUnitsUsed,
+              waterUnitsUsed: waterUnitsUsed,
+              electricRate: elecRate,
+              waterRate: waterRate,
+              commonFee,
+              otherServiceAmount: item.otherServiceAmount || 0,
+              extraExpensesSum,
+              waiveWaterMin: !!item.waiveWaterMin,
+              waterMinChecked,
+              waterMinUnit,
+              waiveElectricMin: !!item.waiveElectricMin,
+              electricMinChecked,
+              electricMinUnit,
+              penaltyAmount: item.penaltyAmount || 0
+            })
+            return total
           })(),
           extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
           waiveElectricMin: item.waiveElectricMin,

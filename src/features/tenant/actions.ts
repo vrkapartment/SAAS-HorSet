@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
 import { calculateLateDays } from "@/features/billing/utils"
+import { calculateDepositProration } from "@/features/room/deposit-calculator"
+import { getFinanceSettings } from "@/features/finance/actions"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -909,6 +911,18 @@ export async function saveCancelledContract(workspaceId: string, contract: {
   deductedRent405?: number
   deductedUtilities408?: number
   deductedServices408?: number
+
+  // Raw fields for backend-side calculation
+  baseRent?: number
+  contractEnd?: string | null
+  checkoutPolicy?: "DAILY_PRORATE" | "FULL_MONTH"
+  isRentWaived?: boolean
+  totalUtilities408?: number
+  customDeductions?: { name: string; amount: number }[]
+  isHistoricalEdit?: boolean
+  isHistoricalBreach?: boolean
+  historicalRentDeduction?: number
+  historicalUtilitiesDeduction?: number
 }) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -922,10 +936,10 @@ export async function saveCancelledContract(workspaceId: string, contract: {
     }
 
     const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, workspace_id")
-      .eq("id", user.id)
-      .single()
+       .from("profiles")
+       .select("role, workspace_id")
+       .eq("id", user.id)
+       .single()
 
     if (!profile) {
       return { success: false, error: "ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน" }
@@ -936,6 +950,69 @@ export async function saveCancelledContract(workspaceId: string, contract: {
 
     if (!isSuperAdmin && !isWorkspaceMember) {
       return { success: false, error: "คุณไม่มีสิทธิ์ในการบันทึกประวัติสำหรับหอพักนี้" }
+    }
+
+    // Server-Side Recomputation for Source of Truth
+    let finalRefundedAmount = contract.refundedAmount
+    let finalActualRefund = contract.actualRefund !== undefined && contract.actualRefund !== null ? contract.actualRefund : contract.refundedAmount
+    let finalForfeitedAmount = contract.forfeitedAmount
+    let finalDeductedRent405 = contract.deductedRent405 || 0
+    let finalDeductedUtilities408 = contract.deductedUtilities408 || 0
+    let finalDeductedServices408 = contract.deductedServices408 || 0
+
+    if (contract.baseRent !== undefined) {
+      let policy = contract.checkoutPolicy
+      if (!policy) {
+        const settingsRes = await getFinanceSettings(workspaceId)
+        if (settingsRes.success && settingsRes.data) {
+          policy = settingsRes.data.checkout_policy
+        }
+      }
+
+      // 2. Perform server-side calculation
+      const serverCalc = calculateDepositProration({
+        baseRent: contract.baseRent,
+        depositAmount: contract.depositAmount,
+        checkoutDate: contract.cancellationDate,
+        contractEnd: contract.contractEnd || null,
+        checkoutPolicy: policy || "DAILY_PRORATE",
+        isRentWaived: contract.isRentWaived,
+        totalUtilities408: contract.totalUtilities408,
+        customDeductions: contract.customDeductions,
+        isHistoricalEdit: contract.isHistoricalEdit,
+        isHistoricalBreach: contract.isHistoricalBreach,
+        historicalRentDeduction: contract.historicalRentDeduction,
+        historicalUtilitiesDeduction: contract.historicalUtilitiesDeduction,
+      })
+
+      // 3. Compare and warn if they don't match (within 0.01 tolerance)
+      const diffRefund = Math.abs(serverCalc.actualRefund - contract.refundedAmount)
+      const diffForfeited = Math.abs(serverCalc.forfeitedAmount - contract.forfeitedAmount)
+      const diffRent = Math.abs(serverCalc.rentDeduction - (contract.deductedRent405 || 0))
+      const diffUtils = Math.abs(serverCalc.utilitiesDeduction - (contract.deductedUtilities408 || 0))
+      const diffServices = Math.abs(serverCalc.servicesDeduction - (contract.deductedServices408 || 0))
+
+      if (
+        diffRefund > 0.01 ||
+        diffForfeited > 0.01 ||
+        diffRent > 0.01 ||
+        diffUtils > 0.01 ||
+        diffServices > 0.01
+      ) {
+        console.warn(
+          `[Server-Side Calculation Discrepancy] for room ${contract.roomNumber} in workspace ${workspaceId}:` +
+          `\nClient values: refunded=${contract.refundedAmount}, forfeited=${contract.forfeitedAmount}, rent=${contract.deductedRent405}, utilities=${contract.deductedUtilities408}, services=${contract.deductedServices408}` +
+          `\nServer values: refunded=${serverCalc.actualRefund}, forfeited=${serverCalc.forfeitedAmount}, rent=${serverCalc.rentDeduction}, utilities=${serverCalc.utilitiesDeduction}, services=${serverCalc.servicesDeduction}`
+        )
+      }
+
+      // 4. Overwrite/use server-computed values as the source of truth
+      finalRefundedAmount = serverCalc.actualRefund
+      finalActualRefund = serverCalc.actualRefund
+      finalForfeitedAmount = serverCalc.forfeitedAmount
+      finalDeductedRent405 = serverCalc.rentDeduction
+      finalDeductedUtilities408 = serverCalc.utilitiesDeduction
+      finalDeductedServices408 = serverCalc.servicesDeduction
     }
 
     const adminSupabase = createSupabaseClient(
@@ -950,12 +1027,12 @@ export async function saveCancelledContract(workspaceId: string, contract: {
       tenant_name: contract.tenantName,
       cancellation_date: contract.cancellationDate,
       deposit_amount: contract.depositAmount,
-      refunded_amount: contract.refundedAmount,
-      actual_refund: contract.actualRefund !== undefined && contract.actualRefund !== null ? contract.actualRefund : contract.refundedAmount,
-      forfeited_amount: contract.forfeitedAmount,
-      deducted_rent_405: contract.deductedRent405 || 0,
-      deducted_utilities_408: contract.deductedUtilities408 || 0,
-      deducted_services_408: contract.deductedServices408 || 0
+      refunded_amount: finalRefundedAmount,
+      actual_refund: finalActualRefund,
+      forfeited_amount: finalForfeitedAmount,
+      deducted_rent_405: finalDeductedRent405,
+      deducted_utilities_408: finalDeductedUtilities408,
+      deducted_services_408: finalDeductedServices408
     }
 
     if (contract.id) {

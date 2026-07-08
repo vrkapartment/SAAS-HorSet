@@ -66,6 +66,7 @@ import {
 } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
+import { calculateDepositProration, checkIfBreakContract } from "@/features/room/deposit-calculator"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { packWorkspaceAndRoom } from "@/lib/urlPacker"
@@ -1424,55 +1425,36 @@ function RoomsContent() {
       
       // 2. สรุปการแบ่งประเภทรายได้หักภาษีปลายงวด
       let totalUtilities408 = 0
-      let calcRentDeduction = 0
-      
-      if (isHistoricalEdit) {
-        totalUtilities408 = Number(historicalUtilitiesDeduction || 0)
-        calcRentDeduction = isRentWaived ? 0 : Number(historicalRentDeduction || 0)
-      } else {
+      if (!isHistoricalEdit) {
         const elecUnits = fElec - prevElec
         const waterUnits = fWater - prevWater
         const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
         const waterCost = waterUnits * (financeSettings?.water_rate || 18)
         totalUtilities408 = elecCost + waterCost
-        
-        if (!isRentWaived) {
-          const daysStayed = new Date(refundCheckoutDate).getDate()
-          const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
-          if (policy === "DAILY_PRORATE") {
-            calcRentDeduction = Math.round((refundingRoom.baseRent / 30) * daysStayed * 100) / 100
-          } else {
-            calcRentDeduction = refundingRoom.baseRent
-          }
-        }
       }
-      
-      const totalCustomDeductions = customDeductions.reduce((sum, d) => sum + Number(d.amount || 0), 0)
-      const totalDeductions = calcRentDeduction + totalUtilities408 + totalCustomDeductions
-      
-      const isContractBroken = isHistoricalEdit ? isHistoricalBreach : checkIfBreakContract(refundCheckoutDate, refundingRoom)
-      
-      let checkoutRefundAmount = 0
-      let forfeitedAmountVal = 0
-      let rentDeductionVal = calcRentDeduction
-      let utilitiesDeductionVal = totalUtilities408
-      let servicesDeductionVal = totalCustomDeductions
-      
-      if (isContractBroken) {
-        // อยู่ไม่ครบระยะสัญญา (ผิดสัญญา): ริบเงินมัดจำทั้งหมด (Refund = 0)
-        checkoutRefundAmount = 0
-        forfeitedAmountVal = refundDeposit
-        
-        // แบ่งสัดส่วนเงินมัดจำที่ริบทั้งหมดเข้า 3 หมวดภาษีเงินได้หอพัก:
-        // 1. หมวด 40(5) [ค่าเช่าค้าง/ค่าเช่าตามส่วน]
-        // 2. หมวด 40(8) [สาธารณูปโภคน้ำไฟปลายงวด]
-        // 3. หมวด 40(8) ที่หักแบบเหมาไม่ได้ [ค่าบริการอื่นๆ + ยอดริบประกันส่วนที่เหลือเป็นค่าปรับผิดสัญญา]
-        servicesDeductionVal = Math.max(0, refundDeposit - rentDeductionVal - utilitiesDeductionVal)
-      } else {
-        const netRefund = refundDeposit - totalDeductions
-        checkoutRefundAmount = Math.max(0, netRefund)
-        forfeitedAmountVal = Math.max(0, refundDeposit - checkoutRefundAmount)
-      }
+
+      const {
+        daysStayed,
+        isContractBroken,
+        rentDeduction: rentDeductionVal,
+        utilitiesDeduction: utilitiesDeductionVal,
+        servicesDeduction: servicesDeductionVal,
+        forfeitedAmount: forfeitedAmountVal,
+        actualRefund: checkoutRefundAmount
+      } = calculateDepositProration({
+        baseRent: refundingRoom.baseRent,
+        depositAmount: Number(refundDeposit),
+        checkoutDate: refundCheckoutDate,
+        contractEnd: refundingRoom.leaseEnd || null,
+        checkoutPolicy: financeSettings?.checkout_policy || "DAILY_PRORATE",
+        isRentWaived,
+        totalUtilities408,
+        customDeductions: customDeductions.map(d => ({ name: d.name, amount: Number(d.amount) })),
+        isHistoricalEdit,
+        isHistoricalBreach,
+        historicalRentDeduction: historicalRentDeduction === "" ? undefined : Number(historicalRentDeduction),
+        historicalUtilitiesDeduction: historicalUtilitiesDeduction === "" ? undefined : Number(historicalUtilitiesDeduction)
+      })
       
       // 3. บันทึกสัญญายกเลิกและกระจายภาษีแยกสัดส่วนลง cancelled_contracts
       const cancellationPayload: any = {
@@ -1486,7 +1468,19 @@ function RoomsContent() {
         forfeitedAmount: Number(forfeitedAmountVal),
         deductedRent405: Number(rentDeductionVal),
         deductedUtilities408: Number(utilitiesDeductionVal),
-        deductedServices408: Number(servicesDeductionVal)
+        deductedServices408: Number(servicesDeductionVal),
+        
+        // Raw Data Fields for Server-Side Recomputation
+        baseRent: refundingRoom.baseRent,
+        contractEnd: refundingRoom.leaseEnd,
+        checkoutPolicy: financeSettings?.checkout_policy || "DAILY_PRORATE",
+        isRentWaived,
+        totalUtilities408,
+        customDeductions,
+        isHistoricalEdit,
+        isHistoricalBreach,
+        historicalRentDeduction,
+        historicalUtilitiesDeduction
       }
       
       if (isHistoricalEdit) {
@@ -4357,39 +4351,31 @@ function RoomsContent() {
                       totalUtilities408 = elecCost + waterCost
                     }
                     
-                    // Rent deduction
-                    let rentDeductionVal = 0
-                    if (isHistorical) {
-                      rentDeductionVal = Number(historicalRentDeduction || 0)
-                    } else if (!isRentWaived) {
-                      const days = new Date(refundCheckoutDate).getDate()
-                      const policy = financeSettings?.checkout_policy || "DAILY_PRORATE"
-                      if (policy === "DAILY_PRORATE") {
-                        rentDeductionVal = Math.round((refundingRoom.baseRent / 30) * days * 100) / 100
-                      } else {
-                        rentDeductionVal = refundingRoom.baseRent
-                      }
-                    }
-                    
-                    // Custom deductions
                     const totalCustomDeductions = customDeductions.reduce((sum, d) => sum + Number(d.amount || 0), 0)
+                    const totalDeductions = (isHistorical ? (isRentWaived ? 0 : Number(historicalRentDeduction || 0)) : (isRentWaived ? 0 : (financeSettings?.checkout_policy === "DAILY_PRORATE" ? Math.round((refundingRoom.baseRent / 30) * new Date(refundCheckoutDate).getDate() * 100) / 100 : refundingRoom.baseRent))) + totalUtilities408 + totalCustomDeductions
                     
-                    // Total deductions
-                    const totalDeductions = rentDeductionVal + totalUtilities408 + totalCustomDeductions
-                    const netRefund = refundDeposit - totalDeductions
+                    const {
+                      isContractBroken,
+                      rentDeduction: rentDeductionVal,
+                      utilitiesDeduction: taxUtilities408,
+                      servicesDeduction: taxServices408,
+                      actualRefund: netRefundVal
+                    } = calculateDepositProration({
+                      baseRent: refundingRoom.baseRent,
+                      depositAmount: Number(refundDeposit),
+                      checkoutDate: refundCheckoutDate,
+                      contractEnd: refundingRoom.leaseEnd || null,
+                      checkoutPolicy: financeSettings?.checkout_policy || "DAILY_PRORATE",
+                      isRentWaived,
+                      totalUtilities408,
+                      customDeductions: customDeductions.map(d => ({ name: d.name, amount: Number(d.amount) })),
+                      isHistoricalEdit: isHistorical,
+                      isHistoricalBreach: isHistoricalBreach,
+                      historicalRentDeduction: historicalRentDeduction === "" ? undefined : Number(historicalRentDeduction),
+                      historicalUtilitiesDeduction: historicalUtilitiesDeduction === "" ? undefined : Number(historicalUtilitiesDeduction)
+                    })
                     
-                    const isContractBroken = isHistorical ? isHistoricalBreach : checkIfBreakContract(refundCheckoutDate, refundingRoom)
-                    
-                    let taxRent405 = rentDeductionVal
-                    let taxUtilities408 = totalUtilities408
-                    let taxServices408 = totalCustomDeductions
-                    let netRefundVal = netRefund
-                    
-                    if (isContractBroken) {
-                      netRefundVal = 0
-                      // ยอดริบมัดจำส่วนที่เหลือจากค่าเช่าและน้ำไฟ จะถูกนับเป็นรายได้ผิดสัญญา ม. 40(8) ที่หักแบบเหมาไม่ได้
-                      taxServices408 = Math.max(0, refundDeposit - rentDeductionVal - totalUtilities408)
-                    }
+                    const taxRent405 = rentDeductionVal
                     
                     return (
                       <div className="space-y-4">
