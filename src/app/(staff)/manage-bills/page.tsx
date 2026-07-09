@@ -160,6 +160,9 @@ function ManageBillsContent() {
   // ป้องกัน effect ที่ sync จาก URL ดึงค่า billingCycle กลับไปเป็นเดือนเดิมก่อนที่ URL จะอัปเดตทัน
   const localCycleChangeRef = useRef(false)
   const debugT0Ref = useRef(Date.now()) // จุดอ้างอิงเวลาเริ่มต้น สำหรับใส่ timestamp สัมพัทธ์ใน debug log ชั่วคราว
+  // นับจำนวน loadData ที่กำลังทำงานอยู่พร้อมกัน (ไม่ว่ารอบไหน) กันไม่ให้ตัว poll พื้นหลังยิงคำขอใหม่ทับ
+  // คำขอที่ยังไม่เสร็จ ซึ่งทำให้คำขอ (network+DB) พะรุงพะรังแข่งกันเองจนทุกคำขอช้าลงเรื่อยๆ
+  const loadDataInFlightCountRef = useRef(0)
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const searchParams = useSearchParams()
@@ -399,6 +402,7 @@ function ManageBillsContent() {
     // (เช่น สลับ dropdown เดือนเร็วๆ ติดกัน) โดยยึดเฉพาะคำตอบของการเรียกครั้งล่าสุดเท่านั้น
     const seq = ++loadDataSeqRef.current
     console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData START seq=${seq} cycle=${cycle} forceRefresh=${forceRefresh} silent=${silent} currentBillingCycleState=${billingCycle}`)
+    loadDataInFlightCountRef.current++
     if (!silent) setLoading(true)
 
     try {
@@ -641,7 +645,8 @@ function ManageBillsContent() {
     } catch (err) {
       console.error("Failed to load billing unified items with cache:", err)
     } finally {
-      console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData FINALLY seq=${seq} cycle=${cycle} silent=${silent}`)
+      loadDataInFlightCountRef.current--
+      console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData FINALLY seq=${seq} cycle=${cycle} silent=${silent} stillInFlight=${loadDataInFlightCountRef.current}`)
       if (!silent) setLoading(false)
     }
   }
@@ -655,9 +660,13 @@ function ManageBillsContent() {
     // Poll billing data every 8 seconds to automatically update when tenants upload slips
     const interval = setInterval(() => {
       const hasUnsaved = unifiedItems.some(item => item.isEdited)
-      if (!hasUnsaved && !slipModalOpen && !createBillModalOpen) {
+      // ห้ามยิง poll ซ้อนทับถ้ามี loadData รอบอื่นกำลังทำงานอยู่แล้ว (ไม่ว่าจะเป็นรอบแรกที่ผู้ใช้เพิ่งเข้าหน้า
+      // หรือ poll รอบก่อนหน้าที่ยังไม่เสร็จ) ไม่เช่นนั้นคำขอจะพะรุงพะรังแข่งกันเองจนทุกคำขอช้าลงเรื่อยๆ
+      if (!hasUnsaved && !slipModalOpen && !createBillModalOpen && loadDataInFlightCountRef.current === 0) {
         console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Poll interval firing loadData (forceRefresh) for closure billingCycle=${billingCycle}`)
         loadData(billingCycle, true, true) // forceRefresh=true, silent=true
+      } else if (loadDataInFlightCountRef.current > 0) {
+        console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Poll interval SKIPPED (loadData already in flight, count=${loadDataInFlightCountRef.current})`)
       }
     }, 8000)
 
