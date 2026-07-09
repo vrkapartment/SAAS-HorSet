@@ -279,14 +279,17 @@ function ManageBillsContent() {
   useEffect(() => {
     // ถ้าความไม่ตรงกันนี้เกิดจากผู้ใช้เพิ่งเลือกเดือนใหม่จาก dropdown เอง (URL ยังไล่ตามไม่ทัน)
     // ห้ามดึง billingCycle กลับไปตาม URL เก่า ให้รอจน URL sync ทันแล้วค่อยเคลียร์ flag นี้
+    console.log(`[DEBUG-CYCLE] Effect-C run targetCycle=${targetCycle} billingCycle=${billingCycle} localFlag=${localCycleChangeRef.current}`)
     if (localCycleChangeRef.current) {
       if (targetCycle === billingCycle) {
         localCycleChangeRef.current = false
+        console.log(`[DEBUG-CYCLE] Effect-C cleared localFlag (URL caught up to ${billingCycle})`)
       }
       return
     }
 
     if (targetCycle && targetCycle !== billingCycle) {
+      console.log(`[DEBUG-CYCLE] Effect-C FORCING billingCycle from ${billingCycle} to targetCycle=${targetCycle}`)
       if (registrationCycle && targetCycle < registrationCycle) {
         setBillingCycle(registrationCycle)
         const parts = registrationCycle.split('-')
@@ -388,6 +391,7 @@ function ManageBillsContent() {
     // กันไม่ให้คำตอบของรอบบิลเก่าที่โหลดช้ากว่ามาทับข้อมูลของรอบบิลใหม่ที่โหลดเสร็จก่อน
     // (เช่น สลับ dropdown เดือนเร็วๆ ติดกัน) โดยยึดเฉพาะคำตอบของการเรียกครั้งล่าสุดเท่านั้น
     const seq = ++loadDataSeqRef.current
+    console.log(`[DEBUG-CYCLE] loadData START seq=${seq} cycle=${cycle} forceRefresh=${forceRefresh} silent=${silent} currentBillingCycleState=${billingCycle}`)
     if (!silent) setLoading(true)
 
     try {
@@ -402,6 +406,7 @@ function ManageBillsContent() {
 
       // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอฟังข้อมูลโปรไฟล์อยู่ ให้เลิกเรียกใช้ state ทั้งหมดของรอบนี้
       if (loadDataSeqRef.current !== seq) {
+        console.log(`[DEBUG-CYCLE] loadData DISCARDED (guard 1) seq=${seq} cycle=${cycle} latestSeq=${loadDataSeqRef.current}`)
         return
       }
 
@@ -499,8 +504,11 @@ function ManageBillsContent() {
 
       // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอบนี้กำลังโหลดอยู่ ให้ทิ้งผลลัพธ์รอบนี้ทั้งหมด
       if (loadDataSeqRef.current !== seq) {
+        console.log(`[DEBUG-CYCLE] loadData DISCARDED (guard 2) seq=${seq} cycle=${cycle} latestSeq=${loadDataSeqRef.current}`)
         return
       }
+
+      console.log(`[DEBUG-CYCLE] loadData COMMITTING seq=${seq} cycle=${cycle} wsId=${wsId} needsFetch=${needsFetch} billsCount=${dbBills?.length} metersCount=${dbMeters?.length}`)
 
       setRoomsList(rooms)
       setMeterReplacements(dbReplacements)
@@ -621,15 +629,18 @@ function ManageBillsContent() {
           invoiceId: roomBill?.invoiceId || undefined
         }
       })
+      console.log(`[DEBUG-CYCLE] loadData setUnifiedItems seq=${seq} cycle=${cycle} rowCount=${compiled.length}`)
       setUnifiedItems(compiled)
     } catch (err) {
       console.error("Failed to load billing unified items with cache:", err)
     } finally {
+      console.log(`[DEBUG-CYCLE] loadData FINALLY seq=${seq} cycle=${cycle} silent=${silent}`)
       if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
+    console.log(`[DEBUG-CYCLE] Effect(billingCycle) firing loadData for billingCycle=${billingCycle}`)
     loadData(billingCycle)
   }, [billingCycle])
 
@@ -638,6 +649,7 @@ function ManageBillsContent() {
     const interval = setInterval(() => {
       const hasUnsaved = unifiedItems.some(item => item.isEdited)
       if (!hasUnsaved && !slipModalOpen && !createBillModalOpen) {
+        console.log(`[DEBUG-CYCLE] Poll interval firing loadData (forceRefresh) for closure billingCycle=${billingCycle}`)
         loadData(billingCycle, true, true) // forceRefresh=true, silent=true
       }
     }, 8000)
@@ -1610,6 +1622,7 @@ function ManageBillsContent() {
             value={billingCycle}
             onChange={(e) => {
               const val = e.target.value
+              console.log(`[DEBUG-CYCLE] DROPDOWN onChange from=${billingCycle} to=${val}`)
 
               // อัปเดต billingCycle ทันทีตรงๆ ไม่รอให้ URL sync ย้อนกลับมาอัปเดตให้
               // และตั้ง flag ไว้กันไม่ให้ effect ที่ sync จาก URL ดึงค่ากลับไปเป็นเดือนเดิม
