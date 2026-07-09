@@ -196,10 +196,12 @@ function ManageBillsContent() {
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
   useEffect(() => {
+    console.log(`[DEBUG-CYCLE] Effect-A run targetCycle=${targetCycle} billingCycle=${billingCycle} registrationCycle=${registrationCycle} localFlag=${localCycleChangeRef.current} url=${typeof window !== "undefined" ? window.location.search : "n/a"}`)
     // หากมี targetCycle จาก URL อยู่แล้ว ให้ข้ามการโหลดจาก sessionStorage เพื่อให้เกียรติ URL
     if (targetCycle) {
       // ตรวจสอบความถูกต้องว่า targetCycle ต่ำกว่าเดือนที่ลงทะเบียนหรือไม่ หากต่ำกว่า ให้ดีดกลับมาลงทะเบียน
       if (registrationCycle && targetCycle < registrationCycle) {
+        console.log(`[DEBUG-CYCLE] Effect-A branch=targetCycle-below-registration -> forcing ${registrationCycle}`)
         setBillingCycle(registrationCycle)
         const parts = registrationCycle.split('-')
         const params = new URLSearchParams(window.location.search)
@@ -209,6 +211,8 @@ function ManageBillsContent() {
           params.set("month", parts[1])
         }
         router.replace(`?${params.toString()}`, { scroll: false })
+      } else {
+        console.log(`[DEBUG-CYCLE] Effect-A branch=targetCycle-present -> no-op (targetCycle=${targetCycle})`)
       }
       return
     }
@@ -216,12 +220,13 @@ function ManageBillsContent() {
     if (typeof window !== "undefined") {
       const cachedMonth = sessionStorage.getItem("dashboard_month")
       const cachedYear = sessionStorage.getItem("dashboard_year")
-      
+
       if (cachedMonth && cachedYear) {
         const cachedCycle = `${cachedYear}-${cachedMonth}`
         if (!registrationCycle || cachedCycle >= registrationCycle) {
+          console.log(`[DEBUG-CYCLE] Effect-A branch=sessionStorage-restore -> setBillingCycle(${cachedCycle}) (was ${billingCycle})`)
           setBillingCycle(cachedCycle)
-          
+
           // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
           const params = new URLSearchParams(window.location.search)
           params.set("cycle", cachedCycle)
@@ -234,6 +239,7 @@ function ManageBillsContent() {
     }
 
     const current = getCurrentBillingCycle()
+    console.log(`[DEBUG-CYCLE] Effect-A branch=fallback-to-current -> current=${current} registrationCycle=${registrationCycle}`)
     if (registrationCycle && current < registrationCycle) {
       setBillingCycle(registrationCycle)
     } else {
