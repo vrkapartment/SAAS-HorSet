@@ -647,7 +647,9 @@ function ManageBillsContent() {
     } finally {
       loadDataInFlightCountRef.current--
       console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData FINALLY seq=${seq} cycle=${cycle} silent=${silent} stillInFlight=${loadDataInFlightCountRef.current}`)
-      if (!silent) setLoading(false)
+      // ปิด loading เฉพาะเมื่อไม่มี loadData รอบอื่นทำงานค้างอยู่แล้วเท่านั้น ไม่เช่นนั้นรอบที่ถูกทิ้ง (stale)
+      // จะไปปิด loading ก่อนที่รอบล่าสุดซึ่งยังไม่เสร็จจะโหลดจริง ทำให้ขึ้นข้อความ "ไม่มีห้องพัก" หลอกๆ ระหว่างรอ
+      if (!silent && loadDataInFlightCountRef.current === 0) setLoading(false)
     }
   }
 
