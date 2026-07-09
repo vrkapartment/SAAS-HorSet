@@ -282,14 +282,16 @@ export default function MeterReadingTable({
 
   const [usageAnomalyConfirm, setUsageAnomalyConfirm] = useState<{
     isOpen: boolean
-    roomNumber: string
     isBulk: boolean
-    elecAbnormal: boolean
-    waterAbnormal: boolean
-    elecUnits: number
-    elecAvg: number
-    waterUnits: number
-    waterAvg: number
+    rooms: {
+      roomNumber: string
+      elecAbnormal: boolean
+      waterAbnormal: boolean
+      elecUnits: number
+      elecAvg: number
+      waterUnits: number
+      waterAvg: number
+    }[]
     onConfirm: () => void
   } | null>(null)
 
@@ -350,14 +352,16 @@ export default function MeterReadingTable({
       if (anomaly.hasAnomaly) {
         setUsageAnomalyConfirm({
           isOpen: true,
-          roomNumber,
           isBulk: false,
-          elecAbnormal: anomaly.elecAbnormal,
-          waterAbnormal: anomaly.waterAbnormal,
-          elecUnits: anomaly.elecUnits,
-          elecAvg: anomaly.elecAvg,
-          waterUnits: anomaly.waterUnits,
-          waterAvg: anomaly.waterAvg,
+          rooms: [{
+            roomNumber,
+            elecAbnormal: anomaly.elecAbnormal,
+            waterAbnormal: anomaly.waterAbnormal,
+            elecUnits: anomaly.elecUnits,
+            elecAvg: anomaly.elecAvg,
+            waterUnits: anomaly.waterUnits,
+            waterAvg: anomaly.waterAvg
+          }],
           onConfirm: doSave
         })
       } else {
@@ -405,18 +409,22 @@ export default function MeterReadingTable({
     }
 
     const checkAnomalyThenSaveAll = () => {
-      const anomalousRooms = itemsToSave.filter(item => getUsageAnomaly(item, type).hasAnomaly)
+      const anomalousRooms = itemsToSave
+        .map(item => ({ roomNumber: item.roomNumber, anomaly: getUsageAnomaly(item, type) }))
+        .filter(r => r.anomaly.hasAnomaly)
       if (anomalousRooms.length > 0) {
         setUsageAnomalyConfirm({
           isOpen: true,
-          roomNumber: anomalousRooms.map(r => r.roomNumber).join(", "),
           isBulk: true,
-          elecAbnormal: type === "electric",
-          waterAbnormal: type === "water",
-          elecUnits: 0,
-          elecAvg: 0,
-          waterUnits: 0,
-          waterAvg: 0,
+          rooms: anomalousRooms.map(r => ({
+            roomNumber: r.roomNumber,
+            elecAbnormal: r.anomaly.elecAbnormal,
+            waterAbnormal: r.anomaly.waterAbnormal,
+            elecUnits: r.anomaly.elecUnits,
+            elecAvg: r.anomaly.elecAvg,
+            waterUnits: r.anomaly.waterUnits,
+            waterAvg: r.anomaly.waterAvg
+          })),
           onConfirm: doSaveAll
         })
       } else {
@@ -2894,11 +2902,15 @@ Thank you 🙏`
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 px-2 leading-relaxed">
                   {t("billing.usage_anomaly_confirm_subtitle_prefix")}{" "}
-                  <strong className="text-rose-500 font-extrabold">{usageAnomalyConfirm.isBulk ? t("billing.all_anomaly_rooms") : t("billing.room_label").replace("{roomNumber}", usageAnomalyConfirm.roomNumber)}</strong>
+                  <strong className="text-rose-500 font-extrabold">
+                    {usageAnomalyConfirm.isBulk
+                      ? t("billing.all_anomaly_rooms")
+                      : t("billing.room_label").replace("{roomNumber}", usageAnomalyConfirm.rooms[0]?.roomNumber || "")}
+                  </strong>
                 </p>
               </div>
 
-              <div className={`w-full p-4 rounded-xl border text-left space-y-2 text-xs leading-relaxed ${
+              <div className={`w-full p-4 rounded-xl border text-left space-y-2 text-xs leading-relaxed max-h-52 overflow-y-auto ${
                 isDark ? "bg-slate-950/40 border-slate-850" : "bg-rose-50/30 border-rose-100 text-rose-800"
               }`}>
                 <p className="font-bold flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
@@ -2906,12 +2918,13 @@ Thank you 🙏`
                   {t("billing.usage_anomaly_check_info_label")}
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
-                  {usageAnomalyConfirm.elecAbnormal && !usageAnomalyConfirm.isBulk && (
-                    <li>{t("billing.usage_anomaly_elec_detail").replace("{units}", String(usageAnomalyConfirm.elecUnits)).replace("{avg}", usageAnomalyConfirm.elecAvg.toFixed(1))}</li>
-                  )}
-                  {usageAnomalyConfirm.waterAbnormal && !usageAnomalyConfirm.isBulk && (
-                    <li>{t("billing.usage_anomaly_water_detail").replace("{units}", String(usageAnomalyConfirm.waterUnits)).replace("{avg}", usageAnomalyConfirm.waterAvg.toFixed(1))}</li>
-                  )}
+                  {usageAnomalyConfirm.rooms.map(r => (
+                    <li key={r.roomNumber}>
+                      <strong className="text-rose-600 dark:text-rose-400">{t("billing.room_label").replace("{roomNumber}", r.roomNumber)}</strong>
+                      {r.elecAbnormal && <>{" — "}{t("billing.usage_anomaly_elec_detail").replace("{units}", String(r.elecUnits)).replace("{avg}", r.elecAvg.toFixed(1))}</>}
+                      {r.waterAbnormal && <>{" — "}{t("billing.usage_anomaly_water_detail").replace("{units}", String(r.waterUnits)).replace("{avg}", r.waterAvg.toFixed(1))}</>}
+                    </li>
+                  ))}
                   <li>{t("billing.usage_anomaly_rule")}</li>
                 </ul>
               </div>
