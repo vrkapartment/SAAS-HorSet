@@ -259,6 +259,7 @@ function ManageBillsContent() {
 
   const [unifiedItems, setUnifiedItems] = useState<UnifiedRoomBillingItem[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
+  const [usageAverages, setUsageAverages] = useState<Record<string, { avgElec: number; avgWater: number; sampleCount: number }>>({})
   const [loading, setLoading] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
@@ -472,8 +473,9 @@ function ManageBillsContent() {
       let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
       let dbPrevMeters = wsId ? getCachedData(wsId, `meters_${prevCycle}`) : null
       let financeData = wsId ? getCachedData(wsId, "finance_settings") : null
+      let usageAveragesData = wsId ? getCachedData(wsId, `usage_avg_${cycle}`) : null
 
-      const needsFetch = forceRefresh || !rooms || !dbBills || !dbMeters || !dbReplacements || !dbPrevMeters || !financeData
+      const needsFetch = forceRefresh || !rooms || !dbBills || !dbMeters || !dbReplacements || !dbPrevMeters || !financeData || !usageAveragesData
 
       if (needsFetch) {
         const unifiedRes = await getBillingPageData(cycle, prevCycle, wsId || "")
@@ -504,12 +506,17 @@ function ManageBillsContent() {
             financeData = fetched.financeSettings
             if (wsId && financeData) setCachedData(wsId, "finance_settings", financeData)
           }
+          if (!usageAveragesData || forceRefresh) {
+            usageAveragesData = fetched.usageAverages
+            if (wsId) setCachedData(wsId, `usage_avg_${cycle}`, usageAveragesData)
+          }
         } else {
           rooms = rooms || []
           dbBills = dbBills || []
           dbMeters = dbMeters || []
           dbReplacements = dbReplacements || []
           dbPrevMeters = dbPrevMeters || []
+          usageAveragesData = usageAveragesData || {}
         }
       }
 
@@ -523,6 +530,7 @@ function ManageBillsContent() {
 
       setRoomsList(rooms)
       setMeterReplacements(dbReplacements)
+      setUsageAverages(usageAveragesData || {})
       const currentPenaltyRate = financeData ? Number(financeData.late_penalty_rate || 0) : 0
 
       const activeRooms = rooms
@@ -1743,6 +1751,7 @@ function ManageBillsContent() {
         handleSendLine={handleSendLine}
         handleMarkAsPaid={handleMarkAsPaid}
         roomsList={roomsList}
+        usageAverages={usageAverages}
         billingCycle={billingCycle}
         workspaceName={workspaceName}
         currentWorkspaceId={currentWorkspaceId}

@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, AlertTriangle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
 import { saveMeterReplacement, deleteMeterReplacement } from "@/features/meter/actions"
@@ -31,6 +31,7 @@ interface MeterReadingTableProps {
   handleSaveAll?: (type: "electric" | "water") => Promise<void>
   // New props for bulk LINE OA feature
   roomsList: any[]
+  usageAverages?: Record<string, { avgElec: number; avgWater: number; sampleCount: number }>
   billingCycle: string
   workspaceName: string
   currentWorkspaceId: string
@@ -73,6 +74,7 @@ export default function MeterReadingTable({
   handleMarkAsPaid,
   handleSaveAll,
   roomsList,
+  usageAverages = {},
   billingCycle,
   workspaceName,
   currentWorkspaceId,
@@ -278,9 +280,90 @@ export default function MeterReadingTable({
     onConfirm: () => void
   } | null>(null)
 
+  const [usageAnomalyConfirm, setUsageAnomalyConfirm] = useState<{
+    isOpen: boolean
+    roomNumber: string
+    isBulk: boolean
+    elecAbnormal: boolean
+    waterAbnormal: boolean
+    elecUnits: number
+    elecAvg: number
+    waterUnits: number
+    waterAvg: number
+    onConfirm: () => void
+  } | null>(null)
+
+  // เทียบหน่วยที่คำนวณได้ของห้องนี้กับค่าเฉลี่ย 3 เดือนล่าสุด เพื่อจับเลขมิเตอร์ที่จดผิดปกติ
+  // ข้ามการเช็คถ้าห้องว่าง หรือผู้เช่าย้ายเข้ามาไม่ถึง 3 เดือน (ยังไม่มีค่าเฉลี่ยที่น่าเชื่อถือ)
+  const getUsageAnomaly = (item: any, type: "electric" | "water" | "all") => {
+    const result = { hasAnomaly: false, elecAbnormal: false, waterAbnormal: false, elecUnits: 0, elecAvg: 0, waterUnits: 0, waterAvg: 0 }
+    if (!item.tenantName) return result
+
+    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+    const leaseStart = roomInfo?.leaseStart
+    if (leaseStart && billingCycle) {
+      const leaseDate = new Date(leaseStart)
+      const cycleDate = new Date(`${billingCycle}-01`)
+      const monthsSinceLease = (cycleDate.getFullYear() - leaseDate.getFullYear()) * 12 + (cycleDate.getMonth() - leaseDate.getMonth())
+      if (monthsSinceLease < 3) return result
+    }
+
+    const avgData = usageAverages?.[item.roomNumber]
+    if (!avgData || avgData.sampleCount === 0) return result
+
+    if (type !== "water" && item.elecCurr !== "") {
+      const elecUnits = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")
+      if (avgData.avgElec > 0 && elecUnits <= 3000 && Math.abs(elecUnits - avgData.avgElec) / avgData.avgElec > 0.5) {
+        result.elecAbnormal = true
+        result.elecUnits = elecUnits
+        result.elecAvg = avgData.avgElec
+        result.hasAnomaly = true
+      }
+    }
+
+    if (type !== "electric" && item.waterCurr !== "") {
+      const waterUnits = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water")
+      if (avgData.avgWater > 0 && waterUnits <= 3000 && Math.abs(waterUnits - avgData.avgWater) / avgData.avgWater > 0.5) {
+        result.waterAbnormal = true
+        result.waterUnits = waterUnits
+        result.waterAvg = avgData.avgWater
+        result.hasAnomaly = true
+      }
+    }
+
+    return result
+  }
+
   const onSaveRowWithRolloverCheck = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
     if (!item) return
+
+    const doSave = async () => {
+      await handleSaveRow(roomNumber, type)
+      if (item.billStatus === "paid") {
+        setUnlockedPaidRooms(prev => ({ ...prev, [roomNumber]: false }))
+      }
+    }
+
+    const checkAnomalyThenSave = () => {
+      const anomaly = getUsageAnomaly(item, type)
+      if (anomaly.hasAnomaly) {
+        setUsageAnomalyConfirm({
+          isOpen: true,
+          roomNumber,
+          isBulk: false,
+          elecAbnormal: anomaly.elecAbnormal,
+          waterAbnormal: anomaly.waterAbnormal,
+          elecUnits: anomaly.elecUnits,
+          elecAvg: anomaly.elecAvg,
+          waterUnits: anomaly.waterUnits,
+          waterAvg: anomaly.waterAvg,
+          onConfirm: doSave
+        })
+      } else {
+        doSave()
+      }
+    }
 
     const hasElecRolloverVal = type !== "water" && isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")
     const hasWaterRolloverVal = type !== "electric" && isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water")
@@ -291,18 +374,10 @@ export default function MeterReadingTable({
         roomNumber,
         type,
         isBulk: false,
-        onConfirm: async () => {
-          await handleSaveRow(roomNumber, type)
-          if (item.billStatus === "paid") {
-            setUnlockedPaidRooms(prev => ({ ...prev, [roomNumber]: false }))
-          }
-        }
+        onConfirm: checkAnomalyThenSave
       })
     } else {
-      await handleSaveRow(roomNumber, type)
-      if (item.billStatus === "paid") {
-        setUnlockedPaidRooms(prev => ({ ...prev, [roomNumber]: false }))
-      }
+      checkAnomalyThenSave()
     }
   }
 
@@ -324,20 +399,41 @@ export default function MeterReadingTable({
       }
     });
 
+    const doSaveAll = async () => {
+      await handleSaveAll(type)
+      setUnlockedPaidRooms({})
+    }
+
+    const checkAnomalyThenSaveAll = () => {
+      const anomalousRooms = itemsToSave.filter(item => getUsageAnomaly(item, type).hasAnomaly)
+      if (anomalousRooms.length > 0) {
+        setUsageAnomalyConfirm({
+          isOpen: true,
+          roomNumber: anomalousRooms.map(r => r.roomNumber).join(", "),
+          isBulk: true,
+          elecAbnormal: type === "electric",
+          waterAbnormal: type === "water",
+          elecUnits: 0,
+          elecAvg: 0,
+          waterUnits: 0,
+          waterAvg: 0,
+          onConfirm: doSaveAll
+        })
+      } else {
+        doSaveAll()
+      }
+    }
+
     if (anyRollover) {
       setRolloverConfirm({
         isOpen: true,
         roomNumber: "ทุกห้องที่เลือก",
         type,
         isBulk: true,
-        onConfirm: async () => {
-          await handleSaveAll(type)
-          setUnlockedPaidRooms({})
-        }
+        onConfirm: checkAnomalyThenSaveAll
       })
     } else {
-      await handleSaveAll(type)
-      setUnlockedPaidRooms({})
+      checkAnomalyThenSaveAll()
     }
   }
 
@@ -2727,6 +2823,86 @@ Thank you 🙏`
                   className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all"
                 >
                   {t("billing.confirm_rollover")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up ยืนยันการใช้งานผิดปกติเทียบค่าเฉลี่ย 3 เดือนล่าสุด (Usage Anomaly Confirmation Modal) */}
+      {usageAnomalyConfirm && usageAnomalyConfirm.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-all"
+            onClick={() => setUsageAnomalyConfirm(null)}
+          />
+          {/* Modal Container */}
+          <div className={`relative w-full max-w-md p-6 rounded-2xl border shadow-2xl transform scale-100 transition-all ${
+            isDark
+              ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-slate-950/50"
+              : "bg-white/95 border-slate-200 text-slate-800 shadow-slate-200/50"
+          }`}>
+            <button
+              onClick={() => setUsageAnomalyConfirm(null)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="p-3 bg-rose-500/10 dark:bg-rose-500/20 text-rose-500 rounded-full">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-black tracking-tight">
+                  {t("billing.usage_anomaly_confirm_title")}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 px-2 leading-relaxed">
+                  {t("billing.usage_anomaly_confirm_subtitle_prefix")}{" "}
+                  <strong className="text-rose-500 font-extrabold">{usageAnomalyConfirm.isBulk ? t("billing.all_anomaly_rooms") : t("billing.room_label").replace("{roomNumber}", usageAnomalyConfirm.roomNumber)}</strong>
+                </p>
+              </div>
+
+              <div className={`w-full p-4 rounded-xl border text-left space-y-2 text-xs leading-relaxed ${
+                isDark ? "bg-slate-950/40 border-slate-850" : "bg-rose-50/30 border-rose-100 text-rose-800"
+              }`}>
+                <p className="font-bold flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {t("billing.usage_anomaly_check_info_label")}
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
+                  {usageAnomalyConfirm.elecAbnormal && !usageAnomalyConfirm.isBulk && (
+                    <li>{t("billing.usage_anomaly_elec_detail").replace("{units}", String(usageAnomalyConfirm.elecUnits)).replace("{avg}", usageAnomalyConfirm.elecAvg.toFixed(1))}</li>
+                  )}
+                  {usageAnomalyConfirm.waterAbnormal && !usageAnomalyConfirm.isBulk && (
+                    <li>{t("billing.usage_anomaly_water_detail").replace("{units}", String(usageAnomalyConfirm.waterUnits)).replace("{avg}", usageAnomalyConfirm.waterAvg.toFixed(1))}</li>
+                  )}
+                  <li>{t("billing.usage_anomaly_rule")}</li>
+                </ul>
+              </div>
+
+              <div className="flex w-full gap-3 pt-2">
+                <button
+                  onClick={() => setUsageAnomalyConfirm(null)}
+                  className={`flex-1 h-11 text-xs font-bold rounded-xl border transition-all ${
+                    isDark
+                      ? "bg-slate-950 border-slate-850 text-slate-400 hover:text-white"
+                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {locale === "en" ? "Cancel" : "ยกเลิก"}
+                </button>
+                <button
+                  onClick={() => {
+                    usageAnomalyConfirm.onConfirm();
+                    setUsageAnomalyConfirm(null);
+                  }}
+                  className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-400 hover:to-red-400 text-white shadow-lg shadow-rose-500/20 active:scale-[0.98] transition-all"
+                >
+                  {t("billing.confirm_usage_anomaly")}
                 </button>
               </div>
             </div>

@@ -54,6 +54,66 @@ export async function getBills(billingCycle?: string, year?: string) {
   }
 }
 
+// คำนวณรอบบิลย้อนหลังจากรอบที่ระบุ (เช่น "2026-07" ย้อน 3 เดือน -> ["2026-06", "2026-05", "2026-04"])
+function getPreviousCycles(cycle: string, count: number): string[] {
+  const [yearStr, monthStr] = cycle.split("-")
+  let year = parseInt(yearStr, 10)
+  let month = parseInt(monthStr, 10)
+  const cycles: string[] = []
+  for (let i = 0; i < count; i++) {
+    month -= 1
+    if (month === 0) {
+      month = 12
+      year -= 1
+    }
+    cycles.push(`${year}-${String(month).padStart(2, "0")}`)
+  }
+  return cycles
+}
+
+// ดึงค่าเฉลี่ยหน่วยไฟ/น้ำของแต่ละห้องจากบิลย้อนหลัง N เดือน (ไม่รวมรอบปัจจุบัน) ใช้เทียบเพื่อเตือนเลขมิเตอร์ที่ผิดปกติ
+export async function getRoomUsageAverages(workspaceId: string, currentCycle: string, monthsBack: number = 3) {
+  if (!isSupabaseConfigured || !workspaceId) {
+    return { success: false, fallback: true }
+  }
+
+  try {
+    const supabase = await createClient()
+    const previousCycles = getPreviousCycles(currentCycle, monthsBack)
+
+    const { data, error } = await supabase
+      .from("bills")
+      .select("room_number, electric_units, water_units")
+      .eq("workspace_id", workspaceId)
+      .in("billing_cycle", previousCycles)
+    if (error) throw error
+
+    const totals = new Map<string, { elecSum: number; waterSum: number; count: number }>()
+    for (const row of data) {
+      const key = row.room_number
+      const entry = totals.get(key) || { elecSum: 0, waterSum: 0, count: 0 }
+      entry.elecSum += Number(row.electric_units) || 0
+      entry.waterSum += Number(row.water_units) || 0
+      entry.count += 1
+      totals.set(key, entry)
+    }
+
+    const averages: Record<string, { avgElec: number; avgWater: number; sampleCount: number }> = {}
+    for (const [roomNumber, entry] of totals) {
+      averages[roomNumber] = {
+        avgElec: entry.elecSum / entry.count,
+        avgWater: entry.waterSum / entry.count,
+        sampleCount: entry.count
+      }
+    }
+
+    return { success: true, data: averages }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงค่าเฉลี่ยการใช้มิเตอร์"
+    return { success: false, error: errorMessage }
+  }
+}
+
 export async function createBill(
   roomNumber: string,
   tenantName: string,
@@ -734,14 +794,16 @@ export async function getBillingPageData(cycle: string, prevCycle: string, works
       metersRes,
       replacementsRes,
       prevMetersRes,
-      financeRes
+      financeRes,
+      usageAveragesRes
     ] = await Promise.all([
       getRooms(),
       getBills(cycle),
       getMeterRecords(cycle),
       getMeterReplacements(cycle),
       getMeterRecords(prevCycle),
-      workspaceId ? getFinanceSettings(workspaceId) : Promise.resolve({ success: true, data: null })
+      workspaceId ? getFinanceSettings(workspaceId) : Promise.resolve({ success: true, data: null }),
+      workspaceId ? getRoomUsageAverages(workspaceId, cycle, 3) : Promise.resolve({ success: true, data: {} })
     ])
 
     return {
@@ -752,7 +814,8 @@ export async function getBillingPageData(cycle: string, prevCycle: string, works
         meters: metersRes.success && metersRes.data ? metersRes.data : [],
         replacements: replacementsRes.success && replacementsRes.data ? replacementsRes.data : [],
         prevMeters: prevMetersRes.success && prevMetersRes.data ? prevMetersRes.data : [],
-        financeSettings: financeRes.success && financeRes.data ? financeRes.data : null
+        financeSettings: financeRes.success && financeRes.data ? financeRes.data : null,
+        usageAverages: usageAveragesRes.success && usageAveragesRes.data ? usageAveragesRes.data : {}
       }
     }
   } catch (error) {
