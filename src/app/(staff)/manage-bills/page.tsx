@@ -159,6 +159,7 @@ function ManageBillsContent() {
   // true ระหว่างที่ผู้ใช้เพิ่งเปลี่ยนเดือนจาก dropdown เอง แต่ URL (router.replace) ยังไล่ตามไม่ทัน
   // ป้องกัน effect ที่ sync จาก URL ดึงค่า billingCycle กลับไปเป็นเดือนเดิมก่อนที่ URL จะอัปเดตทัน
   const localCycleChangeRef = useRef(false)
+  const debugT0Ref = useRef(Date.now()) // จุดอ้างอิงเวลาเริ่มต้น สำหรับใส่ timestamp สัมพัทธ์ใน debug log ชั่วคราว
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const searchParams = useSearchParams()
@@ -196,12 +197,12 @@ function ManageBillsContent() {
   const [registrationCycle, setRegistrationCycle] = useState<string>("")
 
   useEffect(() => {
-    console.log(`[DEBUG-CYCLE] Effect-A run targetCycle=${targetCycle} billingCycle=${billingCycle} registrationCycle=${registrationCycle} localFlag=${localCycleChangeRef.current} url=${typeof window !== "undefined" ? window.location.search : "n/a"}`)
+    console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-A run targetCycle=${targetCycle} billingCycle=${billingCycle} registrationCycle=${registrationCycle} localFlag=${localCycleChangeRef.current} url=${typeof window !== "undefined" ? window.location.search : "n/a"}`)
     // หากมี targetCycle จาก URL อยู่แล้ว ให้ข้ามการโหลดจาก sessionStorage เพื่อให้เกียรติ URL
     if (targetCycle) {
       // ตรวจสอบความถูกต้องว่า targetCycle ต่ำกว่าเดือนที่ลงทะเบียนหรือไม่ หากต่ำกว่า ให้ดีดกลับมาลงทะเบียน
       if (registrationCycle && targetCycle < registrationCycle) {
-        console.log(`[DEBUG-CYCLE] Effect-A branch=targetCycle-below-registration -> forcing ${registrationCycle}`)
+        console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-A branch=targetCycle-below-registration -> forcing ${registrationCycle}`)
         setBillingCycle(registrationCycle)
         const parts = registrationCycle.split('-')
         const params = new URLSearchParams(window.location.search)
@@ -212,7 +213,7 @@ function ManageBillsContent() {
         }
         router.replace(`?${params.toString()}`, { scroll: false })
       } else {
-        console.log(`[DEBUG-CYCLE] Effect-A branch=targetCycle-present -> no-op (targetCycle=${targetCycle})`)
+        console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-A branch=targetCycle-present -> no-op (targetCycle=${targetCycle})`)
       }
       return
     }
@@ -224,7 +225,7 @@ function ManageBillsContent() {
       if (cachedMonth && cachedYear) {
         const cachedCycle = `${cachedYear}-${cachedMonth}`
         if (!registrationCycle || cachedCycle >= registrationCycle) {
-          console.log(`[DEBUG-CYCLE] Effect-A branch=sessionStorage-restore -> setBillingCycle(${cachedCycle}) (was ${billingCycle})`)
+          console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-A branch=sessionStorage-restore -> setBillingCycle(${cachedCycle}) (was ${billingCycle})`)
           setBillingCycle(cachedCycle)
 
           // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
@@ -239,7 +240,7 @@ function ManageBillsContent() {
     }
 
     const current = getCurrentBillingCycle()
-    console.log(`[DEBUG-CYCLE] Effect-A branch=fallback-to-current -> current=${current} registrationCycle=${registrationCycle}`)
+    console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-A branch=fallback-to-current -> current=${current} registrationCycle=${registrationCycle}`)
     if (registrationCycle && current < registrationCycle) {
       setBillingCycle(registrationCycle)
     } else {
@@ -285,17 +286,17 @@ function ManageBillsContent() {
   useEffect(() => {
     // ถ้าความไม่ตรงกันนี้เกิดจากผู้ใช้เพิ่งเลือกเดือนใหม่จาก dropdown เอง (URL ยังไล่ตามไม่ทัน)
     // ห้ามดึง billingCycle กลับไปตาม URL เก่า ให้รอจน URL sync ทันแล้วค่อยเคลียร์ flag นี้
-    console.log(`[DEBUG-CYCLE] Effect-C run targetCycle=${targetCycle} billingCycle=${billingCycle} localFlag=${localCycleChangeRef.current}`)
+    console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-C run targetCycle=${targetCycle} billingCycle=${billingCycle} localFlag=${localCycleChangeRef.current}`)
     if (localCycleChangeRef.current) {
       if (targetCycle === billingCycle) {
         localCycleChangeRef.current = false
-        console.log(`[DEBUG-CYCLE] Effect-C cleared localFlag (URL caught up to ${billingCycle})`)
+        console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-C cleared localFlag (URL caught up to ${billingCycle})`)
       }
       return
     }
 
     if (targetCycle && targetCycle !== billingCycle) {
-      console.log(`[DEBUG-CYCLE] Effect-C FORCING billingCycle from ${billingCycle} to targetCycle=${targetCycle}`)
+      console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect-C FORCING billingCycle from ${billingCycle} to targetCycle=${targetCycle}`)
       if (registrationCycle && targetCycle < registrationCycle) {
         setBillingCycle(registrationCycle)
         const parts = registrationCycle.split('-')
@@ -397,7 +398,7 @@ function ManageBillsContent() {
     // กันไม่ให้คำตอบของรอบบิลเก่าที่โหลดช้ากว่ามาทับข้อมูลของรอบบิลใหม่ที่โหลดเสร็จก่อน
     // (เช่น สลับ dropdown เดือนเร็วๆ ติดกัน) โดยยึดเฉพาะคำตอบของการเรียกครั้งล่าสุดเท่านั้น
     const seq = ++loadDataSeqRef.current
-    console.log(`[DEBUG-CYCLE] loadData START seq=${seq} cycle=${cycle} forceRefresh=${forceRefresh} silent=${silent} currentBillingCycleState=${billingCycle}`)
+    console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData START seq=${seq} cycle=${cycle} forceRefresh=${forceRefresh} silent=${silent} currentBillingCycleState=${billingCycle}`)
     if (!silent) setLoading(true)
 
     try {
@@ -412,7 +413,7 @@ function ManageBillsContent() {
 
       // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอฟังข้อมูลโปรไฟล์อยู่ ให้เลิกเรียกใช้ state ทั้งหมดของรอบนี้
       if (loadDataSeqRef.current !== seq) {
-        console.log(`[DEBUG-CYCLE] loadData DISCARDED (guard 1) seq=${seq} cycle=${cycle} latestSeq=${loadDataSeqRef.current}`)
+        console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData DISCARDED (guard 1) seq=${seq} cycle=${cycle} latestSeq=${loadDataSeqRef.current}`)
         return
       }
 
@@ -510,11 +511,11 @@ function ManageBillsContent() {
 
       // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอบนี้กำลังโหลดอยู่ ให้ทิ้งผลลัพธ์รอบนี้ทั้งหมด
       if (loadDataSeqRef.current !== seq) {
-        console.log(`[DEBUG-CYCLE] loadData DISCARDED (guard 2) seq=${seq} cycle=${cycle} latestSeq=${loadDataSeqRef.current}`)
+        console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData DISCARDED (guard 2) seq=${seq} cycle=${cycle} latestSeq=${loadDataSeqRef.current}`)
         return
       }
 
-      console.log(`[DEBUG-CYCLE] loadData COMMITTING seq=${seq} cycle=${cycle} wsId=${wsId} needsFetch=${needsFetch} billsCount=${dbBills?.length} metersCount=${dbMeters?.length}`)
+      console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData COMMITTING seq=${seq} cycle=${cycle} wsId=${wsId} needsFetch=${needsFetch} billsCount=${dbBills?.length} metersCount=${dbMeters?.length}`)
 
       setRoomsList(rooms)
       setMeterReplacements(dbReplacements)
@@ -635,18 +636,18 @@ function ManageBillsContent() {
           invoiceId: roomBill?.invoiceId || undefined
         }
       })
-      console.log(`[DEBUG-CYCLE] loadData setUnifiedItems seq=${seq} cycle=${cycle} rowCount=${compiled.length}`)
+      console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData setUnifiedItems seq=${seq} cycle=${cycle} rowCount=${compiled.length}`)
       setUnifiedItems(compiled)
     } catch (err) {
       console.error("Failed to load billing unified items with cache:", err)
     } finally {
-      console.log(`[DEBUG-CYCLE] loadData FINALLY seq=${seq} cycle=${cycle} silent=${silent}`)
+      console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms loadData FINALLY seq=${seq} cycle=${cycle} silent=${silent}`)
       if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
-    console.log(`[DEBUG-CYCLE] Effect(billingCycle) firing loadData for billingCycle=${billingCycle}`)
+    console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Effect(billingCycle) firing loadData for billingCycle=${billingCycle}`)
     loadData(billingCycle)
   }, [billingCycle])
 
@@ -655,7 +656,7 @@ function ManageBillsContent() {
     const interval = setInterval(() => {
       const hasUnsaved = unifiedItems.some(item => item.isEdited)
       if (!hasUnsaved && !slipModalOpen && !createBillModalOpen) {
-        console.log(`[DEBUG-CYCLE] Poll interval firing loadData (forceRefresh) for closure billingCycle=${billingCycle}`)
+        console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms Poll interval firing loadData (forceRefresh) for closure billingCycle=${billingCycle}`)
         loadData(billingCycle, true, true) // forceRefresh=true, silent=true
       }
     }, 8000)
@@ -1628,7 +1629,7 @@ function ManageBillsContent() {
             value={billingCycle}
             onChange={(e) => {
               const val = e.target.value
-              console.log(`[DEBUG-CYCLE] DROPDOWN onChange from=${billingCycle} to=${val}`)
+              console.log(`[DEBUG-CYCLE] +${Date.now()-debugT0Ref.current}ms DROPDOWN onChange from=${billingCycle} to=${val}`)
 
               // อัปเดต billingCycle ทันทีตรงๆ ไม่รอให้ URL sync ย้อนกลับมาอัปเดตให้
               // และตั้ง flag ไว้กันไม่ให้ effect ที่ sync จาก URL ดึงค่ากลับไปเป็นเดือนเดิม
