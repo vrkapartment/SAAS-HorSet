@@ -242,7 +242,7 @@
     "rollover_rule3": "กดยืนยันหากตรวจสอบแล้วว่ามิเตอร์มีการหมุนครบรอบจริง",
     "confirm_rollover": "ยืนยันหมุนครบรอบ",
     "usage_anomaly_confirm_title": "⚠️ หน่วยที่ใช้ผิดปกติจากค่าเฉลี่ย",
-    "usage_anomaly_confirm_subtitle_prefix": "หน่วยที่คำนวณได้เบี่ยงเบนจากค่าเฉลี่ย 3 เดือนล่าสุดเกิน 50% สำหรับ",
+    "usage_anomaly_confirm_subtitle_prefix": "หน่วยที่คำนวณได้เบี่ยงเบนจากค่าเฉลี่ย 3 เดือนล่าสุดเกิน 1 เท่าตัว สำหรับ",
     "all_anomaly_rooms": "ทุกห้องที่มีค่าผิดปกติ",
     "usage_anomaly_check_info_label": "โปรดตรวจสอบเลขมิเตอร์อีกครั้งก่อนยืนยัน:",
     "usage_anomaly_elec_detail": "ไฟฟ้า: ใช้ไป {units} หน่วย (ค่าเฉลี่ย {avg} หน่วย)",

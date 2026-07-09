@@ -313,7 +313,7 @@ export default function MeterReadingTable({
 
     if (type !== "water" && item.elecCurr !== "") {
       const elecUnits = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")
-      if (avgData.avgElec > 0 && elecUnits <= 3000 && Math.abs(elecUnits - avgData.avgElec) / avgData.avgElec > 0.5) {
+      if (avgData.avgElec > 0 && elecUnits <= 3000 && Math.abs(elecUnits - avgData.avgElec) / avgData.avgElec > 1) {
         result.elecAbnormal = true
         result.elecUnits = elecUnits
         result.elecAvg = avgData.avgElec
@@ -323,7 +323,7 @@ export default function MeterReadingTable({
 
     if (type !== "electric" && item.waterCurr !== "") {
       const waterUnits = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water")
-      if (avgData.avgWater > 0 && waterUnits <= 3000 && Math.abs(waterUnits - avgData.avgWater) / avgData.avgWater > 0.5) {
+      if (avgData.avgWater > 0 && waterUnits <= 3000 && Math.abs(waterUnits - avgData.avgWater) / avgData.avgWater > 1) {
         result.waterAbnormal = true
         result.waterUnits = waterUnits
         result.waterAvg = avgData.avgWater
