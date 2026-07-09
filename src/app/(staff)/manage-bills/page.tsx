@@ -156,6 +156,9 @@ export default function ManageBillsPage() {
 function ManageBillsContent() {
   const router = useRouter()
   const loadDataSeqRef = useRef(0)
+  // true ระหว่างที่ผู้ใช้เพิ่งเปลี่ยนเดือนจาก dropdown เอง แต่ URL (router.replace) ยังไล่ตามไม่ทัน
+  // ป้องกัน effect ที่ sync จาก URL ดึงค่า billingCycle กลับไปเป็นเดือนเดิมก่อนที่ URL จะอัปเดตทัน
+  const localCycleChangeRef = useRef(false)
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const { resolvedTheme } = useTheme()
   const searchParams = useSearchParams()
@@ -274,6 +277,15 @@ function ManageBillsContent() {
 
   // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ โดยระวังไม่ให้ต่ำกว่า registrationCycle เพื่อป้องกัน infinite loop ของการอัปเดต State
   useEffect(() => {
+    // ถ้าความไม่ตรงกันนี้เกิดจากผู้ใช้เพิ่งเลือกเดือนใหม่จาก dropdown เอง (URL ยังไล่ตามไม่ทัน)
+    // ห้ามดึง billingCycle กลับไปตาม URL เก่า ให้รอจน URL sync ทันแล้วค่อยเคลียร์ flag นี้
+    if (localCycleChangeRef.current) {
+      if (targetCycle === billingCycle) {
+        localCycleChangeRef.current = false
+      }
+      return
+    }
+
     if (targetCycle && targetCycle !== billingCycle) {
       if (registrationCycle && targetCycle < registrationCycle) {
         setBillingCycle(registrationCycle)
@@ -386,6 +398,11 @@ function ManageBillsContent() {
           userProfile = userRes.data
           setCachedData("global", "profile", userRes.data)
         }
+      }
+
+      // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอฟังข้อมูลโปรไฟล์อยู่ ให้เลิกเรียกใช้ state ทั้งหมดของรอบนี้
+      if (loadDataSeqRef.current !== seq) {
+        return
       }
 
       let wsId = ""
@@ -1593,13 +1610,19 @@ function ManageBillsContent() {
             value={billingCycle}
             onChange={(e) => {
               const val = e.target.value
-              
+
+              // อัปเดต billingCycle ทันทีตรงๆ ไม่รอให้ URL sync ย้อนกลับมาอัปเดตให้
+              // และตั้ง flag ไว้กันไม่ให้ effect ที่ sync จาก URL ดึงค่ากลับไปเป็นเดือนเดิม
+              // ระหว่างที่ router.replace() ด้านล่างยังไล่อัปเดต URL ไม่ทัน
+              localCycleChangeRef.current = true
+              setBillingCycle(val)
+
               const parts = val.split('-')
               if (parts.length === 2) {
                 sessionStorage.setItem("dashboard_year", parts[0])
                 sessionStorage.setItem("dashboard_month", parts[1])
               }
-              
+
               const params = new URLSearchParams(window.location.search)
               params.set("cycle", val)
               if (parts.length === 2) {
