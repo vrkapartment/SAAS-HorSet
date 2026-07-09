@@ -249,6 +249,8 @@
     "usage_anomaly_water_detail": "Water: {units} units used (avg. {avg} units)",
     "usage_anomaly_rule": "Click confirm if you have verified the reading is correct (e.g. more/fewer occupants, or usage genuinely increased)",
     "confirm_usage_anomaly": "Confirm Save",
+    "usage_anomaly_label": "⚠️ Unusual usage",
+    "usage_anomaly_short": "⚠️ Unusual",
     "edit_replacement_title": "🔧 Edit Meter Replacement",
     "record_replacement_title": "🔧 Record Meter Replacement (Mid-month)",
     "water_meter_with_tap": "Water Meter",

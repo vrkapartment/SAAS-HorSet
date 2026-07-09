@@ -249,6 +249,8 @@
     "usage_anomaly_water_detail": "น้ำประปา: ใช้ไป {units} หน่วย (ค่าเฉลี่ย {avg} หน่วย)",
     "usage_anomaly_rule": "กดยืนยันหากตรวจสอบแล้วว่าเลขมิเตอร์ถูกต้อง (เช่น มีผู้เช่าเพิ่ม/ลด หรือใช้ไฟ-น้ำมากขึ้นจริง)",
     "confirm_usage_anomaly": "ยืนยันบันทึก",
+    "usage_anomaly_label": "⚠️ หน่วยที่ใช้ผิดปกติ",
+    "usage_anomaly_short": "⚠️ ผิดปกติ",
     "edit_replacement_title": "🔧 แก้ไขบันทึกเปลี่ยนมิเตอร์",
     "record_replacement_title": "🔧 บันทึกเปลี่ยนมิเตอร์ (กลางเดือน)",
     "water_meter_with_tap": "มิเตอร์น้ำประปา",

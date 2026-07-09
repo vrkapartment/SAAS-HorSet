@@ -883,6 +883,9 @@ Thank you 🙏`
               
               const isElectricInvalid = hasElecCurr && elecUnitsUsed > 3000
               const isWaterInvalid = hasWaterCurr && waterUnitsUsed > 3000
+              const usageAnomaly = getUsageAnomaly(item, "all")
+              const isElecAnomaly = usageAnomaly.elecAbnormal
+              const isWaterAnomaly = usageAnomaly.waterAbnormal
               const isMeterAlreadySaved = item.tenantName
                 ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
                 : item.isMeterSaved
@@ -1263,13 +1266,20 @@ Thank you 🙏`
                                     <span>{t("billing.meter_rollover_msg").replace("{units}", String(units))}</span>
                                   </div>
                                 );
+                              } else if (isElecAnomaly) {
+                                return (
+                                  <div className="text-[10px] text-yellow-500 font-extrabold flex items-center gap-1">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{t("billing.usage_anomaly_label")}</span>
+                                  </div>
+                                );
                               }
                               return null;
                             })()}
 
                             <div className="flex justify-between text-xs font-mono">
                               <span className="text-slate-500 dark:text-slate-400">{locale === "en" ? "Units Elec Used:" : "หน่วยไฟที่ใช้:"}</span>
-                              <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
+                              <span className={`font-bold ${!hasElecCurr ? "text-slate-500 dark:text-slate-400" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : isElecAnomaly ? "text-yellow-600 dark:text-yellow-400" : "text-blue-600 dark:text-blue-400"}`}>
                                 {hasElecCurr ? (elecUnitsUsed > 3000 ? (locale === "en" ? "Invalid" : "ข้อมูลผิดพลาด") : elecUnitsUsed >= 0 ? `${elecUnitsUsed} ${t("billing.units_unit")}` : (locale === "en" ? "Error" : "ผิดพลาด")) : (locale === "en" ? "Awaiting" : "รอจด")}
                               </span>
                             </div>
@@ -1424,13 +1434,20 @@ Thank you 🙏`
                                     <span>🔄 มิเตอร์หมุนครบรอบ (+{units} หน่วย)</span>
                                   </div>
                                 );
+                              } else if (isWaterAnomaly) {
+                                return (
+                                  <div className="text-[10px] text-yellow-500 font-extrabold flex items-center gap-1">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{t("billing.usage_anomaly_label")}</span>
+                                  </div>
+                                );
                               }
                               return null;
                             })()}
 
                             <div className="flex justify-between text-xs font-mono">
                               <span className="text-slate-500 dark:text-slate-400">{locale === "en" ? "Units Water Used:" : "หน่วยน้ำที่ใช้:"}</span>
-                              <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : "text-teal-600 dark:text-teal-400"}`}>
+                              <span className={`font-bold ${!hasWaterCurr ? "text-slate-500 dark:text-slate-400" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-red-600 dark:text-red-400" : isWaterAnomaly ? "text-yellow-600 dark:text-yellow-400" : "text-teal-600 dark:text-teal-400"}`}>
                                 {hasWaterCurr ? (waterUnitsUsed > 3000 ? (locale === "en" ? "Invalid" : "ข้อมูลผิดพลาด") : waterUnitsUsed >= 0 ? `${waterUnitsUsed} ${t("billing.units_unit")}` : (locale === "en" ? "Error" : "ผิดพลาด")) : (locale === "en" ? "Awaiting" : "รอจด")}
                               </span>
                             </div>
@@ -1667,6 +1684,9 @@ Thank you 🙏`
                   
                   const isElectricInvalid = hasElecCurr && elecUnitsUsed > 3000
                   const isWaterInvalid = hasWaterCurr && waterUnitsUsed > 3000
+                  const usageAnomaly = getUsageAnomaly(item, "all")
+                  const isElecAnomaly = usageAnomaly.elecAbnormal
+                  const isWaterAnomaly = usageAnomaly.waterAbnormal
                   const isSaveDisabled = !hasEdit || (item.tenantName
                     ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
                     : item.isMeterSaved) || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
@@ -2067,6 +2087,12 @@ Thank you 🙏`
                                       <span>{t("billing.rollover_short").replace("{units}", String(units))}</span>
                                     </div>
                                   );
+                              } else if (isElecAnomaly) {
+                                  return (
+                                    <div className="text-[11px] xl:text-xs 2xl:text-sm text-yellow-600 dark:text-yellow-400 font-medium flex items-center justify-center gap-1 mt-1">
+                                      <span>{t("billing.usage_anomaly_short")}</span>
+                                    </div>
+                                  );
                               }
                               return null;
                             })()}
@@ -2114,7 +2140,7 @@ Thank you 🙏`
 
                           {/* หน่วย / ยอดไฟ */}
                           <td className="py-4 text-center font-mono">
-                            <div className={`font-semibold text-xs sm:text-sm xl:text-base 2xl:text-lg ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : "text-indigo-600 dark:text-indigo-400"}`}>
+                            <div className={`font-semibold text-xs sm:text-sm xl:text-base 2xl:text-lg ${!hasElecCurr ? "text-slate-400 dark:text-slate-500" : elecUnitsUsed > 3000 || elecUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : isElecAnomaly ? "text-yellow-600 dark:text-yellow-400" : "text-indigo-600 dark:text-indigo-400"}`}>
                               {hasElecCurr ? (elecUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : elecUnitsUsed >= 0 ? `${elecUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                             </div>
                             <div className="text-[11px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
@@ -2225,6 +2251,12 @@ Thank you 🙏`
                                       <span>{t("billing.rollover_short").replace("{units}", String(units))}</span>
                                     </div>
                                   );
+                              } else if (isWaterAnomaly) {
+                                  return (
+                                    <div className="text-[11px] xl:text-xs 2xl:text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
+                                      <span>{t("billing.usage_anomaly_short")}</span>
+                                    </div>
+                                  );
                               }
                               return null;
                             })()}
@@ -2272,7 +2304,7 @@ Thank you 🙏`
 
                           {/* หน่วย / ยอดน้ำ */}
                           <td className="py-4 text-center font-mono bg-teal-500/[0.015] dark:bg-teal-500/[0.02]">
-                            <div className={`font-bold text-sm sm:text-base xl:text-lg 2xl:text-xl ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : "text-teal-600 dark:text-teal-400"}`}>
+                            <div className={`font-bold text-sm sm:text-base xl:text-lg 2xl:text-xl ${!hasWaterCurr ? "text-slate-400 dark:text-slate-500" : waterUnitsUsed > 3000 || waterUnitsUsed < 0 ? "text-rose-600 dark:text-rose-450" : isWaterAnomaly ? "text-yellow-600 dark:text-yellow-400" : "text-teal-600 dark:text-teal-400"}`}>
                               {hasWaterCurr ? (waterUnitsUsed > 3000 ? "ข้อมูลผิดพลาด" : waterUnitsUsed >= 0 ? `${waterUnitsUsed} หน่วย` : "ผิดพลาด") : "รอจด"}
                             </div>
                             <div className="mt-1 flex items-center justify-center">
