@@ -42,20 +42,23 @@ export async function loginAction(email: string, password: string, captchaToken?
       return { success: false, error: authError.message }
     }
 
-    // ดึงบทบาทผู้ใช้งาน (role) และ workspace_id จากตาราง profiles ในฐานข้อมูล
+    // ดึงบทบาทผู้ใช้งาน (role), workspace_id และสิทธิ์ (permissions) จากตาราง profiles ในฐานข้อมูล
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role, full_name, phone, tfa_enabled, workspace_id")
+      .select("role, full_name, phone, tfa_enabled, workspace_id, permissions")
       .eq("id", authData.user.id)
       .single()
 
     if (profileError || !profile) {
       // หากไม่มีโปรไฟล์ ให้สร้างจำลองหรือคืนค่าผิดพลาด (ในขั้นตอนการใช้จริงตาราง profiles จะ sync กับ auth.users ผ่าน Trigger)
-      return { 
-        success: false, 
-        error: "เข้าสู่ระบบแล้ว แต่ไม่พบข้อมูล Profile และสิทธิ์การใช้งานในตาราง profiles" 
+      return {
+        success: false,
+        error: "เข้าสู่ระบบแล้ว แต่ไม่พบข้อมูล Profile และสิทธิ์การใช้งานในตาราง profiles"
       }
     }
+
+    // หน้าแรกหลัง login ของ staff ที่ admin กำหนดไว้เฉพาะคน (ถ้าไม่ได้ตั้งไว้ ใช้ /billing เป็นค่าเริ่มต้น)
+    const landingPage = profile.permissions?.landing_page || "/billing"
 
     // ตั้งค่าคุกกี้สิทธิ์ของผู้ใช้เพื่อใช้งานร่วมกับ middleware
     const cookieStore = await cookies()
@@ -65,6 +68,16 @@ export async function loginAction(email: string, password: string, captchaToken?
       secure: process.env.NODE_ENV === "production",
       httpOnly: false, // ต้องการอ่านค่านี้ที่ client-side ใน UI บางส่วน
     })
+
+    // ตั้งค่าคุกกี้หน้าแรกหลัง login ของ staff คนนี้ เพื่อให้ middleware ใช้ตัดสินใจได้โดยไม่ต้อง query DB ซ้ำ
+    if (profile.role === "staff") {
+      cookieStore.set("horset_staff_landing_page", landingPage, {
+        path: "/",
+        maxAge: 86400, // 1 วัน
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: false,
+      })
+    }
 
     // ตั้งค่าคุกกี้ Workspace ปัจจุบันของผู้ใช้เพื่อใช้ทำ Tenant Isolation ทันที
     if (profile.workspace_id) {
@@ -76,16 +89,17 @@ export async function loginAction(email: string, password: string, captchaToken?
       })
     }
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         userId: authData.user.id,
         email: authData.user.email,
         role: profile.role,
         fullName: profile.full_name,
         tfaEnabled: profile.tfa_enabled,
-        workspaceId: profile.workspace_id
-      } 
+        workspaceId: profile.workspace_id,
+        landingPage
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ"

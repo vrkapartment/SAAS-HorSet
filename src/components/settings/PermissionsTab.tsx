@@ -31,17 +31,19 @@ import {
   Landmark,
   Send,
   Download,
-  Settings
+  Settings,
+  LogIn
 } from "lucide-react"
-import { 
-  getWorkspaceStaffAction, 
-  createWorkspaceStaffAction, 
-  updateStaffPermissionsAction, 
+import {
+  getWorkspaceStaffAction,
+  createWorkspaceStaffAction,
+  updateStaffPermissionsAction,
   deleteStaffAction
 } from "@/features/permissions/actions"
-import { 
+import {
   type StaffPermissions,
-  DEFAULT_STAFF_PERMISSIONS
+  DEFAULT_STAFF_PERMISSIONS,
+  STAFF_LANDING_PAGE_OPTIONS
 } from "@/features/permissions/types"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 
@@ -276,6 +278,7 @@ WHERE role IN ('admin', 'super_admin');`
 
   const renderPermissionsSettings = (type: "add" | "edit") => {
     const permissions = type === "add" ? addPermissions : editPermissions
+    const setPerms = type === "add" ? setAddPermissions : setEditPermissions
 
     // List of modules that support separate View vs Edit permissions
     const modules = [
@@ -563,6 +566,32 @@ WHERE role IN ('admin', 'super_admin');`
                 }`} />
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Section 3: หน้าแรกหลัง login */}
+        <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-4">
+          <span className="text-xs sm:text-sm font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2 border-b border-slate-200 dark:border-slate-850 pb-2.5">
+            <LogIn className="w-5 h-5 text-blue-500" />
+            <span>หน้าแรกหลัง Login</span>
+          </span>
+
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl space-y-2">
+            <label className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300">
+              พาพนักงานคนนี้ไปหน้าไหนทันทีหลัง Login
+            </label>
+            <select
+              value={permissions.landing_page || "/billing"}
+              onChange={(e) => setPerms(prev => ({ ...prev, landing_page: e.target.value }))}
+              className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-bold focus:outline-none focus:border-blue-500"
+            >
+              {STAFF_LANDING_PAGE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">
+              ควรเลือกหน้าที่พนักงานคนนี้มีสิทธิ์เข้าถึงจริงตามที่ตั้งไว้ด้านบน ไม่เช่นนั้นจะเข้าไม่ได้ทันทีที่ Login
+            </p>
           </div>
         </div>
       </div>

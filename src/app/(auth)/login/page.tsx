@@ -192,8 +192,8 @@ export default function LoginPage() {
             if (res.data.workspaceId) {
               document.cookie = `horset_current_workspace_id=${res.data.workspaceId}; path=/; max-age=86400`
             }
-            
-            navigateToDashboardWithRole(role)
+
+            navigateToDashboardWithRole(role, res.data.landingPage)
           }
         } else {
           setError(res.error || "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
@@ -242,15 +242,20 @@ export default function LoginPage() {
     }, 1200)
   }
 
-  const navigateToDashboardWithRole = (role: "admin" | "staff" | "tenant" | "super_admin" | null) => {
+  const navigateToDashboardWithRole = (
+    role: "admin" | "staff" | "tenant" | "super_admin" | null,
+    staffLandingPage?: string
+  ) => {
     const targetRole = role || selectedRole
+    // หน้าแรกของ staff แต่ละคนกำหนดได้เฉพาะคนโดย Admin (ค่าเริ่มต้น /billing ถ้าไม่ได้ตั้งไว้)
+    const staffLanding = staffLandingPage || "/billing"
     if (typeof window !== "undefined") {
       if (targetRole === "super_admin") {
         window.location.href = "/super-admin"
       } else if (targetRole === "admin") {
         window.location.href = "/dashboard"
       } else if (targetRole === "staff") {
-        window.location.href = "/meter"
+        window.location.href = staffLanding
       } else {
         window.location.href = "/portal"
       }
@@ -260,7 +265,7 @@ export default function LoginPage() {
       } else if (targetRole === "admin") {
         router.push("/dashboard")
       } else if (targetRole === "staff") {
-        router.push("/meter")
+        router.push(staffLanding)
       } else {
         router.push("/portal")
       }

@@ -65,7 +65,9 @@ export async function updateSession(request: NextRequest) {
       url.pathname = "/dashboard"
       return NextResponse.redirect(url)
     } else if (mockRole === "staff") {
-      url.pathname = "/meter"
+      // หน้าแรกของ staff คนนี้ที่ Admin กำหนดไว้เฉพาะคน (ตั้งไว้เป็นคุกกี้ตอน login) ถ้าไม่มีใช้ /billing เป็นค่าเริ่มต้น
+      const staffLandingPage = request.cookies.get("horset_staff_landing_page")?.value
+      url.pathname = staffLandingPage || "/billing"
       return NextResponse.redirect(url)
     } else if (mockRole === "tenant") {
       url.pathname = "/portal"

@@ -22,6 +22,7 @@ export interface StaffPermissions {
   billing_send_line: boolean          // ส่ง Line OA
   billing_download_pdf: boolean       // ดาวน์โหลด PDF
   billing_copy_summary: boolean       // คัดลอกสรุปบิล
+  landing_page: string                // หน้าแรกที่พาไปหลัง login (เช่น "/billing", "/manage-bills")
 }
 
 export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
@@ -44,7 +45,8 @@ export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
   manage_staff_permissions_edit: false,
   billing_send_line: true,
   billing_download_pdf: true,
-  billing_copy_summary: true
+  billing_copy_summary: true,
+  landing_page: "/billing"
 }
 
 export const ADMIN_DEFAULT_PERMISSIONS: StaffPermissions = {
@@ -67,5 +69,16 @@ export const ADMIN_DEFAULT_PERMISSIONS: StaffPermissions = {
   manage_staff_permissions_edit: true,
   billing_send_line: true,
   billing_download_pdf: true,
-  billing_copy_summary: true
+  billing_copy_summary: true,
+  landing_page: "/dashboard"
 }
+
+// ตัวเลือกหน้าแรกหลัง login ที่ admin กำหนดให้พนักงานแต่ละคนได้
+// เฉพาะหน้าที่ staff role เข้าถึงได้จริงตาม middleware (src/lib/supabase/middleware.ts)
+// ห้ามใส่หน้าที่อยู่ใน adminPaths (เช่น /daily-bills, /tax) เพราะ staff จะถูกบล็อกจน redirect วนลูปไม่จบ
+export const STAFF_LANDING_PAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "/billing", label: "จดมิเตอร์ และดูบิล" },
+  { value: "/manage-bills", label: "จัดการใบแจ้งหนี้" },
+  { value: "/rooms", label: "จัดการห้องพัก และผู้เช่า" },
+  { value: "/tenants", label: "จัดการสัญญา ผู้เช่า" }
+]
