@@ -2892,7 +2892,7 @@ Thank you 🙏`
             </button>
 
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="p-3 bg-rose-500/10 dark:bg-rose-500/20 text-rose-500 rounded-full">
+              <div className="p-3 bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-500 rounded-full">
                 <AlertTriangle className="w-8 h-8" />
               </div>
 
@@ -2902,7 +2902,7 @@ Thank you 🙏`
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 px-2 leading-relaxed">
                   {t("billing.usage_anomaly_confirm_subtitle_prefix")}{" "}
-                  <strong className="text-rose-500 font-extrabold">
+                  <strong className="text-yellow-500 font-extrabold">
                     {usageAnomalyConfirm.isBulk
                       ? t("billing.all_anomaly_rooms")
                       : t("billing.room_label").replace("{roomNumber}", usageAnomalyConfirm.rooms[0]?.roomNumber || "")}
@@ -2911,16 +2911,16 @@ Thank you 🙏`
               </div>
 
               <div className={`w-full p-4 rounded-xl border text-left space-y-2 text-xs leading-relaxed max-h-52 overflow-y-auto ${
-                isDark ? "bg-slate-950/40 border-slate-850" : "bg-rose-50/30 border-rose-100 text-rose-800"
+                isDark ? "bg-slate-950/40 border-slate-850" : "bg-yellow-50/30 border-yellow-100 text-yellow-800"
               }`}>
-                <p className="font-bold flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                <p className="font-bold flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   {t("billing.usage_anomaly_check_info_label")}
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
                   {usageAnomalyConfirm.rooms.map(r => (
                     <li key={r.roomNumber}>
-                      <strong className="text-rose-600 dark:text-rose-400">{t("billing.room_label").replace("{roomNumber}", r.roomNumber)}</strong>
+                      <strong className="text-yellow-600 dark:text-yellow-400">{t("billing.room_label").replace("{roomNumber}", r.roomNumber)}</strong>
                       {r.elecAbnormal && <>{" — "}{t("billing.usage_anomaly_elec_detail").replace("{units}", String(r.elecUnits)).replace("{avg}", r.elecAvg.toFixed(1))}</>}
                       {r.waterAbnormal && <>{" — "}{t("billing.usage_anomaly_water_detail").replace("{units}", String(r.waterUnits)).replace("{avg}", r.waterAvg.toFixed(1))}</>}
                     </li>
@@ -2945,7 +2945,7 @@ Thank you 🙏`
                     usageAnomalyConfirm.onConfirm();
                     setUsageAnomalyConfirm(null);
                   }}
-                  className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-400 hover:to-red-400 text-white shadow-lg shadow-rose-500/20 active:scale-[0.98] transition-all"
+                  className="flex-1 h-11 text-xs font-black rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-white shadow-lg shadow-yellow-500/20 active:scale-[0.98] transition-all"
                 >
                   {t("billing.confirm_usage_anomaly")}
                 </button>
