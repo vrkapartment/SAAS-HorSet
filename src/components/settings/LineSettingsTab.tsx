@@ -1054,7 +1054,144 @@ export default function LineSettingsTab() {
         
         {/* Left side: Configuration Column */}
         <div className="space-y-6">
-          
+
+          {/* Card: Quota Information (ย้ายมาไว้บนสุดให้เห็นก่อนตั้งค่าบัญชี + อัปเดตข้อมูลอัตโนมัติ ไม่ต้องกดเช็คเอง) */}
+          {isConfigured && (
+            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <span>ตรวจสอบโควตา LINE OA</span>
+                      {quotaData?.displayName && (
+                        <span className="text-blue-600 dark:text-blue-400">
+                          "{quotaData.displayName}"
+                        </span>
+                      )}
+                    </h3>
+                    {quotaData && (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="inline-flex items-center gap-1 bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-lg text-[11px] font-black border border-green-500/20 shadow-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping shrink-0" />
+                          <span>{quotaData.displayName || "LINE OA ของหอพัก"}</span>
+                        </span>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono font-bold bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200/50 dark:border-slate-800/60 shadow-sm shrink-0">
+                          {quotaData.basicId || "@line_oa"}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">
+                      โควตาสำหรับส่งข้อความ Flex Message รายเดือนของคุณ
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadLineQuota(true)}
+                  disabled={fetchingQuota}
+                  className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`w-4 h-4 ${fetchingQuota ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+
+              {quotaError && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs sm:text-sm font-bold flex items-start gap-2.5 shadow-inner">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <span className="block font-extrabold text-rose-600 dark:text-rose-400">ดึงข้อมูลโควตาล่าสุดไม่สำเร็จ (LINE Integration Error):</span>
+                    <span className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed block">{quotaError}</span>
+                  </div>
+                </div>
+              )}
+
+              {quotaData ? (
+                <div className="space-y-4 pt-2">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">ส่งไปแล้ว</span>
+                      <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.consumed.toLocaleString()}</strong>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                    </div>
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">คงเหลือ</span>
+                      <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.remaining.toLocaleString()}</strong>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                    </div>
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">โควตารวม</span>
+                      <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.limit.toLocaleString()}</strong>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs sm:text-sm font-extrabold text-slate-500 dark:text-slate-400">
+                      <span>เปอร์เซ็นต์โควตาที่ใช้ไป</span>
+                      <span className={`${percentage >= 85 ? "text-rose-500 animate-pulse" : "text-blue-500"} font-black`}>{percentage}%</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-800/35">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          percentage >= 90 ? "bg-rose-500" : percentage >= 75 ? "bg-amber-500" : "bg-blue-600"
+                        }`}
+                        style={{ width: `${Math.min(100, percentage)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-bold pt-1">
+                    <span className="flex items-center gap-1.5">
+                      {quotaData.cached ? (
+                        <span className="bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">แคชระบบ</span>
+                      ) : (
+                        <span className="bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 text-[10px] font-bold uppercase tracking-wider">อัปเดตสด</span>
+                      )}
+                      <span>
+                        แหล่งที่มา:{" "}
+                        <span className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wide">
+                          {quotaData.source === "api"
+                            ? "LINE API"
+                            : quotaData.source === "database"
+                            ? "database"
+                            : quotaData.source === "database_legacy"
+                            ? "database (legacy)"
+                            : quotaData.source === "memory"
+                            ? "memory cache"
+                            : quotaData.source === "demo"
+                            ? "LINE API (Demo)"
+                            : quotaData.source}
+                        </span>
+                      </span>
+                    </span>
+                    <span>
+                      ล่าสุด:{" "}
+                      {(() => {
+                        try {
+                          const date = new Date(quotaData.updated_at);
+                          return isNaN(date.getTime())
+                            ? "--:--:--"
+                            : date.toLocaleTimeString("th-TH", { hour12: false });
+                        } catch (e) {
+                          return "--:--:--";
+                        }
+                      })()}{" "}
+                      น.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-slate-400 text-sm font-bold">
+                  <span>ยังไม่มีข้อมูลโควตา LINE บันทึกไว้ กรุณากดปุ่มเพื่อดึงข้อมูลสด</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Card: Configuration Settings */}
           <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -1617,143 +1754,6 @@ export default function LineSettingsTab() {
               </div>
             </form>
           </div>
-
-          {/* Card: Quota Information */}
-          {isConfigured && (
-            <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
-                    <Key className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
-                      <span>ตรวจสอบโควตา LINE OA</span>
-                      {quotaData?.displayName && (
-                        <span className="text-blue-600 dark:text-blue-400">
-                          "{quotaData.displayName}"
-                        </span>
-                      )}
-                    </h3>
-                    {quotaData && (
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="inline-flex items-center gap-1 bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-lg text-[11px] font-black border border-green-500/20 shadow-sm">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping shrink-0" />
-                          <span>{quotaData.displayName || "LINE OA ของหอพัก"}</span>
-                        </span>
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono font-bold bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200/50 dark:border-slate-800/60 shadow-sm shrink-0">
-                          {quotaData.basicId || "@line_oa"}
-                        </span>
-                      </div>
-                    )}
-                    <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">
-                      โควตาสำหรับส่งข้อความ Flex Message รายเดือนของคุณ
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => loadLineQuota(true)}
-                  disabled={fetchingQuota}
-                  className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  <RefreshCw className={`w-4 h-4 ${fetchingQuota ? "animate-spin" : ""}`} />
-                </button>
-              </div>
-
-              {quotaError && (
-                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs sm:text-sm font-bold flex items-start gap-2.5 shadow-inner">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div className="flex-1 space-y-1">
-                    <span className="block font-extrabold text-rose-600 dark:text-rose-400">ดึงข้อมูลโควตาล่าสุดไม่สำเร็จ (LINE Integration Error):</span>
-                    <span className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed block">{quotaError}</span>
-                  </div>
-                </div>
-              )}
-
-              {quotaData ? (
-                <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
-                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">ส่งไปแล้ว</span>
-                      <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.consumed.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
-                    </div>
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
-                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">คงเหลือ</span>
-                      <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.remaining.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
-                    </div>
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
-                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">โควตารวม</span>
-                      <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.limit.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs sm:text-sm font-extrabold text-slate-500 dark:text-slate-400">
-                      <span>เปอร์เซ็นต์โควตาที่ใช้ไป</span>
-                      <span className={`${percentage >= 85 ? "text-rose-500 animate-pulse" : "text-blue-500"} font-black`}>{percentage}%</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-800/35">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          percentage >= 90 ? "bg-rose-500" : percentage >= 75 ? "bg-amber-500" : "bg-blue-600"
-                        }`}
-                        style={{ width: `${Math.min(100, percentage)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-bold pt-1">
-                    <span className="flex items-center gap-1.5">
-                      {quotaData.cached ? (
-                        <span className="bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">แคชระบบ</span>
-                      ) : (
-                        <span className="bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 text-[10px] font-bold uppercase tracking-wider">อัปเดตสด</span>
-                      )}
-                      <span>
-                        แหล่งที่มา:{" "}
-                        <span className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wide">
-                          {quotaData.source === "api" 
-                            ? "LINE API" 
-                            : quotaData.source === "database" 
-                            ? "database" 
-                            : quotaData.source === "database_legacy" 
-                            ? "database (legacy)" 
-                            : quotaData.source === "memory" 
-                            ? "memory cache" 
-                            : quotaData.source === "demo" 
-                            ? "LINE API (Demo)" 
-                            : quotaData.source}
-                        </span>
-                      </span>
-                    </span>
-                    <span>
-                      ล่าสุด:{" "}
-                      {(() => {
-                        try {
-                          const date = new Date(quotaData.updated_at);
-                          return isNaN(date.getTime()) 
-                            ? "--:--:--" 
-                            : date.toLocaleTimeString("th-TH", { hour12: false });
-                        } catch (e) {
-                          return "--:--:--";
-                        }
-                      })()}{" "}
-                      น.
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-6 text-center text-slate-400 text-sm font-bold">
-                  <span>ยังไม่มีข้อมูลโควตา LINE บันทึกไว้ กรุณากดปุ่มเพื่อดึงข้อมูลสด</span>
-                </div>
-              )}
-            </div>
-          )}
 
         </div>
 

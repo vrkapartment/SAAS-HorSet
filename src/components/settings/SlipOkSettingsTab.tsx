@@ -18,7 +18,8 @@ import {
   Landmark,
   Smartphone,
   CreditCard,
-  ShieldAlert
+  ShieldAlert,
+  Package
 } from "lucide-react"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getSlipOkSettings, saveSlipOkSettings, getSlipOkQuota, type SlipOkQuota } from "@/features/slipok/actions"
@@ -39,6 +40,7 @@ export default function SlipOkSettingsTab() {
   const [checkAmount, setCheckAmount] = useState(true)
   const [checkReceiver, setCheckReceiver] = useState(true)
   const [autoDisableOnQuotaExceeded, setAutoDisableOnQuotaExceeded] = useState(true)
+  const [monthlyPackageQuota, setMonthlyPackageQuota] = useState<number>(0)
   const [showApiKey, setShowApiKey] = useState(false)
 
   const [saving, setSaving] = useState(false)
@@ -54,6 +56,38 @@ export default function SlipOkSettingsTab() {
   const [accountId, setAccountId] = useState("")
   const [accountType, setAccountType] = useState<"phone" | "national_id">("phone")
 
+  // ดึงโควต้าล่าสุดจาก SlipOK — เรียกได้ทั้งแบบอัตโนมัติตอนโหลดหน้า/บันทึกเสร็จ และแบบกดรีเฟรชเองด้วยปุ่ม
+  const handleCheckQuota = async (targetWorkspaceId?: string) => {
+    const wsId = targetWorkspaceId || workspaceId
+    setQuotaLoading(true)
+    setQuotaError(null)
+    try {
+      if (isDemo) {
+        await new Promise((r) => setTimeout(r, 500))
+        setQuota({ quota: 87, overQuota: 0, specialQuota: 0, endDate: "2026-12-31", specialEndDate: null })
+        return
+      }
+
+      if (!wsId) {
+        setQuotaError("ไม่พบรหัสหอพัก (workspace)")
+        return
+      }
+
+      const res = await getSlipOkQuota(wsId)
+      if (res.success && res.data) {
+        setQuota(res.data)
+      } else {
+        setQuota(null)
+        setQuotaError(res.error || "ไม่สามารถตรวจสอบโควต้าได้")
+      }
+    } catch (err) {
+      console.error("Error checking SlipOK quota:", err)
+      setQuotaError("เกิดข้อผิดพลาดในการตรวจสอบโควต้า")
+    } finally {
+      setQuotaLoading(false)
+    }
+  }
+
   useEffect(() => {
     async function loadSettings() {
       setLoading(true)
@@ -64,10 +98,12 @@ export default function SlipOkSettingsTab() {
           setApiKeyPreview("••••demo")
           setHasApiKey(true)
           setEnabled(true)
+          setMonthlyPackageQuota(100)
           setAccountName("สุรีย์ สัทธาวรกุล")
           setAccountId("0818369763")
           setAccountType("phone")
           setLoading(false)
+          setTimeout(() => handleCheckQuota(), 100)
           return
         }
 
@@ -93,6 +129,12 @@ export default function SlipOkSettingsTab() {
           setCheckAmount(res.data.checkAmount)
           setCheckReceiver(res.data.checkReceiver)
           setAutoDisableOnQuotaExceeded(res.data.autoDisableOnQuotaExceeded)
+          setMonthlyPackageQuota(res.data.monthlyPackageQuota)
+
+          // ถ้าเชื่อมต่อ SlipOK ไว้แล้ว ดึงโควต้าล่าสุดให้อัตโนมัติทันที ไม่ต้องรอผู้ใช้กดปุ่มเอง
+          if (res.data.hasApiKey && res.data.enabled) {
+            setTimeout(() => handleCheckQuota(wsId), 100)
+          }
         } else {
           setLoadError(res.error || "ไม่สามารถโหลดการตั้งค่า SlipOK ได้")
         }
@@ -110,6 +152,7 @@ export default function SlipOkSettingsTab() {
       }
     }
     loadSettings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo])
 
   const handleSave = async () => {
@@ -140,7 +183,8 @@ export default function SlipOkSettingsTab() {
         enabled,
         checkAmount,
         checkReceiver,
-        autoDisableOnQuotaExceeded
+        autoDisableOnQuotaExceeded,
+        monthlyPackageQuota
       )
       if (res.success) {
         setSaveSuccess(true)
@@ -149,6 +193,8 @@ export default function SlipOkSettingsTab() {
           setApiKeyPreview(`••••${apiKeyInput.trim().slice(-4)}`)
         }
         setApiKeyInput("")
+        // บันทึกเสร็จแล้วรีเฟรชโควต้าให้สดใหม่ทันที (เผื่อเปลี่ยน Branch ID/API Key มา)
+        handleCheckQuota(workspaceId)
       } else {
         setSaveError(res.error || "ไม่สามารถบันทึกการตั้งค่าได้")
       }
@@ -160,35 +206,11 @@ export default function SlipOkSettingsTab() {
     }
   }
 
-  const handleCheckQuota = async () => {
-    setQuotaLoading(true)
-    setQuotaError(null)
-    try {
-      if (isDemo) {
-        await new Promise((r) => setTimeout(r, 500))
-        setQuota({ quota: 87, overQuota: 0, specialQuota: 0, endDate: "2026-12-31", specialEndDate: null })
-        return
-      }
-
-      if (!workspaceId) {
-        setQuotaError("ไม่พบรหัสหอพัก (workspace)")
-        return
-      }
-
-      const res = await getSlipOkQuota(workspaceId)
-      if (res.success && res.data) {
-        setQuota(res.data)
-      } else {
-        setQuota(null)
-        setQuotaError(res.error || "ไม่สามารถตรวจสอบโควต้าได้")
-      }
-    } catch (err) {
-      console.error("Error checking SlipOK quota:", err)
-      setQuotaError("เกิดข้อผิดพลาดในการตรวจสอบโควต้า")
-    } finally {
-      setQuotaLoading(false)
-    }
-  }
+  // % โควต้าที่ใช้ไปแล้ว คำนวณจากเพดานแพ็กเกจ/เดือนที่กรอกเอง เทียบกับโควต้าคงเหลือที่ได้จาก SlipOK
+  // (SlipOK API ไม่ได้ส่งค่าเพดานทั้งหมดมาให้ ต้องให้แอดมินกรอกเองตามแพ็กเกจที่สมัครไว้)
+  const percentageUsed = quota && monthlyPackageQuota > 0
+    ? Math.min(100, Math.max(0, Math.round(((monthlyPackageQuota - quota.quota) / monthlyPackageQuota) * 100)))
+    : null
 
   if (loading) {
     return (
@@ -224,6 +246,126 @@ export default function SlipOkSettingsTab() {
           <span>{loadError}</span>
         </div>
       )}
+
+      {/* Card: Quota (ย้ายมาไว้บนสุดให้เห็นก่อนตั้งค่า API + ดึงข้อมูลอัตโนมัติทุกครั้งที่เข้าหน้านี้/บันทึกเสร็จ ไม่ต้องกดเช็คเอง) */}
+      <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-900 pb-3">
+          <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <Gauge className="w-5 h-5 text-blue-500" /> โควต้าคงเหลือเดือนนี้
+          </h3>
+          <button
+            type="button"
+            onClick={() => handleCheckQuota()}
+            disabled={quotaLoading}
+            className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${quotaLoading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+
+        {/* บัญชีรับเงินของหอพักนี้ (จากตั้งค่าการเงิน) — ใช้เทียบว่าตรงกับบัญชีที่ตั้งไว้บนเว็บ SlipOK หรือไม่ */}
+        {accountName && (
+          <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100 truncate">{accountName}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {accountType === "phone" ? (
+                  <Smartphone className="w-3 h-3 text-slate-400" />
+                ) : (
+                  <CreditCard className="w-3 h-3 text-slate-400" />
+                )}
+                <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
+                  พร้อมเพย์ ({accountType === "phone" ? "เบอร์โทรศัพท์" : "เลขบัตรประชาชน"}) · {accountId}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {quotaError && (
+          <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2.5 text-rose-500 text-xs sm:text-sm font-bold">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{quotaError}</span>
+          </div>
+        )}
+
+        {quota ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+                <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">โควต้าคงเหลือ</p>
+                <p className="text-lg sm:text-xl font-black text-emerald-500">{quota.quota.toLocaleString()}</p>
+              </div>
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+                <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">ใช้เกินโควต้า</p>
+                <p className="text-lg sm:text-xl font-black text-rose-500">{quota.overQuota.toLocaleString()}</p>
+              </div>
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+                <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">โควต้าพิเศษ</p>
+                <p className="text-lg sm:text-xl font-black text-blue-500">{quota.specialQuota.toLocaleString()}</p>
+              </div>
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+                <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1 flex items-center justify-center gap-1">
+                  <CalendarClock className="w-3 h-3" /> หมดอายุแพ็กเกจ
+                </p>
+                <p className="text-xs sm:text-sm font-black text-slate-700 dark:text-slate-200">{quota.endDate}</p>
+              </div>
+            </div>
+
+            {/* แถบพลังโควต้า — คำนวณจากเพดานแพ็กเกจ/เดือนที่กรอกไว้ด้านล่าง */}
+            {percentageUsed !== null ? (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs sm:text-sm font-extrabold text-slate-500 dark:text-slate-400">
+                  <span>เปอร์เซ็นต์โควต้าที่ใช้ไป</span>
+                  <span className={`${percentageUsed >= 85 ? "text-rose-500 animate-pulse" : "text-blue-500"} font-black`}>{percentageUsed}%</span>
+                </div>
+                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-800/35">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      percentageUsed >= 90 ? "bg-rose-500" : percentageUsed >= 75 ? "bg-amber-500" : "bg-blue-600"
+                    }`}
+                    style={{ width: `${Math.min(100, percentageUsed)}%` }}
+                  />
+                </div>
+                <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
+                  ใช้ไปแล้ว {(monthlyPackageQuota - quota.quota).toLocaleString()} จาก {monthlyPackageQuota.toLocaleString()} ครั้ง/เดือน
+                </p>
+              </div>
+            ) : (
+              <p className="text-[10px] sm:text-xs text-amber-500 font-bold text-center py-1">
+                กรอก &ldquo;เพดานแพ็กเกจ/เดือน&rdquo; ด้านล่างเพื่อให้ระบบคำนวณแถบ % โควต้าที่ใช้ไปให้
+              </p>
+            )}
+          </div>
+        ) : (
+          !quotaError && (
+            <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold text-center py-4">
+              {hasApiKey && enabled ? "กำลังดึงข้อมูลโควต้าล่าสุดจาก SlipOK..." : "เชื่อมต่อ SlipOK ให้เสร็จก่อน ระบบจะดึงข้อมูลโควต้าให้อัตโนมัติ"}
+            </p>
+          )
+        )}
+
+        {/* เพดานแพ็กเกจ/เดือน — กรอกเองเพราะ SlipOK API ไม่ได้ส่งค่านี้มาให้ */}
+        <div className="pt-2 border-t border-slate-200 dark:border-slate-900 space-y-2">
+          <label className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5" /> เพดานแพ็กเกจ/เดือน (จำนวนครั้งตรวจสอบสลิปที่สมัครไว้กับ SlipOK)
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={monthlyPackageQuota || ""}
+            onChange={(e) => setMonthlyPackageQuota(Number(e.target.value) || 0)}
+            placeholder="เช่น 100"
+            className="w-full sm:w-56 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
+          />
+          <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
+            กรอกตามแพ็กเกจที่สมัครไว้กับ SlipOK (เช็คได้จากหน้าเว็บ SlipOK) แก้แล้วกดปุ่ม &ldquo;บันทึกการตั้งค่า&rdquo; ด้านล่างเพื่อบันทึก
+          </p>
+        </div>
+      </div>
 
       {/* Card: Branch ID + API Key */}
       <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
@@ -413,82 +555,6 @@ export default function SlipOkSettingsTab() {
           {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {saving ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
         </button>
-      </div>
-
-      {/* Card: Quota */}
-      <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-900 pb-3">
-          <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-            <Gauge className="w-5 h-5 text-blue-500" /> โควต้าคงเหลือเดือนนี้
-          </h3>
-          <button
-            type="button"
-            onClick={handleCheckQuota}
-            disabled={quotaLoading}
-            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-black flex items-center gap-2 transition-all disabled:opacity-60"
-          >
-            {quotaLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            ตรวจสอบโควต้า
-          </button>
-        </div>
-
-        {/* บัญชีรับเงินของหอพักนี้ (จากตั้งค่าการเงิน) — ใช้เทียบว่าตรงกับบัญชีที่ตั้งไว้บนเว็บ SlipOK หรือไม่ */}
-        {accountName && (
-          <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-sm">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
-              <Landmark className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100 truncate">{accountName}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {accountType === "phone" ? (
-                  <Smartphone className="w-3 h-3 text-slate-400" />
-                ) : (
-                  <CreditCard className="w-3 h-3 text-slate-400" />
-                )}
-                <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
-                  พร้อมเพย์ ({accountType === "phone" ? "เบอร์โทรศัพท์" : "เลขบัตรประชาชน"}) · {accountId}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {quotaError && (
-          <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2.5 text-rose-500 text-xs sm:text-sm font-bold">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{quotaError}</span>
-          </div>
-        )}
-
-        {quota ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">โควต้าคงเหลือ</p>
-              <p className="text-lg sm:text-xl font-black text-emerald-500">{quota.quota.toLocaleString()}</p>
-            </div>
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">ใช้เกินโควต้า</p>
-              <p className="text-lg sm:text-xl font-black text-rose-500">{quota.overQuota.toLocaleString()}</p>
-            </div>
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">โควต้าพิเศษ</p>
-              <p className="text-lg sm:text-xl font-black text-blue-500">{quota.specialQuota.toLocaleString()}</p>
-            </div>
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1 flex items-center justify-center gap-1">
-                <CalendarClock className="w-3 h-3" /> หมดอายุแพ็กเกจ
-              </p>
-              <p className="text-xs sm:text-sm font-black text-slate-700 dark:text-slate-200">{quota.endDate}</p>
-            </div>
-          </div>
-        ) : (
-          !quotaError && (
-            <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold text-center py-4">
-              กดปุ่ม &ldquo;ตรวจสอบโควต้า&rdquo; เพื่อดึงข้อมูลโควต้าล่าสุดจาก SlipOK
-            </p>
-          )
-        )}
       </div>
     </div>
   )

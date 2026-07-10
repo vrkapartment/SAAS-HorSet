@@ -55,6 +55,7 @@ export interface SlipOkSettingsView {
   checkAmount: boolean
   checkReceiver: boolean
   autoDisableOnQuotaExceeded: boolean
+  monthlyPackageQuota: number
 }
 
 export async function getSlipOkSettings(workspaceId: string) {
@@ -66,7 +67,7 @@ export async function getSlipOkSettings(workspaceId: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("workspace_slipok_settings")
-      .select("branch_id, api_key_encrypted, enabled, check_amount, check_receiver, auto_disable_on_quota_exceeded")
+      .select("branch_id, api_key_encrypted, enabled, check_amount, check_receiver, auto_disable_on_quota_exceeded, monthly_package_quota")
       .eq("workspace_id", workspaceId)
       .maybeSingle()
 
@@ -80,7 +81,8 @@ export async function getSlipOkSettings(workspaceId: string) {
         enabled: true,
         checkAmount: true,
         checkReceiver: true,
-        autoDisableOnQuotaExceeded: true
+        autoDisableOnQuotaExceeded: true,
+        monthlyPackageQuota: 0
       }
       return { success: true, data: emptySettings }
     }
@@ -102,7 +104,8 @@ export async function getSlipOkSettings(workspaceId: string) {
       enabled: data.enabled !== false,
       checkAmount: data.check_amount !== false,
       checkReceiver: data.check_receiver !== false,
-      autoDisableOnQuotaExceeded: data.auto_disable_on_quota_exceeded !== false
+      autoDisableOnQuotaExceeded: data.auto_disable_on_quota_exceeded !== false,
+      monthlyPackageQuota: data.monthly_package_quota !== null && data.monthly_package_quota !== undefined ? Number(data.monthly_package_quota) : 0
     }
 
     return { success: true, data: settings }
@@ -119,7 +122,8 @@ export async function saveSlipOkSettings(
   enabled: boolean,
   checkAmount: boolean,
   checkReceiver: boolean,
-  autoDisableOnQuotaExceeded: boolean
+  autoDisableOnQuotaExceeded: boolean,
+  monthlyPackageQuota: number
 ) {
   try {
     if (!workspaceId) {
@@ -138,6 +142,7 @@ export async function saveSlipOkSettings(
       check_amount: boolean
       check_receiver: boolean
       auto_disable_on_quota_exceeded: boolean
+      monthly_package_quota: number
       updated_at: string
       api_key_encrypted?: string
     } = {
@@ -147,6 +152,7 @@ export async function saveSlipOkSettings(
       check_amount: checkAmount,
       check_receiver: checkReceiver,
       auto_disable_on_quota_exceeded: autoDisableOnQuotaExceeded,
+      monthly_package_quota: Number(monthlyPackageQuota) || 0,
       updated_at: new Date().toISOString()
     }
 
