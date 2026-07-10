@@ -130,6 +130,10 @@ export default function TenantPortal() {
   const [latePenaltyRate, setLatePenaltyRate] = useState(0)
   const [waiveElectricMin, setWaiveElectricMin] = useState(false)
   const [waiveWaterMin, setWaiveWaterMin] = useState(false)
+  const [waterMinChecked, setWaterMinChecked] = useState(true)
+  const [waterMinUnit, setWaterMinUnit] = useState(3)
+  const [electricMinChecked, setElectricMinChecked] = useState(true)
+  const [electricMinUnit, setElectricMinUnit] = useState(10)
   const [extraExpenses, setExtraExpenses] = useState<any[]>([])
   const [workspaceLogo, setWorkspaceLogo] = useState<string>("")
   const [combinedQrUrl, setCombinedQrUrl] = useState<string>("")
@@ -226,6 +230,18 @@ export default function TenantPortal() {
         }
         if (data.waiveWaterMin !== undefined) {
           setWaiveWaterMin(!!data.waiveWaterMin)
+        }
+        if (data.waterMinChecked !== undefined) {
+          setWaterMinChecked(!!data.waterMinChecked)
+        }
+        if (data.waterMinUnit !== undefined) {
+          setWaterMinUnit(Number(data.waterMinUnit))
+        }
+        if (data.electricMinChecked !== undefined) {
+          setElectricMinChecked(!!data.electricMinChecked)
+        }
+        if (data.electricMinUnit !== undefined) {
+          setElectricMinUnit(Number(data.electricMinUnit))
         }
         setExtraExpenses(data.extraExpenses || [])
         if (data.workspaceLogo) {
@@ -345,10 +361,13 @@ export default function TenantPortal() {
   }
 
   // ค่าใช้จ่ายต่างๆ (ใช้ค่าของบิลจริง หรือค่าจำลองหากยังไม่มีบิลในระบบ)
+  // ถ้าใช้ไม่ถึงขั้นต่ำที่ตั้งไว้ (และห้องนี้ไม่ได้ยกเว้นขั้นต่ำ) ให้คิดค่าไฟ/น้ำตามขั้นต่ำแทนยอดใช้จริง
   const elecUnits = bill ? bill.electricUnits : 0
-  const elecAmount = elecUnits * electricRate
+  const finalElecUnits = !waiveElectricMin && electricMinChecked && elecUnits <= electricMinUnit ? electricMinUnit : elecUnits
+  const elecAmount = finalElecUnits * electricRate
   const waterUnits = bill ? bill.waterUnits : 0
-  const waterAmount = waterUnits * waterRate
+  const finalWaterUnits = !waiveWaterMin && waterMinChecked && waterUnits <= waterMinUnit ? waterMinUnit : waterUnits
+  const waterAmount = finalWaterUnits * waterRate
   const commonAreaFee = commonFee
   const otherServiceAmount = bill ? (bill.otherServiceAmount || 0) : 0
 

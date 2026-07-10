@@ -471,13 +471,17 @@ export async function getTenantPortalData() {
     let commonFee = 50
     let waterRate = 18
     let electricRate = 7
+    let waterMinChecked = true
+    let waterMinUnit = 3
+    let electricMinChecked = true
+    let electricMinUnit = 10
 
     let latePenaltyRate = 0
     let workspaceLogo = ""
     if (tenant && tenant.workspace_id) {
       const { data: ws } = await supabase
         .from("workspaces")
-        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate")
+        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
         .eq("id", tenant.workspace_id)
         .maybeSingle()
       if (ws) {
@@ -490,6 +494,10 @@ export async function getTenantPortalData() {
         if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
         if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
         if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
+        if (ws.water_min_checked !== null && ws.water_min_checked !== undefined) waterMinChecked = Boolean(ws.water_min_checked)
+        if (ws.water_min_unit !== null && ws.water_min_unit !== undefined) waterMinUnit = Number(ws.water_min_unit)
+        if (ws.electric_min_checked !== null && ws.electric_min_checked !== undefined) electricMinChecked = Boolean(ws.electric_min_checked)
+        if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
 
         // ดึงโลโก้ประจำหอพักแบบปลอดภัย เผื่อตารางยังไม่ได้เพิ่มคอลัมน์ logo_url
         try {
@@ -540,6 +548,10 @@ export async function getTenantPortalData() {
           commonFee,
           waterRate,
           electricRate,
+          waterMinChecked,
+          waterMinUnit,
+          electricMinChecked,
+          electricMinUnit,
           latePenaltyRate
         }
       }
@@ -639,6 +651,10 @@ export async function getTenantPortalData() {
         commonFee,
         waterRate,
         electricRate,
+        waterMinChecked,
+        waterMinUnit,
+        electricMinChecked,
+        electricMinUnit,
         latePenaltyRate,
         workspaceLogo
       }
@@ -740,7 +756,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     // 3. ค้นหารายละเอียดของ Workspace และการตั้งค่าพร้อมเพย์
     const { data: ws } = await supabase
       .from("workspaces")
-      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate")
+      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
       .eq("id", workspaceId)
       .maybeSingle()
 
@@ -753,6 +769,10 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     let commonFee = 50
     let waterRate = 18
     let electricRate = 7
+    let waterMinChecked = true
+    let waterMinUnit = 3
+    let electricMinChecked = true
+    let electricMinUnit = 10
     let latePenaltyRate = 0
 
     let workspaceLogo = ""
@@ -766,6 +786,10 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
       if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
       if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
+      if (ws.water_min_checked !== null && ws.water_min_checked !== undefined) waterMinChecked = Boolean(ws.water_min_checked)
+      if (ws.water_min_unit !== null && ws.water_min_unit !== undefined) waterMinUnit = Number(ws.water_min_unit)
+      if (ws.electric_min_checked !== null && ws.electric_min_checked !== undefined) electricMinChecked = Boolean(ws.electric_min_checked)
+      if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
 
       // ดึงโลโก้ประจำหอพักแบบปลอดภัย เผื่อตารางยังไม่ได้เพิ่มคอลัมน์ logo_url
       try {
@@ -881,6 +905,10 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         commonFee,
         waterRate,
         electricRate,
+        waterMinChecked,
+        waterMinUnit,
+        electricMinChecked,
+        electricMinUnit,
         latePenaltyRate,
         workspaceLogo
       }
