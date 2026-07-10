@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { createClient } from "@/lib/supabase/client"
 import {
   Receipt,
   FileText,
@@ -645,17 +646,46 @@ function UnifiedBillingContent() {
     loadData(billingCycle)
   }, [billingCycle])
 
+  // เก็บค่าล่าสุดไว้ใน ref เพื่อให้ทั้ง Realtime handler และ fallback poll อ่านค่าปัจจุบันได้
+  // โดยไม่ต้องผูก effect ไว้กับ unifiedItems (ซึ่งเปลี่ยนทุกครั้งที่แก้ไขข้อมูล จะทำให้ subscribe ซ้ำไม่จำเป็น)
+  const guardStateRef = useRef({ unifiedItems, slipModalOpen, createBillModalOpen })
   useEffect(() => {
-    // Poll billing data every 8 seconds to automatically update when tenants upload slips
-    const interval = setInterval(() => {
-      const hasUnsaved = unifiedItems.some(item => item.isEdited)
-      if (!hasUnsaved && !slipModalOpen && !createBillModalOpen) {
-        loadData(billingCycle, true, true) // forceRefresh=true, silent=true
-      }
-    }, 8000)
+    guardStateRef.current = { unifiedItems, slipModalOpen, createBillModalOpen }
+  }, [unifiedItems, slipModalOpen, createBillModalOpen])
 
+  const refreshIfSafe = () => {
+    const { unifiedItems: items, slipModalOpen: slipOpen, createBillModalOpen: createOpen } = guardStateRef.current
+    const hasUnsaved = items.some(item => item.isEdited)
+    if (!hasUnsaved && !slipOpen && !createOpen) {
+      loadData(billingCycle, true, true) // forceRefresh=true, silent=true
+    }
+  }
+
+  // อัปเดตข้อมูลบิลทันทีผ่าน Supabase Realtime เมื่อมีการเปลี่ยนแปลงจริง (เช่น ผู้เช่าอัปโหลดสลิป)
+  // แทนการ poll ถามทุก ๆ ไม่กี่วินาทีโดยไม่รู้ว่ามีอะไรเปลี่ยนหรือไม่
+  useEffect(() => {
+    if (!currentWorkspaceId) return
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`realtime_billing_${currentWorkspaceId}_${billingCycle}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bills", filter: `workspace_id=eq.${currentWorkspaceId}` },
+        () => refreshIfSafe()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentWorkspaceId, billingCycle])
+
+  useEffect(() => {
+    // Poll เป็นแค่ fallback สำรอง เผื่อ Realtime channel ด้านบนหลุดการเชื่อมต่อ
+    const interval = setInterval(refreshIfSafe, 45000)
     return () => clearInterval(interval)
-  }, [billingCycle, unifiedItems, slipModalOpen, createBillModalOpen])
+  }, [billingCycle])
 
   useEffect(() => {
     const hasUnsaved = unifiedItems.some(item => item.isEdited)

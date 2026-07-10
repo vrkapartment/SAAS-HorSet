@@ -305,10 +305,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       // ดึงข้อมูลแจ้งเตือนทันที
       fetchNotifications(false, currentWorkspace.id)
 
-      // ตั้งเวลา Polling ดึงข้อมูลใหม่ทุกๆ 15 วินาทีเพื่ออัปเดตแจ้งเตือนทันทีโดยไม่ต้องกดรีเฟรช (ทำงานเงียบๆ ในพื้นหลัง)
+      // Poll เป็นแค่ fallback สำรอง (เผื่อ Realtime channel ด้านล่างหลุดการเชื่อมต่อ) เพราะการอัปเดตหลักทำผ่าน
+      // Supabase Realtime + window focus refetch ด้านล่างอยู่แล้ว ซึ่งไวกว่าและไม่ต้องยิง Server Action ทุก 15 วิ
       const intervalId = setInterval(() => {
         fetchNotifications(true, currentWorkspace.id)
-      }, 15000)
+      }, 120000)
 
       // ดึงข้อมูลทันทีเมื่อเปิดแท็บหรือหน้าจอเบราว์เซอร์กลับมาโฟกัสอีกครั้ง (ทำงานเงียบๆ ในพื้นหลัง)
       const handleWindowFocus = () => {

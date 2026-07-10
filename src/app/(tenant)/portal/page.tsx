@@ -301,8 +301,9 @@ export default function TenantPortal() {
 
   useEffect(() => {
     loadPortalData(true)
-    // Poll updates every 5s if logged in to auto-reflect approval
-    const timer = setInterval(() => loadPortalData(false), 5000)
+    // Poll ทุก 20s เพื่ออัปเดตสถานะบิลอัตโนมัติ (ไม่ใช้ Supabase Realtime ที่นี่ เพราะหน้านี้เข้าถึงได้แบบไม่ต้อง
+    // login ผ่านลิงก์ LINE ด้วย token ซึ่งไม่มี RLS session ให้ subscribe ตรงจากเบราว์เซอร์ได้อย่างปลอดภัย)
+    const timer = setInterval(() => loadPortalData(false), 20000)
     return () => clearInterval(timer)
   }, [])
 
