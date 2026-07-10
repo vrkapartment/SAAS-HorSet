@@ -27,6 +27,12 @@ export async function getRoomTypes(workspaceId?: string) {
 
 export async function createRoomType(name: string, defaultRent: number) {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("room_types")
@@ -43,6 +49,12 @@ export async function createRoomType(name: string, defaultRent: number) {
 
 export async function updateRoomType(id: string, name: string, defaultRent: number) {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("room_types")
@@ -60,6 +72,12 @@ export async function updateRoomType(id: string, name: string, defaultRent: numb
 
 export async function deleteRoomType(id: string) {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     const { error } = await supabase
       .from("room_types")
@@ -147,6 +165,13 @@ export async function getRooms(workspaceId?: string) {
 
 export async function createRoom(roomNumber: string, roomTypeId: string, baseRent: number, floor: string, extraExpenses: any[] = []) {
   try {
+    const { assertSubscriptionActive, checkWorkspaceQuota, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+      await checkWorkspaceQuota(workspaceId, "rooms")
+    }
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("rooms")
@@ -180,6 +205,12 @@ export async function updateRoom(
   extraExpenses: any[] = []
 ) {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("rooms")
@@ -207,6 +238,12 @@ export async function updateRoom(
 
 export async function deleteRoom(id: string) {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     const { error } = await supabase
       .from("rooms")
@@ -226,6 +263,12 @@ export async function deleteRoom(id: string) {
  */
 export async function updateRoomTypeDeposit(id: string, depositAmount: number) {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("room_types")
@@ -243,6 +286,11 @@ export async function updateRoomTypeDeposit(id: string, depositAmount: number) {
 
 export async function migrateRoomTypeDeposits(workspaceId: string, depositsMap: { [key: string]: number }) {
   try {
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     for (const [id, amount] of Object.entries(depositsMap)) {
       await supabase
@@ -270,17 +318,58 @@ function parseCSV(csvText: string) {
 }
 
 /**
+ * เช็คโควตาห้องพักแบบกลุ่ม (batch) ก่อน insert หลายห้องพร้อมกัน (importRoomsFromCSV / createRoomsBatch)
+ * ต้องเช็คจำนวนห้องที่มีอยู่แล้ว + จำนวนที่จะเพิ่มใหม่ทั้งหมด ไม่เกิน limit ของแผน
+ * (เช็คทีละห้องแบบ checkWorkspaceQuota ไม่ได้ เพราะ count จะไม่อัปเดตจนกว่าจะ insert จริง)
+ * คืนค่า error message ภาษาไทยถ้าจะเกินโควตา หรือ null ถ้าผ่าน (all-or-nothing ก่อน insert ใดๆ ทั้งสิ้น)
+ */
+async function checkRoomsQuotaForBatch(workspaceId: string, additionalCount: number): Promise<string | null> {
+  if (!workspaceId || additionalCount <= 0) return null
+
+  const supabase = await createClient()
+  const { data: sub, error: subError } = await supabase
+    .from("workspace_subscriptions")
+    .select("saas_plans (max_rooms, name)")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()
+
+  // ยังไม่มี migration หรือยังไม่มีแถว subscription -> ไม่จำกัด (fail-open เหมือน checkWorkspaceQuota)
+  if (subError?.code === "42P01" || !sub) return null
+
+  const planRow = Array.isArray(sub.saas_plans) ? sub.saas_plans[0] : sub.saas_plans
+  if (!planRow) return null
+
+  const limit = (planRow as { max_rooms: number | null; name: string }).max_rooms
+  if (limit === null || limit === undefined) return null // ไม่จำกัด
+
+  const { count } = await supabase.from("rooms").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
+  const currentCount = count || 0
+  const totalAfter = currentCount + additionalCount
+
+  if (totalAfter > limit) {
+    const planName = (planRow as { max_rooms: number | null; name: string }).name
+    const overBy = totalAfter - limit
+    return `แผน "${planName}" ของคุณรองรับจำนวนห้องพักสูงสุด ${limit} ห้อง (ปัจจุบันมี ${currentCount} ห้อง และกำลังจะนำเข้าเพิ่มอีก ${additionalCount} ห้อง ซึ่งเกินโควตาไป ${overBy} ห้อง) กรุณาอัปเกรดแผนหรือลดจำนวนห้องที่จะนำเข้าก่อน`
+  }
+
+  return null
+}
+
+/**
  * นำเข้าข้อมูลห้องพักผ่านไฟล์ CSV แบบกลุ่ม (Batch Import) 
  * รองรับการค้นหา room_type_id อัตโนมัติจากชื่อประเภทห้องพัก
  * และใช้ Database transaction (ผ่าน single atomic batch insert ใน Supabase)
  */
 export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
   try {
-    const supabase = await createClient()
-
     if (!workspaceId) {
       return { success: false, error: "ไม่พบรหัส Workspace (กรุณาลงชื่อเข้าใช้งานใหม่)" }
     }
+
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    await assertSubscriptionActive(workspaceId)
+
+    const supabase = await createClient()
 
     // 1. ดึงประเภทห้องพักทั้งหมดของ Workspace นี้มาไว้เป็นแมปสแกนชื่อ
     const { data: roomTypes, error: rtError } = await supabase
@@ -370,6 +459,12 @@ export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
       }
     }
 
+    // 3.5 เช็คโควตาห้องพักของแผนก่อน insert จริง (all-or-nothing เหมือน transaction เดิม)
+    const quotaError = await checkRoomsQuotaForBatch(workspaceId, roomsToInsert.length)
+    if (quotaError) {
+      return { success: false, error: quotaError }
+    }
+
     // 4. บันทึกข้อมูลแบบกลุ่ม (Single Statement Batch) ซึ่งเป็น Transaction ในตัวเองแบบอัตโนมัติ
     const { data, error: insertError } = await supabase
       .from("rooms")
@@ -415,11 +510,22 @@ export async function createRoomsBatch(rooms: {
   workspace_id: string
 }[]) {
   try {
-    const supabase = await createClient()
-
     if (rooms.length === 0) {
       return { success: false, error: "ไม่พบรายการห้องพักที่จะนำเข้า" }
     }
+
+    const workspaceId = rooms[0]?.workspace_id
+    if (workspaceId) {
+      const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+      await assertSubscriptionActive(workspaceId)
+
+      const quotaError = await checkRoomsQuotaForBatch(workspaceId, rooms.length)
+      if (quotaError) {
+        return { success: false, error: quotaError }
+      }
+    }
+
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("rooms")
@@ -447,6 +553,12 @@ export async function createRoomsBatch(rooms: {
 
 export async function updateRoomStatus(id: string, status: "occupied" | "available" | "Pending_Refund") {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) {
+      await assertSubscriptionActive(workspaceId)
+    }
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("rooms")

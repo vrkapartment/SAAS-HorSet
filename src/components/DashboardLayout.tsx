@@ -52,6 +52,8 @@ import { getBills } from "@/features/billing/actions"
 import { getExpenses } from "@/features/expenses/actions"
 import PullToRefresh from "./PullToRefresh"
 import { getNotificationsAction, type AppNotification } from "@/features/notification/actions"
+import SubscriptionStatusBanner from "@/features/subscription/components/SubscriptionStatusBanner"
+import UploadSlipModal from "@/features/subscription/components/UploadSlipModal"
 
 
 interface DashboardLayoutProps {
@@ -200,6 +202,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [userPermissions, setUserPermissions] = useState<StaffPermissions | null>(null)
+
+  // สถานะเปิด/ปิด modal อัปโหลดสลิปชำระค่าบริการ subscription ของ HorSet (กดจาก SubscriptionStatusBanner)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // ตรวจสอบโหมดทดสอบ / เชื่อมต่อจริง
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
@@ -1327,6 +1332,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
         {/* ตัวเนื้อหาภายในหน้าเว็บ (Page Content Injection) */}
         <main className={`flex-1 p-4 sm:p-6 md:p-8 ${(pathname === "/rooms" || pathname === "/settings" || pathname?.startsWith("/settings")) ? "max-w-none" : "max-w-7xl"} w-full mx-auto space-y-6 overflow-x-hidden touch-pan-y overscroll-x-none`}>
+          {/* แจ้งสถานะ subscription ของหอพัก (trial ใกล้หมด / ค้างชำระ / read-only) เฉพาะ Admin เท่านั้น */}
+          {!isDemo && userRole === "admin" && currentWorkspace.id && (
+            <SubscriptionStatusBanner
+              workspaceId={currentWorkspace.id}
+              onUpgradeClick={() => setShowUpgradeModal(true)}
+            />
+          )}
           <div className="w-full max-w-full overflow-hidden">
             <PullToRefresh>
               {isPathAllowed() ? (
@@ -1388,6 +1400,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         isOpen={showSupportModal}
         workspaceName={currentWorkspace.name}
         onDecide={handleDecideSupport}
+      />
+
+      {/* Modal อัปโหลดสลิปชำระค่าบริการ subscription ของ HorSet เปิดจากปุ่ม "อัปเกรดแผน" ใน SubscriptionStatusBanner */}
+      <UploadSlipModal
+        isOpen={showUpgradeModal}
+        workspaceId={currentWorkspace.id}
+        onClose={() => setShowUpgradeModal(false)}
       />
 
 

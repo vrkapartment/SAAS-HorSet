@@ -267,6 +267,16 @@ export async function registerWithSecretCodeAction(data: {
       return { success: false, error: "รหัสเชิญชวนนี้หมดอายุแล้ว (รหัสเชิญชวนมีอายุการใช้งาน 2 ชั่วโมง)" }
     }
 
+    // 1.5 ถ้าเป็นการสมัครในบทบาท Staff ต้องเช็คโควตาจำนวนบัญชี Staff ของ workspace ก่อนสมัครสมาชิกเสมอ
+    if (codeData.role === "staff") {
+      try {
+        const { checkWorkspaceQuota } = await import("@/features/subscription/actions")
+        await checkWorkspaceQuota(codeData.workspace_id, "staff")
+      } catch (quotaError) {
+        return { success: false, error: quotaError instanceof Error ? quotaError.message : "เกิดข้อผิดพลาดในการตรวจสอบโควตาบัญชี Staff" }
+      }
+    }
+
     // 2. สมัครสมาชิกผ่าน Supabase Auth พร้อมระบุ role, workspace_id และ registration_code
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email.trim(),

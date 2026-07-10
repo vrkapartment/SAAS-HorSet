@@ -67,6 +67,10 @@ export async function createTenant(
   }
 
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
 
     // 1. ค้นหา roomId จาก roomNumber
@@ -116,6 +120,10 @@ export async function deleteTenant(id: string, roomNumber: string) {
   }
 
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
 
     // 1. ดึงข้อมูลผู้เช่ารายนี้ก่อนเพื่อนำไปสำรองประวัติลง tenants_old
@@ -188,6 +196,9 @@ export async function lazyCleanupPastDueTenants(workspaceId: string) {
   }
 
   try {
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
 
     // ดึงวันที่ปัจจุบันตามโซนเวลาประเทศไทย (+07:00)
@@ -324,6 +335,10 @@ export async function deleteOldTenant(id: string) {
   }
 
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
     const { error } = await supabase
       .from("tenants_old")
@@ -349,6 +364,10 @@ export async function updateTenant(
   contractEnd: string
 ) {
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
 
     // 1. ดึงข้อมูลสัญญาเดิมมาเช็คว่ามีการย้ายห้องหรือไม่
@@ -993,6 +1012,9 @@ export async function saveCancelledContract(workspaceId: string, contract: {
   }
 
   try {
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -1164,6 +1186,10 @@ export async function deleteCancelledContract(id: string) {
       return { success: false, error: "คุณไม่มีสิทธิ์ในการลบประวัติสำหรับหอพักนี้" }
     }
 
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const { error } = await adminSupabase
       .from("cancelled_contracts")
       .delete()
@@ -1209,6 +1235,9 @@ export async function migrateLocalStorageCancelledContracts(workspaceId: string,
     if (!isSuperAdmin && !isWorkspaceMember) {
       return { success: false, error: "คุณไม่มีสิทธิ์ในการย้ายข้อมูลสำหรับหอพักนี้" }
     }
+
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    await assertSubscriptionActive(workspaceId)
 
     const adminSupabase = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -1258,6 +1287,10 @@ export async function disconnectLine(tenantId: string) {
   }
 
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("tenants")
@@ -1293,6 +1326,9 @@ export async function createTenantsBatch(
   }
 
   try {
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
 
     if (tenants.length === 0) {

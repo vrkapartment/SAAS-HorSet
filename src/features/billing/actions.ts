@@ -138,6 +138,10 @@ export async function createBill(
     }
     const workspaceId = profileRes.data.workspace_id
 
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนสร้าง/แก้ไขบิล (บล็อกถ้า read_only/cancelled)
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     // 2. Fetch workspace finance settings
     const financeRes = await getFinanceSettings(workspaceId)
     if (!financeRes.success || !financeRes.data) {
@@ -267,6 +271,11 @@ export async function updateBillStatus(
   }
 
   try {
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนแก้ไขสถานะบิล/อัปโหลดสลิป (บล็อกถ้า read_only/cancelled)
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const subscriptionWorkspaceId = portalAuth?.workspaceId || (await getCurrentWorkspaceId())
+    if (subscriptionWorkspaceId) await assertSubscriptionActive(subscriptionWorkspaceId)
+
     const supabase = await createClient()
     let activeClient = supabase
 
@@ -626,6 +635,11 @@ export async function deleteBill(id: string) {
   }
 
   try {
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนลบบิล (บล็อกถ้า read_only/cancelled)
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const subscriptionWorkspaceId = await getCurrentWorkspaceId()
+    if (subscriptionWorkspaceId) await assertSubscriptionActive(subscriptionWorkspaceId)
+
     const supabase = await createClient()
 
     // 1. ดึงข้อมูลบิลก่อนลบ เพื่อสำรองไว้ที่ bills_deleted ก่อนลบจริง (ห้ามลบข้อมูลการเงินถาวรโดยไม่มีสำรอง)
@@ -703,6 +717,12 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
     if (role !== "admin" && role !== "staff" && role !== "super_admin") {
       console.error("🖥️ [Server Action] Role is unauthorized:", role)
       return { success: false, error: "⚠️ ขออภัย คุณไม่มีสิทธิ์ในการบันทึกค่าปรับล่าช้า" }
+    }
+
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนแก้ไขค่าปรับล่าช้า (บล็อกถ้า read_only/cancelled)
+    if (profileRes.data.workspace_id) {
+      const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+      await assertSubscriptionActive(profileRes.data.workspace_id)
     }
 
     // 2. เชื่อมต่อฐานข้อมูลโดยสลับไปใช้ Admin Client หากตั้งค่า Service Role Key ไว้
@@ -920,6 +940,10 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
     }
     const workspaceId = profileRes.data.workspace_id
+
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนบันทึกบิล/มิเตอร์ทั้งหมด (บล็อกถ้า read_only/cancelled)
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
 
     const financeRes = await getFinanceSettings(workspaceId)
     if (!financeRes.success || !financeRes.data) {

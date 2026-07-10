@@ -52,6 +52,16 @@ export async function createWorkspaceUserAction(data: CreateUserParams) {
       }
     })
 
+    // 0. ถ้าเป็นการสร้างบัญชีบทบาท Staff ต้องเช็คโควตาจำนวนบัญชี Staff ของ workspace ก่อนสร้างบัญชีเสมอ
+    if (data.role === "staff") {
+      try {
+        const { checkWorkspaceQuota } = await import("@/features/subscription/actions")
+        await checkWorkspaceQuota(data.workspaceId, "staff")
+      } catch (quotaError) {
+        return { success: false, error: quotaError instanceof Error ? quotaError.message : "เกิดข้อผิดพลาดในการตรวจสอบโควตาบัญชี Staff" }
+      }
+    }
+
     // 1. สร้างผู้ใช้งานลงในระบบ Supabase Auth
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,

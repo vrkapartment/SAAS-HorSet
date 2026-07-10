@@ -89,6 +89,10 @@ export async function saveMeterRecord(
   }
 
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const elecCurrVal = elecCurr === "" ? null : Number(elecCurr)
     const waterCurrVal = waterCurr === "" ? null : Number(waterCurr)
 
@@ -126,6 +130,9 @@ export async function saveMeterReplacement(
   }
 
   try {
+    const { assertSubscriptionActive } = await import("@/features/subscription/actions")
+    await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
 
     const { data: existing } = await supabase
@@ -213,6 +220,10 @@ export async function deleteMeterReplacement(
   }
 
   try {
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const workspaceId = await getCurrentWorkspaceId()
+    if (workspaceId) await assertSubscriptionActive(workspaceId)
+
     const supabase = await createClient()
     const { error } = await supabase
       .from("meter_replacements")

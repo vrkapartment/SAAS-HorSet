@@ -80,6 +80,11 @@ export async function getExpenses(taxYear?: string, workspaceId?: string) {
  */
 export async function createExpense(title: string, amount: number, taxYear: string, category: "40_5" | "40_8", workspaceId?: string, createdAt?: string) {
   try {
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนบันทึกรายจ่าย (บล็อกถ้า read_only/cancelled)
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const subscriptionWorkspaceId = workspaceId || (await getCurrentWorkspaceId())
+    if (subscriptionWorkspaceId) await assertSubscriptionActive(subscriptionWorkspaceId)
+
     const supabase = await createClient()
     const prefixTitle = `[${category}] ${title}`
 
@@ -176,6 +181,11 @@ export async function createExpense(title: string, amount: number, taxYear: stri
  */
 export async function updateExpense(id: string, title: string, amount: number, taxYear: string, category: "40_5" | "40_8", createdAt?: string) {
   try {
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนแก้ไขรายจ่าย (บล็อกถ้า read_only/cancelled)
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const subscriptionWorkspaceId = await getCurrentWorkspaceId()
+    if (subscriptionWorkspaceId) await assertSubscriptionActive(subscriptionWorkspaceId)
+
     const supabase = await createClient()
     const prefixTitle = `[${category}] ${title}`
 
@@ -264,6 +274,11 @@ export async function updateExpense(id: string, title: string, amount: number, t
  */
 export async function deleteExpense(id: string) {
   try {
+    // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนลบรายจ่าย (บล็อกถ้า read_only/cancelled)
+    const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
+    const subscriptionWorkspaceId = await getCurrentWorkspaceId()
+    if (subscriptionWorkspaceId) await assertSubscriptionActive(subscriptionWorkspaceId)
+
     const supabase = await createClient()
     const { error } = await supabase
       .from("expenses")
