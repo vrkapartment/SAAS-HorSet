@@ -11,7 +11,8 @@ import {
   Settings, 
   RefreshCw,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck
 } from "lucide-react"
 
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -24,6 +25,7 @@ import PermissionsTab from "@/components/settings/PermissionsTab"
 import TestConnectionTab from "@/components/settings/TestConnectionTab"
 import ProfileTab from "@/components/settings/ProfileTab"
 import LineSettingsTab from "@/components/settings/LineSettingsTab"
+import SlipOkSettingsTab from "@/components/settings/SlipOkSettingsTab"
 
 function SettingsHubContent() {
   const router = useRouter()
@@ -160,6 +162,13 @@ function SettingsHubContent() {
       allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
     },
     {
+      id: "slipok",
+      name: "เชื่อมต่อ SlipOK",
+      icon: ShieldCheck,
+      description: "ตั้งค่า Branch ID และ API Key สำหรับตรวจสอบสลิปโอนเงินอัตโนมัติ พร้อมดูโควต้าคงเหลือ",
+      allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
+    },
+    {
       id: "supabase",
       name: "ตรวจสอบเชื่อมต่อ Supabase",
       icon: Network,
@@ -188,6 +197,8 @@ function SettingsHubContent() {
         return <TestConnectionTab />
       case "line-oa":
         return <LineSettingsTab />
+      case "slipok":
+        return <SlipOkSettingsTab />
       default:
         return <ProfileTab />
     }

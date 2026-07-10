@@ -1,9 +1,11 @@
 import React, { useState } from "react"
-import { X, CreditCard, UserCheck, Eye, ZoomIn, ZoomOut } from "lucide-react"
+import { X, CreditCard, UserCheck, Eye, ZoomIn, ZoomOut, ShieldCheck, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { verifySlipWithSlipOk } from "@/features/slipok/actions"
 
 interface SlipVerificationModalProps {
   isDark: boolean
   slipModalOpen: boolean
+  workspaceId: string
   selectedBill: {
     billId?: string
     roomNumber: string
@@ -22,6 +24,7 @@ interface SlipVerificationModalProps {
 export default function SlipVerificationModal({
   isDark,
   slipModalOpen,
+  workspaceId,
   selectedBill,
   billingCycle,
   onClose,
@@ -29,8 +32,29 @@ export default function SlipVerificationModal({
   onReject
 }: SlipVerificationModalProps) {
   const [isZoomed, setIsZoomed] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<{ success: boolean; message: string } | null>(null)
 
   if (!slipModalOpen || !selectedBill) return null
+
+  const handleVerifyWithSlipOk = async () => {
+    if (!selectedBill.slipUrl || !workspaceId) return
+    setVerifying(true)
+    setVerifyResult(null)
+    try {
+      const res = await verifySlipWithSlipOk(workspaceId, selectedBill.slipUrl, selectedBill.billAmount)
+      if (res.success) {
+        setVerifyResult({ success: true, message: "✅ ตรวจสอบผ่าน: ยอดเงินและบัญชีผู้รับตรงกับสลิป" })
+      } else {
+        setVerifyResult({ success: false, message: `❌ ${res.error || "ตรวจสอบไม่ผ่าน กรุณาเช็กด้วยตนเอง"}` })
+      }
+    } catch (err) {
+      console.error("Error verifying slip with SlipOK:", err)
+      setVerifyResult({ success: false, message: "❌ เกิดข้อผิดพลาดในการเชื่อมต่อ SlipOK" })
+    } finally {
+      setVerifying(false)
+    }
+  }
 
   return (
     <>
@@ -177,6 +201,41 @@ export default function SlipVerificationModal({
                 ⚠️ โปรดเช็กยอดเงินโอนและเวลารับเงินในแอปบัญชีธนาคารหอพักของคุณให้ตรงกับรูปสลิปก่อนกดยืนยัน
               </div>
             </div>
+
+            {/* ปุ่มตรวจสอบสลิปอัตโนมัติกับ SlipOK (ตัวช่วย ไม่ได้แทนที่การตัดสินใจของ staff) */}
+            {selectedBill.slipUrl && (
+              <div className="pt-2 space-y-2">
+                <button
+                  onClick={handleVerifyWithSlipOk}
+                  disabled={verifying}
+                  className={`w-full h-10 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                    isDark
+                      ? "bg-blue-950/20 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-900/40 hover:border-blue-600"
+                      : "bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border-blue-200 hover:border-blue-600"
+                  }`}
+                >
+                  {verifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  {verifying ? "กำลังตรวจสอบสลิปกับ SlipOK..." : "ตรวจสอบสลิปกับ SlipOK"}
+                </button>
+
+                {verifyResult && (
+                  <div
+                    className={`p-2.5 rounded-xl text-[11px] font-bold flex items-start gap-2 ${
+                      verifyResult.success
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500"
+                        : "bg-rose-500/10 border border-rose-500/20 text-rose-500"
+                    }`}
+                  >
+                    {verifyResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    )}
+                    <span>{verifyResult.message}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ปุ่มกดอนุมัติ/ปฏิเสธ */}
             <div className="space-y-2 pt-4 md:pt-6">

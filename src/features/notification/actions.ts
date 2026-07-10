@@ -632,7 +632,45 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
 /**
  * ส่งข้อความแจ้งเตือนสลิปโอนเงินใหม่ไปยัง Admin (ทั้งแบบส่วนตัวและกลุ่มทีมงาน)
  */
-export async function sendLineSlipNotificationAction(billId: string, workspaceId: string) {
+export type SlipNotificationVariant = "new" | "success" | "warning"
+
+const SLIP_NOTIFICATION_VARIANTS: Record<
+  SlipNotificationVariant,
+  { headerColor: string; headerTitle: string; altPrefix: string; buttonColor: string; buttonLabel: string }
+> = {
+  // ยังไม่ได้เชื่อมต่อ SlipOK (หรือปิดใช้งานอยู่) — ข้อความเดิม รอ staff ตรวจสอบเอง
+  new: {
+    headerColor: "#4F46E5",
+    headerTitle: "📥 มีผู้เช่าอัปโหลดสลิปโอนเงินใหม่",
+    altPrefix: "📥 สลิปใหม่รอตรวจ",
+    buttonColor: "#4F46E5",
+    buttonLabel: "🔍 ตรวจสอบสลิป & ยืนยัน"
+  },
+  // เชื่อมต่อ SlipOK แล้ว และตรวจสอบสลิปผ่าน (ยอดเงิน/บัญชีตรงกัน)
+  success: {
+    headerColor: "#059669",
+    headerTitle: "✅ โอนเงินสำเร็จ (ตรวจสอบผ่าน SlipOK อัตโนมัติ)",
+    altPrefix: "✅ โอนเงินสำเร็จ",
+    buttonColor: "#059669",
+    buttonLabel: "✅ เข้าไปยืนยันปิดบิล"
+  },
+  // เชื่อมต่อ SlipOK แล้ว แต่ตรวจสอบไม่ผ่าน (ยอดเงิน/บัญชีไม่ตรง หรือสลิปไม่ถูกต้อง)
+  warning: {
+    headerColor: "#DC2626",
+    headerTitle: "⚠️ ตรวจสอบสลิป (SlipOK ตรวจไม่ผ่าน) กรุณาตรวจสอบด่วน",
+    altPrefix: "⚠️ ตรวจสอบสลิป",
+    buttonColor: "#DC2626",
+    buttonLabel: "⚠️ ตรวจสอบสลิปด่วน"
+  }
+}
+
+export async function sendLineSlipNotificationAction(
+  billId: string,
+  workspaceId: string,
+  variant: SlipNotificationVariant = "new",
+  slipOkReason?: string
+) {
+  const variantConfig = SLIP_NOTIFICATION_VARIANTS[variant]
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -729,14 +767,14 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
     const verifyLink = `${safeAppUrl}/manage-bills?verify_bill_id=${billId}&cycle=${encodeURIComponent(bill.billing_cycle)}`
 
     // สร้าง Flex Message
-    const altText = `📥 สลิปใหม่รอตรวจ: ห้อง ${bill.room_number} ยอด ${Number(bill.amount).toLocaleString()} บาท`
-    
+    const altText = `${variantConfig.altPrefix}: ห้อง ${bill.room_number} ยอด ${Number(bill.amount).toLocaleString()} บาท`
+
     const flexMessageContent: any = {
       type: "bubble",
       header: {
         type: "box",
         layout: "vertical",
-        backgroundColor: "#4F46E5", // Indigo Premium
+        backgroundColor: variantConfig.headerColor,
         paddingTop: "xl",
         paddingBottom: "xl",
         paddingStart: "xl",
@@ -744,7 +782,7 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
         contents: [
           {
             type: "text",
-            text: "📥 มีผู้เช่าอัปโหลดสลิปโอนเงินใหม่",
+            text: variantConfig.headerTitle,
             color: "#FFFFFF",
             size: "sm",
             weight: "bold"
@@ -849,7 +887,55 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
                 align: "end"
               }
             ]
-          }
+          },
+          ...(variant === "success"
+            ? [
+                {
+                  type: "separator",
+                  margin: "lg"
+                },
+                {
+                  type: "text",
+                  text: "ผลตรวจสอบอัตโนมัติ (SlipOK)",
+                  color: "#059669",
+                  size: "xs",
+                  weight: "bold",
+                  margin: "lg"
+                },
+                {
+                  type: "text",
+                  text: "✅ ยอดเงินและบัญชีผู้รับตรงกับสลิป ตรวจสอบผ่านอัตโนมัติ",
+                  color: "#047857",
+                  size: "sm",
+                  margin: "xs",
+                  wrap: true
+                }
+              ]
+            : []),
+          ...(variant === "warning"
+            ? [
+                {
+                  type: "separator",
+                  margin: "lg"
+                },
+                {
+                  type: "text",
+                  text: "ผลตรวจสอบอัตโนมัติ (SlipOK)",
+                  color: "#DC2626",
+                  size: "xs",
+                  weight: "bold",
+                  margin: "lg"
+                },
+                {
+                  type: "text",
+                  text: slipOkReason || "ตรวจสอบสลิปอัตโนมัติไม่ผ่าน กรุณาตรวจสอบด้วยตนเอง",
+                  color: "#991B1B",
+                  size: "sm",
+                  margin: "xs",
+                  wrap: true
+                }
+              ]
+            : [])
         ]
       }
     }
@@ -877,11 +963,11 @@ export async function sendLineSlipNotificationAction(billId: string, workspaceId
         {
           type: "button",
           style: "primary",
-          color: "#4F46E5",
+          color: variantConfig.buttonColor,
           height: "sm",
           action: {
             type: "uri",
-            label: "🔍 ตรวจสอบสลิป & ยืนยัน",
+            label: variantConfig.buttonLabel,
             uri: verifyLink
           }
         }

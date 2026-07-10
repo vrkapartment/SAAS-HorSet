@@ -1802,6 +1802,7 @@ function ManageBillsContent() {
       <SlipVerificationModal
         isDark={isDark}
         slipModalOpen={slipModalOpen}
+        workspaceId={currentWorkspaceId}
         selectedBill={selectedBill}
         billingCycle={billingCycle}
         onClose={closeSlipModal}

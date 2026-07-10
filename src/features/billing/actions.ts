@@ -526,10 +526,34 @@ export async function updateBillStatus(
     if (status === "pending") {
       const workspaceId = finalData.workspace_id || billData?.workspace_id;
       if (workspaceId) {
+        // ค่าเริ่มต้น: ยังไม่ได้เชื่อมต่อ SlipOK (หรือปิดใช้งานอยู่) -> ส่งข้อความ "มีสลิปใหม่" แบบเดิม
+        let variant: "new" | "success" | "warning" = "new"
+        let slipOkReason: string | undefined
+
+        // ตรวจสอบสลิปกับ SlipOK อัตโนมัติ เฉพาะหอพักที่ตั้งค่า Branch ID/API Key ไว้แล้วเท่านั้น
+        // (ข้ามเงียบๆ ถ้ายังไม่ได้ตั้งค่า เพื่อไม่กระทบการอัปโหลดสลิปของหอพักที่ยังไม่ได้เชื่อมต่อ SlipOK)
+        if (slipUrl) {
+          try {
+            const { getSlipOkSettings, verifySlipWithSlipOk } = await import("@/features/slipok/actions");
+            const slipOkSettingsRes = await getSlipOkSettings(workspaceId);
+            if (slipOkSettingsRes.success && slipOkSettingsRes.data?.hasApiKey && slipOkSettingsRes.data.enabled) {
+              const verifyRes = await verifySlipWithSlipOk(workspaceId, slipUrl, amount);
+              if (verifyRes.success) {
+                variant = "success"
+              } else {
+                variant = "warning"
+                slipOkReason = verifyRes.error || "ตรวจสอบสลิปอัตโนมัติไม่ผ่าน กรุณาตรวจสอบด้วยตนเอง"
+              }
+            }
+          } catch (err) {
+            console.error("Error auto-verifying slip with SlipOK:", err);
+          }
+        }
+
         // Dynamically import to avoid circular dependencies
         const { sendLineSlipNotificationAction } = await import("@/features/notification/actions");
         try {
-          const res = await sendLineSlipNotificationAction(id, workspaceId);
+          const res = await sendLineSlipNotificationAction(id, workspaceId, variant, slipOkReason);
           if (!res.success) {
             console.error("⚠️ LINE Slip Notification Failed:", res.error);
           } else {
