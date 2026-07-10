@@ -225,8 +225,12 @@ async function autoDisableSlipOk(workspaceId: string, reason: string) {
   }
 }
 
-const QUOTA_EXCEEDED_MESSAGE =
+const QUOTA_EXCEEDED_MESSAGE_DISABLED =
   "โควต้า SlipOK เดือนนี้หมดแล้ว ระบบได้ปิดการตรวจสอบสลิปอัตโนมัติให้แล้วเพื่อป้องกันค่าใช้จ่ายส่วนเกิน กรุณาติดต่อ SlipOK เพื่อเติมโควต้า หรือกลับมาเปิดใช้งานเองในหน้าตั้งค่าหากต้องการใช้ต่อแม้มีค่าใช้จ่ายเพิ่ม"
+
+// ใช้ตอนที่ admin ปิด toggle "ป้องกันค่าใช้จ่ายส่วนเกิน" ไว้ -> ระบบไม่ได้ปิดการเชื่อมต่อให้ ยังพยายามตรวจสอบต่อไปตามที่ตั้งค่าไว้
+const QUOTA_EXCEEDED_MESSAGE_STILL_ON =
+  "โควต้า SlipOK เดือนนี้หมดแล้ว แต่ตั้งค่าไว้ให้ยังตรวจสอบต่อไป (ปิดฟีเจอร์ป้องกันค่าใช้จ่ายส่วนเกินไว้อยู่) อาจมีค่าใช้จ่ายส่วนเกินตามแพ็กเกจของ SlipOK"
 
 export async function getSlipOkQuota(workspaceId: string) {
   try {
@@ -260,9 +264,11 @@ export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string
       const quotaCheck = await fetchQuotaFromSlipOk(branchId, apiKey)
       if (quotaCheck.success && quotaCheck.data.quota <= 0) {
         await autoDisableSlipOk(workspaceId, "โควต้าหมดก่อนตรวจสลิป")
-        return { success: false, error: QUOTA_EXCEEDED_MESSAGE }
+        return { success: false, error: QUOTA_EXCEEDED_MESSAGE_DISABLED }
       }
     }
+    // ถ้าปิด toggle ป้องกันค่าใช้จ่ายไว้ จะข้ามการเช็คโควต้าล่วงหน้านี้ไปเลย ปล่อยให้ยิงตรวจสลิปจริงด้านล่างตามปกติ
+    // (ถ้าเกินโควต้าจริง SlipOK จะตอบ error 1004 กลับมาเองด้านล่าง)
 
     const response = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}`, {
       method: "POST",
@@ -286,8 +292,9 @@ export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string
       if (json.code === 1004) {
         if (autoDisableOnQuotaExceeded) {
           await autoDisableSlipOk(workspaceId, "SlipOK แจ้ง error 1004 (เกินโควต้า)")
+          return { success: false, error: QUOTA_EXCEEDED_MESSAGE_DISABLED, data: json.data }
         }
-        return { success: false, error: QUOTA_EXCEEDED_MESSAGE, data: json.data }
+        return { success: false, error: QUOTA_EXCEEDED_MESSAGE_STILL_ON, data: json.data }
       }
       return { success: false, error: mapSlipOkError(json), data: json.data }
     }
