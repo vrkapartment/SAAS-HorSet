@@ -76,6 +76,17 @@ export interface WorkspaceSubscriptionView {
   trialEndsAt: string | null
   currentPeriodEnd: string | null
   plan: SaasPlan | null
+  usage: { rooms: number; staff: number; buildings: number }
+}
+
+async function getWorkspaceUsage(workspaceId: string) {
+  const supabase = await createClient()
+  const [{ count: rooms }, { count: staff }, { count: buildings }] = await Promise.all([
+    supabase.from("rooms").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("role", "staff"),
+    supabase.from("buildings").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
+  ])
+  return { rooms: rooms || 0, staff: staff || 0, buildings: buildings || 0 }
 }
 
 /**
@@ -96,18 +107,27 @@ export async function getWorkspaceSubscription(workspaceId: string): Promise<{ s
       .eq("workspace_id", workspaceId)
       .maybeSingle()
 
+    const emptyUsage = { rooms: 0, staff: 0, buildings: 0 }
+
     if (error) {
       if (error.code === RELATION_MISSING_CODE) {
-        return { success: true, data: { status: "active", billingCycle: "monthly", trialEndsAt: null, currentPeriodEnd: null, plan: null } }
+        return { success: true, data: { status: "active", billingCycle: "monthly", trialEndsAt: null, currentPeriodEnd: null, plan: null, usage: emptyUsage } }
       }
       throw error
     }
 
     if (!data) {
-      return { success: true, data: { status: "active", billingCycle: "monthly", trialEndsAt: null, currentPeriodEnd: null, plan: null } }
+      return { success: true, data: { status: "active", billingCycle: "monthly", trialEndsAt: null, currentPeriodEnd: null, plan: null, usage: emptyUsage } }
     }
 
     const planRow = Array.isArray(data.saas_plans) ? data.saas_plans[0] : data.saas_plans
+
+    let usage = emptyUsage
+    try {
+      usage = await getWorkspaceUsage(workspaceId)
+    } catch {
+      // ถ้านับ usage ไม่ได้ (เช่น ยังไม่มีตาราง buildings) ให้ใช้ค่าว่างไปก่อน ไม่บล็อกการแสดงผลสถานะแผน
+    }
 
     return {
       success: true,
@@ -116,7 +136,8 @@ export async function getWorkspaceSubscription(workspaceId: string): Promise<{ s
         billingCycle: data.billing_cycle,
         trialEndsAt: data.trial_ends_at,
         currentPeriodEnd: data.current_period_end,
-        plan: planRow ? mapPlanRow(planRow as Record<string, unknown>) : null
+        plan: planRow ? mapPlanRow(planRow as Record<string, unknown>) : null,
+        usage
       }
     }
   } catch (error) {
@@ -154,9 +175,8 @@ export async function assertSubscriptionActive(workspaceId: string): Promise<voi
   if (data.status === "read_only") {
     throw new Error("ระยะเวลาทดลองใช้งานหรือรอบบิลของหอพักนี้สิ้นสุดแล้ว กรุณาชำระค่าบริการเพื่อกลับมาใช้งานได้ตามปกติ (ขณะนี้ดูข้อมูลได้อย่างเดียว)")
   }
-  if (data.status === "cancelled") {
-    throw new Error("หอพักนี้ยกเลิกการใช้งานระบบแล้ว กรุณาติดต่อผู้ดูแลระบบเพื่อเปิดใช้งานอีกครั้ง")
-  }
+  // หมายเหตุ: status "cancelled" ตั้งใจไม่บล็อกที่นี่ — บัญชีที่ยกเลิกยังใช้งานได้ตามปกติจนถึงวันหมดอายุ
+  // ปัจจุบัน (current_period_end/trial_ends_at) เดิม แล้วค่อยถูก cron เปลี่ยนเป็น read_only เมื่อครบกำหนดจริง
 }
 
 const QUOTA_LABELS: Record<"rooms" | "staff" | "buildings", string> = {
@@ -310,9 +330,21 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
     if (verifyRes.success) {
       const periodMs = billingCycle === "yearly" ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000
       const now = new Date()
-      const currentPeriodEnd = new Date(now.getTime() + periodMs)
 
       const serviceClient = await getServiceRoleOrSessionClient()
+
+      // ถ้ายังอยู่ในช่วงทดลองใช้ฟรีและยังไม่หมดอายุ ให้เริ่มนับรอบบิลใหม่หลังวันที่ trial หมดอายุ
+      // แทนที่จะเริ่มนับทันที เพื่อไม่ให้เสียวันทดลองใช้ที่เหลืออยู่ไปฟรีๆ
+      const { data: existingSub } = await serviceClient
+        .from("workspace_subscriptions")
+        .select("status, trial_ends_at")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle()
+
+      const trialEndsAt = existingSub?.status === "trial" && existingSub.trial_ends_at ? new Date(existingSub.trial_ends_at) : null
+      const periodStart = trialEndsAt && trialEndsAt.getTime() > now.getTime() ? trialEndsAt : now
+      const currentPeriodEnd = new Date(periodStart.getTime() + periodMs)
+
       await serviceClient
         .from("saas_payments")
         .update({ status: "verified", slipok_response: verifyRes.data, verified_at: now.toISOString() })
@@ -326,12 +358,22 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
             plan_id: planId,
             status: "active",
             billing_cycle: billingCycle,
-            current_period_start: now.toISOString(),
+            current_period_start: periodStart.toISOString(),
             current_period_end: currentPeriodEnd.toISOString()
           },
           { onConflict: "workspace_id" }
         )
       if (subUpdateError) throw subUpdateError
+
+      const carriedOverDays = trialEndsAt && trialEndsAt.getTime() > now.getTime()
+        ? Math.ceil((trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+        : 0
+      if (carriedOverDays > 0) {
+        return {
+          success: true,
+          message: `ชำระเงินสำเร็จ! ระบบจะให้คุณใช้แผน Pro (ทดลองใช้) ฟรีต่ออีก ${carriedOverDays} วันตามเดิม แล้วค่อยเริ่มนับรอบบิลของแผน "${plan.name}" หลังจากนั้น`
+        }
+      }
 
       return { success: true, message: `ชำระเงินสำเร็จ! อัปเกรดเป็นแผน "${plan.name}" เรียบร้อยแล้ว` }
     }
@@ -388,6 +430,46 @@ export async function superAdminOverrideSubscription(
     return { success: true }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการปรับแผนการใช้งาน" }
+  }
+}
+
+/**
+ * ให้ Admin ของ workspace เอง (ไม่ใช่ Super Admin) ยกเลิกการใช้งานบัญชีตนเอง
+ * บัญชีจะยังใช้งานได้ตามปกติจนถึงวันหมดอายุปัจจุบัน (trial_ends_at หรือ current_period_end) จากนั้นจะกลายเป็น cancelled
+ * ไม่ได้ตัดสิทธิ์ทันที เพื่อไม่ให้เสียเงิน/เวลาที่จ่ายไปแล้วฟรีๆ
+ */
+export async function cancelWorkspaceSubscription(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "admin" || profileRes.data?.workspace_id !== workspaceId) {
+      return { success: false, error: "คุณไม่มีสิทธิ์ยกเลิกบัญชีของหอพักนี้" }
+    }
+
+    // ใช้ Service Role Client เพราะ RLS ของ workspace_subscriptions ไม่ได้เปิด update ให้ role admin โดยตรง
+    // (การเช็คสิทธิ์ที่แท้จริงคือ getCurrentUserProfileAction ด้านบนที่ยืนยันแล้วว่าเป็น admin ของ workspace นี้เท่านั้น)
+    const serviceClient = await getServiceRoleOrSessionClient()
+    const { data: sub, error: subError } = await serviceClient
+      .from("workspace_subscriptions")
+      .select("status, trial_ends_at, current_period_end")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+    if (subError) throw subError
+
+    const expiresAt = sub?.status === "trial" ? sub.trial_ends_at : sub?.current_period_end
+
+    const { error } = await serviceClient
+      .from("workspace_subscriptions")
+      .update({ status: "cancelled", current_period_end: expiresAt || new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการยกเลิกบัญชี" }
   }
 }
 

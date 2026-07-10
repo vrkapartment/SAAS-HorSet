@@ -93,10 +93,25 @@ export async function GET(request: Request) {
       warnings.push(`ตรวจสอบ past_due เลย grace period ไม่สำเร็จ: ${pastDueError.message}`)
     }
 
+    // 1.4 cancelled ที่ครบวันหมดอายุเดิมแล้ว (current_period_end ถูกตั้งไว้ตอนกดยกเลิกให้เท่ากับวันหมดอายุเดิม) -> read_only
+    // ไม่บล็อกทันทีตอนกดยกเลิก เพื่อให้ยังใช้งานได้ปกติจนถึงวันที่จ่ายเงิน/ทดลองใช้ไว้ครบจริง
+    const { data: cancelledToReadOnly, error: cancelledError } = await supabaseAdmin
+      .from("workspace_subscriptions")
+      .update({ status: "read_only" })
+      .eq("status", "cancelled")
+      .lt("current_period_end", nowIso)
+      .select("workspace_id")
+
+    if (cancelledError) {
+      console.error("Error updating expired cancelled subscriptions:", cancelledError)
+      warnings.push(`ตรวจสอบ cancelled หมดอายุไม่สำเร็จ: ${cancelledError.message}`)
+    }
+
     const subscriptionStatusChanges = {
       trial_to_read_only: trialToReadOnly?.length || 0,
       active_to_past_due: activeToPastDue?.length || 0,
-      past_due_to_read_only: pastDueToReadOnly?.length || 0
+      past_due_to_read_only: pastDueToReadOnly?.length || 0,
+      cancelled_to_read_only: cancelledToReadOnly?.length || 0
     }
 
     // =====================================================================

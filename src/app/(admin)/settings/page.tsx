@@ -2,17 +2,18 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { 
-  Building, 
-  Landmark, 
-  Shield, 
-  Network, 
-  User, 
-  Settings, 
+import {
+  Building,
+  Landmark,
+  Shield,
+  Network,
+  User,
+  Settings,
   RefreshCw,
   AlertCircle,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  Package
 } from "lucide-react"
 
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -26,6 +27,7 @@ import TestConnectionTab from "@/components/settings/TestConnectionTab"
 import ProfileTab from "@/components/settings/ProfileTab"
 import LineSettingsTab from "@/components/settings/LineSettingsTab"
 import SlipOkSettingsTab from "@/components/settings/SlipOkSettingsTab"
+import PackageSettingsTab from "@/components/settings/PackageSettingsTab"
 
 function SettingsHubContent() {
   const router = useRouter()
@@ -169,6 +171,13 @@ function SettingsHubContent() {
       allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
     },
     {
+      id: "package",
+      name: "แพ็กเกจ",
+      icon: Package,
+      description: "ดูสถานะแพ็กเกจปัจจุบัน อัปเกรดแผน และจัดการบัญชีการใช้งานของหอพัก",
+      allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
+    },
+    {
       id: "supabase",
       name: "ตรวจสอบเชื่อมต่อ Supabase",
       icon: Network,
@@ -199,6 +208,8 @@ function SettingsHubContent() {
         return <LineSettingsTab />
       case "slipok":
         return <SlipOkSettingsTab />
+      case "package":
+        return <PackageSettingsTab />
       default:
         return <ProfileTab />
     }
