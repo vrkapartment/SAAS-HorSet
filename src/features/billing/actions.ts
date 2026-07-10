@@ -554,6 +554,17 @@ export async function updateBillStatus(
               const verifyRes = await verifySlipWithSlipOk(workspaceId, slipUrl, serverVerifiedAmount);
               if (verifyRes.success) {
                 variant = "success"
+                // SlipOK ตรวจสอบสลิปผ่านแล้ว -> ปิดบิลเป็น "ชำระเงินแล้ว" ให้ทันทีโดยไม่ต้องรอ staff กดยืนยันซ้ำ
+                const { data: paidData, error: paidError } = await activeClient
+                  .from("bills")
+                  .update({ status: "paid", updated_at: new Date().toISOString() })
+                  .eq("id", id)
+                  .select()
+                if (paidError) {
+                  console.error("Error auto-marking bill as paid after SlipOK success:", paidError)
+                } else if (paidData && paidData.length > 0) {
+                  finalData = paidData[0]
+                }
               } else if (verifyRes.code && SLIPOK_RETRYABLE_ERROR_CODES.includes(verifyRes.code)) {
                 // ข้อมูลธนาคารยังไม่เข้าระบบ SlipOK -> เข้าคิวให้ Cron ตรวจซ้ำทุก 5 นาที (สูงสุด 3 ครั้ง)
                 // ก่อนแจ้งเตือนแอดมิน เพื่อลดการแจ้งเตือน false-warning ที่จะหายไปเองถ้ารอสักพัก

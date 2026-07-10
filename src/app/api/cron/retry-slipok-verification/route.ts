@@ -91,6 +91,11 @@ export async function GET(request: Request) {
             .from("slipok_retry_queue")
             .update({ status: "succeeded", updated_at: new Date().toISOString() })
             .eq("id", item.id)
+          // SlipOK ตรวจสอบสลิปผ่านแล้ว -> ปิดบิลเป็น "ชำระเงินแล้ว" ให้ทันทีโดยไม่ต้องรอ staff กดยืนยันซ้ำ
+          await supabaseAdmin
+            .from("bills")
+            .update({ status: "paid", updated_at: new Date().toISOString() })
+            .eq("id", item.bill_id)
           await sendLineSlipNotificationAction(item.bill_id, item.workspace_id, "success")
           details.push({ queue_id: item.id, bill_id: item.bill_id, outcome: "succeeded" })
           continue
