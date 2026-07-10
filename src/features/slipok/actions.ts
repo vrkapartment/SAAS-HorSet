@@ -33,9 +33,6 @@ function mapSlipOkError(json: SlipOkErrorPayload): string {
   return json?.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุจาก SlipOK"
 }
 
-// code 1009/1010 = ข้อมูลจากธนาคารยังไม่เข้าระบบ SlipOK ชั่วคราว ให้ auto-retry ได้ (ไม่ใช่ error ถาวร)
-export const SLIPOK_RETRYABLE_ERROR_CODES = [1009, 1010]
-
 // ใช้ Service Role Client เมื่อมี Env พร้อม เพื่อให้ฟังก์ชันกลุ่มนี้เรียกได้จากทุกที่ (Cron Job, Webhook)
 // ที่ไม่มี session คุกกี้ของผู้ใช้ให้ RLS ตรวจสอบ เช่นเดียวกับ pattern ใน features/notification/actions.ts
 async function getServiceRoleOrSessionClient() {

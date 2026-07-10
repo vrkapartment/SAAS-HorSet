@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { verifySlipWithSlipOk, SLIPOK_RETRYABLE_ERROR_CODES } from "@/features/slipok/actions"
+import { verifySlipWithSlipOk } from "@/features/slipok/actions"
+import { SLIPOK_RETRYABLE_ERROR_CODES } from "@/features/slipok/constants"
 import { sendLineSlipNotificationAction } from "@/features/notification/actions"
 
 export const dynamic = "force-dynamic"

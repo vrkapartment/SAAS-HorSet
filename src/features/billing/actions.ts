@@ -545,7 +545,8 @@ export async function updateBillStatus(
         // (ข้ามเงียบๆ ถ้ายังไม่ได้ตั้งค่า เพื่อไม่กระทบการอัปโหลดสลิปของหอพักที่ยังไม่ได้เชื่อมต่อ SlipOK)
         if (slipUrl) {
           try {
-            const { getSlipOkSettings, verifySlipWithSlipOk, SLIPOK_RETRYABLE_ERROR_CODES } = await import("@/features/slipok/actions");
+            const { getSlipOkSettings, verifySlipWithSlipOk } = await import("@/features/slipok/actions");
+            const { SLIPOK_RETRYABLE_ERROR_CODES } = await import("@/features/slipok/constants");
             const slipOkSettingsRes = await getSlipOkSettings(workspaceId);
             if (slipOkSettingsRes.success && slipOkSettingsRes.data?.hasApiKey && slipOkSettingsRes.data.enabled) {
               // ใช้ serverVerifiedAmount (คำนวณค่าปรับล่าช้าสดฝั่ง server ด้านบน) ไม่ใช่ amount ที่ client ส่งมา
