@@ -538,12 +538,14 @@ export async function updateBillStatus(
         // ค่าเริ่มต้น: ยังไม่ได้เชื่อมต่อ SlipOK (หรือปิดใช้งานอยู่) -> ส่งข้อความ "มีสลิปใหม่" แบบเดิม
         let variant: "new" | "success" | "warning" = "new"
         let slipOkReason: string | undefined
+        // true เมื่อเจอ error ชั่วคราวจากธนาคาร (1009/1010) แล้วเข้าคิว auto-retry ไว้แทน -> ยังไม่ต้องแจ้งเตือนไลน์รอบนี้
+        let deferNotificationForRetry = false
 
         // ตรวจสอบสลิปกับ SlipOK อัตโนมัติ เฉพาะหอพักที่ตั้งค่า Branch ID/API Key ไว้แล้วเท่านั้น
         // (ข้ามเงียบๆ ถ้ายังไม่ได้ตั้งค่า เพื่อไม่กระทบการอัปโหลดสลิปของหอพักที่ยังไม่ได้เชื่อมต่อ SlipOK)
         if (slipUrl) {
           try {
-            const { getSlipOkSettings, verifySlipWithSlipOk } = await import("@/features/slipok/actions");
+            const { getSlipOkSettings, verifySlipWithSlipOk, SLIPOK_RETRYABLE_ERROR_CODES } = await import("@/features/slipok/actions");
             const slipOkSettingsRes = await getSlipOkSettings(workspaceId);
             if (slipOkSettingsRes.success && slipOkSettingsRes.data?.hasApiKey && slipOkSettingsRes.data.enabled) {
               // ใช้ serverVerifiedAmount (คำนวณค่าปรับล่าช้าสดฝั่ง server ด้านบน) ไม่ใช่ amount ที่ client ส่งมา
@@ -551,6 +553,27 @@ export async function updateBillStatus(
               const verifyRes = await verifySlipWithSlipOk(workspaceId, slipUrl, serverVerifiedAmount);
               if (verifyRes.success) {
                 variant = "success"
+              } else if (verifyRes.code && SLIPOK_RETRYABLE_ERROR_CODES.includes(verifyRes.code)) {
+                // ข้อมูลธนาคารยังไม่เข้าระบบ SlipOK -> เข้าคิวให้ Cron ตรวจซ้ำทุก 5 นาที (สูงสุด 3 ครั้ง)
+                // ก่อนแจ้งเตือนแอดมิน เพื่อลดการแจ้งเตือน false-warning ที่จะหายไปเองถ้ารอสักพัก
+                const { error: queueError } = await activeClient
+                  .from("slipok_retry_queue")
+                  .insert({
+                    bill_id: id,
+                    workspace_id: workspaceId,
+                    slip_url: slipUrl,
+                    amount: serverVerifiedAmount ?? null,
+                    next_retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+                    last_error_code: verifyRes.code,
+                    last_error_message: verifyRes.error
+                  })
+                if (queueError) {
+                  console.error("Error queueing SlipOK retry:", queueError)
+                  variant = "warning"
+                  slipOkReason = verifyRes.error || "ตรวจสอบสลิปอัตโนมัติไม่ผ่าน กรุณาตรวจสอบด้วยตนเอง"
+                } else {
+                  deferNotificationForRetry = true
+                }
               } else {
                 variant = "warning"
                 slipOkReason = verifyRes.error || "ตรวจสอบสลิปอัตโนมัติไม่ผ่าน กรุณาตรวจสอบด้วยตนเอง"
@@ -561,17 +584,19 @@ export async function updateBillStatus(
           }
         }
 
-        // Dynamically import to avoid circular dependencies
-        const { sendLineSlipNotificationAction } = await import("@/features/notification/actions");
-        try {
-          const res = await sendLineSlipNotificationAction(id, workspaceId, variant, slipOkReason);
-          if (!res.success) {
-            console.error("⚠️ LINE Slip Notification Failed:", res.error);
-          } else {
-            console.log("✅ LINE Slip Notification Sent:", res.data);
+        if (!deferNotificationForRetry) {
+          // Dynamically import to avoid circular dependencies
+          const { sendLineSlipNotificationAction } = await import("@/features/notification/actions");
+          try {
+            const res = await sendLineSlipNotificationAction(id, workspaceId, variant, slipOkReason);
+            if (!res.success) {
+              console.error("⚠️ LINE Slip Notification Failed:", res.error);
+            } else {
+              console.log("✅ LINE Slip Notification Sent:", res.data);
+            }
+          } catch (err) {
+            console.error("Error sending LINE slip notification:", err);
           }
-        } catch (err) {
-          console.error("Error sending LINE slip notification:", err);
         }
       }
     }

@@ -33,6 +33,23 @@ function mapSlipOkError(json: SlipOkErrorPayload): string {
   return json?.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุจาก SlipOK"
 }
 
+// code 1009/1010 = ข้อมูลจากธนาคารยังไม่เข้าระบบ SlipOK ชั่วคราว ให้ auto-retry ได้ (ไม่ใช่ error ถาวร)
+export const SLIPOK_RETRYABLE_ERROR_CODES = [1009, 1010]
+
+// ใช้ Service Role Client เมื่อมี Env พร้อม เพื่อให้ฟังก์ชันกลุ่มนี้เรียกได้จากทุกที่ (Cron Job, Webhook)
+// ที่ไม่มี session คุกกี้ของผู้ใช้ให้ RLS ตรวจสอบ เช่นเดียวกับ pattern ใน features/notification/actions.ts
+async function getServiceRoleOrSessionClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (url && serviceKey && !serviceKey.includes("placeholder")) {
+    const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+    return createSupabaseClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+  }
+  return await createClient()
+}
+
 export interface SlipOkSettingsView {
   branchId: string
   hasApiKey: boolean
@@ -155,7 +172,7 @@ export async function saveSlipOkSettings(
 }
 
 async function getDecryptedCredentials(workspaceId: string) {
-  const supabase = await createClient()
+  const supabase = await getServiceRoleOrSessionClient()
   const { data, error } = await supabase
     .from("workspace_slipok_settings")
     .select("branch_id, api_key_encrypted, enabled, check_amount, check_receiver, auto_disable_on_quota_exceeded")
@@ -214,7 +231,7 @@ async function fetchQuotaFromSlipOk(branchId: string, apiKey: string) {
 // เรียกตอนพบว่าโควต้าหมด เพื่อกันไม่ให้เรียก API ต่อจนเกิดค่าใช้จ่ายส่วนเกินโดยไม่ได้ตั้งใจ
 async function autoDisableSlipOk(workspaceId: string, reason: string) {
   try {
-    const supabase = await createClient()
+    const supabase = await getServiceRoleOrSessionClient()
     await supabase
       .from("workspace_slipok_settings")
       .update({ enabled: false, updated_at: new Date().toISOString() })
@@ -264,7 +281,7 @@ export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string
       const quotaCheck = await fetchQuotaFromSlipOk(branchId, apiKey)
       if (quotaCheck.success && quotaCheck.data.quota <= 0) {
         await autoDisableSlipOk(workspaceId, "โควต้าหมดก่อนตรวจสลิป")
-        return { success: false, error: QUOTA_EXCEEDED_MESSAGE_DISABLED }
+        return { success: false, error: QUOTA_EXCEEDED_MESSAGE_DISABLED, code: undefined as number | undefined }
       }
     }
     // ถ้าปิด toggle ป้องกันค่าใช้จ่ายไว้ จะข้ามการเช็คโควต้าล่วงหน้านี้ไปเลย ปล่อยให้ยิงตรวจสลิปจริงด้านล่างตามปกติ
@@ -292,16 +309,16 @@ export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string
       if (json.code === 1004) {
         if (autoDisableOnQuotaExceeded) {
           await autoDisableSlipOk(workspaceId, "SlipOK แจ้ง error 1004 (เกินโควต้า)")
-          return { success: false, error: QUOTA_EXCEEDED_MESSAGE_DISABLED, data: json.data }
+          return { success: false, error: QUOTA_EXCEEDED_MESSAGE_DISABLED, code: 1004, data: json.data }
         }
-        return { success: false, error: QUOTA_EXCEEDED_MESSAGE_STILL_ON, data: json.data }
+        return { success: false, error: QUOTA_EXCEEDED_MESSAGE_STILL_ON, code: 1004, data: json.data }
       }
-      return { success: false, error: mapSlipOkError(json), data: json.data }
+      return { success: false, error: mapSlipOkError(json), code: typeof json?.code === "number" ? json.code : undefined, data: json.data }
     }
 
     return { success: true, data: json.data }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบสลิปกับ SlipOK"
-    return { success: false, error: errorMessage }
+    return { success: false, error: errorMessage, code: undefined as number | undefined }
   }
 }
