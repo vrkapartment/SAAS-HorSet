@@ -45,5 +45,8 @@ next-env.d.ts
 # scratch folder
 /scratch
 
+# supabase CLI local cache (project link, pooler URL, version info)
+/supabase/.temp
+
 .vercel
 .env*
