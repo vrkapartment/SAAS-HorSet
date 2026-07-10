@@ -40,6 +40,7 @@ export interface SlipOkSettingsView {
   enabled: boolean
   checkAmount: boolean
   checkReceiver: boolean
+  autoDisableOnQuotaExceeded: boolean
 }
 
 export async function getSlipOkSettings(workspaceId: string) {
@@ -51,7 +52,7 @@ export async function getSlipOkSettings(workspaceId: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("workspace_slipok_settings")
-      .select("branch_id, api_key_encrypted, enabled, check_amount, check_receiver")
+      .select("branch_id, api_key_encrypted, enabled, check_amount, check_receiver, auto_disable_on_quota_exceeded")
       .eq("workspace_id", workspaceId)
       .maybeSingle()
 
@@ -64,7 +65,8 @@ export async function getSlipOkSettings(workspaceId: string) {
         apiKeyPreview: "",
         enabled: true,
         checkAmount: true,
-        checkReceiver: true
+        checkReceiver: true,
+        autoDisableOnQuotaExceeded: true
       }
       return { success: true, data: emptySettings }
     }
@@ -85,7 +87,8 @@ export async function getSlipOkSettings(workspaceId: string) {
       apiKeyPreview,
       enabled: data.enabled !== false,
       checkAmount: data.check_amount !== false,
-      checkReceiver: data.check_receiver !== false
+      checkReceiver: data.check_receiver !== false,
+      autoDisableOnQuotaExceeded: data.auto_disable_on_quota_exceeded !== false
     }
 
     return { success: true, data: settings }
@@ -101,7 +104,8 @@ export async function saveSlipOkSettings(
   apiKey: string | null,
   enabled: boolean,
   checkAmount: boolean,
-  checkReceiver: boolean
+  checkReceiver: boolean,
+  autoDisableOnQuotaExceeded: boolean
 ) {
   try {
     if (!workspaceId) {
@@ -119,6 +123,7 @@ export async function saveSlipOkSettings(
       enabled: boolean
       check_amount: boolean
       check_receiver: boolean
+      auto_disable_on_quota_exceeded: boolean
       updated_at: string
       api_key_encrypted?: string
     } = {
@@ -127,6 +132,7 @@ export async function saveSlipOkSettings(
       enabled,
       check_amount: checkAmount,
       check_receiver: checkReceiver,
+      auto_disable_on_quota_exceeded: autoDisableOnQuotaExceeded,
       updated_at: new Date().toISOString()
     }
 
@@ -152,7 +158,7 @@ async function getDecryptedCredentials(workspaceId: string) {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("workspace_slipok_settings")
-    .select("branch_id, api_key_encrypted, enabled, check_amount, check_receiver")
+    .select("branch_id, api_key_encrypted, enabled, check_amount, check_receiver, auto_disable_on_quota_exceeded")
     .eq("workspace_id", workspaceId)
     .maybeSingle()
 
@@ -168,7 +174,8 @@ async function getDecryptedCredentials(workspaceId: string) {
     branchId: data.branch_id as string,
     apiKey: decryptText(data.api_key_encrypted as string),
     checkAmount: data.check_amount !== false,
-    checkReceiver: data.check_receiver !== false
+    checkReceiver: data.check_receiver !== false,
+    autoDisableOnQuotaExceeded: data.auto_disable_on_quota_exceeded !== false
   }
 }
 
@@ -180,30 +187,63 @@ export interface SlipOkQuota {
   specialEndDate: string | null
 }
 
+async function fetchQuotaFromSlipOk(branchId: string, apiKey: string) {
+  const response = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}/quota`, {
+    method: "GET",
+    headers: { "x-authorization": apiKey }
+  })
+
+  const json = await response.json()
+
+  if (!response.ok || !json.success) {
+    return { success: false as const, error: mapSlipOkError(json) }
+  }
+
+  const quota: SlipOkQuota = {
+    quota: json.data.quota,
+    overQuota: json.data.overQuota,
+    specialQuota: json.data.specialQuota,
+    endDate: json.data.endDate,
+    specialEndDate: json.data.specialEndDate ?? null
+  }
+
+  return { success: true as const, data: quota }
+}
+
+// ปิดการใช้งาน SlipOK ของ workspace นี้อัตโนมัติ (ไม่ลบ Branch ID/API Key ทิ้ง แค่ enabled = false)
+// เรียกตอนพบว่าโควต้าหมด เพื่อกันไม่ให้เรียก API ต่อจนเกิดค่าใช้จ่ายส่วนเกินโดยไม่ได้ตั้งใจ
+async function autoDisableSlipOk(workspaceId: string, reason: string) {
+  try {
+    const supabase = await createClient()
+    await supabase
+      .from("workspace_slipok_settings")
+      .update({ enabled: false, updated_at: new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+    console.warn(`SlipOK auto-disabled for workspace ${workspaceId}: ${reason}`)
+  } catch (err) {
+    console.error("Failed to auto-disable SlipOK after quota exceeded:", err)
+  }
+}
+
+const QUOTA_EXCEEDED_MESSAGE =
+  "โควต้า SlipOK เดือนนี้หมดแล้ว ระบบได้ปิดการตรวจสอบสลิปอัตโนมัติให้แล้วเพื่อป้องกันค่าใช้จ่ายส่วนเกิน กรุณาติดต่อ SlipOK เพื่อเติมโควต้า หรือกลับมาเปิดใช้งานเองในหน้าตั้งค่าหากต้องการใช้ต่อแม้มีค่าใช้จ่ายเพิ่ม"
+
 export async function getSlipOkQuota(workspaceId: string) {
   try {
-    const { branchId, apiKey } = await getDecryptedCredentials(workspaceId)
+    const { branchId, apiKey, autoDisableOnQuotaExceeded } = await getDecryptedCredentials(workspaceId)
+    const result = await fetchQuotaFromSlipOk(branchId, apiKey)
 
-    const response = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}/quota`, {
-      method: "GET",
-      headers: { "x-authorization": apiKey }
-    })
-
-    const json = await response.json()
-
-    if (!response.ok || !json.success) {
-      return { success: false, error: mapSlipOkError(json) }
+    if (!result.success) {
+      return { success: false, error: result.error }
     }
 
-    const quota: SlipOkQuota = {
-      quota: json.data.quota,
-      overQuota: json.data.overQuota,
-      specialQuota: json.data.specialQuota,
-      endDate: json.data.endDate,
-      specialEndDate: json.data.specialEndDate ?? null
+    // ถ้าโควต้าหมดแล้ว (แต่ยังไม่โดน error 1004 จาก SlipOK เพราะยังไม่มีการยิงตรวจสลิปจริง) ปิดการใช้งานไว้ก่อนกันเผื่อ
+    // (เฉพาะเมื่อ admin เปิดฟีเจอร์นี้ไว้เท่านั้น)
+    if (autoDisableOnQuotaExceeded && result.data.quota <= 0) {
+      await autoDisableSlipOk(workspaceId, "โควต้าหมดจากการตรวจสอบด้วยตนเอง")
     }
 
-    return { success: true, data: quota }
+    return { success: true, data: result.data }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเชื่อมต่อ SlipOK"
     return { success: false, error: errorMessage }
@@ -212,7 +252,17 @@ export async function getSlipOkQuota(workspaceId: string) {
 
 export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string, amount?: number) {
   try {
-    const { branchId, apiKey, checkAmount, checkReceiver } = await getDecryptedCredentials(workspaceId)
+    const { branchId, apiKey, checkAmount, checkReceiver, autoDisableOnQuotaExceeded } = await getDecryptedCredentials(workspaceId)
+
+    // เช็คโควต้าคงเหลือก่อนตรวจสลิปทุกครั้ง ถ้าหมดแล้วปิดการใช้งานอัตโนมัติทันทีและไม่ยิง API ตรวจสลิปต่อ
+    // (ป้องกันไม่ให้เกิดค่าใช้จ่ายส่วนเกินโควต้าโดยไม่ได้ตั้งใจ — เฉพาะเมื่อ admin เปิดฟีเจอร์นี้ไว้เท่านั้น)
+    if (autoDisableOnQuotaExceeded) {
+      const quotaCheck = await fetchQuotaFromSlipOk(branchId, apiKey)
+      if (quotaCheck.success && quotaCheck.data.quota <= 0) {
+        await autoDisableSlipOk(workspaceId, "โควต้าหมดก่อนตรวจสลิป")
+        return { success: false, error: QUOTA_EXCEEDED_MESSAGE }
+      }
+    }
 
     const response = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}`, {
       method: "POST",
@@ -232,6 +282,13 @@ export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string
     const json = await response.json()
 
     if (!response.ok || !json.success) {
+      // SlipOK แจ้งเกินโควต้า (code 1004) -> ปิดการใช้งานอัตโนมัติกันเรียกซ้ำเกินโควต้าต่อไปอีก (เผื่อเช็คด้านบนไม่ทัน)
+      if (json.code === 1004) {
+        if (autoDisableOnQuotaExceeded) {
+          await autoDisableSlipOk(workspaceId, "SlipOK แจ้ง error 1004 (เกินโควต้า)")
+        }
+        return { success: false, error: QUOTA_EXCEEDED_MESSAGE, data: json.data }
+      }
       return { success: false, error: mapSlipOkError(json), data: json.data }
     }
 

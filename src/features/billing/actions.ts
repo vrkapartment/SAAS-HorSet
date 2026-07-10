@@ -342,6 +342,11 @@ export async function updateBillStatus(
       updateData.slip_url = slipUrl
     }
 
+    // ยอดที่ใช้ส่งไปเทียบกับ SlipOK จริง (คำนวณค่าปรับล่าช้าฝั่ง server สดๆ ในบล็อกด้านล่าง เพื่อไม่พึ่งค่าที่ client
+    // ส่งมา ซึ่งอาจจะเก่ากว่าเวลาปัจจุบันไปแล้วบ้าง (เช่น เปิดหน้าค้างไว้ข้ามวัน ทำให้ค่าปรับที่คำนวณไว้ตอนโหลดหน้าน้อยไป)
+    // ค่านี้ไม่กระทบยอดที่บันทึกลงตาราง bills เลย (updateData.amount ด้านล่างยังทำงานแบบเดิมทุกอย่าง)
+    let serverVerifiedAmount: number | undefined = amount
+
     if (billData) {
       // ตรวจสอบว่าบิลนี้มีค่าปรับเดิมบันทึกไว้ในฐานข้อมูลแล้วหรือไม่ (รวมถึงกรณีเป็น 0 ที่ผู้ใช้ตั้งใจกรอกหรือตั้งค่าไว้)
       const hasExistingPenalty = billData.penalty_amount !== null && billData.penalty_amount !== undefined
@@ -415,9 +420,10 @@ export async function updateBillStatus(
         }
       } else if (status === "pending") {
         if (hasExistingPenalty && billData.status !== "unpaid") {
-          // หากมีค่าปรับเดิมอยู่แล้ว ให้ใช้ค่าเดิม ไม่คำนวณใหม่
+          // หากมีค่าปรับเดิมอยู่แล้ว ให้ใช้ค่าเดิม ไม่คำนวณใหม่ (billData.amount รวมค่าปรับนี้ไว้แล้ว)
           updateData.penalty_amount = Number(billData.penalty_amount)
           updateData.late_days = billData.late_days !== null && billData.late_days !== undefined ? Number(billData.late_days) : 0
+          serverVerifiedAmount = Number(billData.amount)
           if (amount !== undefined && amount !== null) {
             updateData.amount = Number(amount)
           }
@@ -453,9 +459,12 @@ export async function updateBillStatus(
 
           const lateDays = calculateLateDays(billData.billing_cycle)
           const penaltyAmount = lateDays * latePenaltyRate
-          
+
           updateData.late_days = lateDays
           updateData.penalty_amount = penaltyAmount
+
+          // ยอดที่แท้จริง ณ วินาทีนี้ (ต้นฉบับ + ค่าปรับที่คำนวณสดข้างบน) ไว้ใช้เทียบกับ SlipOK เท่านั้น
+          serverVerifiedAmount = Number(billData.amount) + penaltyAmount
 
           if (amount !== undefined && amount !== null) {
             updateData.amount = Number(amount)
@@ -537,7 +546,9 @@ export async function updateBillStatus(
             const { getSlipOkSettings, verifySlipWithSlipOk } = await import("@/features/slipok/actions");
             const slipOkSettingsRes = await getSlipOkSettings(workspaceId);
             if (slipOkSettingsRes.success && slipOkSettingsRes.data?.hasApiKey && slipOkSettingsRes.data.enabled) {
-              const verifyRes = await verifySlipWithSlipOk(workspaceId, slipUrl, amount);
+              // ใช้ serverVerifiedAmount (คำนวณค่าปรับล่าช้าสดฝั่ง server ด้านบน) ไม่ใช่ amount ที่ client ส่งมา
+              // เพื่อกันปัญหายอดเพี้ยนถ้า client เปิดหน้าทิ้งไว้ข้ามวันก่อนกดส่งสลิป
+              const verifyRes = await verifySlipWithSlipOk(workspaceId, slipUrl, serverVerifiedAmount);
               if (verifyRes.success) {
                 variant = "success"
               } else {

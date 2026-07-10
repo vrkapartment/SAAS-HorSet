@@ -14,10 +14,15 @@ import {
   Eye,
   EyeOff,
   ListChecks,
-  ExternalLink
+  ExternalLink,
+  Landmark,
+  Smartphone,
+  CreditCard,
+  ShieldAlert
 } from "lucide-react"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getSlipOkSettings, saveSlipOkSettings, getSlipOkQuota, type SlipOkQuota } from "@/features/slipok/actions"
+import { getFinanceSettings } from "@/features/finance/actions"
 
 export default function SlipOkSettingsTab() {
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
@@ -33,6 +38,7 @@ export default function SlipOkSettingsTab() {
   const [enabled, setEnabled] = useState(true)
   const [checkAmount, setCheckAmount] = useState(true)
   const [checkReceiver, setCheckReceiver] = useState(true)
+  const [autoDisableOnQuotaExceeded, setAutoDisableOnQuotaExceeded] = useState(true)
   const [showApiKey, setShowApiKey] = useState(false)
 
   const [saving, setSaving] = useState(false)
@@ -42,6 +48,11 @@ export default function SlipOkSettingsTab() {
   const [quota, setQuota] = useState<SlipOkQuota | null>(null)
   const [quotaLoading, setQuotaLoading] = useState(false)
   const [quotaError, setQuotaError] = useState<string | null>(null)
+
+  // ข้อมูลบัญชีรับเงินของหอพักนี้ (จากตั้งค่าการเงิน) โชว์คู่กับโควต้าเพื่อให้เช็คง่ายว่าตรงกับที่ตั้งไว้บน SlipOK ไหม
+  const [accountName, setAccountName] = useState("")
+  const [accountId, setAccountId] = useState("")
+  const [accountType, setAccountType] = useState<"phone" | "national_id">("phone")
 
   useEffect(() => {
     async function loadSettings() {
@@ -53,6 +64,9 @@ export default function SlipOkSettingsTab() {
           setApiKeyPreview("••••demo")
           setHasApiKey(true)
           setEnabled(true)
+          setAccountName("สุรีย์ สัทธาวรกุล")
+          setAccountId("0818369763")
+          setAccountType("phone")
           setLoading(false)
           return
         }
@@ -66,7 +80,11 @@ export default function SlipOkSettingsTab() {
         const wsId = profileRes.data.workspace_id
         setWorkspaceId(wsId)
 
-        const res = await getSlipOkSettings(wsId)
+        const [res, financeRes] = await Promise.all([
+          getSlipOkSettings(wsId),
+          getFinanceSettings(wsId)
+        ])
+
         if (res.success && res.data) {
           setBranchId(res.data.branchId)
           setApiKeyPreview(res.data.apiKeyPreview)
@@ -74,8 +92,15 @@ export default function SlipOkSettingsTab() {
           setEnabled(res.data.enabled)
           setCheckAmount(res.data.checkAmount)
           setCheckReceiver(res.data.checkReceiver)
+          setAutoDisableOnQuotaExceeded(res.data.autoDisableOnQuotaExceeded)
         } else {
           setLoadError(res.error || "ไม่สามารถโหลดการตั้งค่า SlipOK ได้")
+        }
+
+        if (financeRes.success && financeRes.data) {
+          setAccountName(financeRes.data.promptpay_name || "")
+          setAccountId(financeRes.data.promptpay_id || "")
+          setAccountType(financeRes.data.promptpay_type || "phone")
         }
       } catch (err) {
         console.error("Error loading SlipOK settings:", err)
@@ -108,7 +133,15 @@ export default function SlipOkSettingsTab() {
         return
       }
 
-      const res = await saveSlipOkSettings(workspaceId, branchId, apiKeyInput.trim() || null, enabled, checkAmount, checkReceiver)
+      const res = await saveSlipOkSettings(
+        workspaceId,
+        branchId,
+        apiKeyInput.trim() || null,
+        enabled,
+        checkAmount,
+        checkReceiver,
+        autoDisableOnQuotaExceeded
+      )
       if (res.success) {
         setSaveSuccess(true)
         if (apiKeyInput.trim()) {
@@ -326,6 +359,38 @@ export default function SlipOkSettingsTab() {
           )}
         </div>
 
+        {/* ป้องกันค่าใช้จ่ายส่วนเกินโควต้า */}
+        <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-900">
+          <h4 className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            <ShieldAlert className="w-3.5 h-3.5" /> ป้องกันค่าใช้จ่ายส่วนเกิน
+          </h4>
+
+          <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
+            <div className="space-y-0.5">
+              <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">ปิดการตรวจสอบอัตโนมัติเมื่อโควต้าหมด</h5>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                {autoDisableOnQuotaExceeded
+                  ? "🟢 เปิดไว้: ถ้าโควต้า SlipOK เดือนนี้หมด ระบบจะปิดการตรวจสอบให้อัตโนมัติทันที เพื่อไม่ให้เสียค่าใช้จ่ายส่วนเกิน"
+                  : "🔴 ปิดไว้: ต่อให้โควต้าหมดแล้ว ระบบจะยังพยายามตรวจสอบต่อไป (อาจมีค่าใช้จ่ายส่วนเกินตามแพ็กเกจของ SlipOK)"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAutoDisableOnQuotaExceeded((prev) => !prev)}
+              disabled={saving}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
+                autoDisableOnQuotaExceeded ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
+              } ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
+                  autoDisableOnQuotaExceeded ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
         {saveError && (
           <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2.5 text-rose-500 text-xs sm:text-sm font-bold">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -366,6 +431,28 @@ export default function SlipOkSettingsTab() {
             ตรวจสอบโควต้า
           </button>
         </div>
+
+        {/* บัญชีรับเงินของหอพักนี้ (จากตั้งค่าการเงิน) — ใช้เทียบว่าตรงกับบัญชีที่ตั้งไว้บนเว็บ SlipOK หรือไม่ */}
+        {accountName && (
+          <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100 truncate">{accountName}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {accountType === "phone" ? (
+                  <Smartphone className="w-3 h-3 text-slate-400" />
+                ) : (
+                  <CreditCard className="w-3 h-3 text-slate-400" />
+                )}
+                <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
+                  พร้อมเพย์ ({accountType === "phone" ? "เบอร์โทรศัพท์" : "เลขบัตรประชาชน"}) · {accountId}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {quotaError && (
           <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2.5 text-rose-500 text-xs sm:text-sm font-bold">
