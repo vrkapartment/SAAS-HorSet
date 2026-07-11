@@ -534,31 +534,31 @@ export async function uploadTaxFormTemplateAction(formType: "90" | "94", taxYear
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 
-    if (formType === "90") {
-      // ภ.ง.ด. 90 มี template เดียวใช้ข้ามทุกปี: ลบของเดิมทิ้งก่อน แล้วค่อย insert ใหม่
-      const { error: deleteError } = await supabaseAdmin.from("tax_form_templates").delete().eq("form_type", "90")
-      if (deleteError) throw deleteError
+    // หา record เดิมด้วยตัวเองก่อนเสมอ (ไม่ใช้ .upsert(onConflict) เพราะ unique index ของ tax_year เป็น partial index
+    // (WHERE form_type = '94') ซึ่ง PostgREST/Postgres ไม่สามารถ infer มาเป็น ON CONFLICT arbiter แบบ bare column ได้
+    // ถ้าใช้ upsert ตรงๆ จะ error หรือไม่อัปเดตแถวเดิมจริง ทำให้ Admin ยังโหลด template ของปีเก่าอยู่)
+    const existingQuery = supabaseAdmin.from("tax_form_templates").select("id").eq("form_type", formType)
+    const { data: existing, error: findError } = await (
+      formType === "90" ? existingQuery : existingQuery.eq("tax_year", taxYear)
+    ).maybeSingle()
+    if (findError) throw findError
 
+    if (existing) {
+      // อัปเดตไฟล์ของ record เดิม (สำหรับ '90' จะไม่แตะ tax_year เดิมที่ Super Admin เคยตั้งไว้)
+      const { error: updateError } = await supabaseAdmin
+        .from("tax_form_templates")
+        .update({ file_url: fileUrl, file_name: fileName, updated_by: profileRes.data.id })
+        .eq("id", existing.id)
+      if (updateError) throw updateError
+    } else {
       const { error: insertError } = await supabaseAdmin.from("tax_form_templates").insert({
-        form_type: "90",
-        tax_year: null,
+        form_type: formType,
+        tax_year: formType === "90" ? null : taxYear,
         file_url: fileUrl,
         file_name: fileName,
         updated_by: profileRes.data.id,
       })
       if (insertError) throw insertError
-    } else {
-      const { error: upsertError } = await supabaseAdmin.from("tax_form_templates").upsert(
-        {
-          form_type: "94",
-          tax_year: taxYear,
-          file_url: fileUrl,
-          file_name: fileName,
-          updated_by: profileRes.data.id,
-        },
-        { onConflict: "tax_year" }
-      )
-      if (upsertError) throw upsertError
     }
 
     return { success: true }

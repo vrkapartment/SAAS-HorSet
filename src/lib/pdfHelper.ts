@@ -95,7 +95,7 @@ export interface PndData {
 // ชื่อฟิลด์ PDF AcroForm ที่ generatePndPdf() ต้องใช้กรอกข้อมูลจริง (ดูจุด setField() ด้านล่าง)
 // ใช้เป็น single source of truth ทั้งตอน fill ข้อมูลจริง และตอน Super Admin ตรวจสอบไฟล์ template ที่อัปโหลดใหม่
 export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
-  "90": ["Text80.0", "Text7.0", "Text7.3", "Text9", "Text34.0", "Text34.1", "Text34.2", "Text33.9", "Text70", "Text40.0", "Text40.1", "Text40.2"],
+  "90": ["Text11111", "Text80.0", "Text7.0", "Text7.3", "Text9", "Text34.0", "Text34.1", "Text34.2", "Text33.9", "Text70", "Text40.0", "Text40.1", "Text40.2"],
   "94": ["Text1.1", "Text1.5", "Text1.28", "Text1.6", "Text1.31", "Text3.10", "Text4.10.1", "Text4.15", "Text4.18", "Text4.20", "Text3.40", "Text3.41", "Text3.42", "Text5.19", "Text5.18"],
 }
 
@@ -151,6 +151,9 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
   // 5. กรอกข้อมูลและตัวเลขลงในแบบฟอร์มผ่าน Form Fields
   if (type === "90") {
     // ภ.ง.ด. 90 (เต็มปี)
+    // ปีภาษี (ฟิลด์ทางการที่พิมพ์อยู่บนหัวแบบฟอร์ม แยกจากหมายเหตุ HorSet ที่วาดด้วยพิกัดด้านล่าง)
+    setField("Text11111", data.taxYear)
+
     // ข้อมูลส่วนตัว
     setField("Text80.0", cleanTaxId)
     setField("Text7.0", data.firstName)
