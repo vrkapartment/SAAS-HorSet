@@ -86,7 +86,7 @@ export default function LineSettingsTab() {
   const [quotaError, setQuotaError] = useState<string | null>(null)
   
   // Interactive Manual & Utility states
-  const [showManual, setShowManual] = useState(true)
+  const [showManual, setShowManual] = useState(false)
   const [copiedEndpoint, setCopiedEndpoint] = useState(false)
   const [copiedWebhook, setCopiedWebhook] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
