@@ -141,9 +141,12 @@ export default function TaxPage() {
   const [expenseError, setExpenseError] = useState<string | null>(null)
 
   const [bills, setBills] = useState<BillItem[]>([])
+  // true จนกว่าข้อมูลชุดแรก (รวมถึงประวัติยกเลิกสัญญา) จะโหลดครบ ป้องกันการ์ดสรุปยอดโชว์เลขที่ยังไม่ครบก่อนเด้งเป็นเลขจริง
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true)
 
   useEffect(() => {
     async function loadInitialData() {
+      setIsSummaryLoading(true)
       try {
         const userRes = await getCurrentUserProfileClient()
         
@@ -194,34 +197,40 @@ export default function TaxPage() {
             }
           }
 
+          // เริ่มโหลดข้อมูลแบบคู่ขนาน (Parallel Fetching) เพื่อประสิทธิภาพสูงสุดและปลอดภัยตามเดิม
+          // หมายเหตุ: ยอดริบมัดจำ (คำนวณจาก cancelledContracts) มีผลต่อการ์ดสรุปยอดโดยตรง จึงต้องรวมอยู่ใน
+          // fetchPromises ให้ Promise.all รอด้วย ไม่งั้นการ์ดจะเด้งจากเลขที่ยังไม่รวมยอดริบมัดจำ ไปเป็นเลขที่รวมแล้ว
+          const fetchPromises = [];
+
           if (hasLocalCancellations && tempCancellations.length > 0) {
             // ย้ายข้อมูลไปยัง Supabase
-            migrateLocalStorageCancelledContracts(currentWsId, tempCancellations).then(async (migrated) => {
-              if (migrated.success) {
-                localStorage.removeItem(`cancelled_contracts_${currentWsId}`)
-                console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
-                const res = await getCancelledContracts(currentWsId!)
+            fetchPromises.push(
+              migrateLocalStorageCancelledContracts(currentWsId, tempCancellations).then(async (migrated) => {
+                if (migrated.success) {
+                  localStorage.removeItem(`cancelled_contracts_${currentWsId}`)
+                  console.log("Successfully migrated cancelled contracts to Supabase and deleted local storage cache")
+                  const res = await getCancelledContracts(currentWsId!)
+                  if (res.success && res.data) {
+                    setCancelledContracts(res.data)
+                  }
+                } else if (migrated.error === "table_not_found") {
+                  setCancelledContracts(tempCancellations)
+                  console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
+                }
+              })
+            )
+          } else {
+            fetchPromises.push(
+              getCancelledContracts(currentWsId).then(res => {
                 if (res.success && res.data) {
                   setCancelledContracts(res.data)
+                } else if (res.error === "table_not_found") {
+                  console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
+                  setCancelledContracts([])
                 }
-              } else if (migrated.error === "table_not_found") {
-                setCancelledContracts(tempCancellations)
-                console.warn("Table 'cancelled_contracts' not found in database. Local data kept in memory.")
-              }
-            })
-          } else {
-            getCancelledContracts(currentWsId).then(res => {
-              if (res.success && res.data) {
-                setCancelledContracts(res.data)
-              } else if (res.error === "table_not_found") {
-                console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
-                setCancelledContracts([])
-              }
-            })
+              })
+            )
           }
-
-          // เริ่มโหลดข้อมูลแบบคู่ขนาน (Parallel Fetching) เพื่อประสิทธิภาพสูงสุดและปลอดภัยตามเดิม
-          const fetchPromises = [];
 
           // 1. โหลดข้อมูลผู้เสียภาษีและการเงิน
           const financeCacheKey = "finance_settings"
@@ -343,6 +352,8 @@ export default function TaxPage() {
         }
       } catch (err) {
         console.error("Failed to load initial data in tax page:", err)
+      } finally {
+        setIsSummaryLoading(false)
       }
     }
 
@@ -1145,9 +1156,13 @@ export default function TaxPage() {
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้ค่าเช่าห้องพัก</h4>
               <p className="text-xs text-slate-400 leading-none">รายได้เฉพาะส่วนที่เป็นค่าเช่าห้องพักสุทธิ</p>
-              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300">
-                {formatMoney(rent405Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
-              </p>
+              {isSummaryLoading ? (
+                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              ) : (
+                <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300">
+                  {formatMoney(rent405Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
+                </p>
+              )}
             </div>
           </div>
           
@@ -1179,9 +1194,13 @@ export default function TaxPage() {
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ค่าน้ำไฟและบริการ</h4>
               <p className="text-xs text-slate-400 leading-none">ค่ายูนิตสาธารณูปโภคและส่วนกลาง</p>
-              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-emerald-500 to-green-600 dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
-                {formatMoney(utilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
-              </p>
+              {isSummaryLoading ? (
+                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              ) : (
+                <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-emerald-500 to-green-600 dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
+                  {formatMoney(utilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
+                </p>
+              )}
             </div>
           </div>
           
@@ -1213,9 +1232,13 @@ export default function TaxPage() {
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">รายได้อื่น (ปรับ/ริบมัดจำ)</h4>
               <p className="text-xs text-slate-400 leading-none">เงินปรับชำระล่าช้าหรือเงินริบมัดจำทำสัญญา</p>
-              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-amber-600 via-orange-500 to-rose-650 dark:from-amber-400 dark:via-orange-400 dark:to-rose-450">
-                {formatMoney(other408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
-              </p>
+              {isSummaryLoading ? (
+                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              ) : (
+                <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-amber-600 via-orange-500 to-rose-650 dark:from-amber-400 dark:via-orange-400 dark:to-rose-450">
+                  {formatMoney(other408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">บาท</span>
+                </p>
+              )}
             </div>
           </div>
           
