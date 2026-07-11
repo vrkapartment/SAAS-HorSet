@@ -17,7 +17,8 @@ export async function updateSession(request: NextRequest) {
   const tenantPaths = ["/portal"]
 
   // ตรวจสอบความถูกต้องของเส้นทางกับสิทธิ์ผู้ใช้งาน
-  if (superAdminPaths.includes(path) && mockRole !== "super_admin") {
+  // ใช้ startsWith สำหรับ super-admin เพื่อครอบคลุมหน้าย่อยด้วย (เช่น /super-admin/plans)
+  if (superAdminPaths.some((p) => path === p || path.startsWith(`${p}/`)) && mockRole !== "super_admin") {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)

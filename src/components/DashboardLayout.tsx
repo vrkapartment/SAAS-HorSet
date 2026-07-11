@@ -54,7 +54,7 @@ import { getExpenses } from "@/features/expenses/actions"
 import PullToRefresh from "./PullToRefresh"
 import { getNotificationsAction, type AppNotification } from "@/features/notification/actions"
 import SubscriptionStatusBanner from "@/features/subscription/components/SubscriptionStatusBanner"
-import UploadSlipModal from "@/features/subscription/components/UploadSlipModal"
+import PricingModal from "@/features/subscription/components/PricingModal"
 
 
 interface DashboardLayoutProps {
@@ -1415,8 +1415,8 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         onDecide={handleDecideSupport}
       />
 
-      {/* Modal อัปโหลดสลิปชำระค่าบริการ subscription ของ HorSet เปิดจากปุ่ม "อัปเกรดแผน" ใน SubscriptionStatusBanner */}
-      <UploadSlipModal
+      {/* ป๊อปอัปเลือก/อัปเกรดแพ็กเกจ subscription ของ HorSet เปิดจากปุ่ม "อัปเกรดแผน" ใน SubscriptionStatusBanner */}
+      <PricingModal
         isOpen={showUpgradeModal}
         workspaceId={currentWorkspace.id}
         onClose={() => setShowUpgradeModal(false)}

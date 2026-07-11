@@ -238,8 +238,47 @@ const SETTINGS_KEYS = {
   apiKey: "HORSET_SLIPOK_API_KEY",
   promptpayId: "HORSET_PROMPTPAY_ID",
   promptpayType: "HORSET_PROMPTPAY_TYPE",
-  promptpayName: "HORSET_PROMPTPAY_NAME"
+  promptpayName: "HORSET_PROMPTPAY_NAME",
+  bankName: "HORSET_BANK_NAME"
 } as const
+
+export interface HorSetPaymentInfo {
+  promptpayId: string
+  promptpayType: "phone" | "national_id"
+  promptpayName: string
+  bankName: string
+}
+
+/**
+ * ข้อมูลบัญชีรับเงินของ HorSet เอง สำหรับแสดงในหน้าชำระเงินค่า subscription
+ * ปลอดภัยที่จะเปิดเผยให้ client เห็นได้ (เหมือนเลขบัญชีร้านค้าที่โชว์ให้ลูกค้าทุกคนเห็นตอนจ่ายเงินอยู่แล้ว)
+ * ไม่รวม Branch ID / API Key ของ SlipOK ซึ่งเป็นความลับ (ดึงเฉพาะฝั่ง server ผ่าน getHorSetSlipOkCredentials เท่านั้น)
+ */
+export async function getHorSetPaymentInfo() {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("system_settings")
+      .select("key, value")
+      .in("key", [SETTINGS_KEYS.promptpayId, SETTINGS_KEYS.promptpayType, SETTINGS_KEYS.promptpayName, SETTINGS_KEYS.bankName])
+
+    if (error) throw error
+
+    const promptpayId = data?.find(r => r.key === SETTINGS_KEYS.promptpayId)?.value || ""
+    const promptpayType = (data?.find(r => r.key === SETTINGS_KEYS.promptpayType)?.value as "phone" | "national_id") || "phone"
+    const promptpayName = data?.find(r => r.key === SETTINGS_KEYS.promptpayName)?.value || ""
+    const bankName = data?.find(r => r.key === SETTINGS_KEYS.bankName)?.value || ""
+
+    if (!promptpayId) {
+      return { success: false, error: "ยังไม่ได้ตั้งค่าบัญชี PromptPay ของ HorSet กรุณาติดต่อผู้ดูแลระบบ" }
+    }
+
+    const info: HorSetPaymentInfo = { promptpayId, promptpayType, promptpayName, bankName }
+    return { success: true, data: info }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลบัญชีรับเงินของ HorSet" }
+  }
+}
 
 async function getHorSetSlipOkCredentials() {
   const supabase = await getServiceRoleOrSessionClient()

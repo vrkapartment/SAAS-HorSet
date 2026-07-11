@@ -299,8 +299,8 @@ export default function PricingModal({ isOpen, workspaceId, onClose, onSuccess }
       <UploadSlipModal
         isOpen={!!payingPlan}
         workspaceId={workspaceId}
-        initialPlanId={payingPlan?.id}
-        initialBillingCycle={billingCycle}
+        plan={payingPlan}
+        billingCycle={billingCycle}
         onClose={() => setPayingPlan(null)}
         onSuccess={handleUploadSuccess}
       />
