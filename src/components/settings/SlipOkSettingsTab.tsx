@@ -648,21 +648,13 @@ export default function SlipOkSettingsTab() {
                   </button>
                   
                   {openStep1 && (
-                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 animate-fadeIn">
-                      <p className="leading-relaxed">
-                        เข้าสู่เว็บไซต์ผู้ให้บริการตรวจสอบสลิปโอนเงิน <span className="font-bold text-slate-800 dark:text-slate-100">SlipOK Portal</span> เพื่อลงทะเบียนบัญชีสำหรับธุรกิจ/หอพักของคุณ
-                      </p>
-                      <div className="py-1">
-                        <a 
-                          href="https://portal.slipok.com/" 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-500/10"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>เข้าสู่เว็บไซต์ SlipOK Portal 🌐</span>
-                        </a>
-                      </div>
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3 animate-fadeIn">
+                      <ul className="list-disc pl-5 space-y-2 text-slate-600 dark:text-slate-300 font-semibold">
+                        <li>
+                          สมัคร SlipOK โดยแอดไลน์ <a href="https://line.me/R/ti/p/%40slipok" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 font-black underline inline-flex items-center gap-1">@slipok <ExternalLink className="w-3.5 h-3.5 inline" /></a>
+                        </li>
+                        <li>ทำตามขั้นตอนการสมัครของ SlipOK</li>
+                      </ul>
                     </div>
                   )}
                 </div>
@@ -684,9 +676,13 @@ export default function SlipOkSettingsTab() {
                   </button>
                   
                   {openStep2 && (
-                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-2 leading-relaxed animate-fadeIn">
-                      <p>
-                        เลือกซื้อแพ็กเกจโควต้าสำหรับหอพักตามความต้องการ โดยระบบของ SlipOK คิดค่าบริการต่อการสแกนตรวจสอบสลิปเฉลี่ยไม่ถึง <span className="text-emerald-500 font-bold">1 บาทต่อครั้ง</span> เท่านั้น ช่วยให้ประหยัดและสะดวกต่อหอพักของคุณอย่างมาก
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-2.5 leading-relaxed animate-fadeIn">
+                      <ul className="list-disc pl-5 space-y-2 text-slate-600 dark:text-slate-300 font-semibold">
+                        <li>หากท่านมีห้องพักไม่เกิน 100 ห้อง ท่านสามารถกดเลือก <span className="font-black text-slate-800 dark:text-slate-100">แพ็คเกจ OK BASIC</span> ได้เลย</li>
+                        <li>หากท่านมีจำนวนห้องพักมากกว่า 100 ห้อง ควรเลือก <span className="font-black text-slate-800 dark:text-slate-100">OK START</span> เพื่อใช้งานได้เต็มประสิทธิภาพ</li>
+                      </ul>
+                      <p className="bg-slate-100 dark:bg-slate-950 p-3 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 mt-2.5">
+                        📌 <span className="font-extrabold text-slate-700 dark:text-slate-300">หมายเหตุ :</span> โควต้าการใช้งาน ชำระโดยตรงกับ SlipOK
                       </p>
                     </div>
                   )}
@@ -709,17 +705,12 @@ export default function SlipOkSettingsTab() {
                   </button>
                   
                   {openStep3 && (
-                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 leading-relaxed animate-fadeIn">
-                      <p>
-                        เมื่อเข้าสู่ระบบแล้ว ให้ไปที่หน้า <span className="font-bold text-slate-800 dark:text-slate-100">ข้อมูลสาขา (Branch)</span> จากนั้นคัดลอกข้อมูลเหล่านี้:
-                      </p>
-                      <ul className="list-disc pl-5 space-y-1.5 text-slate-500 dark:text-slate-400 font-medium">
-                        <li><span className="font-bold text-slate-700 dark:text-slate-200">Branch ID</span>: ตัวเลขระบุสาขาเฉพาะของท่าน (เช่น <code className="bg-slate-100 dark:bg-slate-950 px-1.5 py-0.5 rounded font-mono font-bold text-blue-500">12345</code>)</li>
-                        <li><span className="font-bold text-slate-700 dark:text-slate-200">API Key</span>: รหัส Token ยาวๆ สำหรับอนุญาตการดึงข้อมูลเพื่อตรวจสอบความถูกต้องของสลิป</li>
+                    <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3 leading-relaxed animate-fadeIn">
+                      <p className="mb-2 font-semibold">เมื่อเข้าสู่ระบบแล้ว ให้ไปที่หน้า <span className="font-black text-slate-800 dark:text-slate-100">ข้อมูลสาขา (Branch)</span> จากนั้นคัดลอกข้อมูลเหล่านี้:</p>
+                      <ul className="list-disc pl-5 space-y-2 text-slate-600 dark:text-slate-300 font-semibold">
+                        <li>คัดลอกชุดตัวเลข 5 ตัวสุดท้ายของ API นำมาใส่ใน <span className="font-black text-slate-800 dark:text-slate-100">Branch ID</span> ทางด้านซ้าย</li>
+                        <li>คัดลอก <span className="font-black text-slate-800 dark:text-slate-100">API Key</span> นำมาใส่ใน API Key ทางด้านซ้าย</li>
                       </ul>
-                      <p>
-                        นำค่าทั้งสองมาวางในช่องตั้งค่าด้านซ้ายในระบบ <span className="text-blue-500 font-bold">HorSet</span> เพื่อทำเชื่อมโยงระบบเข้าหากัน
-                      </p>
                     </div>
                   )}
                 </div>
@@ -745,14 +736,11 @@ export default function SlipOkSettingsTab() {
                       <p className="text-rose-500 font-extrabold">
                         ข้อแนะนำที่สำคัญมากเพื่อความปลอดภัยสูงสุดในการเงินของหอพัก:
                       </p>
-                      <p>
-                        ให้เข้าไปตั้งค่าข้อมูลบัญชีธนาคารหรือพร้อมเพย์รับเงินของท่านใน <span className="font-bold text-slate-800 dark:text-slate-100">หน้าเว็บ SlipOK Portal</span> 
+                      <p className="font-semibold">
+                        ให้เข้าไปตั้งค่าข้อมูลบัญชีธนาคารหรือพร้อมเพย์รับเงินของท่านใน <span className="font-black text-slate-800 dark:text-slate-100">หน้าเว็บ SlipOK</span> 
                       </p>
-                      <p>
-                        โดยให้ข้อมูลบัญชีธนาคารตรงกันกับกล่อง <span className="text-blue-500 font-bold">บัญชีการเงินที่ดึงมาจาก HorSet</span> ในด้านซ้ายนี้
-                      </p>
-                      <p className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-amber-600 dark:text-amber-400 font-bold">
-                        💡 ประโยชน์: เมื่อตั้งค่าบัญชีรับเงินไว้ หากผู้เช่าโอนเงินผิดบัญชี หรือไปสลับรูปภาพสลิปที่โอนไปหาผู้อื่นมาแอบอ้าง ระบบจะรู้ทันทีและระบุสถานะว่า "ตรวจสอบไม่ผ่าน" เพื่อป้องกันกลโกงและการอัปโหลดสลิปที่ไม่ใช่ยอดเงินเข้าหอพักของคุณจริง ๆ!
+                      <p className="font-semibold">
+                        โดยให้ข้อมูลบัญชีธนาคารตรงกันกับระบบ <span className="font-black text-blue-500">HorSet</span> เพื่อความถูกต้องในการตรวจสอบสลิป
                       </p>
                     </div>
                   )}
