@@ -892,10 +892,10 @@ export default function TaxPage() {
           <AlertTriangle className="w-5 h-5 animate-pulse" />
         </div>
         <div className="space-y-1.5 relative z-10">
-          <p className="text-xs font-bold text-amber-800 dark:text-amber-450 tracking-wide flex items-center gap-1.5">
+          <p className="text-xs font-bold text-amber-800 dark:text-amber-300 tracking-wide flex items-center gap-1.5">
             ข้อสงวนสิทธิ์ทางกฎหมาย (Legal Disclaimer)
           </p>
-          <p className="text-slate-600 dark:text-slate-350 text-xs sm:text-sm leading-relaxed max-w-5xl">
+          <p className="text-amber-950/70 dark:text-amber-100/80 text-xs sm:text-sm leading-relaxed max-w-5xl">
             ข้อมูลการคำนวณและรายงานตัวเลขรายได้ในหน้านี้ จัดทำขึ้นเพื่อใช้เป็นข้อมูลอ้างอิงเบื้องต้นในการคำนวณภาษีเท่านั้น ผู้ใช้งานต้องนำส่งแบบฟอร์มภาษีและตรวจสอบเอกสารความถูกต้องด้วยตนเองผ่านช่องทางระบบอย่างเป็นทางการของกรมสรรพากรอีกครั้ง
           </p>
         </div>
