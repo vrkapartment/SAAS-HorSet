@@ -147,6 +147,7 @@ export default function TaxPage() {
   const [expenseTitle, setExpenseTitle] = useState("")
   const [expenseAmount, setExpenseAmount] = useState<number | string>("")
   const [expenseCategory, setExpenseCategory] = useState<"40_5" | "40_8">("40_5")
+  const [expenseDate, setExpenseDate] = useState("")
   const [expenseSubmitting, setExpenseSubmitting] = useState(false)
   const [expenseError, setExpenseError] = useState<string | null>(null)
 
@@ -469,6 +470,9 @@ export default function TaxPage() {
     setExpenseTitle("")
     setExpenseAmount("")
     setExpenseCategory("40_5")
+    // ค่าเริ่มต้นวันที่: ถ้ากำลังดูปีภาษีปัจจุบันให้ใช้วันนี้ ถ้าเป็นปีอื่นให้เริ่มที่ต้นปีนั้นแทน
+    const currentRealYear = new Date().getFullYear().toString()
+    setExpenseDate(taxYear === currentRealYear ? new Date().toISOString().slice(0, 10) : `${taxYear}-01-01`)
     setExpenseError(null)
     setExpenseModalOpen(true)
   }
@@ -482,6 +486,7 @@ export default function TaxPage() {
     setExpenseTitle(expense.title)
     setExpenseAmount(expense.amount)
     setExpenseCategory(expense.category)
+    setExpenseDate(expense.created_at ? expense.created_at.slice(0, 10) : "")
     setExpenseError(null)
     setExpenseModalOpen(true)
   }
@@ -501,9 +506,16 @@ export default function TaxPage() {
       setExpenseError("กรุณากรอกจำนวนเงินให้ถูกต้องและมากกว่า 0 บาท")
       return
     }
+    if (!expenseDate) {
+      setExpenseError("กรุณาเลือกวันที่เกิดค่าใช้จ่าย")
+      return
+    }
 
     setExpenseSubmitting(true)
     setExpenseError(null)
+
+    // ใช้เที่ยงวันตามเวลาท้องถิ่นกันปัญหาวันที่เพี้ยนข้ามเขตเวลาตอนแปลงเป็น ISO
+    const expenseCreatedAt = new Date(`${expenseDate}T12:00:00`).toISOString()
 
     try {
       let res
@@ -513,14 +525,17 @@ export default function TaxPage() {
           expenseTitle.trim(),
           amt,
           taxYear,
-          expenseCategory
+          expenseCategory,
+          expenseCreatedAt
         )
       } else {
         res = await createExpense(
           expenseTitle.trim(),
           amt,
           taxYear,
-          expenseCategory
+          expenseCategory,
+          undefined,
+          expenseCreatedAt
         )
       }
 
@@ -777,6 +792,20 @@ export default function TaxPage() {
     ? calculatedOther408Half
     : (dataSource === "system" ? 0 : manualOther408 / 2)) + (dataSource === "system" ? totalDeductedServices408Half : 0)
 
+  // ค่าใช้จ่ายจริงที่เกิดขึ้นในครึ่งปีแรก (ม.ค.-มิ.ย.) แยกตามวันที่จริงของแต่ละรายการ
+  // แทนที่จะหารยอดทั้งปีด้วย 2 ซึ่งไม่ตรงกับรายจ่ายจริงที่อาจเกิดไม่เท่ากันในแต่ละครึ่งปี
+  const expensesInFirstHalf = expenses.filter(exp => {
+    if (!exp.created_at) return false
+    const month = new Date(exp.created_at).getMonth() + 1
+    return month >= 1 && month <= 6
+  })
+  const actualExpense405Half = expensesInFirstHalf
+    .filter(exp => exp.category === "40_5")
+    .reduce((sum, exp) => sum + exp.amount, 0)
+  const actualExpense408Half = expensesInFirstHalf
+    .filter(exp => exp.category === "40_8")
+    .reduce((sum, exp) => sum + exp.amount, 0)
+
   // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5)
   // เต็มปี
   const getDeduction405Full = () => {
@@ -788,7 +817,7 @@ export default function TaxPage() {
   // ครึ่งปี
   const getDeduction405Half = () => {
     if (deductionMethod405 === "เหมา 30%") return rent405Half * 0.30
-    return actualExpense405 / 2
+    return actualExpense405Half
   }
   const deductionRent405Half = getDeduction405Half()
 
@@ -801,7 +830,7 @@ export default function TaxPage() {
 
   const getDeduction408Half = () => {
     if (deductionMethod408 === "เหมา 60%") return utilities408Half * 0.60
-    return actualExpense408 / 2
+    return actualExpense408Half
   }
   const deductionUtilities408Half = getDeduction408Half()
 
@@ -1127,6 +1156,9 @@ export default function TaxPage() {
                     <p className="text-xs text-slate-400 dark:text-slate-450 leading-relaxed">
                       * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
                     </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-450 font-semibold">
+                      ใช้สำหรับ ภ.ง.ด.94 (ครึ่งปีแรก ม.ค.-มิ.ย. ตามวันที่จริงของแต่ละรายการ): {formatMoney(actualExpense405Half)} บาท
+                    </p>
                   </div>
                 )}
               </div>
@@ -1178,6 +1210,9 @@ export default function TaxPage() {
                     </div>
                     <p className="text-xs text-slate-400 dark:text-slate-450 leading-relaxed">
                       * ยอดรวมมาจากการบันทึกรายจ่ายจริงในตารางด้านล่าง กรุณาเพิ่มรายการเพื่ออัปเดตยอดหักลดหย่อน
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-450 font-semibold">
+                      ใช้สำหรับ ภ.ง.ด.94 (ครึ่งปีแรก ม.ค.-มิ.ย. ตามวันที่จริงของแต่ละรายการ): {formatMoney(actualExpense408Half)} บาท
                     </p>
                   </div>
                 )}
@@ -2005,6 +2040,21 @@ export default function TaxPage() {
                     บาท
                   </div>
                 </div>
+              </div>
+
+              {/* วันที่เกิดค่าใช้จ่าย */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">วันที่เกิดค่าใช้จ่าย <span className="text-red-400">*</span></label>
+                <input
+                  type="date"
+                  required
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                />
+                <p className="text-[11px] text-slate-450 dark:text-slate-500">
+                  ใช้แยกยอดค่าใช้จ่ายจริงของ ภ.ง.ด.94 (ครึ่งปีแรก ม.ค.-มิ.ย.) ให้ถูกต้อง แทนการหารยอดทั้งปีด้วย 2
+                </p>
               </div>
 
               {/* เลือกประเภท */}
