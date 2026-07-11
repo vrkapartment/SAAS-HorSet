@@ -133,7 +133,7 @@ export default function UploadSlipModal({
       ctx.drawImage(qrImg, 0, 0, 500, 500)
 
       const logoImg = new Image()
-      logoImg.src = "/horset_icon.png"
+      logoImg.src = "/icon-512x512.png"
 
       logoImg.onload = () => {
         try {
