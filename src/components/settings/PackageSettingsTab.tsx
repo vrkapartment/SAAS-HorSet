@@ -176,7 +176,7 @@ export default function PackageSettingsTab() {
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-bold leading-relaxed max-w-md">
               {isTrial
-                ? "ทดลองใช้ Pro features ฟรี — สมัครแพ็กเกจก่อนหมดอายุเพื่อใช้งานต่อ"
+                ? `ทดลองใช้สิทธิ์แผน ${plan?.name || "Starter"} ฟรี — สมัครแพ็กเกจก่อนหมดอายุเพื่อใช้งานต่อ`
                 : status === "read_only"
                   ? "บัญชีถูกจำกัดสิทธิ์เป็นแบบดูข้อมูลได้อย่างเดียว กรุณาชำระเงินเพื่อใช้งานต่อ"
                   : status === "cancelled"

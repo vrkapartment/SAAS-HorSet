@@ -143,10 +143,10 @@ export default function PricingModal({ isOpen, workspaceId, onClose, onSuccess }
         {isTrial && trialDaysRemaining !== null && trialDaysRemaining >= 0 && (
           <div className="max-w-2xl mx-auto mb-8 p-4 rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-950/20 space-y-1.5">
             <p className="text-xs sm:text-sm font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 shrink-0" /> คุณอยู่ในช่วงทดลองใช้ Pro ฟรี — เหลือ {trialDaysRemaining} วัน
+              <Sparkles className="w-4 h-4 shrink-0" /> คุณอยู่ในช่วงทดลองใช้ฟรี — เหลือ {trialDaysRemaining} วัน
             </p>
             <p className="text-[11px] sm:text-xs font-semibold text-emerald-700 dark:text-emerald-400 leading-relaxed">
-              💚 วันทดลองที่เหลือจะไม่หาย! สมัครแพ็กเกจตอนนี้ — ระบบจะให้ใช้ Pro ฟรีต่อ {trialDaysRemaining} วัน แล้วค่อยเริ่มนับแพ็กเกจที่เลือกหลังจากนั้น
+              💚 วันทดลองที่เหลือจะไม่หาย! สมัครแพ็กเกจตอนนี้ — ระบบจะให้ใช้สิทธิ์ทดลองฟรีต่อ {trialDaysRemaining} วัน แล้วค่อยเริ่มนับแพ็กเกจที่เลือกหลังจากนั้น
             </p>
           </div>
         )}

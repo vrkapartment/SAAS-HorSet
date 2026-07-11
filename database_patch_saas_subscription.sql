@@ -141,9 +141,9 @@ create table if not exists public.workspace_subscriptions (
 
 create index if not exists idx_workspace_subscriptions_status on public.workspace_subscriptions (status);
 
--- สร้างแถว trial 30 วันให้ทุก workspace ที่มีอยู่แล้วและยังไม่มี subscription (ใช้แผน pro เป็นสิทธิ์ระหว่าง trial)
+-- สร้างแถว trial 30 วันให้ทุก workspace ที่มีอยู่แล้วและยังไม่มี subscription (ใช้แผน starter เป็นสิทธิ์ระหว่าง trial)
 insert into public.workspace_subscriptions (workspace_id, plan_id, status, trial_ends_at)
-select w.id, (select id from public.saas_plans where code = 'pro'), 'trial', now() + interval '30 days'
+select w.id, (select id from public.saas_plans where code = 'starter'), 'trial', now() + interval '30 days'
 from public.workspaces w
 where not exists (select 1 from public.workspace_subscriptions s where s.workspace_id = w.id)
 on conflict (workspace_id) do nothing;
@@ -168,7 +168,7 @@ begin
   insert into public.workspace_subscriptions (workspace_id, plan_id, status, trial_ends_at)
   values (
     new.id,
-    (select id from public.saas_plans where code = 'pro'),
+    (select id from public.saas_plans where code = 'starter'),
     'trial',
     now() + interval '30 days'
   )

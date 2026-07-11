@@ -412,7 +412,7 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
       if (carriedOverDays > 0) {
         return {
           success: true,
-          message: `ชำระเงินสำเร็จ! ระบบจะให้คุณใช้แผน Pro (ทดลองใช้) ฟรีต่ออีก ${carriedOverDays} วันตามเดิม แล้วค่อยเริ่มนับรอบบิลของแผน "${plan.name}" หลังจากนั้น`
+          message: `ชำระเงินสำเร็จ! ระบบจะให้คุณใช้สิทธิ์ทดลองใช้ฟรีต่ออีก ${carriedOverDays} วันตามเดิม แล้วค่อยเริ่มนับรอบบิลของแผน "${plan.name}" หลังจากนั้น`
         }
       }
 
