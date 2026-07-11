@@ -401,6 +401,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
         "Content-Type": "application/json",
         "Authorization": `Bearer ${channelAccessToken}`
       },
+      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         to: lineUserId.trim(),
         messages: [
@@ -982,6 +983,7 @@ export async function sendLineSlipNotificationAction(
           "Content-Type": "application/json",
           "Authorization": `Bearer ${channelAccessToken}`
         },
+        signal: AbortSignal.timeout(8000),
         body: JSON.stringify({
           to: toTarget.trim(),
           messages: [
@@ -1073,7 +1075,8 @@ export async function getLineProfilesAction(userIdsStr: string, workspaceId: str
             method: "GET",
             headers: {
               "Authorization": `Bearer ${channelAccessToken}`
-            }
+            },
+            signal: AbortSignal.timeout(8000)
           })
 
           if (res.ok) {

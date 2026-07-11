@@ -210,7 +210,8 @@ export interface SlipOkQuota {
 async function fetchQuotaFromSlipOk(branchId: string, apiKey: string) {
   const response = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}/quota`, {
     method: "GET",
-    headers: { "x-authorization": apiKey }
+    headers: { "x-authorization": apiKey },
+    signal: AbortSignal.timeout(8000)
   })
 
   const json = await response.json()
@@ -296,6 +297,7 @@ export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string
         "x-authorization": apiKey,
         "Content-Type": "application/json"
       },
+      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         url: imageUrl,
         // log: true เปิดเช็คบัญชีผู้รับ (ต้องตั้งบัญชีไว้ใน SlipOK LIFF ก่อน) + กันสลิปซ้ำ ปิดได้ถ้าไม่ต้องการ

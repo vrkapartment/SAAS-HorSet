@@ -565,22 +565,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               }
             }
 
-            const { data: grantData, error: grantError } = await supabase
-              .from("support_access_grants")
-              .select("status")
-              .eq("workspace_id", activeWsId)
-              .maybeSingle()
-
-            if (grantData) {
-              setSupportStatus(grantData.status)
-              setCookie(`horset_support_status_${activeWsId}`, grantData.status)
-              if (grantData.status === "pending" && currentRole === "admin") {
-                setShowSupportModal(true)
-              }
-            } else {
-              setSupportStatus("none")
-              setCookie(`horset_support_status_${activeWsId}`, "none")
-            }
+            // หมายเหตุ: ไม่ query support_access_grants ตรงนี้แล้ว — useSupportAccess (บรรทัดด้านบน)
+            // มี effect ที่ fetch + sync ค่าเดียวกันอยู่แล้วทันทีที่ currentWorkspace.id ถูกตั้งค่า
+            // (ผ่าน setCurrentWorkspace ด้านบน) รวมถึงคอย realtime ต่อให้ด้วย การ query ซ้ำตรงนี้
+            // มีแต่จะทำให้ยิง request ไปที่ตารางนี้ซ้ำโดยไม่จำเป็น
           } catch (err) {
             console.error("Supabase load error inside DashboardLayout init:", err)
             fallbackMock(activeWsId, currentRole)

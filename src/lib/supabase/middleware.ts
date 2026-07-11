@@ -13,7 +13,7 @@ export async function updateSession(request: NextRequest) {
   const superAdminPaths = ["/super-admin"]
   const adminPaths = ["/dashboard", "/tax", "/daily-bills", "/finance-settings", "/test-connection"]
   const sharedPaths = ["/rooms", "/tenants"]
-  const staffPaths = ["/meter", "/billing"]
+  const staffPaths = ["/meter", "/billing", "/manage-bills"]
   const tenantPaths = ["/portal"]
 
   // ตรวจสอบความถูกต้องของเส้นทางกับสิทธิ์ผู้ใช้งาน

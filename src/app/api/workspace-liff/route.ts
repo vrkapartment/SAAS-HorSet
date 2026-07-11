@@ -5,6 +5,26 @@ import { createClient } from "@/lib/supabase/server"
 const botCache = new Map<string, { botBasicId: string; botDisplayName: string; timestamp: number }>()
 const CACHE_TTL = 30 * 60 * 1000 // 30 minutes
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Route นี้ต้องเปิดให้เรียกได้แบบไม่มี session (หน้าลงทะเบียนผู้เช่าต้องใช้ liffId เปิด LINE Login
+// ก่อน login จริง) ข้อมูลที่คืนกลับเป็นแค่ liffId/ชื่อบอทสาธารณะ ไม่มี token หลุดออกไป — จำกัดแค่
+// รูปแบบ workspace_id ต้องเป็น UUID จริง + rate limit ต่อ IP กันการไล่ scrape เท่านั้น
+const RATE_LIMIT_WINDOW_MS = 60 * 1000
+const RATE_LIMIT_MAX_REQUESTS = 20
+const rateLimitBuckets = new Map<string, { count: number; windowStart: number }>()
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  const bucket = rateLimitBuckets.get(ip)
+  if (!bucket || now - bucket.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitBuckets.set(ip, { count: 1, windowStart: now })
+    return false
+  }
+  bucket.count += 1
+  return bucket.count > RATE_LIMIT_MAX_REQUESTS
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -13,13 +33,18 @@ export async function GET(request: NextRequest) {
     const defaultBotBasicId = "@423xmlwo"
     const defaultBotDisplayName = "แชทบิลอัตโนมัติ"
 
-    if (!workspaceId) {
+    if (!workspaceId || !UUID_RE.test(workspaceId)) {
       return NextResponse.json({
         success: true,
         liffId: defaultLiffId,
         botBasicId: defaultBotBasicId,
         botDisplayName: defaultBotDisplayName
       })
+    }
+
+    const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
+    if (isRateLimited(clientIp)) {
+      return NextResponse.json({ success: false, error: "Too many requests" }, { status: 429 })
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
