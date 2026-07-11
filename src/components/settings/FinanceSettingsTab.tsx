@@ -320,6 +320,8 @@ export default function FinanceSettingsTab() {
 
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
       const res = await saveFinanceSettings(workspaceId, payload)
+      // TODO(debug-temp): ไล่บั๊กช่องที่อยู่ไม่บันทึก จะเอาออกทันทีที่หาสาเหตุเจอ
+      console.log("[DEBUG] saveFinanceSettings result:", JSON.stringify(res, null, 2))
       if (res.success) {
         // บันทึกเงินประกันแยกตามประเภทห้องพัก
         if (roomTypes.length > 0) {

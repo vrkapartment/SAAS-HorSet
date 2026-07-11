@@ -458,7 +458,12 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
       throw updateError
     }
 
-    return { success: true, message: "บันทึกข้อมูลเข้าฐานข้อมูลเรียบร้อยแล้ว!" }
+    // TODO(debug-temp): ข้อมูล debug ชั่วคราวเพื่อไล่บั๊กช่องที่อยู่ที่ไม่บันทึก จะเอาออกทันทีที่หาสาเหตุเจอ
+    return {
+      success: true,
+      message: "บันทึกข้อมูลเข้าฐานข้อมูลเรียบร้อยแล้ว!",
+      debug: { sentSoi: settings.tax_address_soi, usedServiceRole: dbClient !== supabase, updatedRows }
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูลการเงิน"
     return { success: false, error: errorMessage }
