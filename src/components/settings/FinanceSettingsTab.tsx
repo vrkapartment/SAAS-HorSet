@@ -22,7 +22,14 @@ export default function FinanceSettingsTab() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [taxId, setTaxId] = useState("")
+  const [addressBuilding, setAddressBuilding] = useState("")
+  const [addressRoom, setAddressRoom] = useState("")
+  const [addressFloor, setAddressFloor] = useState("")
+  const [addressVillage, setAddressVillage] = useState("")
   const [addressNo, setAddressNo] = useState("")
+  const [addressMoo, setAddressMoo] = useState("")
+  const [addressSoi, setAddressSoi] = useState("")
+  const [addressYaek, setAddressYaek] = useState("")
   const [addressRoad, setAddressRoad] = useState("")
   const [addressSubdistrict, setAddressSubdistrict] = useState("")
   const [addressDistrict, setAddressDistrict] = useState("")
@@ -129,6 +136,13 @@ export default function FinanceSettingsTab() {
             setAddressDistrict(parsed.district)
             setAddressProvince(parsed.province)
             setAddressZipcode(parsed.zipcode)
+            setAddressBuilding(cached.tax_address_building || "")
+            setAddressRoom(cached.tax_address_room || "")
+            setAddressFloor(cached.tax_address_floor || "")
+            setAddressVillage(cached.tax_address_village || "")
+            setAddressMoo(cached.tax_address_moo || "")
+            setAddressSoi(cached.tax_address_soi || "")
+            setAddressYaek(cached.tax_address_yaek || "")
             setPhone(cached.tax_phone || "")
             setPromptPayType(cached.promptpay_type || "phone")
             setPromptPayId(cached.promptpay_id || "")
@@ -161,6 +175,13 @@ export default function FinanceSettingsTab() {
               setAddressDistrict(parsed.district)
               setAddressProvince(parsed.province)
               setAddressZipcode(parsed.zipcode)
+              setAddressBuilding(res.data.tax_address_building || "")
+              setAddressRoom(res.data.tax_address_room || "")
+              setAddressFloor(res.data.tax_address_floor || "")
+              setAddressVillage(res.data.tax_address_village || "")
+              setAddressMoo(res.data.tax_address_moo || "")
+              setAddressSoi(res.data.tax_address_soi || "")
+              setAddressYaek(res.data.tax_address_yaek || "")
               setPhone(res.data.tax_phone || "")
               setPromptPayType(res.data.promptpay_type || "phone")
               setPromptPayId(res.data.promptpay_id || "")
@@ -287,7 +308,14 @@ export default function FinanceSettingsTab() {
         advance_rent: advanceRent,
         slip_retention_months: slipRetentionMonths,
         taxpayer_status: taxpayerStatus,
-        partner_count: partnerCount
+        partner_count: partnerCount,
+        tax_address_building: addressBuilding,
+        tax_address_room: addressRoom,
+        tax_address_floor: addressFloor,
+        tax_address_village: addressVillage,
+        tax_address_moo: addressMoo,
+        tax_address_soi: addressSoi,
+        tax_address_yaek: addressYaek
       }
 
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
@@ -472,18 +500,98 @@ export default function FinanceSettingsTab() {
               <div className="space-y-4 border-t border-slate-200 dark:border-slate-900/40 pt-4">
                 <label className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold block uppercase tracking-wide">ที่อยู่ตามทะเบียนบ้าน (เพื่อกรอกในแบบยื่นภาษีกรมสรรพากร)</label>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <p className="text-[11px] text-slate-450 dark:text-slate-500 -mt-2">
+                  แยกกรอกทีละช่องตามแบบฟอร์มจริงของกรมสรรพากร (ช่องไหนไม่มีเว้นว่างได้ ยกเว้น &quot;เลขที่&quot;)
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">เลขที่ / ซอย / หมู่บ้าน / อาคาร</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">อาคาร</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น ตึกเอ"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={addressBuilding}
+                      onChange={(e) => setAddressBuilding(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ห้องเลขที่</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น 101"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={addressRoom}
+                      onChange={(e) => setAddressRoom(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ชั้นที่</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น 2"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={addressFloor}
+                      onChange={(e) => setAddressFloor(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">หมู่บ้าน</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น หมู่บ้านสวนสน"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={addressVillage}
+                      onChange={(e) => setAddressVillage(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">เลขที่</label>
                     <input
                       type="text"
                       required
-                      placeholder="เช่น 21 ซอยหงษ์อ่อน"
+                      placeholder="เช่น 21"
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressNo}
                       onChange={(e) => setAddressNo(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">หมู่ที่</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น 5"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={addressMoo}
+                      onChange={(e) => setAddressMoo(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ตรอก/ซอย</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น หงษ์อ่อน"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={addressSoi}
+                      onChange={(e) => setAddressSoi(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">แยก</label>
+                    <input
+                      type="text"
+                      placeholder="เช่น 3"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={addressYaek}
+                      onChange={(e) => setAddressYaek(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs sm:text-sm text-slate-400 font-bold block">ถนน (ถ้าไม่มีให้ใส่ -)</label>
                     <input
@@ -494,9 +602,6 @@ export default function FinanceSettingsTab() {
                       onChange={(e) => setAddressRoad(e.target.value)}
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs sm:text-sm text-slate-400 font-bold block">ตำบล / แขวง</label>
                     <input

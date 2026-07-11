@@ -32,6 +32,15 @@ export interface FinanceSettings {
   // สถานภาพผู้เสียภาษี (กำหนดค่าลดหย่อนส่วนตัว ข.1 ของแบบฟอร์ม ภ.ง.ด. 90/94)
   taxpayer_status?: "individual" | "partnership"
   partner_count?: number
+  // ที่อยู่แยกช่องย่อยเพิ่มเติม (นอกเหนือจาก เลขที่/ถนน/ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์ ที่รวมอยู่ใน tax_address)
+  // ใช้กรอกช่อง อาคาร/ห้องเลขที่/ชั้นที่/หมู่บ้าน/หมู่ที่/ตรอกซอย/แยก ของแบบฟอร์ม ภ.ง.ด. 94 โดยเฉพาะ
+  tax_address_building?: string
+  tax_address_room?: string
+  tax_address_floor?: string
+  tax_address_village?: string
+  tax_address_moo?: string
+  tax_address_soi?: string
+  tax_address_yaek?: string
 }
 
 /**
@@ -193,17 +202,17 @@ export async function getFinanceSettings(workspaceId: string) {
       return ""
     }
 
-    // 9. สถานภาพผู้เสียภาษี (แยกดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ติดตั้ง)
+    // 9. สถานภาพผู้เสียภาษี + ที่อยู่ช่องย่อยเพิ่มเติม (แยกดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ติดตั้ง)
     const fetchTaxpayerStatus = async (): Promise<any> => {
       try {
         const { data, error } = await supabase
           .from("workspaces")
-          .select("taxpayer_status, partner_count")
+          .select("taxpayer_status, partner_count, tax_address_building, tax_address_room, tax_address_floor, tax_address_village, tax_address_moo, tax_address_soi, tax_address_yaek")
           .eq("id", workspaceId)
           .single()
         if (!error && data) return data
       } catch (e) {
-        console.warn("Columns taxpayer_status/partner_count not available in workspaces. Defaulting.")
+        console.warn("Columns taxpayer_status/partner_count/tax_address_* not available in workspaces. Defaulting.")
       }
       return null
     }
@@ -279,7 +288,14 @@ export async function getFinanceSettings(workspaceId: string) {
         checkout_policy: merged.checkout_policy || "DAILY_PRORATE",
         logo_url: logoUrl,
         taxpayer_status: (taxpayerStatusData?.taxpayer_status as "individual" | "partnership") || "individual",
-        partner_count: Number(taxpayerStatusData?.partner_count || 1)
+        partner_count: Number(taxpayerStatusData?.partner_count || 1),
+        tax_address_building: taxpayerStatusData?.tax_address_building || "",
+        tax_address_room: taxpayerStatusData?.tax_address_room || "",
+        tax_address_floor: taxpayerStatusData?.tax_address_floor || "",
+        tax_address_village: taxpayerStatusData?.tax_address_village || "",
+        tax_address_moo: taxpayerStatusData?.tax_address_moo || "",
+        tax_address_soi: taxpayerStatusData?.tax_address_soi || "",
+        tax_address_yaek: taxpayerStatusData?.tax_address_yaek || ""
       } as FinanceSettings
     }
   } catch (error) {
@@ -346,7 +362,14 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0),
         checkout_policy: settings.checkout_policy || "DAILY_PRORATE",
         taxpayer_status: settings.taxpayer_status || "individual",
-        partner_count: Number(settings.partner_count || 1)
+        partner_count: Number(settings.partner_count || 1),
+        tax_address_building: (settings.tax_address_building || "").trim(),
+        tax_address_room: (settings.tax_address_room || "").trim(),
+        tax_address_floor: (settings.tax_address_floor || "").trim(),
+        tax_address_village: (settings.tax_address_village || "").trim(),
+        tax_address_moo: (settings.tax_address_moo || "").trim(),
+        tax_address_soi: (settings.tax_address_soi || "").trim(),
+        tax_address_yaek: (settings.tax_address_yaek || "").trim()
       })
       .eq("id", workspaceId)
 

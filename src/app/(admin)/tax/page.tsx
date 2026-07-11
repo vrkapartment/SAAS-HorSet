@@ -103,6 +103,14 @@ export default function TaxPage() {
   const [phone, setPhone] = useState("")
   const [taxpayerStatus, setTaxpayerStatus] = useState<"individual" | "partnership">("individual")
   const [partnerCount, setPartnerCount] = useState(1)
+  // ที่อยู่ช่องย่อยเพิ่มเติมที่ไม่ได้รวมอยู่ใน address (tax_address) — ใช้กรอกแบบฟอร์ม ภ.ง.ด. 94 โดยเฉพาะ
+  const [addressBuilding, setAddressBuilding] = useState("")
+  const [addressRoom, setAddressRoom] = useState("")
+  const [addressFloor, setAddressFloor] = useState("")
+  const [addressVillage, setAddressVillage] = useState("")
+  const [addressMoo, setAddressMoo] = useState("")
+  const [addressSoi, setAddressSoi] = useState("")
+  const [addressYaek, setAddressYaek] = useState("")
   const [loadingPdf, setLoadingPdf] = useState<"90" | "94" | null>(null)
 
   // แหล่งที่มาของข้อมูลการคำนวณภาษี
@@ -245,6 +253,13 @@ export default function TaxPage() {
             setPhone(cachedFinance.tax_phone || "")
             setTaxpayerStatus(cachedFinance.taxpayer_status || "individual")
             setPartnerCount(Number(cachedFinance.partner_count || 1))
+            setAddressBuilding(cachedFinance.tax_address_building || "")
+            setAddressRoom(cachedFinance.tax_address_room || "")
+            setAddressFloor(cachedFinance.tax_address_floor || "")
+            setAddressVillage(cachedFinance.tax_address_village || "")
+            setAddressMoo(cachedFinance.tax_address_moo || "")
+            setAddressSoi(cachedFinance.tax_address_soi || "")
+            setAddressYaek(cachedFinance.tax_address_yaek || "")
             setElectricRate(Number(cachedFinance.electric_rate !== null && cachedFinance.electric_rate !== undefined ? cachedFinance.electric_rate : 7))
             setWaterRate(Number(cachedFinance.water_rate !== null && cachedFinance.water_rate !== undefined ? cachedFinance.water_rate : 18))
             setCommonFee(Number(cachedFinance.common_fee !== null && cachedFinance.common_fee !== undefined ? cachedFinance.common_fee : 50))
@@ -262,6 +277,13 @@ export default function TaxPage() {
                   setPhone(res.data.tax_phone || "")
                   setTaxpayerStatus(res.data.taxpayer_status || "individual")
                   setPartnerCount(Number(res.data.partner_count || 1))
+                  setAddressBuilding(res.data.tax_address_building || "")
+                  setAddressRoom(res.data.tax_address_room || "")
+                  setAddressFloor(res.data.tax_address_floor || "")
+                  setAddressVillage(res.data.tax_address_village || "")
+                  setAddressMoo(res.data.tax_address_moo || "")
+                  setAddressSoi(res.data.tax_address_soi || "")
+                  setAddressYaek(res.data.tax_address_yaek || "")
                   setElectricRate(res.data.electric_rate)
                   setWaterRate(res.data.water_rate)
                   setCommonFee(res.data.common_fee)
@@ -828,7 +850,16 @@ export default function TaxPage() {
         other408: type === "94" ? other408Half * 2 : undefined,
         netIncome: type === "90" ? netIncomeFull : netIncomeHalf,
         taxYear: printedTaxYear,
-        addressParts: type === "94" ? parseAddress(address) : undefined,
+        addressParts: type === "94" ? {
+          ...parseAddress(address),
+          building: addressBuilding,
+          room: addressRoom,
+          floor: addressFloor,
+          village: addressVillage,
+          moo: addressMoo,
+          soi: addressSoi,
+          yaek: addressYaek,
+        } : undefined,
         taxpayerStatus,
         partnerCount,
       }, customTemplateUrl)

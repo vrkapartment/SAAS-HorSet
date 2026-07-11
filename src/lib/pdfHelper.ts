@@ -95,7 +95,14 @@ export interface PndData {
   other408?: number
   deductionOther408?: number
   addressParts?: {
+    building: string
+    room: string
+    floor: string
+    village: string
     no: string
+    moo: string
+    soi: string
+    yaek: string
     road: string
     subdistrict: string
     district: string
@@ -224,7 +231,10 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
       }
     }
 
-    const addressParts = data.addressParts || { no: "", road: "", subdistrict: "", district: "", province: "", zipcode: "" }
+    const addressParts = data.addressParts || {
+      building: "", room: "", floor: "", village: "", no: "", moo: "", soi: "", yaek: "",
+      road: "", subdistrict: "", district: "", province: "", zipcode: ""
+    }
     const taxpayerStatus = data.taxpayerStatus || "individual"
     const partnerCount = data.partnerCount || 1
 
@@ -232,7 +242,14 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     setField("Text1.1", formattedTaxId)
     setField("Text1.5", data.firstName)
     setField("Text1.7", data.lastName)
+    setField("Text1.9", addressParts.building)
+    setField("Text1.10", addressParts.room)
+    setField("Text1.11", addressParts.floor)
+    setField("Text1.12", addressParts.village)
     setField("Text1.13", addressParts.no)
+    setField("Text1.14", addressParts.moo)
+    setField("Text1.15", addressParts.soi)
+    setField("Text1.21", addressParts.yaek)
     setField("Text1.16", addressParts.road)
     setField("Text1.17", addressParts.subdistrict)
     setField("Text1.18", addressParts.district)
