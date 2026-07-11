@@ -851,7 +851,8 @@ WHERE role IN ('admin', 'super_admin');`
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
           <form 
             onSubmit={handleAddStaffSubmit}
-            className="w-full max-w-3xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh]"
+            style={{ overflowY: "auto" }}
           >
             <button
               type="button"
@@ -972,7 +973,8 @@ WHERE role IN ('admin', 'super_admin');`
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
           <form 
             onSubmit={handleEditStaffSubmit}
-            className="w-full max-w-3xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl space-y-4 flex flex-col max-h-[90vh]"
+            style={{ overflowY: "auto" }}
           >
             <button
               type="button"

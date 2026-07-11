@@ -175,7 +175,10 @@ export default function UploadSlipModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl relative shadow-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div
+        className="w-full max-w-md max-h-[90vh] p-5 sm:p-6 rounded-3xl relative shadow-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+        style={{ overflowY: "auto" }}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg transition-all cursor-pointer z-10 text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"

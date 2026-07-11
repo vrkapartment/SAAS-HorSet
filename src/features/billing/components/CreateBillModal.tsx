@@ -56,9 +56,12 @@ export default function CreateBillModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-      <div className={`w-full max-w-md max-h-[90vh] overflow-y-auto p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up border ${
-        isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
-      }`}>
+      <div
+        className={`w-full max-w-md max-h-[90vh] p-5 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up border ${
+          isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
+        }`}
+        style={{ overflowY: "auto" }}
+      >
         <button
           onClick={onClose}
           className={`absolute top-5 right-5 p-1.5 rounded-lg transition-all cursor-pointer ${

@@ -59,9 +59,12 @@ export default function SlipVerificationModal({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-        <div className={`${
-          isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
-        } w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 border`}>
+        <div
+          className={`${
+            isDark ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"
+          } w-full max-w-3xl max-h-[90vh] p-4 md:p-6 rounded-3xl relative shadow-2xl animate-scale-up grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 border`}
+          style={{ overflowY: "auto" }}
+        >
           
           {/* Close Button */}
           <button
