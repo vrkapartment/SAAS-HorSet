@@ -420,11 +420,6 @@ export default function TaxPage() {
     }
   }
 
-  // รีโหลดข้อมูลทุกครั้งที่เปลี่ยนปีภาษี
-  useEffect(() => {
-    loadExpensesData(taxYear)
-  }, [taxYear])
-
   // จัดการฟอร์มบันทึกค่าใช้จ่าย
   const handleOpenAddExpense = () => {
     if (!hasEditPermission) {
@@ -714,32 +709,34 @@ export default function TaxPage() {
   const totalDeductedServices408Half = cancelledInYearHalf.reduce((sum, c) => sum + getContractServices408(c), 0)
 
   // 1. รายได้รวมมาตรา 40(5) (เฉพาะค่าเช่าห้องพักหลัก) + ยอดค่าเช่าล่วงหน้า + ค่าเช่าหักจากประกันวันเช็คเอาท์
+  // หมายเหตุ: ยอดหักจากเงินประกัน (totalDeducted...) นับรวมเฉพาะโหมด "ระบบ" เท่านั้น
+  // โหมด "กำหนดตัวเลขเอง" ให้ยึดค่าที่ผู้ใช้กรอกเป็นยอดจริงทั้งหมด ไม่บวกเพิ่ม
   const rent405Full = (dataSource === "system" && hasPaidBills
     ? calculatedRent405Full
-    : (dataSource === "system" ? 0 : manualRent405)) + totalAdvanceRentAmount + totalDeductedRent405
+    : (dataSource === "system" ? 0 : manualRent405)) + totalAdvanceRentAmount + (dataSource === "system" ? totalDeductedRent405 : 0)
 
   // 2. รายได้รวมมาตรา 40(8) (ค่าน้ำไฟ/บริการส่วนกลาง) + ค่าน้ำไฟหักจากประกันวันเช็คเอาท์
   const utilities408Full = (dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Full
-    : (dataSource === "system" ? 0 : manualUtilities408)) + totalDeductedUtilities408
+    : (dataSource === "system" ? 0 : manualUtilities408)) + (dataSource === "system" ? totalDeductedUtilities408 : 0)
 
   // 3. รายได้รวมอื่นๆ มาตรา 40(8) (เงินปรับจ่ายล่าช้า / ยอดค่าบริการและค่าเสียหายอื่นๆ วันเช็คเอาท์ - ไม่เข้าเกณฑ์หักเหมา)
   const other408Full = (dataSource === "system" && hasPaidBills
     ? calculatedOther408Full
-    : (dataSource === "system" ? 0 : manualOther408)) + totalDeductedServices408
+    : (dataSource === "system" ? 0 : manualOther408)) + (dataSource === "system" ? totalDeductedServices408 : 0)
 
   // ครึ่งปี
   const rent405Half = (dataSource === "system" && hasPaidBills
     ? calculatedRent405Half
-    : (dataSource === "system" ? 0 : manualRent405 / 2)) + totalAdvanceRentAmountHalf + totalDeductedRent405Half
+    : (dataSource === "system" ? 0 : manualRent405 / 2)) + totalAdvanceRentAmountHalf + (dataSource === "system" ? totalDeductedRent405Half : 0)
 
   const utilities408Half = (dataSource === "system" && hasPaidBills
     ? calculatedUtilities408Half
-    : (dataSource === "system" ? 0 : manualUtilities408 / 2)) + totalDeductedUtilities408Half
+    : (dataSource === "system" ? 0 : manualUtilities408 / 2)) + (dataSource === "system" ? totalDeductedUtilities408Half : 0)
 
   const other408Half = (dataSource === "system" && hasPaidBills
     ? calculatedOther408Half
-    : (dataSource === "system" ? 0 : manualOther408 / 2)) + totalDeductedServices408Half
+    : (dataSource === "system" ? 0 : manualOther408 / 2)) + (dataSource === "system" ? totalDeductedServices408Half : 0)
 
   // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5)
   // เต็มปี
