@@ -486,3 +486,149 @@ export async function getHorsetSlipOkQuotaAction() {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบโควต้า SlipOK ของ HorSet" }
   }
 }
+
+// ดึงรายการ PDF template ของ ภ.ง.ด. 90/94 ทั้งหมดที่มีการอัปโหลดไว้ (สำหรับแสดงในหน้าตั้งค่า Super Admin)
+export async function getTaxFormTemplatesAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true, data: [] }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data, error } = await supabaseAdmin
+      .from("tax_form_templates")
+      .select("id, form_type, tax_year, file_url, file_name, updated_at")
+      .order("form_type", { ascending: true })
+      .order("tax_year", { ascending: false })
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงรายการ PDF template" }
+  }
+}
+
+// บันทึก PDF template ใหม่ของ ภ.ง.ด. 90 (ใช้ข้ามทุกปี ไม่ผูก tax_year) หรือ ภ.ง.ด. 94 (ผูกกับปีภาษีเฉพาะเจาะจง)
+export async function uploadTaxFormTemplateAction(formType: "90" | "94", taxYear: string | null, fileUrl: string, fileName: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    if (formType === "94" && !taxYear) {
+      return { success: false, error: "กรุณาระบุปีภาษีสำหรับแบบฟอร์ม ภ.ง.ด. 94" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    if (formType === "90") {
+      // ภ.ง.ด. 90 มี template เดียวใช้ข้ามทุกปี: ลบของเดิมทิ้งก่อน แล้วค่อย insert ใหม่
+      const { error: deleteError } = await supabaseAdmin.from("tax_form_templates").delete().eq("form_type", "90")
+      if (deleteError) throw deleteError
+
+      const { error: insertError } = await supabaseAdmin.from("tax_form_templates").insert({
+        form_type: "90",
+        tax_year: null,
+        file_url: fileUrl,
+        file_name: fileName,
+        updated_by: profileRes.data.id,
+      })
+      if (insertError) throw insertError
+    } else {
+      const { error: upsertError } = await supabaseAdmin.from("tax_form_templates").upsert(
+        {
+          form_type: "94",
+          tax_year: taxYear,
+          file_url: fileUrl,
+          file_name: fileName,
+          updated_by: profileRes.data.id,
+        },
+        { onConflict: "tax_year" }
+      )
+      if (upsertError) throw upsertError
+    }
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึก PDF template" }
+  }
+}
+
+// ลบ PDF template ที่อัปโหลดไว้ (กลับไปใช้ไฟล์เริ่มต้นของระบบโดยอัตโนมัติ)
+export async function deleteTaxFormTemplateAction(id: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { error } = await supabaseAdmin.from("tax_form_templates").delete().eq("id", id)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบ PDF template" }
+  }
+}
+
+// ตั้งค่าปีภาษีที่ให้พิมพ์ลงบนแบบฟอร์ม ภ.ง.ด. 90 (ใช้ข้ามทุกปีที่ Admin ดูรายงานภาษี จนกว่า Super Admin จะเปลี่ยนอีกครั้ง)
+export async function updatePnd90TaxYearAction(taxYear: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    if (!taxYear.trim()) {
+      return { success: false, error: "กรุณาระบุปีภาษี" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data: existing, error: findError } = await supabaseAdmin
+      .from("tax_form_templates")
+      .select("id")
+      .eq("form_type", "90")
+      .maybeSingle()
+    if (findError) throw findError
+
+    if (!existing) {
+      return { success: false, error: "กรุณาอัปโหลดไฟล์ PDF template ของ ภ.ง.ด. 90 ก่อน จึงจะกำหนดปีภาษีได้" }
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("tax_form_templates")
+      .update({ tax_year: taxYear.trim() })
+      .eq("id", existing.id)
+    if (updateError) throw updateError
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกปีภาษี" }
+  }
+}
