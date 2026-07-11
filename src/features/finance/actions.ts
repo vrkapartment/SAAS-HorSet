@@ -335,7 +335,17 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
       return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
     }
 
-    const { data: updatedRows, error: updateError } = await supabase
+    // สิทธิ์ถูกตรวจสอบด้วยโค้ดข้างบนแล้ว (isAdmin + isSameWorkspace) จึงเขียนข้อมูลด้วย Service Role Client แทน
+    // client ปกติที่ผูกกับ RLS โดยตรง — เพราะ RLS policy เดิมของตาราง workspaces เช็คแค่ profiles.workspace_id
+    // ตรงกับ id แถวเป๊ะๆ ซึ่งสำหรับ super_admin ที่ profiles.workspace_id เป็น NULL แล้ว จะไม่ match แถวไหนเลย
+    // ทำให้ UPDATE จับคู่ได้ 0 แถวแบบเงียบๆ (ไม่ error) เหมือนบันทึกสำเร็จทั้งที่ไม่มีอะไรถูกเขียนจริง
+    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const dbClient = (serviceUrl && serviceKey && !serviceKey.includes("placeholder"))
+      ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : supabase
+
+    const { data: updatedRows, error: updateError } = await dbClient
       .from("workspaces")
       .update({
         tax_firstname: settings.tax_firstname.trim(),
@@ -390,7 +400,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
 
       if (isMissingColumn) {
         // หากคอลัมน์ deposit_type หรือ deposit_amount หรือ checkout_policy ยังไม่มี ให้บันทึกแบบจำกัดเท่าที่มี
-        const { error: lpMissingError } = await supabase
+        const { error: lpMissingError } = await dbClient
           .from("workspaces")
           .update({
             tax_firstname: settings.tax_firstname.trim(),
@@ -419,7 +429,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
 
         if (lpMissingError) {
           // หากไม่มีคอลัมน์อื่นๆ อีก ให้ลดรูปบันทึกส่วนข้อมูลหลักที่รับประกันว่ามีแน่นอน
-          const { error: coreUpdateError } = await supabase
+          const { error: coreUpdateError } = await dbClient
             .from("workspaces")
             .update({
               tax_firstname: settings.tax_firstname.trim(),
@@ -597,18 +607,30 @@ export async function savePropertyLogoUrl(workspaceId: string, logoUrl: string) 
       return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
     }
 
+    // สิทธิ์ตรวจสอบด้วยโค้ดข้างบนแล้ว เขียนด้วย Service Role Client แทน (ดูเหตุผลเดียวกับ saveFinanceSettings)
+    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const dbClient = (serviceUrl && serviceKey && !serviceKey.includes("placeholder"))
+      ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : supabase
+
     // 2. อัปเดตคอลัมน์ logo_url
-    const { error: updateError } = await supabase
+    const { data: updatedRows, error: updateError } = await dbClient
       .from("workspaces")
       .update({ logo_url: logoUrl })
       .eq("id", workspaceId)
+      .select("id")
+
+    if (!updateError && (!updatedRows || updatedRows.length === 0)) {
+      return { success: false, error: "ไม่สามารถบันทึกโลโก้ได้ (ไม่พบสิทธิ์เข้าถึง workspace นี้) กรุณาติดต่อผู้ดูแลระบบ" }
+    }
 
     if (updateError) {
       // ตรวจสอบว่าเกิดจากไม่มีคอลัมน์ logo_url หรือไม่
       if (updateError.code === "42703" || updateError.message.includes("logo_url")) {
-        return { 
-          success: false, 
-          error: "ตารางฐานข้อมูลไม่มีคอลัมน์ logo_url กรุณาติดต่อผู้พัฒนา หรือติดตั้ง SQL Patch (database_patch_workspace_logo.sql) ในระบบหลังบ้าน" 
+        return {
+          success: false,
+          error: "ตารางฐานข้อมูลไม่มีคอลัมน์ logo_url กรุณาติดต่อผู้พัฒนา หรือติดตั้ง SQL Patch (database_patch_workspace_logo.sql) ในระบบหลังบ้าน"
         }
       }
       throw updateError
