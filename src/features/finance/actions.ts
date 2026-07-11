@@ -335,7 +335,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
       return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
     }
 
-    const { error: updateError } = await supabase
+    const { data: updatedRows, error: updateError } = await supabase
       .from("workspaces")
       .update({
         tax_firstname: settings.tax_firstname.trim(),
@@ -372,6 +372,16 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         tax_address_yaek: (settings.tax_address_yaek || "").trim()
       })
       .eq("id", workspaceId)
+      .select("id")
+
+    // Supabase/Postgres ไม่ throw error เมื่อ UPDATE จับคู่ได้ 0 แถว (เช่น ถูก RLS policy กรองทิ้งแบบเงียบๆ)
+    // ต้องเช็คว่ามีแถวที่อัปเดตจริงกลับมาไหม ไม่งั้นจะรายงาน success ทั้งที่ไม่ได้บันทึกอะไรเลย
+    if (!updateError && (!updatedRows || updatedRows.length === 0)) {
+      return {
+        success: false,
+        error: "ไม่สามารถบันทึกข้อมูลได้ (ไม่พบสิทธิ์เข้าถึง workspace นี้ หรือถูกนโยบายความปลอดภัยของฐานข้อมูลปฏิเสธ) กรุณาติดต่อผู้ดูแลระบบ"
+      }
+    }
 
     if (updateError) {
       const isMissingColumn = 
