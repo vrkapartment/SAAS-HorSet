@@ -452,20 +452,13 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         return {
           success: true,
           fallback: true,
-          message: "บันทึกข้อมูลเรียบร้อยแล้ว! (มีบางคอลัมน์เพิ่มเติม เช่น เงินประกัน/ค่าเช่าล่วงหน้า ยังไม่ได้ติดตั้งลงในฐานข้อมูลระบบคลาวด์ของคุณ)",
-          // TODO(debug-temp): ไล่บั๊กช่องที่อยู่ไม่บันทึก จะเอาออกทันทีที่หาสาเหตุเจอ
-          debug: { originalUpdateError: updateError }
+          message: "บันทึกข้อมูลเรียบร้อยแล้ว! (มีบางคอลัมน์เพิ่มเติม เช่น เงินประกัน/ค่าเช่าล่วงหน้า ยังไม่ได้ติดตั้งลงในฐานข้อมูลระบบคลาวด์ของคุณ)"
         }
       }
       throw updateError
     }
 
-    // TODO(debug-temp): ข้อมูล debug ชั่วคราวเพื่อไล่บั๊กช่องที่อยู่ที่ไม่บันทึก จะเอาออกทันทีที่หาสาเหตุเจอ
-    return {
-      success: true,
-      message: "บันทึกข้อมูลเข้าฐานข้อมูลเรียบร้อยแล้ว!",
-      debug: { sentSoi: settings.tax_address_soi, usedServiceRole: dbClient !== supabase, updatedRows }
-    }
+    return { success: true, message: "บันทึกข้อมูลเข้าฐานข้อมูลเรียบร้อยแล้ว!" }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูลการเงิน"
     return { success: false, error: errorMessage }
