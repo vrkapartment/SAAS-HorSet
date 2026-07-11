@@ -90,7 +90,13 @@ export function useSupportAccess(
     checkStatus()
 
     // Fallback poll เผื่อ Realtime channel ด้านล่างหลุดการเชื่อมต่อ (การอัปเดตหลักทำผ่าน Realtime ซึ่งไวกว่า)
-    const interval = setInterval(checkStatus, 15000)
+    // ทำงานเฉพาะตอนที่ยังไม่ยืนยันว่า Realtime เชื่อมต่อสำเร็จเท่านั้น ไม่ใช่ยิงควบคู่กันตลอดเวลา
+    const isRealtimeConnectedRef = { current: false }
+    const interval = setInterval(() => {
+      if (!isRealtimeConnectedRef.current) {
+        checkStatus()
+      }
+    }, 15000)
 
     let channel: RealtimeChannel | null = null
     if (!isDemo) {
@@ -109,7 +115,9 @@ export function useSupportAccess(
             checkStatus()
           }
         )
-        .subscribe()
+        .subscribe((status) => {
+          isRealtimeConnectedRef.current = status === "SUBSCRIBED"
+        })
     }
 
     return () => {

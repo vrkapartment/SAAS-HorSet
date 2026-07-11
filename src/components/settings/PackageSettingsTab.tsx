@@ -332,12 +332,14 @@ export default function PackageSettingsTab() {
         </div>
       )}
 
-      <PricingModal
-        isOpen={showPricingModal}
-        workspaceId={workspaceId}
-        onClose={() => setShowPricingModal(false)}
-        onSuccess={refetch}
-      />
+      {showPricingModal && (
+        <PricingModal
+          isOpen={showPricingModal}
+          workspaceId={workspaceId}
+          onClose={() => setShowPricingModal(false)}
+          onSuccess={refetch}
+        />
+      )}
     </div>
   )
 }
