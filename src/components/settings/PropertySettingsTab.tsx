@@ -9,14 +9,6 @@ import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRoomTypes, updateRoomTypeDeposit, migrateRoomTypeDeposits } from "@/features/room/actions"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 
-function setCookie(name: string, value: string, days = 7) {
-  if (typeof document === "undefined") return
-  const date = new Date()
-  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
-  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:"
-  document.cookie = `${name}=${value}; path=/; expires=${date.toUTCString()}${isSecure ? "; Secure" : ""}; SameSite=Lax`
-}
-
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
   const value = `; ${document.cookie}`
@@ -110,20 +102,9 @@ export default function PropertySettingsTab() {
           }
         }
 
-        const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
-        if (!isDemo && (!currentWsId || currentWsId === "d290f1ee-6c54-4b01-90e6-d701748f0851")) {
-          try {
-            const supabase = createClient()
-            const { data: wsData } = await supabase.from("workspaces").select("id").limit(1)
-            if (wsData && wsData.length > 0) {
-              const fallbackId = wsData[0].id
-              currentWsId = fallbackId
-              setCookie("horset_current_workspace_id", fallbackId)
-            }
-          } catch (wsErr) {
-            console.error("Failed to fallback real workspace ID in property settings:", wsErr)
-          }
-        }
+        // หมายเหตุ: ห้ามเดา workspace อื่นมาใช้แทนเด็ดขาดถ้าหา currentWsId ของผู้ใช้เองไม่เจอ — เดิมโค้ดตรงนี้เคย
+        // query workspace แรกที่เจอมาใช้แทนแล้ว cache ไว้ใน cookie ทำให้เห็นข้อมูลตั้งค่าหอพักจริงของ workspace อื่น
+        // โดยไม่ได้ตั้งใจ ตอนนี้ถ้าหาไม่เจอจะแสดง error ให้เลือก workspace ก่อนแทน
 
         if (currentWsId) {
           setWorkspaceId(currentWsId)

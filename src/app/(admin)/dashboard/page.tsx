@@ -459,24 +459,10 @@ function AdminDashboardContent() {
             }
           }
 
-          // Fallback: หากท้ายที่สุดยังไม่มีค่าคุกกี้จริง ๆ ให้สืบค้น Workspace ID ตัวแรกที่ระบบตรวจเจอจาก Supabase เสมอ
-          if (!wsId) {
-            try {
-              const supabase = createClient()
-              const { data: workspaces, error: wsError } = await supabase
-                .from("workspaces")
-                .select("id")
-                .limit(1)
-              if (!wsError && workspaces && workspaces.length > 0) {
-                wsId = workspaces[0].id
-                if (typeof window !== "undefined") {
-                  setCookie("horset_current_workspace_id", wsId)
-                }
-              }
-            } catch (err) {
-              console.error("Failed to query fallback workspace in loadDashboardData:", err)
-            }
-          }
+          // หมายเหตุ: ห้ามเดา workspace อื่นมาใช้แทนเด็ดขาดถ้าหา wsId ของผู้ใช้เองไม่เจอ (เช่น super_admin ที่ยังไม่เคย
+          // เลือก workspace ผ่านเมนูสลับ workspace) — เดิมโค้ดตรงนี้เคย query workspace แรกที่เจอมาใช้แทนแล้ว cache
+          // ไว้ใน cookie ทำให้เห็นข้อมูล dashboard จริงของ workspace อื่นโดยไม่ได้ตั้งใจ ถ้าหาไม่เจอจริงๆ ให้ wsId
+          // ว่างไว้ ปล่อยให้ query ด้านล่างคืนค่าว่างแทนการเดา
         }
 
         // เช็คอีกครั้งว่าระหว่างทางมีการเริ่ม Fetch รอบใหม่หรือไม่

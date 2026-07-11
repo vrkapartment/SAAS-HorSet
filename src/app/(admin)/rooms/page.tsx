@@ -343,7 +343,7 @@ function RoomsContent() {
 
     setUploadingCsv(true)
     setMappingError(null)
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const wsId = getCookie("horset_current_workspace_id") || ""
 
     try {
       const reader = new FileReader()
@@ -492,7 +492,7 @@ function RoomsContent() {
       return
     }
 
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const wsId = getCookie("horset_current_workspace_id") || ""
 
     // รวมทั้งชุดข้อมูลที่ดีอยู่แล้ว และชุดข้อมูลที่ได้รับการแก้ไขแมปเสร็จสิ้นจากในโมดอลป๊อปอัป
     const allRooms = [...autoMappedRooms, ...csvRooms]
@@ -531,7 +531,7 @@ function RoomsContent() {
     setLoading(true)
     setError(null)
     try {
-      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      const wsId = getCookie("horset_current_workspace_id") || ""
       
       // ดึงข้อมูล LIFF ID ไดนามิกของ Workspace นี้
       fetch(`/api/workspace-liff?workspace_id=${wsId}`)
@@ -678,7 +678,7 @@ function RoomsContent() {
 
   // ซิงค์ค่ามัดจำ/เงินประกันแยกตามประเภทห้องจาก Database และย้ายข้อมูลหากยังมีใน Local Storage
   useEffect(() => {
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const wsId = getCookie("horset_current_workspace_id") || ""
     let localRtDeposits: { [key: string]: number } = {}
     let hasLocalSaved = false
     if (typeof window !== "undefined") {
@@ -793,7 +793,7 @@ function RoomsContent() {
       setTypeSubmitting(true)
       const res = await deleteRoomType(deleteTarget.id)
       if (res.success) {
-        const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+        const wsId = getCookie("horset_current_workspace_id") || ""
         clearWorkspaceCache(wsId)
         showToast("✓ ลบประเภทห้องพักสำเร็จแล้ว", "success")
         const typesRes = await getRoomTypes(wsId)
@@ -875,7 +875,7 @@ function RoomsContent() {
     if (!newTypeName) return
     setTypeSubmitting(true)
 
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const wsId = getCookie("horset_current_workspace_id") || ""
 
     if (editingType) {
       const res = await updateRoomType(editingType.id, newTypeName, Number(newTypeRent))
@@ -1010,7 +1010,7 @@ function RoomsContent() {
   }
 
   const getLiffRegistrationLink = (roomId: string) => {
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const wsId = getCookie("horset_current_workspace_id") || ""
     const packed = packWorkspaceAndRoom(wsId, roomId)
     if (packed) {
       return `https://liff.line.me/${workspaceLiffId}?p=${packed}`
@@ -1380,7 +1380,7 @@ function RoomsContent() {
     setRefundError(null)
     
     try {
-      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      const wsId = getCookie("horset_current_workspace_id") || ""
       
       if (!isHistoricalEdit) {
         const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
@@ -1535,7 +1535,7 @@ function RoomsContent() {
       return
     }
     if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการยกเลิกสัญญานี้? สำหรับยอดภาษีจะคำนวณใหม่โดยอัตโนมัติ")) return
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const wsId = getCookie("horset_current_workspace_id") || ""
     const res = await deleteCancelledContract(id)
     if (res.success || res.error === "table_not_found") {
       const updated = cancelledContracts.filter(c => c.id !== id)

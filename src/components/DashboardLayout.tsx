@@ -184,7 +184,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const [userRole, setUserRole] = useState<"admin" | "staff" | "super_admin">(role)
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace>({
-    id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+    id: "",
     name: ""
   })
   const [workspaceLoading, setWorkspaceLoading] = useState(true)
@@ -454,7 +454,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   // โหลดสิทธิ์, ข้อมูลผู้ใช้, รายการ Workspace และสิทธิ์การช่วยเหลือระบบทั้งหมดในรอบเดียวเพื่อความเสถียรและเร็วสูงสุด
   useEffect(() => {
     const initUserData = async () => {
-      let activeWsId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      let activeWsId = ""
       let currentRole: "admin" | "staff" | "super_admin" = role
       try {
         // 1. ตรวจสอบบทบาทเบื้องต้นจาก cookie ก่อนเพื่อให้ปรับ state ได้อย่างรวดเร็ว
@@ -532,16 +532,15 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         }
 
         // 2. จัดการเรื่องคุกกี้ Workspace
+        // สำคัญ: ถ้าเป็น super_admin (หรือหา workspace_id ของตัวเองไม่เจอ) และยังไม่เคยเลือก workspace ผ่าน
+        // dropdown สลับ workspace มาก่อนเลย (ไม่มีคุกกี้) ห้ามเดา/ผูกกับ workspace ใดๆ ไว้ก่อนโดยเด็ดขาด
+        // เพราะจะเห็นข้อมูลจริง (การเงิน/LINE OA/SlipOK) ของ workspace อื่นที่ไม่ใช่ของตัวเองทันที
         if (currentRole !== "super_admin" && profileWsId) {
           activeWsId = profileWsId
           setCookie("horset_current_workspace_id", activeWsId)
         } else {
           const savedWsId = getCookie("horset_current_workspace_id")
-          if (savedWsId) {
-            activeWsId = savedWsId
-          } else {
-            setCookie("horset_current_workspace_id", activeWsId)
-          }
+          activeWsId = savedWsId || ""
         }
 
         // 3. โหลด Workspaces และ Support Access Status
@@ -555,13 +554,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             
             if (wsData && wsData.length > 0) {
               setWorkspaces(wsData)
-              const matched = wsData.find((w) => w.id === activeWsId)
-              if (matched) {
-                setCurrentWorkspace(matched)
-              } else {
-                setCurrentWorkspace(wsData[0])
-                activeWsId = wsData[0].id
-                setCookie("horset_current_workspace_id", activeWsId)
+              // ห้ามเดา workspace แรกที่เจอมาแทนเด็ดขาดถ้า activeWsId ไม่ตรงกับที่มีจริง (เช่น cookie เก่า/ไม่ถูกต้อง
+              // หรือ super_admin ที่ยังไม่เคยเลือก workspace เลย) ไม่งั้นจะเห็นข้อมูลจริงของ workspace อื่นทันที —
+              // ปล่อย currentWorkspace ว่างไว้ ให้ผู้ใช้เลือกจาก dropdown สลับ workspace เองแทน
+              if (activeWsId) {
+                const matched = wsData.find((w) => w.id === activeWsId)
+                if (matched) {
+                  setCurrentWorkspace(matched)
+                }
               }
             }
 

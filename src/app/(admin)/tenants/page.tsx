@@ -144,7 +144,7 @@ export default function TenantsPage() {
   const handleDownloadTemplate = async () => {
     try {
       showToast("⏳ กำลังจัดเตรียมข้อมูลเทมเพลต...", "info")
-      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      const wsId = getCookie("horset_current_workspace_id") || ""
       const roomsRes = await getRooms(wsId)
       let sortedRooms: any[] = []
       
@@ -207,7 +207,7 @@ export default function TenantsPage() {
 
     setUploadingCsv(true)
     setCsvErrors(null)
-    const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const wsId = getCookie("horset_current_workspace_id") || ""
 
     try {
       const reader = new FileReader()
@@ -386,7 +386,7 @@ export default function TenantsPage() {
     setError(null)
     setTableNotFound(false)
     try {
-      const wsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+      const wsId = getCookie("horset_current_workspace_id") || ""
       const [currentRes, oldRes, financeRes, roomsRes] = await Promise.all([
         getTenants(),
         getOldTenants(),

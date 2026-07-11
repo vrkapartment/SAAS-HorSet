@@ -158,8 +158,15 @@ export default function LineSettingsTab() {
           const res = await getCurrentUserProfileClient()
           if (res.success && res.data) {
             setCurrentUser(res.data)
-            wsId = res.data.workspace_id || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+            // ห้ามใช้ workspace ตัวอย่าง (demo seed) เป็นค่า fallback ตอนใช้งานจริงเด็ดขาด — จะไปโหลดข้อมูล LINE OA
+            // จริงของ workspace อื่นมาแสดงผิดๆ ถ้าหา workspace_id ของผู้ใช้เองไม่เจอ ให้ถือว่ายังไม่พร้อมแทน
+            wsId = res.data.workspace_id || ""
             setWorkspaceId(wsId)
+            if (!wsId) {
+              setSettingsError("ไม่สามารถระบุหอพัก (workspace) ของท่านได้ กรุณาเลือกหอพักจากเมนูด้านบนก่อน")
+              setProfileLoading(false)
+              return
+            }
           } else {
             setSettingsError("ไม่สามารถระบุตัวตนของผู้ใช้ได้ กรุณาล็อกอินใหม่อีกครั้ง")
             setProfileLoading(false)
@@ -442,7 +449,7 @@ export default function LineSettingsTab() {
         return
       }
 
-      const res = await getLineProfilesAction(trimmedUid, workspaceId || "d290f1ee-6c54-4b01-90e6-d701748f0851")
+      const res = await getLineProfilesAction(trimmedUid, workspaceId || "")
       if (res.success && res.data && res.data.length > 0) {
         const profile = res.data[0]
         setModalProfilePreview(profile)

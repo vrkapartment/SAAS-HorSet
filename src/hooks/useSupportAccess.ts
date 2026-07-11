@@ -33,7 +33,7 @@ export function useSupportAccess(
 
   const [supportStatus, setSupportStatus] = useState<string>(() => {
     if (typeof window === "undefined") return "none"
-    const savedWsId = getCookie("horset_current_workspace_id") || "d290f1ee-6c54-4b01-90e6-d701748f0851"
+    const savedWsId = getCookie("horset_current_workspace_id") || ""
     const savedStatus = getCookie(`horset_support_status_${savedWsId}`)
     return savedStatus || "none"
   })
