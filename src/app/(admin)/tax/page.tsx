@@ -796,6 +796,17 @@ export default function TaxPage() {
     setLoadingPdf(type)
     try {
       const { generatePndPdf } = await import("@/lib/pdfHelper")
+
+      // เช็คว่า Super Admin อัปโหลด PDF template เองไว้หรือไม่ ถ้ามีให้ใช้ไฟล์นั้นแทนไฟล์เริ่มต้นของระบบ
+      const { getActiveTaxFormTemplateAction } = await import("@/features/tax/actions")
+      const templateRes = await getActiveTaxFormTemplateAction(type, taxYear)
+      const customTemplateUrl = templateRes.success ? templateRes.data?.file_url : undefined
+
+      // ภ.ง.ด. 90 ใช้ template เดียวข้ามทุกปี: ถ้า Super Admin ตั้งปีภาษีที่จะพิมพ์ลงฟอร์มไว้ ให้ใช้ปีนั้นแทนปีที่ Admin เลือกดูรายงานอยู่
+      const printedTaxYear = (type === "90" && templateRes.success && templateRes.data?.tax_year)
+        ? templateRes.data.tax_year
+        : taxYear
+
       const blob = await generatePndPdf(type, {
         firstName,
         lastName,
@@ -807,9 +818,9 @@ export default function TaxPage() {
         utilities408: type === "90" ? (utilities408Full + other408Full) : (utilities408Half + other408Half) * 2,
         deductionUtilities408: type === "90" ? deductionUtilities408Full : deductionUtilities408Half,
         netIncome: type === "90" ? netIncomeFull : netIncomeHalf,
-        taxYear,
-      })
-      
+        taxYear: printedTaxYear,
+      }, customTemplateUrl)
+
       const link = document.createElement("a")
       link.href = URL.createObjectURL(blob)
       link.download = `pnd${type}_${taxYear}.pdf`
