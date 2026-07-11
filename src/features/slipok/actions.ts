@@ -207,7 +207,7 @@ export interface SlipOkQuota {
   specialEndDate: string | null
 }
 
-async function fetchQuotaFromSlipOk(branchId: string, apiKey: string) {
+export async function fetchQuotaFromSlipOk(branchId: string, apiKey: string) {
   const response = await fetch(`https://api.slipok.com/api/line/apikey/${branchId}/quota`, {
     method: "GET",
     headers: { "x-authorization": apiKey },

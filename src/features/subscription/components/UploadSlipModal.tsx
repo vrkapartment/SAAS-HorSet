@@ -58,6 +58,10 @@ export default function UploadSlipModal({
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState<SubmitResult | null>(null)
 
+  // QR ที่วาดรวมโลโก้ HorSet ไว้ตรงกลางแล้ว (ผ่าน canvas) — ใช้ pattern เดียวกับ QR พร้อมเพย์ของหอพักในหน้า Tenant Portal
+  const [combinedQrUrl, setCombinedQrUrl] = useState<string>("")
+  const [isQrLoading, setIsQrLoading] = useState(false)
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -95,19 +99,96 @@ export default function UploadSlipModal({
     }
   }, [isOpen])
 
-  if (!isOpen || !plan) return null
+  const amount = plan ? (billingCycle === "yearly" ? plan.priceYearly ?? plan.priceMonthly * 12 : plan.priceMonthly) : 0
+  const qrPayload = paymentInfo?.promptpayId ? generatePromptPayPayload(paymentInfo.promptpayId, amount) : null
+  const qrImageUrl = qrPayload
+    ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrPayload)}&size=500x500&ecc=H`
+    : null
 
-  const amount = billingCycle === "yearly" ? plan.priceYearly ?? plan.priceMonthly * 12 : plan.priceMonthly
+  // วาด QR + โลโก้ HorSet ตรงกลางลงบน canvas (pattern เดียวกับ QR พร้อมเพย์ของหอพักในหน้า Tenant Portal)
+  // เพื่อกันปัญหา QR เดิมที่ครอปมุมด้วย CSS rounded ตรงๆ จนดูล้นกรอบ/ไม่สวยงาม
+  useEffect(() => {
+    if (!isOpen || !qrImageUrl) {
+      setCombinedQrUrl("")
+      return
+    }
+
+    setIsQrLoading(true)
+
+    const qrImg = new Image()
+    qrImg.crossOrigin = "anonymous"
+    qrImg.src = qrImageUrl
+
+    qrImg.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 500
+      canvas.height = 500
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        setCombinedQrUrl(qrImageUrl)
+        setIsQrLoading(false)
+        return
+      }
+
+      ctx.drawImage(qrImg, 0, 0, 500, 500)
+
+      const logoImg = new Image()
+      logoImg.src = "/horset_icon.png"
+
+      logoImg.onload = () => {
+        try {
+          const bgSize = 86
+          const logoSize = 64
+          const radius = 12
+          const x = 250 - bgSize / 2
+          const y = 250 - bgSize / 2
+
+          ctx.fillStyle = "#ffffff"
+          ctx.beginPath()
+          ctx.moveTo(x + radius, y)
+          ctx.arcTo(x + bgSize, y, x + bgSize, y + bgSize, radius)
+          ctx.arcTo(x + bgSize, y + bgSize, x, y + bgSize, radius)
+          ctx.arcTo(x, y + bgSize, x, y, radius)
+          ctx.arcTo(x, y, x + bgSize, y, radius)
+          ctx.closePath()
+          ctx.fill()
+
+          const lx = 250 - logoSize / 2
+          const ly = 250 - logoSize / 2
+          ctx.drawImage(logoImg, lx, ly, logoSize, logoSize)
+
+          setCombinedQrUrl(canvas.toDataURL("image/png"))
+        } catch (err) {
+          console.error("Error drawing HorSet logo on QR canvas:", err)
+          setCombinedQrUrl(canvas.toDataURL("image/png"))
+        } finally {
+          setIsQrLoading(false)
+        }
+      }
+
+      logoImg.onerror = () => {
+        try {
+          setCombinedQrUrl(canvas.toDataURL("image/png"))
+        } catch {
+          setCombinedQrUrl(qrImageUrl)
+        }
+        setIsQrLoading(false)
+      }
+    }
+
+    qrImg.onerror = () => {
+      setCombinedQrUrl(qrImageUrl)
+      setIsQrLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, qrImageUrl])
+
+  if (!isOpen || !plan) return null
 
   const isTrial = subscription?.status === "trial"
   const trialDaysRemaining = isTrial ? getDaysRemaining(subscription?.trialEndsAt ?? null, nowMs) : null
   const showBonus = isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0
   const cycleLabel = billingCycle === "yearly" ? "1 ปี" : "1 เดือน"
-
-  const qrPayload = paymentInfo?.promptpayId ? generatePromptPayPayload(paymentInfo.promptpayId, amount) : null
-  const qrImageUrl = qrPayload
-    ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrPayload)}&size=300x300&ecc=H`
-    : null
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -250,10 +331,23 @@ export default function UploadSlipModal({
             <div className="space-y-2 mb-4">
               <h4 className="text-[11px] font-black text-slate-500 dark:text-slate-400">QR PromptPay</h4>
               <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 flex flex-col items-center gap-2">
-                {qrImageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qrImageUrl} alt="พร้อมเพย์ QR ของ HorSet" className="w-48 h-48 sm:w-56 sm:h-56 rounded-xl" />
-                )}
+                <div className="w-48 h-48 sm:w-56 sm:h-56 bg-white p-2 rounded-lg flex items-center justify-center shrink-0">
+                  {isQrLoading ? (
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                      <span className="text-[9px] text-slate-400 font-medium">กำลังโหลด...</span>
+                    </div>
+                  ) : (
+                    (combinedQrUrl || qrImageUrl) && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={combinedQrUrl || qrImageUrl || ""}
+                        alt="พร้อมเพย์ QR ของ HorSet"
+                        className="w-full h-full object-contain"
+                      />
+                    )
+                  )}
+                </div>
                 <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 text-center">
                   สแกนแล้วยอดขึ้นอัตโนมัติ ฿{amount.toLocaleString("th-TH")}
                 </p>

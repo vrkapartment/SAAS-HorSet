@@ -448,3 +448,41 @@ export async function updateSystemSettingAction(key: string, value: string) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to update setting" }
   }
 }
+
+// ดึงโควต้า SlipOK คงเหลือของบัญชี HorSet เอง (ใช้รับชำระค่า subscription จากเจ้าของหอพัก ไม่เกี่ยวกับ SlipOK ของแต่ละ workspace)
+export async function getHorsetSlipOkQuotaAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) {
+      return { success: true, data: { quota: 87, overQuota: 0, specialQuota: 0, endDate: "2026-12-31", specialEndDate: null } }
+    }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data, error } = await supabaseAdmin
+      .from("system_settings")
+      .select("key, value")
+      .in("key", ["HORSET_SLIPOK_BRANCH_ID", "HORSET_SLIPOK_API_KEY"])
+    if (error) throw error
+
+    const branchId = data?.find((d) => d.key === "HORSET_SLIPOK_BRANCH_ID")?.value
+    const encryptedApiKey = data?.find((d) => d.key === "HORSET_SLIPOK_API_KEY")?.value
+
+    if (!branchId || !encryptedApiKey) {
+      return { success: false, error: "ยังไม่ได้ตั้งค่า Branch ID/API Key ของ SlipOK สำหรับ HorSet กรุณาตั้งค่าก่อน" }
+    }
+
+    const apiKey = decryptText(encryptedApiKey)
+    const { fetchQuotaFromSlipOk } = await import("@/features/slipok/actions")
+    return await fetchQuotaFromSlipOk(branchId, apiKey)
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบโควต้า SlipOK ของ HorSet" }
+  }
+}
