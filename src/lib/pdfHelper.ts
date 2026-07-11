@@ -1,5 +1,6 @@
 import { PDFDocument, rgb } from "pdf-lib"
 import fontkit from "@pdf-lib/fontkit"
+import { calculateProgressiveTax, calculateMinimumTax, calculateFinalTaxDue, calculatePersonalDeduction } from "./thaiTax"
 
 // ฟังก์ชันช่วยเขียนข้อความภาษาไทยที่จัดสระและวรรณยุกต์ไม่ให้เยื้องหรือเว้นช่องว่าง (Thai Text Shaping Helper)
 export function drawThaiText(
@@ -90,13 +91,33 @@ export interface PndData {
   deductionUtilities408: number
   netIncome: number
   taxYear: string
+  // เฉพาะ ภ.ง.ด. 94: รายได้อื่น (ปรับ/ริบมัดจำ) แยกจาก utilities408, ที่อยู่แยกช่อง, และสถานภาพผู้เสียภาษี (กำหนดค่าลดหย่อนส่วนตัว)
+  other408?: number
+  deductionOther408?: number
+  addressParts?: {
+    no: string
+    road: string
+    subdistrict: string
+    district: string
+    province: string
+    zipcode: string
+  }
+  taxpayerStatus?: "individual" | "partnership"
+  partnerCount?: number
 }
 
 // ชื่อฟิลด์ PDF AcroForm ที่ generatePndPdf() ต้องใช้กรอกข้อมูลจริง (ดูจุด setField() ด้านล่าง)
 // ใช้เป็น single source of truth ทั้งตอน fill ข้อมูลจริง และตอน Super Admin ตรวจสอบไฟล์ template ที่อัปโหลดใหม่
 export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
   "90": ["Text11111", "Text80.0", "Text7.0", "Text7.3", "Text9", "Text34.0", "Text34.1", "Text34.2", "Text33.9", "Text70", "Text40.0", "Text40.1", "Text40.2"],
-  "94": ["Text1.1", "Text1.5", "Text1.28", "Text1.6", "Text1.31", "Text3.10", "Text4.10.1", "Text4.15", "Text4.18", "Text4.20", "Text3.40", "Text3.41", "Text3.42", "Text5.19", "Text5.18"],
+  "94": [
+    "Text1.1", "Text1.5", "Text1.7", "Text1.13", "Text1.16", "Text1.17", "Text1.18", "Text1.19", "Text1.20",
+    "Text3.10", "Text3.11", "Text3.12", "Text3.15", "Text3.16", "Text3.17",
+    "Text3.20", "Text3.21", "Text3.22", "Text3.25", "Text3.26", "Text3.27",
+    "Text3.30", "Text3.31", "Text3.32", "Text3.35", "Text3.36", "Text3.37",
+    "Text4.10.1",
+    "Text2.1", "Text2.2", "Text2.3", "Text2.5", "Text2.7", "Text2.8", "Text2.9", "Text2.10", "Text2.12", "Text2.15", "Text2.17", "Text2.19",
+  ],
 }
 
 export async function generatePndPdf(type: "90" | "94", data: PndData, templateUrl?: string) {
@@ -186,34 +207,120 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     )
   } else {
     // ภ.ง.ด. 94 (ครึ่งปี)
+    // หมายเหตุ field mapping ของฟอร์มนี้ตรวจสอบจากตำแหน่ง x/y จริงของทุก field แล้ว (ไม่ได้เดา) — ดูรายละเอียดใน
+    // plan การแก้ไข: Text1.28/Text1.6/Text1.31 ของเดิมผิด (เป็นช่องคู่สมรส/ชื่อกลาง/ไม่มีอยู่จริงตามลำดับ)
+    // และ Text4.10.1/4.15/4.18/4.20 ของเดิมเป็นช่องในตาราง "ข. รายการลดหย่อนฯ" ไม่ใช่รายได้ 40(5)-(8) เลย
+    const fmt = (n: number) => (Number.isFinite(n) ? n : 0).toFixed(2)
+    const selectRadio = (name: string, option: string) => {
+      try {
+        form.getRadioGroup(name).select(option)
+      } catch (e) {
+        console.warn(`ไม่สามารถเลือก radio ${name}:`, e)
+      }
+    }
+
+    const addressParts = data.addressParts || { no: "", road: "", subdistrict: "", district: "", province: "", zipcode: "" }
+    const taxpayerStatus = data.taxpayerStatus || "individual"
+    const partnerCount = data.partnerCount || 1
+
     // ข้อมูลส่วนตัวหน้าแรก
     setField("Text1.1", cleanTaxId)
     setField("Text1.5", data.firstName)
-    setField("Text1.28", data.lastName)
-    setField("Text1.6", data.address)
-    setField("Text1.31", data.phone)
+    setField("Text1.7", data.lastName)
+    setField("Text1.13", addressParts.no)
+    setField("Text1.16", addressParts.road)
+    setField("Text1.17", addressParts.subdistrict)
+    setField("Text1.18", addressParts.district)
+    setField("Text1.19", addressParts.province)
+    setField("Text1.20", addressParts.zipcode)
 
-    // ใบแนบ มาตรา 40(5) (ค่าเช่าครึ่งปี) - หน้า 2
-    const rentHalf = data.rent405 / 2
-    const rentNetHalf = rentHalf - data.deductionRent405
+    // ก.1 รายได้ค่าเช่าห้องพัก (มาตรา 40(5))
+    const rentGrossHalf = data.rent405 / 2
+    const rentDeductionHalf = data.deductionRent405
+    const rentNetHalf = Math.max(0, rentGrossHalf - rentDeductionHalf)
+    const rentDeductionPct = rentGrossHalf > 0 ? Math.round((rentDeductionHalf / rentGrossHalf) * 100) : 0
     setField("Text3.10", cleanTaxId)
-    setField("Text4.10.1", Math.round(rentHalf).toString())
-    setField("Text4.15", Math.round(rentHalf).toString())
-    setField("Text4.18", Math.round(data.deductionRent405).toString())
-    setField("Text4.20", Math.round(rentNetHalf).toString())
+    setField("Text3.11", "รายได้ค่าเช่าห้องพัก")
+    setField("Text3.12", fmt(rentGrossHalf))
+    setField("Text3.15", rentDeductionPct.toString())
+    selectRadio("Radio Button6", "Yes")
+    setField("Text3.16", fmt(rentDeductionHalf))
+    setField("Text3.17", fmt(rentNetHalf))
 
-    // ใบแนบ มาตรา 40(8) (น้ำไฟ/บริการครึ่งปี) - หน้า 2
-    const utilitiesHalf = data.utilities408 / 2
-    const utilitiesNetHalf = utilitiesHalf - data.deductionUtilities408
-    setField("Text3.40", cleanTaxId)
-    setField("Text3.41", "ค่าสาธารณูปโภคและบริการ")
-    setField("Text3.42", Math.round(utilitiesHalf).toString())
-    setField("Text5.19", Math.round(data.deductionUtilities408).toString())
-    setField("Text5.18", Math.round(utilitiesNetHalf).toString())
+    // ก.2 ค่าน้ำไฟและบริการ (มาตรา 40(8))
+    const utilGrossHalf = data.utilities408 / 2
+    const utilDeductionHalf = data.deductionUtilities408
+    const utilNetHalf = Math.max(0, utilGrossHalf - utilDeductionHalf)
+    const utilDeductionPct = utilGrossHalf > 0 ? Math.round((utilDeductionHalf / utilGrossHalf) * 100) : 0
+    setField("Text3.20", cleanTaxId)
+    setField("Text3.21", "ค่าน้ำไฟและบริการ")
+    setField("Text3.22", fmt(utilGrossHalf))
+    setField("Text3.25", utilDeductionPct.toString())
+    selectRadio("Radio Button7", "Yes")
+    setField("Text3.26", fmt(utilDeductionHalf))
+    setField("Text3.27", fmt(utilNetHalf))
+
+    // ก.3 รายได้อื่น (ปรับ/ริบมัดจำ) — กฎหมายไม่ให้สิทธิ์หักแบบเหมา ใช้ "จริง" เสมอ (ไม่มีข้อมูลค่าใช้จ่ายจริงให้หัก จึงเป็น 0)
+    const otherGrossHalf = (data.other408 || 0) / 2
+    setField("Text3.30", cleanTaxId)
+    setField("Text3.31", "รายได้อื่น (ปรับ/ริบมัดจำ)")
+    setField("Text3.32", fmt(otherGrossHalf))
+    setField("Text3.35", "0")
+    selectRadio("Radio Button8", "2")
+    setField("Text3.36", "0")
+    setField("Text3.37", fmt(otherGrossHalf))
+
+    // ข.1 ค่าลดหย่อนส่วนตัว (ตามสถานภาพผู้เสียภาษี)
+    const personalDeduction = calculatePersonalDeduction("94", taxpayerStatus, partnerCount)
+    setField("Text4.10.1", fmt(personalDeduction))
+
+    // กล่องคำนวณภาษีหน้า 1 (ข้อ 1-19) — คำนวณภาษีขั้นบันไดจริง ค่าที่ระบบไม่มีข้อมูล (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ฯลฯ) ตั้งเป็น 0
+    const netIncomeAfterExpense = rentNetHalf + utilNetHalf + otherGrossHalf
+    const item1 = netIncomeAfterExpense
+    const item2 = personalDeduction
+    const item3 = Math.max(0, item1 - item2)
+    const item4 = 0
+    const item5 = item3 - item4
+    const item6 = 0
+    const item7 = Math.max(0, item5 - item6)
+    const grossAssessableHalf = rentGrossHalf + utilGrossHalf + otherGrossHalf
+    const item8 = calculateProgressiveTax(item7)
+    const item9 = calculateMinimumTax(grossAssessableHalf)
+    const item10 = calculateFinalTaxDue(item8, item9)
+    const item11 = 0
+    const item12 = item10 + item11
+    const item13 = 0
+    const item14 = 0 // ภาษีหัก ณ ที่จ่าย — ไม่มี field แยกในแบบฟอร์มนี้ (ระบบไม่มีข้อมูลส่วนนี้)
+    const item15 = item12 + item13 - item14
+    const item16 = 0
+    const item17 = Math.max(0, item15 - item16)
+    const item18 = 0
+    const item19 = item17 + item18
+
+    setField("Text2.1", fmt(item1))
+    setField("Text2.2", fmt(item2))
+    setField("Text2.3", fmt(item3))
+    setField("Text2.4", fmt(item4))
+    setField("Text2.5", fmt(item5))
+    setField("Text2.6", fmt(item6))
+    setField("Text2.7", fmt(item7))
+    setField("Text2.8", fmt(item8))
+    setField("Text2.9", fmt(item9))
+    setField("Text2.10", fmt(item10))
+    setField("Text2.11", fmt(item11))
+    setField("Text2.12", fmt(item12))
+    setField("Text2.13", fmt(item13))
+    setField("Text2.15", fmt(item15))
+    setField("Text2.16", fmt(item16))
+    setField("Text2.17", fmt(item17))
+    setField("Text2.18", fmt(item18))
+    setField("Text2.19", fmt(item19))
+    // หมายเหตุ: Text2.26 (กล่อง "ภาษีที่ชำระ" ด้านขวา) มี maxLength=3 ในไฟล์ template จริง ไม่พอใส่ยอดเงินเต็มจำนวน
+    // จึงไม่กรอกช่องนี้ (ค่าที่ถูกต้องอยู่ใน Text2.19 อยู่แล้วซึ่งเป็นรายการที่ 19 ในตารางคำนวณภาษีตามลำดับ)
 
     // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง
     drawText(
-      `* คำนวณโดยระบบ HorSet: รายได้ 40(5) ครึ่งปี = ${(data.rent405 / 2).toLocaleString()} บ. | รายได้ 40(8) ครึ่งปี = ${(data.utilities408 / 2).toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
+      `* คำนวณโดยระบบ HorSet: รายได้ 40(5) ครึ่งปี = ${rentGrossHalf.toLocaleString()} บ. | รายได้ 40(8) ครึ่งปี = ${(utilGrossHalf + otherGrossHalf).toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
       45,
       25,
       8

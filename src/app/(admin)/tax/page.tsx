@@ -101,6 +101,8 @@ export default function TaxPage() {
   const [taxId, setTaxId] = useState("")
   const [address, setAddress] = useState("")
   const [phone, setPhone] = useState("")
+  const [taxpayerStatus, setTaxpayerStatus] = useState<"individual" | "partnership">("individual")
+  const [partnerCount, setPartnerCount] = useState(1)
   const [loadingPdf, setLoadingPdf] = useState<"90" | "94" | null>(null)
 
   // แหล่งที่มาของข้อมูลการคำนวณภาษี
@@ -241,6 +243,8 @@ export default function TaxPage() {
             setTaxId(cachedFinance.tax_id || "")
             setAddress(cachedFinance.tax_address || "")
             setPhone(cachedFinance.tax_phone || "")
+            setTaxpayerStatus(cachedFinance.taxpayer_status || "individual")
+            setPartnerCount(Number(cachedFinance.partner_count || 1))
             setElectricRate(Number(cachedFinance.electric_rate !== null && cachedFinance.electric_rate !== undefined ? cachedFinance.electric_rate : 7))
             setWaterRate(Number(cachedFinance.water_rate !== null && cachedFinance.water_rate !== undefined ? cachedFinance.water_rate : 18))
             setCommonFee(Number(cachedFinance.common_fee !== null && cachedFinance.common_fee !== undefined ? cachedFinance.common_fee : 50))
@@ -256,6 +260,8 @@ export default function TaxPage() {
                   setTaxId(res.data.tax_id || "")
                   setAddress(res.data.tax_address || "")
                   setPhone(res.data.tax_phone || "")
+                  setTaxpayerStatus(res.data.taxpayer_status || "individual")
+                  setPartnerCount(Number(res.data.partner_count || 1))
                   setElectricRate(res.data.electric_rate)
                   setWaterRate(res.data.water_rate)
                   setCommonFee(res.data.common_fee)
@@ -796,6 +802,7 @@ export default function TaxPage() {
     setLoadingPdf(type)
     try {
       const { generatePndPdf } = await import("@/lib/pdfHelper")
+      const { parseAddress } = await import("@/lib/thaiAddress")
 
       // เช็คว่า Super Admin อัปโหลด PDF template เองไว้หรือไม่ ถ้ามีให้ใช้ไฟล์นั้นแทนไฟล์เริ่มต้นของระบบ
       const { getActiveTaxFormTemplateAction } = await import("@/features/tax/actions")
@@ -815,10 +822,15 @@ export default function TaxPage() {
         phone,
         rent405: type === "90" ? rent405Full : rent405Half * 2,
         deductionRent405: type === "90" ? deductionRent405Full : deductionRent405Half,
-        utilities408: type === "90" ? (utilities408Full + other408Full) : (utilities408Half + other408Half) * 2,
+        // ภ.ง.ด. 90 ยังรวม 40(8) ทั้งสองก้อนเป็นยอดเดียว (ไม่ได้แยกแถวในฟอร์มนี้) ส่วน ภ.ง.ด. 94 แยก ค่าน้ำไฟ กับ รายได้อื่น ออกจากกัน
+        utilities408: type === "90" ? (utilities408Full + other408Full) : utilities408Half * 2,
         deductionUtilities408: type === "90" ? deductionUtilities408Full : deductionUtilities408Half,
+        other408: type === "94" ? other408Half * 2 : undefined,
         netIncome: type === "90" ? netIncomeFull : netIncomeHalf,
         taxYear: printedTaxYear,
+        addressParts: type === "94" ? parseAddress(address) : undefined,
+        taxpayerStatus,
+        partnerCount,
       }, customTemplateUrl)
 
       const link = document.createElement("a")

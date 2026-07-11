@@ -7,6 +7,7 @@ import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRoomTypes, updateRoomTypeDeposit, migrateRoomTypeDeposits } from "@/features/room/actions"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
+import { parseAddress, formatAddress } from "@/lib/thaiAddress"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -14,145 +15,6 @@ function getCookie(name: string): string | undefined {
   const parts = value.split(`; ${name}=`)
   if (parts.length === 2) return parts.pop()?.split(";").shift()
   return undefined
-}
-
-function parseAddress(fullAddress: string) {
-  const result = {
-    no: "",
-    road: "",
-    subdistrict: "",
-    district: "",
-    province: "",
-    zipcode: ""
-  }
-  
-  if (!fullAddress) return result
-
-  // Extract postal code (5 digits at the end)
-  const zipMatch = fullAddress.match(/\b\d{5}\b/)
-  if (zipMatch) {
-    result.zipcode = zipMatch[0]
-    fullAddress = fullAddress.replace(zipMatch[0], "").trim()
-  }
-
-  // Extract province: look for จังหวัด... or จ.... or กรุงเทพ...
-  const provinceKeywords = ["จังหวัด", "จ.", "กรุงเทพมหานคร", "กรุงเทพฯ", "กรุงเทพ"]
-  let foundProvince = ""
-  for (const kw of provinceKeywords) {
-    if (fullAddress.includes(kw)) {
-      const idx = fullAddress.indexOf(kw)
-      const after = fullAddress.substring(idx).trim()
-      foundProvince = after
-      fullAddress = fullAddress.substring(0, idx).trim()
-      break
-    }
-  }
-  if (foundProvince) {
-    result.province = foundProvince.replace(/^(จังหวัด|จ\.)\s*/, "").trim()
-  }
-
-  // Extract district: look for อำเภอ... or อ.... or เขต...
-  const districtKeywords = ["อำเภอ", "เขต", "อ."]
-  let foundDistrict = ""
-  for (const kw of districtKeywords) {
-    if (fullAddress.includes(kw)) {
-      const idx = fullAddress.indexOf(kw)
-      const after = fullAddress.substring(idx).trim()
-      foundDistrict = after
-      fullAddress = fullAddress.substring(0, idx).trim()
-      break
-    }
-  }
-  if (foundDistrict) {
-    result.district = foundDistrict.replace(/^(อำเภอ|เขต|อ\.)\s*/, "").trim()
-  }
-
-  // Extract subdistrict: look for ตำบล... or ต.... or แขวง...
-  const subdistrictKeywords = ["ตำบล", "แขวง", "ต."]
-  let foundSubdistrict = ""
-  for (const kw of subdistrictKeywords) {
-    if (fullAddress.includes(kw)) {
-      const idx = fullAddress.indexOf(kw)
-      const after = fullAddress.substring(idx).trim()
-      foundSubdistrict = after
-      fullAddress = fullAddress.substring(0, idx).trim()
-      break
-    }
-  }
-  if (foundSubdistrict) {
-    result.subdistrict = foundSubdistrict.replace(/^(ตำบล|แขวง|ต\.)\s*/, "").trim()
-  }
-
-  // Extract road: look for ถนน... or ถ....
-  const roadKeywords = ["ถนน", "ถ."]
-  let foundRoad = ""
-  for (const kw of roadKeywords) {
-    if (fullAddress.includes(kw)) {
-      const idx = fullAddress.indexOf(kw)
-      const after = fullAddress.substring(idx).trim()
-      foundRoad = after
-      fullAddress = fullAddress.substring(0, idx).trim()
-      break
-    }
-  }
-  if (foundRoad) {
-    result.road = foundRoad.replace(/^(ถนน|ถ\.)\s*/, "").trim()
-  }
-
-  // The rest is address No
-  result.no = fullAddress.replace(/,$/, "").trim()
-
-  return result
-}
-
-function formatAddress(no: string, road: string, subdistrict: string, district: string, province: string, zipcode: string): string {
-  const parts: string[] = []
-  if (no) parts.push(no)
-  
-  if (road && road !== "-") {
-    if (road.startsWith("ถนน") || road.startsWith("ถ.")) {
-      parts.push(road)
-    } else {
-      parts.push(`ถนน${road}`)
-    }
-  }
-  
-  if (subdistrict) {
-    const isBkk = province.includes("กรุงเทพ") || province.includes("BKK") || province.includes("Bangkok")
-    const prefix = isBkk ? "แขวง" : "ตำบล"
-    if (subdistrict.startsWith(prefix) || subdistrict.startsWith("ต.") || subdistrict.startsWith("ต ")) {
-      parts.push(subdistrict)
-    } else {
-      parts.push(`${prefix}${subdistrict}`)
-    }
-  }
-
-  if (district) {
-    const isBkk = province.includes("กรุงเทพ") || province.includes("BKK") || province.includes("Bangkok")
-    const prefix = isBkk ? "เขต" : "อำเภอ"
-    if (district.startsWith(prefix) || district.startsWith("อ.") || district.startsWith("อ ")) {
-      parts.push(district)
-    } else {
-      parts.push(`${prefix}${district}`)
-    }
-  }
-
-  if (province) {
-    const isBkk = province.includes("กรุงเทพ") || province.includes("BKK") || province.includes("Bangkok")
-    if (isBkk) {
-      parts.push(province)
-    } else {
-      if (province.startsWith("จังหวัด") || province.startsWith("จ.")) {
-        parts.push(province)
-      } else {
-        parts.push(`จังหวัด${province}`)
-      }
-    }
-  }
-
-  if (zipcode) parts.push(zipcode)
-
-  return parts.join(" ")
 }
 
 export default function FinanceSettingsTab() {
@@ -167,6 +29,8 @@ export default function FinanceSettingsTab() {
   const [addressProvince, setAddressProvince] = useState("")
   const [addressZipcode, setAddressZipcode] = useState("")
   const [phone, setPhone] = useState("")
+  const [taxpayerStatus, setTaxpayerStatus] = useState<"individual" | "partnership">("individual")
+  const [partnerCount, setPartnerCount] = useState<number>(1)
 
   const [promptPayType, setPromptPayType] = useState<"phone" | "national_id">("phone")
   const [promptPayId, setPromptPayId] = useState("")
@@ -281,6 +145,8 @@ export default function FinanceSettingsTab() {
             setElectricMinChecked(cached.electric_min_checked !== undefined ? cached.electric_min_checked : true)
             setElectricMinUnit(cached.electric_min_unit !== undefined ? cached.electric_min_unit : 10)
             setSlipRetentionMonths(cached.slip_retention_months !== undefined ? cached.slip_retention_months : 0)
+            setTaxpayerStatus(cached.taxpayer_status || "individual")
+            setPartnerCount(cached.partner_count !== undefined ? cached.partner_count : 1)
             setIsDatabaseBacked(true)
           } else {
             const res = await getFinanceSettings(currentWsId)
@@ -313,6 +179,8 @@ export default function FinanceSettingsTab() {
               setElectricMinChecked(res.data.electric_min_checked !== undefined ? res.data.electric_min_checked : true)
               setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
               setSlipRetentionMonths(res.data.slip_retention_months !== undefined ? res.data.slip_retention_months : 0)
+              setTaxpayerStatus(res.data.taxpayer_status || "individual")
+              setPartnerCount(res.data.partner_count !== undefined ? res.data.partner_count : 1)
               setIsDatabaseBacked(true)
               setCachedData(currentWsId, cacheKey, res.data)
             } else if (res.error) {
@@ -417,7 +285,9 @@ export default function FinanceSettingsTab() {
         deposit_amount: depositAmount,
         deposit_type: depositType,
         advance_rent: advanceRent,
-        slip_retention_months: slipRetentionMonths
+        slip_retention_months: slipRetentionMonths,
+        taxpayer_status: taxpayerStatus,
+        partner_count: partnerCount
       }
 
       // บันทึกผ่าน Server Action ไปยังฐานข้อมูล โดยสิทธิ์ Admin ของ Workspace เท่านั้น
@@ -552,6 +422,36 @@ export default function FinanceSettingsTab() {
                   value={taxId}
                   onChange={(e) => setTaxId(e.target.value)}
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">สถานภาพผู้เสียภาษี</label>
+                  <select
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                    value={taxpayerStatus}
+                    onChange={(e) => setTaxpayerStatus(e.target.value as "individual" | "partnership")}
+                  >
+                    <option value="individual">บุคคลธรรมดา</option>
+                    <option value="partnership">ห้างหุ้นส่วนสามัญที่มิใช่นิติบุคคล</option>
+                  </select>
+                  <p className="text-[11px] text-slate-450 dark:text-slate-500">
+                    ใช้กำหนดค่าลดหย่อนส่วนตัวในแบบฟอร์ม ภ.ง.ด. 90/94 ให้ถูกต้องตามสถานภาพ
+                  </p>
+                </div>
+                {taxpayerStatus === "partnership" && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">จำนวนหุ้นส่วน</label>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="เช่น 2"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
+                      value={partnerCount}
+                      onChange={(e) => setPartnerCount(Math.max(1, Number(e.target.value) || 1))}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -29,6 +29,9 @@ export interface FinanceSettings {
   slip_retention_months?: number
   checkout_policy?: "DAILY_PRORATE" | "FULL_MONTH"
   logo_url?: string
+  // สถานภาพผู้เสียภาษี (กำหนดค่าลดหย่อนส่วนตัว ข.1 ของแบบฟอร์ม ภ.ง.ด. 90/94)
+  taxpayer_status?: "individual" | "partnership"
+  partner_count?: number
 }
 
 /**
@@ -190,6 +193,21 @@ export async function getFinanceSettings(workspaceId: string) {
       return ""
     }
 
+    // 9. สถานภาพผู้เสียภาษี (แยกดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ติดตั้ง)
+    const fetchTaxpayerStatus = async (): Promise<any> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("taxpayer_status, partner_count")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) return data
+      } catch (e) {
+        console.warn("Columns taxpayer_status/partner_count not available in workspaces. Defaulting.")
+      }
+      return null
+    }
+
     const [
       coreData,
       utilityData,
@@ -198,7 +216,8 @@ export async function getFinanceSettings(workspaceId: string) {
       { leaseDuration, leaseExpiryAction },
       slipRetentionMonths,
       checkoutPolicy,
-      logoUrl
+      logoUrl,
+      taxpayerStatusData
     ] = await Promise.all([
       fetchCore(),
       fetchUtility(),
@@ -207,7 +226,8 @@ export async function getFinanceSettings(workspaceId: string) {
       fetchLease(),
       fetchSlipRetention(),
       fetchCheckoutPolicy(),
-      fetchLogo()
+      fetchLogo(),
+      fetchTaxpayerStatus()
     ])
 
     const merged = {
@@ -257,8 +277,10 @@ export async function getFinanceSettings(workspaceId: string) {
         lease_expiry_action: (merged.lease_expiry_action as "renew" | "original") || "renew",
         slip_retention_months: Number(merged.slip_retention_months !== null && merged.slip_retention_months !== undefined ? merged.slip_retention_months : 0),
         checkout_policy: merged.checkout_policy || "DAILY_PRORATE",
-        logo_url: logoUrl
-      } as FinanceSettings 
+        logo_url: logoUrl,
+        taxpayer_status: (taxpayerStatusData?.taxpayer_status as "individual" | "partnership") || "individual",
+        partner_count: Number(taxpayerStatusData?.partner_count || 1)
+      } as FinanceSettings
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลการเงิน"
@@ -322,7 +344,9 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
         lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
         lease_expiry_action: settings.lease_expiry_action || "renew",
         slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0),
-        checkout_policy: settings.checkout_policy || "DAILY_PRORATE"
+        checkout_policy: settings.checkout_policy || "DAILY_PRORATE",
+        taxpayer_status: settings.taxpayer_status || "individual",
+        partner_count: Number(settings.partner_count || 1)
       })
       .eq("id", workspaceId)
 
