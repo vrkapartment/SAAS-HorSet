@@ -168,6 +168,11 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
   }
 
   const cleanTaxId = data.taxId.replace(/[^0-9]/g, "")
+  // ช่องเลขประจำตัวผู้เสียภาษีในฟอร์มนี้เป็น PDF comb field ที่แบ่งเซลล์ตามความยาวตัวอักษรจริง (maxLength=17)
+  // นับรวมขีดคั่นด้วย (รูปแบบ X-XXXX-XXXXX-XX-X) จึงต้องพิมพ์ขีดคั่นลงไปเองให้ครบ 17 ตัวอักษร ไม่ใช่ใส่แค่ 13 หลักเปล่าๆ
+  const formattedTaxId = cleanTaxId.length === 13
+    ? `${cleanTaxId.slice(0, 1)}-${cleanTaxId.slice(1, 5)}-${cleanTaxId.slice(5, 10)}-${cleanTaxId.slice(10, 12)}-${cleanTaxId.slice(12, 13)}`
+    : cleanTaxId
 
   // 5. กรอกข้อมูลและตัวเลขลงในแบบฟอร์มผ่าน Form Fields
   if (type === "90") {
@@ -176,7 +181,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     setField("Text11111", data.taxYear)
 
     // ข้อมูลส่วนตัว
-    setField("Text80.0", cleanTaxId)
+    setField("Text80.0", formattedTaxId)
     setField("Text7.0", data.firstName)
     setField("Text7.3", data.lastName)
     setField("Text9", data.address)
@@ -224,7 +229,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     const partnerCount = data.partnerCount || 1
 
     // ข้อมูลส่วนตัวหน้าแรก
-    setField("Text1.1", cleanTaxId)
+    setField("Text1.1", formattedTaxId)
     setField("Text1.5", data.firstName)
     setField("Text1.7", data.lastName)
     setField("Text1.13", addressParts.no)
@@ -239,7 +244,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     const rentDeductionHalf = data.deductionRent405
     const rentNetHalf = Math.max(0, rentGrossHalf - rentDeductionHalf)
     const rentDeductionPct = rentGrossHalf > 0 ? Math.round((rentDeductionHalf / rentGrossHalf) * 100) : 0
-    setField("Text3.10", cleanTaxId)
+    setField("Text3.10", formattedTaxId)
     setField("Text3.11", "รายได้ค่าเช่าห้องพัก")
     setField("Text3.12", fmt(rentGrossHalf))
     setField("Text3.15", rentDeductionPct.toString())
@@ -252,7 +257,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     const utilDeductionHalf = data.deductionUtilities408
     const utilNetHalf = Math.max(0, utilGrossHalf - utilDeductionHalf)
     const utilDeductionPct = utilGrossHalf > 0 ? Math.round((utilDeductionHalf / utilGrossHalf) * 100) : 0
-    setField("Text3.20", cleanTaxId)
+    setField("Text3.20", formattedTaxId)
     setField("Text3.21", "ค่าน้ำไฟและบริการ")
     setField("Text3.22", fmt(utilGrossHalf))
     setField("Text3.25", utilDeductionPct.toString())
@@ -262,7 +267,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
 
     // ก.3 รายได้อื่น (ปรับ/ริบมัดจำ) — กฎหมายไม่ให้สิทธิ์หักแบบเหมา ใช้ "จริง" เสมอ (ไม่มีข้อมูลค่าใช้จ่ายจริงให้หัก จึงเป็น 0)
     const otherGrossHalf = (data.other408 || 0) / 2
-    setField("Text3.30", cleanTaxId)
+    setField("Text3.30", formattedTaxId)
     setField("Text3.31", "รายได้อื่น (ปรับ/ริบมัดจำ)")
     setField("Text3.32", fmt(otherGrossHalf))
     setField("Text3.35", "0")
