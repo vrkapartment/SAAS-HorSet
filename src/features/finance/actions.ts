@@ -449,10 +449,12 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
           }
         }
 
-        return { 
-          success: true, 
+        return {
+          success: true,
           fallback: true,
-          message: "บันทึกข้อมูลเรียบร้อยแล้ว! (มีบางคอลัมน์เพิ่มเติม เช่น เงินประกัน/ค่าเช่าล่วงหน้า ยังไม่ได้ติดตั้งลงในฐานข้อมูลระบบคลาวด์ของคุณ)" 
+          message: "บันทึกข้อมูลเรียบร้อยแล้ว! (มีบางคอลัมน์เพิ่มเติม เช่น เงินประกัน/ค่าเช่าล่วงหน้า ยังไม่ได้ติดตั้งลงในฐานข้อมูลระบบคลาวด์ของคุณ)",
+          // TODO(debug-temp): ไล่บั๊กช่องที่อยู่ไม่บันทึก จะเอาออกทันทีที่หาสาเหตุเจอ
+          debug: { originalUpdateError: updateError }
         }
       }
       throw updateError
