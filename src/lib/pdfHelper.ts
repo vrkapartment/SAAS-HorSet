@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from "pdf-lib"
+import { PDFDocument, PDFName, rgb } from "pdf-lib"
 import fontkit from "@pdf-lib/fontkit"
 import { calculateProgressiveTax, calculateMinimumTax, calculateFinalTaxDue, calculatePersonalDeduction } from "./thaiTax"
 
@@ -111,6 +111,9 @@ export interface PndData {
   }
   taxpayerStatus?: "individual" | "partnership"
   partnerCount?: number
+  // วิธีหักค่าใช้จ่ายที่ Admin เลือกจริงต่อหมวด (ใช้ติ๊กช่อง "ร้อยละ"/"จริง" ในตาราง ก. ของ ภ.ง.ด. 94 ให้ตรงกับที่ตั้งค่าไว้)
+  rentDeductionMethod?: "percentage" | "actual"
+  utilitiesDeductionMethod?: "percentage" | "actual"
 }
 
 // ชื่อฟิลด์ PDF AcroForm ที่ generatePndPdf() ต้องใช้กรอกข้อมูลจริง (ดูจุด setField() ด้านล่าง)
@@ -223,11 +226,28 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     // plan การแก้ไข: Text1.28/Text1.6/Text1.31 ของเดิมผิด (เป็นช่องคู่สมรส/ชื่อกลาง/ไม่มีอยู่จริงตามลำดับ)
     // และ Text4.10.1/4.15/4.18/4.20 ของเดิมเป็นช่องในตาราง "ข. รายการลดหย่อนฯ" ไม่ใช่รายได้ 40(5)-(8) เลย
     const fmt = (n: number) => (Number.isFinite(n) ? n : 0).toFixed(2)
-    const selectRadio = (name: string, option: string) => {
+    // หมายเหตุ: ปุ่มติ๊ก "ร้อยละ"/"จริง" ของฟอร์มนี้ (Radio Button6/7/8) มี option export value ซ้ำกันในบาง field
+    // (เช่น Radio Button6 ทั้งสอง widget ใช้ชื่อ "Yes" เหมือนกันจากมุมมอง getOptions()) ทำให้ .select("Yes") แบบปกติ
+    // เลือกผิด widget ได้ จึงต้องตั้งค่า AS (appearance state) ของแต่ละ widget โดยตรงตามลำดับ index แทน
+    // (index 0 = ตัวเลือก "ร้อยละ" ซ้ายมือ, index 1 = ตัวเลือก "จริง" ขวามือ ตามตำแหน่งจริงบนฟอร์มทั้ง 3 ปุ่ม)
+    const selectRadioWidget = (name: string, widgetIndex: 0 | 1) => {
       try {
-        form.getRadioGroup(name).select(option)
+        const radioGroup = form.getRadioGroup(name)
+        const widgets = radioGroup.acroField.getWidgets()
+        widgets.forEach((w, i) => {
+          const onValue = w.getOnValue()
+          if (i === widgetIndex && onValue) {
+            w.dict.set(PDFName.of("AS"), onValue)
+          } else {
+            w.dict.set(PDFName.of("AS"), PDFName.of("Off"))
+          }
+        })
+        const selectedOn = widgets[widgetIndex]?.getOnValue()
+        if (selectedOn) {
+          radioGroup.acroField.dict.set(PDFName.of("V"), selectedOn)
+        }
       } catch (e) {
-        console.warn(`ไม่สามารถเลือก radio ${name}:`, e)
+        console.warn(`ไม่สามารถเลือก radio ${name} (widget ${widgetIndex}):`, e)
       }
     }
 
@@ -260,12 +280,13 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     const rentGrossHalf = data.rent405 / 2
     const rentDeductionHalf = data.deductionRent405
     const rentNetHalf = Math.max(0, rentGrossHalf - rentDeductionHalf)
+    const rentIsActual = data.rentDeductionMethod === "actual"
     const rentDeductionPct = rentGrossHalf > 0 ? Math.round((rentDeductionHalf / rentGrossHalf) * 100) : 0
     setField("Text3.10", formattedTaxId)
     setField("Text3.11", "รายได้ค่าเช่าห้องพัก")
     setField("Text3.12", fmt(rentGrossHalf))
-    setField("Text3.15", rentDeductionPct.toString())
-    selectRadio("Radio Button6", "Yes")
+    setField("Text3.15", rentIsActual ? "" : rentDeductionPct.toString())
+    selectRadioWidget("Radio Button6", rentIsActual ? 1 : 0)
     setField("Text3.16", fmt(rentDeductionHalf))
     setField("Text3.17", fmt(rentNetHalf))
 
@@ -273,12 +294,13 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     const utilGrossHalf = data.utilities408 / 2
     const utilDeductionHalf = data.deductionUtilities408
     const utilNetHalf = Math.max(0, utilGrossHalf - utilDeductionHalf)
+    const utilIsActual = data.utilitiesDeductionMethod === "actual"
     const utilDeductionPct = utilGrossHalf > 0 ? Math.round((utilDeductionHalf / utilGrossHalf) * 100) : 0
     setField("Text3.20", formattedTaxId)
     setField("Text3.21", "ค่าน้ำไฟและบริการ")
     setField("Text3.22", fmt(utilGrossHalf))
-    setField("Text3.25", utilDeductionPct.toString())
-    selectRadio("Radio Button7", "Yes")
+    setField("Text3.25", utilIsActual ? "" : utilDeductionPct.toString())
+    selectRadioWidget("Radio Button7", utilIsActual ? 1 : 0)
     setField("Text3.26", fmt(utilDeductionHalf))
     setField("Text3.27", fmt(utilNetHalf))
 
@@ -288,7 +310,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     setField("Text3.31", "รายได้อื่น (ปรับ/ริบมัดจำ)")
     setField("Text3.32", fmt(otherGrossHalf))
     setField("Text3.35", "0")
-    selectRadio("Radio Button8", "2")
+    selectRadioWidget("Radio Button8", 1)
     setField("Text3.36", "0")
     setField("Text3.37", fmt(otherGrossHalf))
 

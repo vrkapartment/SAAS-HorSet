@@ -862,6 +862,8 @@ export default function TaxPage() {
         } : undefined,
         taxpayerStatus,
         partnerCount,
+        rentDeductionMethod: deductionMethod405 === "เหมา 30%" ? "percentage" : "actual",
+        utilitiesDeductionMethod: deductionMethod408 === "เหมา 60%" ? "percentage" : "actual",
       }, customTemplateUrl)
 
       const link = document.createElement("a")
