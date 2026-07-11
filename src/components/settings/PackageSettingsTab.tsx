@@ -16,7 +16,7 @@ import {
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
 import { cancelWorkspaceSubscription, type SaasPlan } from "@/features/subscription/actions"
-import { useSupportAccess } from "@/hooks/useSupportAccess"
+import { useSupportAccessContext } from "@/context/SupportAccessContext"
 import PricingModal from "@/features/subscription/components/PricingModal"
 
 type FeatureKey = keyof NonNullable<SaasPlan["features"]>
@@ -44,7 +44,6 @@ export default function PackageSettingsTab() {
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
   const [workspaceId, setWorkspaceId] = useState("")
-  const [workspaceName, setWorkspaceName] = useState("")
   const [userRole, setUserRole] = useState<"admin" | "staff" | "super_admin">("admin")
   const [profileLoading, setProfileLoading] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
@@ -67,7 +66,6 @@ export default function PackageSettingsTab() {
       try {
         if (isDemo) {
           setWorkspaceId("demo-workspace")
-          setWorkspaceName("หอพักทดลอง (Demo)")
           setUserRole("admin")
           return
         }
@@ -89,11 +87,7 @@ export default function PackageSettingsTab() {
   }, [isDemo])
 
   const { subscription, loading: subLoading, error: subError, refetch } = useWorkspaceSubscription(workspaceId)
-  const { supportStatus, handleRequestSupport, handleDecideSupport } = useSupportAccess(
-    { id: workspaceId, name: workspaceName },
-    userRole === "super_admin" ? "super_admin" : "admin",
-    isDemo
-  )
+  const { supportStatus, handleRequestSupport, handleDecideSupport } = useSupportAccessContext()
 
   const handleCancelAccount = async () => {
     if (

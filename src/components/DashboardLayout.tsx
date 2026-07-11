@@ -42,6 +42,7 @@ import Sidebar from "./dashboard/Sidebar"
 import SupportModal from "./dashboard/SupportModal"
 import ProfileModal from "./dashboard/ProfileModal"
 import { useSupportAccess } from "@/hooks/useSupportAccess"
+import { SupportAccessContext } from "@/context/SupportAccessContext"
 import { getCurrentUserProfileClient, setCachedUserProfile, clearCachedUserProfile } from "@/features/auth/client"
 import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISSIONS } from "@/features/permissions/types"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
@@ -1342,7 +1343,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           <div className="w-full max-w-full overflow-hidden">
             <PullToRefresh>
               {isPathAllowed() ? (
-                children
+                <SupportAccessContext.Provider
+                  value={{
+                    supportStatus,
+                    setSupportStatus,
+                    showSupportModal,
+                    setShowSupportModal,
+                    handleRequestSupport,
+                    handleDecideSupport,
+                    handleExitSupport
+                  }}
+                >
+                  {children}
+                </SupportAccessContext.Provider>
               ) : (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
                   <div className="glass-panel p-8 sm:p-12 rounded-3xl max-w-md border border-red-500/20 shadow-xl relative overflow-hidden bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl">

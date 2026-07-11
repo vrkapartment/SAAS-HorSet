@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 
 interface Workspace {
@@ -88,9 +89,36 @@ export function useSupportAccess(
 
     checkStatus()
 
-    const interval = setInterval(checkStatus, 3000)
+    // Fallback poll เผื่อ Realtime channel ด้านล่างหลุดการเชื่อมต่อ (การอัปเดตหลักทำผ่าน Realtime ซึ่งไวกว่า)
+    const interval = setInterval(checkStatus, 15000)
 
-    return () => clearInterval(interval)
+    let channel: RealtimeChannel | null = null
+    if (!isDemo) {
+      const supabase = createClient()
+      channel = supabase
+        .channel(`realtime_support_access_${currentWorkspace.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "support_access_grants",
+            filter: `workspace_id=eq.${currentWorkspace.id}`
+          },
+          () => {
+            checkStatus()
+          }
+        )
+        .subscribe()
+    }
+
+    return () => {
+      clearInterval(interval)
+      if (channel) {
+        const supabase = createClient()
+        supabase.removeChannel(channel)
+      }
+    }
   }, [currentWorkspace.id, userRole, isDemo])
 
   // ฟังก์ชันจัดการคำขอสิทธิ์เข้าถึง (สำหรับ Super Admin)
