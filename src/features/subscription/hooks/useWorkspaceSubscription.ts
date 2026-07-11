@@ -49,12 +49,17 @@ export function useWorkspaceSubscription(workspaceId: string): UseWorkspaceSubsc
   const [subscription, setSubscription] = useState<WorkspaceSubscriptionView | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // เก็บ workspaceId ที่ fetch เสร็จล่าสุดไว้เทียบกับ workspaceId ปัจจุบัน — ถ้ายังไม่ตรงกันแปลว่า
+  // ยัง "ต้องถือว่ากำลังโหลดอยู่" ป้องกัน UI เห็นช่วงสั้นๆ ที่ loading เป็น false แต่ subscription ยังเป็นค่าเก่า/null
+  // (เกิดตอน workspaceId เปลี่ยนจากค่าว่างเป็นค่าจริงในการ render รอบเดียวกับที่ effect ยังไม่ทันรันซ้ำ)
+  const [fetchedForId, setFetchedForId] = useState<string | null>(null)
 
   const fetchSubscription = useCallback(async (forceRefresh = false) => {
     if (!workspaceId) {
       setSubscription(null)
       setLoading(false)
       setError(null)
+      setFetchedForId("")
       return
     }
 
@@ -73,6 +78,7 @@ export function useWorkspaceSubscription(workspaceId: string): UseWorkspaceSubsc
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการดึงข้อมูลสถานะการใช้งานของหอพัก")
     } finally {
       setLoading(false)
+      setFetchedForId(workspaceId)
     }
   }, [workspaceId])
 
@@ -82,5 +88,7 @@ export function useWorkspaceSubscription(workspaceId: string): UseWorkspaceSubsc
 
   const refetch = useCallback(() => fetchSubscription(true), [fetchSubscription])
 
-  return { subscription, loading, error, refetch }
+  const effectiveLoading = loading || fetchedForId !== workspaceId
+
+  return { subscription, loading: effectiveLoading, error, refetch }
 }
