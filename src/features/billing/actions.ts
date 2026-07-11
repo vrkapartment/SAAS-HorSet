@@ -7,7 +7,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { calculateLateDays } from "./utils"
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, getMeterReplacements } from "@/features/meter/actions"
-import { getFinanceSettings } from "@/features/finance/actions"
+import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
 
 import { calculateBillTotal } from "./bill-calculator"
 
@@ -874,7 +874,12 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
   }
 }
 
-export async function getBillingPageData(cycle: string, prevCycle: string, workspaceId: string) {
+export async function getBillingPageData(
+  cycle: string,
+  prevCycle: string,
+  workspaceId: string,
+  cached?: { rooms?: Awaited<ReturnType<typeof getRooms>>["data"]; financeSettings?: FinanceSettings | null }
+) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
@@ -889,12 +894,15 @@ export async function getBillingPageData(cycle: string, prevCycle: string, works
       financeRes,
       usageAveragesRes
     ] = await Promise.all([
-      getRooms(),
+      // ถ้ามีข้อมูลที่ cache ไว้แล้วจากฝั่ง caller (เช่น สลับเดือนแต่ห้องพัก/การตั้งค่าการเงินยังไม่เปลี่ยน) ไม่ต้อง fetch ซ้ำ
+      cached?.rooms ? Promise.resolve({ success: true, data: cached.rooms }) : getRooms(),
       getBills(cycle),
       getMeterRecords(cycle),
       getMeterReplacements(cycle),
       getMeterRecords(prevCycle),
-      workspaceId ? getFinanceSettings(workspaceId) : Promise.resolve({ success: true, data: null }),
+      cached?.financeSettings
+        ? Promise.resolve({ success: true, data: cached.financeSettings })
+        : workspaceId ? getFinanceSettings(workspaceId) : Promise.resolve({ success: true, data: null }),
       workspaceId ? getRoomUsageAverages(workspaceId, cycle, 3) : Promise.resolve({ success: true, data: {} })
     ])
 

@@ -38,61 +38,66 @@ export async function getFinanceSettings(workspaceId: string) {
   try {
     const supabase = await createClient()
 
-    // 1. ดึงข้อมูลส่วนข้อมูลหลัก (ที่รับประกันว่ามีอยู่ในตารางแน่ๆ)
-    const { data: coreData, error: coreError } = await supabase
-      .from("workspaces")
-      .select("name, tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee")
-      .eq("id", workspaceId)
-      .single()
+    // แต่ละส่วนแยก query กันเพื่อความปลอดภัยกรณีคอลัมน์บางตัวยังไม่ถูกสร้างในบาง environment (เหมือนเดิม)
+    // แต่ยิงทุก query พร้อมกันผ่าน Promise.all แทนการ await เรียงทีละตัว เพื่อไม่ให้ latency บวกสะสมเป็น 8 เท่า
 
-    if (coreError) {
-      throw coreError
-    }
-
-    // 2. ดึงข้อมูลค่าน้ำค่าไฟเพิ่มเติม (ซึ่งอาจจะยังไม่ได้รัน SQL เพิ่มคอลัมน์)
-    let utilityData: any = null
-    const { data: utData, error: utError } = await supabase
-      .from("workspaces")
-      .select("water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
-      .eq("id", workspaceId)
-      .single()
-
-    if (!utError) {
-      utilityData = utData
-    } else {
-      console.warn("Utility columns (water_rate, etc.) not available yet in table workspaces. Using defaults.")
-    }
-
-    // 3. ดึงข้อมูลค่าปรับรายวัน (แยกการดึงข้อมูลเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ถูกสร้าง)
-    let latePenaltyRate = 0
-    try {
-      const { data: lpData, error: lpError } = await supabase
+    // 1. ข้อมูลส่วนข้อมูลหลัก (ที่รับประกันว่ามีอยู่ในตารางแน่ๆ)
+    const fetchCore = async () => {
+      const { data, error } = await supabase
         .from("workspaces")
-        .select("late_penalty_rate")
+        .select("name, tax_firstname, tax_lastname, tax_id, tax_address, tax_phone, promptpay_type, promptpay_id, promptpay_name, common_fee")
         .eq("id", workspaceId)
         .single()
-      if (!lpError && lpData) {
-        latePenaltyRate = Number(lpData.late_penalty_rate || 0)
+      if (error) throw error
+      return data
+    }
+
+    // 2. ค่าน้ำค่าไฟเพิ่มเติม (ซึ่งอาจจะยังไม่ได้รัน SQL เพิ่มคอลัมน์)
+    const fetchUtility = async (): Promise<any> => {
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
+        .eq("id", workspaceId)
+        .single()
+      if (error) {
+        console.warn("Utility columns (water_rate, etc.) not available yet in table workspaces. Using defaults.")
+        return null
       }
-    } catch (e) {
-      console.warn("Column late_penalty_rate not available in workspaces. Defaulting to 0.")
+      return data
     }
 
-    // 4. ดึงข้อมูลเงินประกันและค่าเช่าล่วงหน้า (แยกการดึงเพื่อความปลอดภัย)
-    let depositAmount = 0
-    let advanceRent = 0
-    let depositType: "months" | "fixed" = "months"
-    try {
-      const { data: depData, error: depError } = await supabase
-        .from("workspaces")
-        .select("deposit_amount, advance_rent, deposit_type")
-        .eq("id", workspaceId)
-        .single()
-      if (!depError && depData) {
-        depositAmount = Number(depData.deposit_amount || 0)
-        advanceRent = Number(depData.advance_rent || 0)
-        depositType = (depData.deposit_type as "months" | "fixed") || "months"
-      } else {
+    // 3. ค่าปรับรายวัน (แยกการดึงข้อมูลเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ถูกสร้าง)
+    const fetchLatePenalty = async (): Promise<number> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("late_penalty_rate")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) {
+          return Number(data.late_penalty_rate || 0)
+        }
+      } catch (e) {
+        console.warn("Column late_penalty_rate not available in workspaces. Defaulting to 0.")
+      }
+      return 0
+    }
+
+    // 4. เงินประกันและค่าเช่าล่วงหน้า (แยกการดึงเพื่อความปลอดภัย)
+    const fetchDeposit = async (): Promise<{ depositAmount: number; advanceRent: number; depositType: "months" | "fixed" }> => {
+      try {
+        const { data: depData, error: depError } = await supabase
+          .from("workspaces")
+          .select("deposit_amount, advance_rent, deposit_type")
+          .eq("id", workspaceId)
+          .single()
+        if (!depError && depData) {
+          return {
+            depositAmount: Number(depData.deposit_amount || 0),
+            advanceRent: Number(depData.advance_rent || 0),
+            depositType: (depData.deposit_type as "months" | "fixed") || "months"
+          }
+        }
         // หากมี error (เช่น คอลัมน์ deposit_type ยังไม่มี) ให้ลองดึงเฉพาะส่วนเงินประกันและค่าเช่าล่วงหน้า
         const { data: depDataNoType, error: depErrorNoType } = await supabase
           .from("workspaces")
@@ -100,81 +105,110 @@ export async function getFinanceSettings(workspaceId: string) {
           .eq("id", workspaceId)
           .single()
         if (!depErrorNoType && depDataNoType) {
-          depositAmount = Number(depDataNoType.deposit_amount || 0)
-          advanceRent = Number(depDataNoType.advance_rent || 0)
-          // Heuristics: ถ้าค่าเงินประกัน > 12 คาดการณ์ว่าเป็นแบบใส่ตัวเลขคงที่ (fixed)
-          depositType = depositAmount > 12 ? "fixed" : "months"
+          const depositAmount = Number(depDataNoType.deposit_amount || 0)
+          return {
+            depositAmount,
+            advanceRent: Number(depDataNoType.advance_rent || 0),
+            // Heuristics: ถ้าค่าเงินประกัน > 12 คาดการณ์ว่าเป็นแบบใส่ตัวเลขคงที่ (fixed)
+            depositType: depositAmount > 12 ? "fixed" : "months"
+          }
         }
+      } catch (e) {
+        console.warn("Column deposit_type or other deposit columns not available in workspaces. Defaulting.")
       }
-    } catch (e) {
-      console.warn("Column deposit_type or other deposit columns not available in workspaces. Defaulting.")
+      return { depositAmount: 0, advanceRent: 0, depositType: "months" }
     }
 
-    // 5. ดึงข้อมูลระยะเวลาสัญญาเช่าเริ่มต้นและสถานะเมื่อสัญญาหมดอายุ (แยกการดึงเพื่อความปลอดภัย)
-    let leaseDuration = 6
-    let leaseExpiryAction: "renew" | "original" = "renew"
-    try {
-      const { data: leaseData, error: leaseError } = await supabase
-        .from("workspaces")
-        .select("lease_duration, lease_expiry_action")
-        .eq("id", workspaceId)
-        .single()
-      if (!leaseError && leaseData) {
-        if (leaseData.lease_duration !== null && leaseData.lease_duration !== undefined) {
-          leaseDuration = Number(leaseData.lease_duration)
+    // 5. ระยะเวลาสัญญาเช่าเริ่มต้นและสถานะเมื่อสัญญาหมดอายุ (แยกการดึงเพื่อความปลอดภัย)
+    const fetchLease = async (): Promise<{ leaseDuration: number; leaseExpiryAction: "renew" | "original" }> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("lease_duration, lease_expiry_action")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) {
+          return {
+            leaseDuration: data.lease_duration !== null && data.lease_duration !== undefined ? Number(data.lease_duration) : 6,
+            leaseExpiryAction: (data.lease_expiry_action as "renew" | "original") || "renew"
+          }
         }
-        if (leaseData.lease_expiry_action) {
-          leaseExpiryAction = leaseData.lease_expiry_action as "renew" | "original"
+      } catch (e) {
+        console.warn("Columns lease_duration or lease_expiry_action not available in workspaces. Defaulting.")
+      }
+      return { leaseDuration: 6, leaseExpiryAction: "renew" }
+    }
+
+    // 6. ระยะเวลาเก็บสลิปโอนเงิน (แยกดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ติดตั้ง)
+    const fetchSlipRetention = async (): Promise<number> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("slip_retention_months")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) {
+          return Number(data.slip_retention_months || 0)
         }
+      } catch (e) {
+        console.warn("Column slip_retention_months not available in workspaces. Defaulting to 0.")
       }
-    } catch (e) {
-      console.warn("Columns lease_duration or lease_expiry_action not available in workspaces. Defaulting.")
+      return 0
     }
 
-    // 6. ดึงข้อมูลระยะเวลาเก็บสลิปโอนเงิน (แยกดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ติดตั้ง)
-    let slipRetentionMonths = 0
-    try {
-      const { data: slipData, error: slipError } = await supabase
-        .from("workspaces")
-        .select("slip_retention_months")
-        .eq("id", workspaceId)
-        .single()
-      if (!slipError && slipData) {
-        slipRetentionMonths = Number(slipData.slip_retention_months || 0)
+    // 7. นโยบายหักเงินประกันวันย้ายออก (แยกการดึงเพื่อความปลอดภัย)
+    const fetchCheckoutPolicy = async (): Promise<"DAILY_PRORATE" | "FULL_MONTH"> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("checkout_policy")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data && data.checkout_policy) {
+          return data.checkout_policy as "DAILY_PRORATE" | "FULL_MONTH"
+        }
+      } catch (e) {
+        console.warn("Column checkout_policy not available in workspaces. Defaulting to DAILY_PRORATE.")
       }
-    } catch (e) {
-      console.warn("Column slip_retention_months not available in workspaces. Defaulting to 0.")
+      return "DAILY_PRORATE"
     }
 
-    // 7. ดึงข้อมูลนโยบายหักเงินประกันวันย้ายออก (แยกการดึงเพื่อความปลอดภัย)
-    let checkoutPolicy: "DAILY_PRORATE" | "FULL_MONTH" = "DAILY_PRORATE"
-    try {
-      const { data: cpData, error: cpError } = await supabase
-        .from("workspaces")
-        .select("checkout_policy")
-        .eq("id", workspaceId)
-        .single()
-      if (!cpError && cpData && cpData.checkout_policy) {
-        checkoutPolicy = cpData.checkout_policy as "DAILY_PRORATE" | "FULL_MONTH"
+    // 8. รูปภาพ Logo ของหอพัก (แยกดึงเพื่อความปลอดภัย)
+    const fetchLogo = async (): Promise<string> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("logo_url")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) {
+          return data.logo_url || ""
+        }
+      } catch (e) {
+        console.warn("Column logo_url not available in workspaces. Defaulting to empty string.")
       }
-    } catch (e) {
-      console.warn("Column checkout_policy not available in workspaces. Defaulting to DAILY_PRORATE.")
+      return ""
     }
 
-    // 8. ดึงข้อมูลรูปภาพ Logo ของหอพัก (แยกดึงเพื่อความปลอดภัย)
-    let logoUrl = ""
-    try {
-      const { data: logoData, error: logoError } = await supabase
-        .from("workspaces")
-        .select("logo_url")
-        .eq("id", workspaceId)
-        .single()
-      if (!logoError && logoData) {
-        logoUrl = logoData.logo_url || ""
-      }
-    } catch (e) {
-      console.warn("Column logo_url not available in workspaces. Defaulting to empty string.")
-    }
+    const [
+      coreData,
+      utilityData,
+      latePenaltyRate,
+      { depositAmount, advanceRent, depositType },
+      { leaseDuration, leaseExpiryAction },
+      slipRetentionMonths,
+      checkoutPolicy,
+      logoUrl
+    ] = await Promise.all([
+      fetchCore(),
+      fetchUtility(),
+      fetchLatePenalty(),
+      fetchDeposit(),
+      fetchLease(),
+      fetchSlipRetention(),
+      fetchCheckoutPolicy(),
+      fetchLogo()
+    ])
 
     const merged = {
       ...coreData,

@@ -459,10 +459,14 @@ function UnifiedBillingContent() {
       const needsFetch = forceRefresh || !rooms || !dbBills || !dbMeters || !dbReplacements || !dbPrevMeters || !financeData || !usageAveragesData
 
       if (needsFetch) {
-        const unifiedRes = await getBillingPageData(cycle, prevCycle, wsId || "")
+        // ส่งข้อมูลที่ cache ไว้แล้ว (rooms/finance_settings ไม่เปลี่ยนตามเดือน) เพื่อไม่ให้ Server Action fetch ซ้ำตอนสลับเดือน
+        const unifiedRes = await getBillingPageData(cycle, prevCycle, wsId || "", {
+          rooms: rooms || undefined,
+          financeSettings: financeData || undefined
+        })
         if (unifiedRes.success && unifiedRes.data) {
           const fetched = unifiedRes.data
-          
+
           if (!rooms || forceRefresh) {
             rooms = fetched.rooms
             if (wsId) setCachedData(wsId, "rooms", rooms)
