@@ -27,6 +27,7 @@
     "property_settings": "Dormitory Settings",
     "test_connection": "Supabase Connection",
     "super_admin": "Super Admin Control",
+    "super_admin_plans": "Manage Subscription Plans",
     "profile": "Edit Profile & Password",
     "settings": "System Settings"
   },

@@ -256,7 +256,9 @@ export interface HorSetPaymentInfo {
  */
 export async function getHorSetPaymentInfo() {
   try {
-    const supabase = await createClient()
+    // ใช้ Service Role Client เพราะ RLS ของ system_settings เปิดให้อ่านได้เฉพาะ super_admin เท่านั้น
+    // แต่ข้อมูลนี้ต้องให้ admin ของทุก workspace อ่านได้ตอนจะจ่ายเงินซื้อแพ็กเกจ (ปลอดภัยที่จะเปิดเผย ไม่ใช่ความลับ)
+    const supabase = await getServiceRoleOrSessionClient()
     const { data, error } = await supabase
       .from("system_settings")
       .select("key, value")

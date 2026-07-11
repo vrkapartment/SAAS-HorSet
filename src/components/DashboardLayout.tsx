@@ -32,7 +32,8 @@ import {
   Settings,
   CheckCheck,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  CreditCard
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
@@ -908,6 +909,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       path: "/super-admin",
       icon: ShieldCheck,
       roles: ["super_admin"]
+    },
+    {
+      name: t("nav.super_admin_plans") || "จัดการแผนการใช้งาน",
+      path: "/super-admin/plans",
+      icon: CreditCard,
+      roles: ["super_admin"]
     }
   ]
 
@@ -1012,7 +1019,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
     // หากเป็น Super Admin และไม่มีสิทธิ์ช่วยเหลือของ Workspace ปัจจุบัน ให้ซ่อนแท็บอื่นๆ ทั้งหมด ตลอดเวลา
     if (userRole === "super_admin" && supportStatus !== "approved") {
-      const allowedPaths = ["/super-admin", "#profile"]
+      const allowedPaths = ["/super-admin", "/super-admin/plans", "#profile"]
       if (!allowedPaths.includes(item.path)) {
         return false
       }
