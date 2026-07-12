@@ -81,6 +81,8 @@ export default function TaxTemplateMappingPage() {
   const [pickerOption, setPickerOption] = useState("")
   const [pickerFormat, setPickerFormat] = useState<PndFieldFormat>("raw")
   const [saving, setSaving] = useState(false)
+  // ยืนยันอีกรอบก่อนย้าย mapping ของความหมายเดียวกันจาก field เดิมไปที่ field ใหม่ (ป้องกันกดผิดแล้ว field เดิมว่างไปโดยไม่ตั้งใจ)
+  const [moveConfirm, setMoveConfirm] = useState<{ from: string; to: string } | null>(null)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [viewportRects, setViewportRects] = useState<Record<string, [number, number, number, number][]>>({})
@@ -164,6 +166,12 @@ export default function TaxTemplateMappingPage() {
     mappings.find((m) =>
       m.physical_field_name === fieldName && (fieldKind === "radio" ? m.widget_index === widgetIndex : true)
     )
+  // หา mapping ที่มีอยู่แล้วของ "ความหมาย" หนึ่งอัน (ไม่สนว่าตอนนี้อยู่ที่ widget ไหน) ใช้เช็คว่าจะย้ายจาก field เดิมหรือเปล่า
+  const mappingForLogicalKey = (logicalKey: string, isRadio: boolean, optionKey?: string) =>
+    mappings.find((m) =>
+      m.logical_key === logicalKey && m.field_kind === (isRadio ? "radio" : "text") && (isRadio ? m.option_key === optionKey : true)
+    )
+  const describeMapping = (m: MappingRow) => (m.field_kind === "radio" ? `${m.physical_field_name} (widget ${m.widget_index})` : m.physical_field_name)
 
   const openPicker = (field: InspectedField, widgetIndex: number) => {
     const existing = mappingForWidget(field.name, widgetIndex, field.fieldKind === "radio" ? "radio" : "text")
@@ -171,13 +179,30 @@ export default function TaxTemplateMappingPage() {
     setPickerKey(existing?.logical_key || "")
     setPickerOption(existing?.option_key || "")
     setPickerFormat((existing?.value_format as PndFieldFormat) || guessDefaultFormat(existing?.logical_key || ""))
+    setMoveConfirm(null)
   }
 
   const handleSaveAssignment = async () => {
     if (!pickerTarget || !formType || !pickerKey) return
+
+    // ถ้า "ความหมาย" (+ ตัวเลือก ถ้าเป็น radio) นี้ถูก map ไว้ที่ field อื่นอยู่แล้ว การบันทึกครั้งนี้จะ "ย้าย" มันมาที่ field
+    // ที่กำลังคลิกอยู่ (field เดิมจะว่างไปทันที) ต้องให้กดยืนยันซ้ำอีกครั้งก่อน ป้องกันการกดผิดโดยไม่ตั้งใจ
+    const isRadio = pickerTarget.field.fieldKind === "radio"
+    const existing = mappingForLogicalKey(pickerKey, isRadio, pickerOption)
+    const movesElsewhere = existing && (
+      existing.physical_field_name !== pickerTarget.field.name ||
+      (isRadio && existing.widget_index !== pickerTarget.widgetIndex)
+    )
+    if (movesElsewhere && !moveConfirm) {
+      setMoveConfirm({
+        from: describeMapping(existing),
+        to: isRadio ? `${pickerTarget.field.name} (widget ${pickerTarget.widgetIndex})` : pickerTarget.field.name,
+      })
+      return
+    }
+
     setSaving(true)
     try {
-      const isRadio = pickerTarget.field.fieldKind === "radio"
       const res = await saveFieldMappingAction({
         templateId,
         logicalKey: pickerKey,
@@ -190,6 +215,7 @@ export default function TaxTemplateMappingPage() {
       if (!res.success) throw new Error(res.error)
       await refreshMappingsAndCoverage(formType)
       setPickerTarget(null)
+      setMoveConfirm(null)
     } catch (e) {
       alert(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ")
     } finally {
@@ -405,17 +431,20 @@ export default function TaxTemplateMappingPage() {
             <label className="text-xs text-slate-400 block mb-1">ความหมาย</label>
             <select
               value={pickerKey}
-              onChange={(e) => { setPickerKey(e.target.value); setPickerOption(""); setPickerFormat(guessDefaultFormat(e.target.value)) }}
+              onChange={(e) => { setPickerKey(e.target.value); setPickerOption(""); setPickerFormat(guessDefaultFormat(e.target.value)); setMoveConfirm(null) }}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 mb-3"
             >
               <option value="">— เลือก —</option>
               {Object.entries(catalogBySection).map(([section, entries]) => (
                 <optgroup key={section} label={SECTION_LABELS[section] || section}>
-                  {entries.map((entry) => (
-                    <option key={entry.key} value={entry.key}>
-                      {entry.key}{entry.label ? ` — ${entry.label}` : ""}
-                    </option>
-                  ))}
+                  {entries.map((entry) => {
+                    const existing = mappingForLogicalKey(entry.key, entry.kind === "radio")
+                    return (
+                      <option key={entry.key} value={entry.key}>
+                        {entry.key}{entry.label ? ` — ${entry.label}` : ""}{existing ? ` (map แล้วที่ ${describeMapping(existing)})` : ""}
+                      </option>
+                    )
+                  })}
                 </optgroup>
               ))}
             </select>
@@ -425,15 +454,30 @@ export default function TaxTemplateMappingPage() {
                 <label className="text-xs text-slate-400 block mb-1">ตัวเลือก (option)</label>
                 <select
                   value={pickerOption}
-                  onChange={(e) => setPickerOption(e.target.value)}
+                  onChange={(e) => { setPickerOption(e.target.value); setMoveConfirm(null) }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 mb-3"
                 >
                   <option value="">— เลือก —</option>
-                  {selectedCatalogEntry.options.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
+                  {selectedCatalogEntry.options.map((opt) => {
+                    const existing = mappingForLogicalKey(pickerKey, true, opt)
+                    return (
+                      <option key={opt} value={opt}>
+                        {opt}{existing ? ` (map แล้วที่ ${describeMapping(existing)})` : ""}
+                      </option>
+                    )
+                  })}
                 </select>
               </>
+            )}
+
+            {moveConfirm && (
+              <div className="mb-3 text-xs text-amber-200 bg-amber-950/40 border border-amber-900 rounded-lg p-2.5 flex items-start gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  ความหมายนี้ map ไว้ที่ <span className="font-mono">{moveConfirm.from}</span> อยู่แล้ว ต้องการย้ายมาที่{" "}
+                  <span className="font-mono">{moveConfirm.to}</span> แทนใช่ไหม (field เดิมจะว่างทันที) — กด &quot;ยืนยันย้าย mapping&quot; อีกครั้งเพื่อยืนยัน
+                </span>
+              </div>
             )}
 
             {pickerTarget.field.fieldKind !== "radio" && (
@@ -453,7 +497,7 @@ export default function TaxTemplateMappingPage() {
 
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => setPickerTarget(null)}
+                onClick={() => { setPickerTarget(null); setMoveConfirm(null) }}
                 className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
               >
                 ยกเลิก
@@ -470,10 +514,12 @@ export default function TaxTemplateMappingPage() {
               <button
                 onClick={handleSaveAssignment}
                 disabled={saving || !pickerKey || (pickerTarget.field.fieldKind === "radio" && !pickerOption)}
-                className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+                  moveConfirm ? "bg-amber-600 text-white hover:bg-amber-500" : "bg-blue-600 text-white hover:bg-blue-500"
+                }`}
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                บันทึก
+                {moveConfirm ? "ยืนยันย้าย mapping" : "บันทึก"}
               </button>
             </div>
           </div>
