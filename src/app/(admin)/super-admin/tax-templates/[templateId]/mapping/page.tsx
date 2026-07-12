@@ -281,15 +281,13 @@ export default function TaxTemplateMappingPage() {
               map แล้ว {coverage.mappedKeyCount}/{coverage.totalRequiredKeys}
             </div>
           )}
-          <a
-            href="https://claude.ai/code/artifact/56ea7c6e-04f4-4f65-a0db-c61dd73bf0f7"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => router.push(`/super-admin/tax-templates/${templateId}/mapping/help`)}
             className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 border border-slate-700 hover:bg-slate-900 hover:text-slate-100 transition-colors"
           >
             <BookOpen className="w-3.5 h-3.5" />
             วิธีใช้งาน
-          </a>
+          </button>
         </div>
       </div>
 
