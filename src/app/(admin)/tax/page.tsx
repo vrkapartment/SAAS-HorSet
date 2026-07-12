@@ -880,7 +880,8 @@ export default function TaxPage() {
         other408: type === "90" ? other408Full : other408Half * 2,
         netIncome: type === "90" ? netIncomeFull : netIncomeHalf,
         taxYear: printedTaxYear,
-        addressParts: type === "94" ? {
+        // ที่อยู่แยกช่องใช้กับทั้ง ภ.ง.ด. 90 และ 94 เพราะฟอร์มทั้งสองมีกล่องที่อยู่ย่อยแยกกันบนหน้าแรกเหมือนกัน
+        addressParts: {
           ...parseAddress(address),
           building: addressBuilding,
           room: addressRoom,
@@ -889,7 +890,7 @@ export default function TaxPage() {
           moo: addressMoo,
           soi: addressSoi,
           yaek: addressYaek,
-        } : undefined,
+        },
         taxpayerStatus,
         partnerCount,
         rentDeductionMethod: deductionMethod405 === "เหมา 30%" ? "percentage" : "actual",

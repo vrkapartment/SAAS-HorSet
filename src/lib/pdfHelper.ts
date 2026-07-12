@@ -121,11 +121,15 @@ export interface PndData {
 // ใช้เป็น single source of truth ทั้งตอน fill ข้อมูลจริง และตอน Super Admin ตรวจสอบไฟล์ template ที่อัปโหลดใหม่
 export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
   "90": [
-    "Text11111", "Text80.0", "Text7.0", "Text7.3", "Text9",
-    "Text34.0", "Text34.1", "Text34.2", "Text33.9",
+    "Text11111", "Text80.0", "Text7.0", "Text7.2",
+    "Text9", "Text13", "Text155.3", "Text155.5", "Text155.6", "Text20",
+    "Text360.1", "Text360.2", "Text360.3",
     "Text70", "Text40.0", "Text40.1", "Text40.2",
     "Text71", "Text40.3", "Text40.4", "Text40.5",
+    "Text38.0",
     "Text87.2", "Text87.3", "Text87.4", "Text87.6", "Text87.8", "Text87.9", "Text87.33", "Text87.34", "Text87.12",
+    "Text23.1.1", "Text30.0",
+    "Text69.1", "Text69.58",
   ],
   "94": [
     "Text1.1", "Text1.5", "Text1.7", "Text1.13", "Text1.16", "Text1.17", "Text1.18", "Text1.19", "Text1.20",
@@ -216,27 +220,64 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     }
   }
 
+  // ช่องจำนวนเงินหลายช่องในฟอร์มนี้เป็น PDF comb field แบบ "บาท-สตางค์" ที่มีเซลล์ขีดคั่นตายตัวก่อนเลข 2 หลักสุดท้ายเสมอ
+  // (ตั้ง Q=right-justify ไว้ในฟอร์ม แต่ pdf-lib ไม่ auto จัดชิดขวาให้ comb field — เทียบกันแล้วจาก appearance stream จริง)
+  // จึงต้องเติมช่องว่างด้านหน้าเองให้ครบความยาวเซลล์ทั้งหมดเพื่อดันตัวเลขชนขวาให้ตรงตำแหน่งขีดคั่นที่พิมพ์ไว้
+  const fmtComb = (n: number, totalLen: number) => {
+    const val = Math.max(0, Number.isFinite(n) ? n : 0)
+    const [intPart, decPart] = (Math.round(val * 100) / 100).toFixed(2).split(".")
+    const bahtCells = totalLen - 3 // หัก 1 เซลล์ขีดคั่น + 2 เซลล์สตางค์
+    const bahtDigits = intPart.length > bahtCells ? intPart.slice(-bahtCells) : intPart.padStart(bahtCells, " ")
+    return `${bahtDigits}-${decPart}`
+  }
+
   // 5. กรอกข้อมูลและตัวเลขลงในแบบฟอร์มผ่าน Form Fields
   if (type === "90") {
     // ภ.ง.ด. 90 (เต็มปี)
-    // ปีภาษี (ฟิลด์ทางการที่พิมพ์อยู่บนหัวแบบฟอร์ม แยกจากหมายเหตุ HorSet ที่วาดด้วยพิกัดด้านล่าง)
+    // หมายเหตุ: field mapping ของฟอร์มนี้ตรวจสอบจากตำแหน่ง x/y จริงของทุก field เทียบกับ label บนหน้าจริงแล้ว (ไม่ได้เดา)
+    // ของเดิมผิดหลายจุด — Text7.3 ที่เข้าใจว่าเป็นนามสกุลจริงๆ คือช่องชื่อคู่สมรส, Text9 รับที่อยู่ทั้งก้อนทั้งที่เป็นแค่ช่อง "อาคาร",
+    // Text34.0/34.1/34.2/33.9 ที่ใช้เป็นค่าเช่าจริงๆ คือช่องกองทุนรวม (RMF/LTF) ของข้อ 4 คนละรายการ,
+    // และไม่เคยกรอกช่อง "สถานภาพผู้มีเงินได้", ช่องภาษีชำระเพิ่มเติม/ไว้เกินหน้าแรก, และเลขผู้จ่ายเงินได้ของข้อ 7 เลย
     setField("Text11111", data.taxYear)
 
-    // ข้อมูลส่วนตัว
+    // ข้อมูลส่วนตัว (Text7.3/Text7.4/Text7.5 เป็นช่องชื่อ-ชื่อกลาง-นามสกุลของ "คู่สมรส" ไม่ใช่ผู้มีเงินได้ จึงไม่กรอก)
     setField("Text80.0", formattedTaxId)
     setField("Text7.0", data.firstName)
-    setField("Text7.3", data.lastName)
-    setField("Text9", data.address)
-    
-    // เบอร์โทรศัพท์ วาดด้วยพิกัดเนื่องจากไม่มีฟิลด์เฉพาะบนหน้าแรก
-    drawText(data.phone, 350, 617, 10)
+    setField("Text7.2", data.lastName)
 
-    // มาตรา 40(5) (ค่าเช่าห้องพัก) - หน้า 2
+    // เลือกสถานภาพของผู้มีเงินได้ (widget 0 = บุคคลธรรมดา, widget 1 = ห้างหุ้นส่วนสามัญที่มิใช่นิติบุคคล)
+    selectRadioWidget("Radio Button48", data.taxpayerStatus === "partnership" ? 1 : 0)
+    // ยื่นปกติเสมอ (ระบบยังไม่รองรับยื่นแบบเพิ่มเติม)
+    selectRadioWidget("Radio Button999", 0)
+
+    // ที่อยู่แยกช่องตามกล่องจริงบนฟอร์ม (เดิมยัดที่อยู่ทั้งก้อนลงช่อง "อาคาร" ช่องเดียว ทำให้ล้นทับช่องอื่นๆ)
+    const addressParts = data.addressParts || {
+      building: "", room: "", floor: "", village: "", no: "", moo: "", soi: "", yaek: "",
+      road: "", subdistrict: "", district: "", province: "", zipcode: ""
+    }
+    setField("Text9", addressParts.building)
+    setField("Text100.1", addressParts.room)
+    setField("Text100.2", addressParts.floor)
+    setField("Text100.3", addressParts.village)
+    setField("Text13", addressParts.no)
+    setField("Text14", addressParts.moo)
+    setField("Text155.1", addressParts.soi)
+    setField("Text155.2", addressParts.yaek)
+    setField("Text155.3", addressParts.road)
+    setField("Text155.4", addressParts.subdistrict)
+    setField("Text155.5", addressParts.district)
+    setField("Text155.6", addressParts.province)
+    setField("Text20", addressParts.zipcode)
+    // หมายเหตุ: ฟอร์มนี้ไม่มีช่องเบอร์โทรศัพท์บนหน้าแรก (ของเดิมวาดทับตำแหน่งอื่นด้วยพิกัดที่ไม่มีฟิลด์รองรับจริง จึงตัดออก)
+
+    // มาตรา 40(5) ข้อ 4 ➊ "การให้เช่าทรัพย์สิน (1) บ้าน โรงเรือน สิ่งปลูกสร้างอย่างอื่น หรือแพ" - หน้า 2
+    // (ของเดิมกรอกลง Text34.0/34.1/34.2/33.9 ซึ่งจริงๆ เป็นช่องคนละรายการ (กองทุนรวม RMF/LTF ในข้อ 4 ➏) ทำให้ค่าเช่าไปโผล่ผิดจุด)
     const rentNet = data.rent405 - data.deductionRent405
-    setField("Text34.0", Math.round(data.rent405).toString())
-    setField("Text34.1", Math.round(data.deductionRent405).toString())
-    setField("Text34.2", Math.round(rentNet).toString())
-    setField("Text33.9", Math.round(rentNet).toString()) // รวมเงินได้ประเภท 40(1)-40(5) คงเหลือ
+    const rentIsActual = data.rentDeductionMethod === "actual"
+    setField("Text360.1", fmtComb(data.rent405, 12))
+    setField("Text360.2", fmtComb(data.deductionRent405, 12))
+    setField("Text360.3", fmtComb(rentNet, 12))
+    selectRadioWidget("Radio Button14", rentIsActual ? 1 : 0)
 
     // มาตรา 40(8) ข้อ 7(1) ค่าน้ำไฟและบริการ - หน้า 3
     // (ก่อนหน้านี้ค่าน้ำไฟ/บริการ กับ รายได้อื่น (ปรับ/ริบมัดจำ) ถูกยัดรวมเป็นก้อนเดียวลงช่องเดียว
@@ -244,10 +285,11 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     const utilitiesNet = data.utilities408 - data.deductionUtilities408
     const utilIsActual = data.utilitiesDeductionMethod === "actual"
     const utilDeductionPct = data.utilities408 > 0 ? Math.round((data.deductionUtilities408 / data.utilities408) * 100) : 0
+    setField("Text38.0", formattedTaxId) // ผู้จ่ายเงินได้ เลขประจำตัวผู้เสียภาษีอากร — ไม่มีผู้หักภาษี ณ ที่จ่ายจริง ใช้เลขของผู้มีเงินได้เอง
     setField("Text70", "ค่าน้ำไฟและบริการ")
-    setField("Text40.0", Math.round(data.utilities408).toString())
-    setField("Text40.1", Math.round(data.deductionUtilities408).toString())
-    setField("Text40.2", Math.round(utilitiesNet).toString())
+    setField("Text40.0", fmtComb(data.utilities408, 13))
+    setField("Text40.1", fmtComb(data.deductionUtilities408, 13))
+    setField("Text40.2", fmtComb(utilitiesNet, 13))
     setField("Text73.0", utilIsActual ? "" : utilDeductionPct.toString())
     selectRadioWidget("Radio Button22", utilIsActual ? 1 : 0)
 
@@ -257,84 +299,79 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
       const deductionOther408 = data.deductionOther408 || 0
       const otherNet = other408 - deductionOther408
       setField("Text71", "รายได้อื่น (ปรับ/รับมัดจำ)")
-      setField("Text40.3", Math.round(other408).toString())
-      setField("Text40.4", Math.round(deductionOther408).toString())
-      setField("Text40.5", Math.round(otherNet).toString())
+      setField("Text40.3", fmtComb(other408, 13))
+      setField("Text40.4", fmtComb(deductionOther408, 13))
+      setField("Text40.5", fmtComb(otherNet, 13))
       selectRadioWidget("Radio Button24", 1)
     }
 
-    // ข้อ 11 การคำนวณภาษี (กล่องสรุปภาษีหน้า 4) — คำนวณภาษีขั้นบันไดจริงแบบเดียวกับ ภ.ง.ด. 94 (thaiTax.ts)
-    // ตำแหน่ง field ตรวจสอบจริงจาก x/y ของทุก field เทียบกับข้อความ label บนหน้า 4 แล้ว (ไม่ได้เดา)
-    // ค่าที่ระบบไม่มีข้อมูล (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ยื่นเพิ่มเติม ฯลฯ) ตั้งเป็น 0 เหมือนที่ทำไว้ใน ภ.ง.ด. 94
-    // หมายเหตุ: ช่องพวกนี้เป็น PDF comb field แบบ "บาท-สตางค์" ที่มีเซลล์ขีดคั่นตายตัวก่อนเลข 2 หลักสุดท้ายเสมอ (Q=right-justify
-    // แต่ pdf-lib ไม่ auto จัดชิดขวาให้ comb field) จึงต้องเติมช่องว่างด้านหน้าเองให้ครบความยาวเซลล์ทั้งหมดเพื่อดันตัวเลขชนขวา
-    const fmtComb = (n: number, totalLen: number) => {
-      const val = Math.max(0, Number.isFinite(n) ? n : 0)
-      const [intPart, decPart] = (Math.round(val * 100) / 100).toFixed(2).split(".")
-      const bahtCells = totalLen - 3 // หัก 1 เซลล์ขีดคั่น + 2 เซลล์สตางค์
-      const bahtDigits = intPart.length > bahtCells ? intPart.slice(-bahtCells) : intPart.padStart(bahtCells, " ")
-      return `${bahtDigits}-${decPart}`
-    }
     // เลือก radio "ชำระเพิ่มเติม" (ซ้าย, widget 0) เมื่อยอดเป็นบวก หรือ "ชำระไว้เกิน" (ขวา, widget 1) เมื่อติดลบ ไม่เลือกเมื่อเป็น 0
     const selectDueOrOverpaid = (name: string, amount: number) => {
       if (amount > 0) selectRadioWidget(name, 0)
       else if (amount < 0) selectRadioWidget(name, 1)
     }
 
-    const item1 = data.netIncome
+    // ค่าลดหย่อนส่วนตัว (ตามสถานภาพผู้เสียภาษี) ใช้ทั้งในข้อ 11 ข้อ 2. และในใบแนบแสดงรายละเอียดรายการลดหย่อนฯ หน้า 5
     const personalDeduction = calculatePersonalDeduction("90", data.taxpayerStatus || "individual", data.partnerCount || 1)
+
+    // ใบแนบแสดงรายละเอียดรายการลดหย่อนและยกเว้นหลังจากหักค่าใช้จ่าย - หน้า 5 (ก่อนหน้านี้ไม่เคยกรอกเลย ทั้งที่ข้อ 11 ข้อ 2.
+    // ของหน้า 4 อ้างอิงยอดจากหน้านี้โดยตรง — ระบบมีข้อมูลเฉพาะค่าลดหย่อนส่วนตัว (รายการ 1.) จึงกรอกเป็นทั้งรายการ 1. และยอดรวม 24.)
+    setField("Text69.1", fmtComb(personalDeduction, 12))
+    setField("Text69.58", fmtComb(personalDeduction, 12))
+
+    // ข้อ 11 การคำนวณภาษี (กล่องสรุปภาษีหน้า 4) — คำนวณภาษีขั้นบันไดจริงแบบเดียวกับ ภ.ง.ด. 94 (thaiTax.ts)
+    // รายการที่ระบบไม่มีข้อมูลจริง (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ยื่นเพิ่มเติม ฯลฯ) ปล่อยว่างไว้ไม่กรอกเลข 0 ลงไป
+    // ส่วนรายการที่คำนวณได้จริง (ถึงจะได้ 0 จากการคำนวณ) ยังกรอกตามปกติ เพื่อไม่ให้ดูเหมือนข้อมูลหาย
+    const item1 = data.netIncome
     const item2 = personalDeduction
     const item3 = Math.max(0, item1 - item2)
-    const item4 = 0 // หัก เงินบริจาคสนับสนุนการศึกษา/อื่นๆ — ระบบไม่มีข้อมูลส่วนนี้
+    const item4 = 0 // หัก เงินบริจาคสนับสนุนการศึกษา/อื่นๆ — ระบบไม่มีข้อมูลส่วนนี้ ปล่อยว่าง
     const item5 = item3 - item4
-    const item6 = 0 // หัก เงินบริจาคทั่วไป — ระบบไม่มีข้อมูลส่วนนี้
+    const item6 = 0 // หัก เงินบริจาคทั่วไป — ระบบไม่มีข้อมูลส่วนนี้ ปล่อยว่าง
     const item7 = Math.max(0, item5 - item6)
     const grossAssessableFull = data.rent405 + data.utilities408 + other408 // ไม่รวมมาตรา 40(1) (ระบบไม่มีเงินได้ประเภทนี้อยู่แล้ว)
     const item8 = calculateProgressiveTax(item7)
     const item9 = calculateMinimumTax(grossAssessableFull)
     const item10 = calculateFinalTaxDue(item8, item9)
-    const item11 = 0 // ภาษีจากใบแสดงเงินได้ฯ ในเขตพัฒนาพิเศษเฉพาะกิจ — ไม่มีข้อมูล
+    const item11 = 0 // ภาษีจากใบแสดงเงินได้ฯ ในเขตพัฒนาพิเศษเฉพาะกิจ — ไม่มีข้อมูล ปล่อยว่าง
     const item12 = item10 + item11
-    const item13 = 0 // หัก ภาษีเงินได้หัก ณ ที่จ่ายและเครดิตภาษี — ไม่มี field แยกในระบบ (เหมือน ภ.ง.ด. 94)
+    const item13 = 0 // หัก ภาษีเงินได้หัก ณ ที่จ่ายและเครดิตภาษี — ไม่มี field แยกในระบบ (เหมือน ภ.ง.ด. 94) ปล่อยว่าง
     const item14 = item12 - item13
-    const item15 = 0 // ยกมาจากข้อ 8 (ขายอสังหาริมทรัพย์แยกยื่น) — ไม่มีข้อมูล
+    const item15 = 0 // ยกมาจากข้อ 8 (ขายอสังหาริมทรัพย์แยกยื่น) — ไม่มีข้อมูล ปล่อยว่าง
     const item16 = item14 + item15
-    const item17 = 0 // ยกมาจากข้อ 9 (เงินได้จากการให้/รับ เลือกเสียภาษี 5%) — ไม่มีข้อมูล
-    const item18 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล
-    const item19 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล
-    const item20 = 0 // เฉพาะกรณียื่นเพิ่มเติม (ระบบนี้ยื่นปกติ)
+    const item17 = 0 // ยกมาจากข้อ 9 (เงินได้จากการให้/รับ เลือกเสียภาษี 5%) — ไม่มีข้อมูล ปล่อยว่าง
+    const item18 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
+    const item19 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
+    const item20 = 0 // เฉพาะกรณียื่นเพิ่มเติม (ระบบนี้ยื่นปกติ) ปล่อยว่าง
     const item21 = item16 + item17 + item18 - item19 - item20
-    const item22 = 0 // เงินเพิ่ม — ไม่มีข้อมูล
+    const item22 = 0 // เงินเพิ่ม — ไม่มีข้อมูล ปล่อยว่าง
     const item23 = item21 + item22
 
     setField("Text87.2", fmtComb(item1, 13))
     setField("Text87.3", fmtComb(item2, 13))
     setField("Text87.4", fmtComb(item3, 13))
-    setField("Text87.5", fmtComb(item4, 13))
     setField("Text87.6", fmtComb(item5, 13))
-    setField("Text87.7", fmtComb(item6, 13))
     setField("Text87.8", fmtComb(item7, 13))
     setField("Text87.9", fmtComb(item8, 13))
     setField("Text87.10", grossAssessableFull.toFixed(2)) // ฐานสำหรับสูตร "x 0.005" ของข้อ 9 (ไม่ใช่ comb field)
     setField("Text87.33", fmtComb(item9, 13))
     setField("Text87.34", fmtComb(item10, 13))
-    setField("Text87.11", fmtComb(item11, 12))
     setField("Text87.12", fmtComb(item12, 12))
-    setField("Text87.14", fmtComb(item13, 12))
     setField("Text87.181", fmtComb(item14, 12))
     selectDueOrOverpaid("Radio Button89", item14)
-    setField("Text87.19", fmtComb(item15, 12))
     setField("Text87.20", fmtComb(item16, 12))
     selectDueOrOverpaid("Radio Button93", item16)
-    setField("Text87.21", fmtComb(item17, 12))
-    setField("Text87.23", fmtComb(item18, 12))
-    setField("Text87.24", fmtComb(item19, 12))
-    setField("Text87.25", fmtComb(item20, 12))
     setField("Text87.26", fmtComb(item21, 12))
     selectDueOrOverpaid("Radio Button106", item21)
-    setField("Text87.27", fmtComb(item22, 12))
     setField("Text87.28", fmtComb(item23, 12))
     selectDueOrOverpaid("Radio Button107", item23)
+
+    // กล่องสรุปย่อ "ภาษีที่ชำระเพิ่มเติม/ชำระไว้เกิน" ที่หัวหน้าแรก (มายกมาจากผลลัพธ์สุดท้ายของข้อ 11 ข้อ 23.)
+    if (item23 >= 0) {
+      setField("Text23.1.1", fmtComb(item23, 12))
+    } else {
+      setField("Text30.0", fmtComb(-item23, 12))
+    }
 
     // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง
     drawText(
