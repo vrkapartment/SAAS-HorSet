@@ -170,7 +170,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     setTouchStart(null)
   }
 
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const { getCachedData, setCachedData, clearAllCache } = useWorkspaceData()
 
   // Theme states
@@ -426,14 +426,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   const formatNotificationTime = (timestamp: number) => {
     const diff = Date.now() - timestamp
-    if (diff < 60000) return "เมื่อสักครู่"
+    if (diff < 60000) return t("common_time.just_now")
     const mins = Math.floor(diff / 60000)
-    if (mins < 60) return `${mins} นาทีที่แล้ว`
+    if (mins < 60) return t("common_time.minutes_ago").replace("{n}", String(mins))
     const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`
+    if (hours < 24) return t("common_time.hours_ago").replace("{n}", String(hours))
     const days = Math.floor(hours / 24)
-    if (days < 30) return `${days} วันที่แล้ว`
-    return new Date(timestamp).toLocaleDateString("th-TH", {
+    if (days < 30) return t("common_time.days_ago").replace("{n}", String(days))
+    return new Date(timestamp).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", {
       day: "numeric",
       month: "short",
       year: "2-digit"

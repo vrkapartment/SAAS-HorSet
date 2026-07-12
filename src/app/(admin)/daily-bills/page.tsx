@@ -758,7 +758,7 @@ export default function DailyBillsPage() {
                             {item.amount.toLocaleString()} {t("daily_bills.baht_unit")}
                           </td>
                           <td className="py-4 text-center font-mono text-xs sm:text-sm text-slate-400 dark:text-slate-500">
-                            {new Date(item.created_at).toLocaleDateString("th-TH", {
+                            {new Date(item.created_at).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", {
                               day: "2-digit",
                               month: "short",
                               year: "2-digit"
@@ -819,7 +819,7 @@ export default function DailyBillsPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400 dark:text-slate-500 font-medium">{t("daily_bills.date_label")}</span>
                           <span className="font-mono text-slate-600 dark:text-slate-350">
-                            {new Date(item.created_at).toLocaleDateString("th-TH", {
+                            {new Date(item.created_at).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", {
                               day: "2-digit",
                               month: "long",
                               year: "numeric"

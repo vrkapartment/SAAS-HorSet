@@ -128,7 +128,7 @@ interface CsvRoomItem {
 }
 
 function RoomsContent() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const fetchCounterRef = useRef(0)
   const [rooms, setRooms] = useState<RoomItem[]>([])
@@ -2166,7 +2166,7 @@ function RoomsContent() {
                               <div className="flex justify-between">
                                 <span>ระยะสัญญา:</span>
                                 <span className="font-bold text-slate-700 dark:text-slate-300">
-                                  {room.leaseEnd ? new Date(room.leaseEnd).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                                  {room.leaseEnd ? new Date(room.leaseEnd).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", { day: "numeric", month: "short", year: "numeric" }) : "-"}
                                 </span>
                               </div>
                             </div>
@@ -2767,7 +2767,7 @@ function RoomsContent() {
                           ห้อง {c.roomNumber} - <DynamicText>{c.tenantName}</DynamicText>
                         </td>
                         <td className="py-3.5 px-4 text-center text-slate-500 dark:text-slate-400 font-semibold font-mono text-xs sm:text-sm">
-                          {c.cancellationDate ? new Date(c.cancellationDate).toLocaleDateString("th-TH", {
+                          {c.cancellationDate ? new Date(c.cancellationDate).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", {
                             year: "numeric",
                             month: "short",
                             day: "numeric",
@@ -3721,11 +3721,11 @@ function RoomsContent() {
                       </div>
                       <div className="flex justify-between py-2.5">
                         <span className="text-slate-400 dark:text-slate-500">ระยะสัญญาเริ่มต้น:</span> 
-                        <span className="font-mono text-slate-700 dark:text-slate-300">{selectedRoom.leaseStart ? new Date(selectedRoom.leaseStart).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}</span>
+                        <span className="font-mono text-slate-700 dark:text-slate-300">{selectedRoom.leaseStart ? new Date(selectedRoom.leaseStart).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}</span>
                       </div>
                       <div className="flex justify-between py-2.5">
                         <span className="text-slate-400 dark:text-slate-500">วันสิ้นสุดสัญญา:</span> 
-                        <span className="font-mono text-slate-700 dark:text-slate-300">{selectedRoom.leaseEnd ? new Date(selectedRoom.leaseEnd).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}</span>
+                        <span className="font-mono text-slate-700 dark:text-slate-300">{selectedRoom.leaseEnd ? new Date(selectedRoom.leaseEnd).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}</span>
                       </div>
                       <div className="flex justify-between py-2.5">
                         <span className="text-slate-400 dark:text-slate-500">รหัส LINE UID:</span> 

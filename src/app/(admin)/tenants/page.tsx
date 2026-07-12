@@ -75,7 +75,7 @@ interface OldTenantItem {
 }
 
 export default function TenantsPage() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const router = useRouter()
   
   // Tabs and State
@@ -685,7 +685,7 @@ export default function TenantsPage() {
     if (!dateStr) return "-"
     try {
       const d = new Date(dateStr)
-      return d.toLocaleDateString("th-TH", {
+      return d.toLocaleDateString(locale === "th" ? "th-TH" : "en-US", {
         year: "numeric",
         month: "short",
         day: "numeric"

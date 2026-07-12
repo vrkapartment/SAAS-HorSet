@@ -585,6 +585,12 @@
     "saving_to_db_btn": "Saving data to the database...",
     "save_finance_settings_btn": "Save Finance Settings"
   },
+  "common_time": {
+    "just_now": "Just now",
+    "minutes_ago": "{n} minutes ago",
+    "hours_ago": "{n} hours ago",
+    "days_ago": "{n} days ago"
+  },
   "test_connection": {
     "title": "Supabase Connection Diagnostics",
     "subtitle": "This page helps you verify the connection between the HorSet application and your local or cloud Supabase database.",
@@ -733,6 +739,10 @@
     "paid_money_bag": "Paid 💰",
     "failed_cross": "Failed ❌",
     "no_connected_tenants_cycle": "No connected tenants in this billing cycle.",
+    "invalid_data": "Invalid Data",
+    "awaiting_reading": "Awaiting",
+    "min_charge_short": "(min.)",
+    "no_occupied_rooms": "No occupied or rented rooms at this time",
     "advice_label": "Advice:",
     "unconnected_advice_desc": "Since the tenant has not yet registered or connected their LINE OA, you can click \"Copy Summary\" or \"Download PDF\" to send the bill details or the PDF file via manual channels (such as LINE chat, Facebook Messenger, SMS).",
     "download_pdf": "Download PDF",
