@@ -873,10 +873,11 @@ export default function TaxPage() {
         phone,
         rent405: type === "90" ? rent405Full : rent405Half * 2,
         deductionRent405: type === "90" ? deductionRent405Full : deductionRent405Half,
-        // ภ.ง.ด. 90 ยังรวม 40(8) ทั้งสองก้อนเป็นยอดเดียว (ไม่ได้แยกแถวในฟอร์มนี้) ส่วน ภ.ง.ด. 94 แยก ค่าน้ำไฟ กับ รายได้อื่น ออกจากกัน
-        utilities408: type === "90" ? (utilities408Full + other408Full) : utilities408Half * 2,
+        // ทั้ง ภ.ง.ด. 90 และ 94 มีแถว (1) ค่าน้ำไฟ/บริการ กับ (2) รายได้อื่น (ปรับ/ริบมัดจำ) แยกกันในข้อ 7/ก. ของฟอร์ม
+        // จึงต้องส่ง utilities408 กับ other408 แยกกันเสมอ ไม่ยัดรวมเป็นก้อนเดียว มิฉะนั้นตัวเลขที่กรอกจะไม่ตรงกับฟอร์มจริง
+        utilities408: type === "90" ? utilities408Full : utilities408Half * 2,
         deductionUtilities408: type === "90" ? deductionUtilities408Full : deductionUtilities408Half,
-        other408: type === "94" ? other408Half * 2 : undefined,
+        other408: type === "90" ? other408Full : other408Half * 2,
         netIncome: type === "90" ? netIncomeFull : netIncomeHalf,
         taxYear: printedTaxYear,
         addressParts: type === "94" ? {

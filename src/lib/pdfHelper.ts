@@ -91,7 +91,8 @@ export interface PndData {
   deductionUtilities408: number
   netIncome: number
   taxYear: string
-  // เฉพาะ ภ.ง.ด. 94: รายได้อื่น (ปรับ/ริบมัดจำ) แยกจาก utilities408, ที่อยู่แยกช่อง, และสถานภาพผู้เสียภาษี (กำหนดค่าลดหย่อนส่วนตัว)
+  // รายได้อื่น (ปรับ/ริบมัดจำ) แยกจาก utilities408 เสมอ ทั้ง ภ.ง.ด. 90 และ 94 เพราะฟอร์มทั้งสองมีแถวแยกสำหรับรายได้ประเภทนี้
+  // (ภ.ง.ด. 94 ยังใช้ addressParts/taxpayerStatus แยกช่างเพิ่มเติมที่ 90 ไม่มี)
   other408?: number
   deductionOther408?: number
   addressParts?: {
@@ -119,7 +120,13 @@ export interface PndData {
 // ชื่อฟิลด์ PDF AcroForm ที่ generatePndPdf() ต้องใช้กรอกข้อมูลจริง (ดูจุด setField() ด้านล่าง)
 // ใช้เป็น single source of truth ทั้งตอน fill ข้อมูลจริง และตอน Super Admin ตรวจสอบไฟล์ template ที่อัปโหลดใหม่
 export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
-  "90": ["Text11111", "Text80.0", "Text7.0", "Text7.3", "Text9", "Text34.0", "Text34.1", "Text34.2", "Text33.9", "Text70", "Text40.0", "Text40.1", "Text40.2"],
+  "90": [
+    "Text11111", "Text80.0", "Text7.0", "Text7.3", "Text9",
+    "Text34.0", "Text34.1", "Text34.2", "Text33.9",
+    "Text70", "Text40.0", "Text40.1", "Text40.2",
+    "Text71", "Text40.3", "Text40.4", "Text40.5",
+    "Text87.2", "Text87.3", "Text87.4", "Text87.6", "Text87.8", "Text87.9", "Text87.33", "Text87.34", "Text87.12",
+  ],
   "94": [
     "Text1.1", "Text1.5", "Text1.7", "Text1.13", "Text1.16", "Text1.17", "Text1.18", "Text1.19", "Text1.20",
     "Text3.10", "Text3.11", "Text3.12", "Text3.15", "Text3.16", "Text3.17",
@@ -184,6 +191,31 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     ? `${cleanTaxId.slice(0, 1)}-${cleanTaxId.slice(1, 5)}-${cleanTaxId.slice(5, 10)}-${cleanTaxId.slice(10, 12)}-${cleanTaxId.slice(12, 13)}`
     : cleanTaxId
 
+  // ปุ่มติ๊ก "ร้อยละ"/"จริง" ของทั้งสองฟอร์ม (เช่น Radio Button22/24 ของ 90, Radio Button6/7/8 ของ 94) มี
+  // option export value ซ้ำกันในบาง field (ทุก widget ของปุ่มเดียวกันรายงานชื่อเดียวกันจากมุมมอง getOptions())
+  // ทำให้ .select() แบบปกติเลือกผิด widget หรือโยน error จึงต้องตั้งค่า AS (appearance state) ของแต่ละ widget
+  // โดยตรงตามลำดับ index แทน (index 0 = ตัวเลือก "ร้อยละ" ซ้ายมือ, index 1 = ตัวเลือก "จริง" ขวามือ ตามตำแหน่งจริงบนฟอร์ม)
+  const selectRadioWidget = (name: string, widgetIndex: 0 | 1) => {
+    try {
+      const radioGroup = form.getRadioGroup(name)
+      const widgets = radioGroup.acroField.getWidgets()
+      widgets.forEach((w, i) => {
+        const onValue = w.getOnValue()
+        if (i === widgetIndex && onValue) {
+          w.dict.set(PDFName.of("AS"), onValue)
+        } else {
+          w.dict.set(PDFName.of("AS"), PDFName.of("Off"))
+        }
+      })
+      const selectedOn = widgets[widgetIndex]?.getOnValue()
+      if (selectedOn) {
+        radioGroup.acroField.dict.set(PDFName.of("V"), selectedOn)
+      }
+    } catch (e) {
+      console.warn(`ไม่สามารถเลือก radio ${name} (widget ${widgetIndex}):`, e)
+    }
+  }
+
   // 5. กรอกข้อมูลและตัวเลขลงในแบบฟอร์มผ่าน Form Fields
   if (type === "90") {
     // ภ.ง.ด. 90 (เต็มปี)
@@ -206,16 +238,107 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     setField("Text34.2", Math.round(rentNet).toString())
     setField("Text33.9", Math.round(rentNet).toString()) // รวมเงินได้ประเภท 40(1)-40(5) คงเหลือ
 
-    // มาตรา 40(8) (ค่าสาธารณูปโภคและบริการ) - หน้า 3
+    // มาตรา 40(8) ข้อ 7(1) ค่าน้ำไฟและบริการ - หน้า 3
+    // (ก่อนหน้านี้ค่าน้ำไฟ/บริการ กับ รายได้อื่น (ปรับ/ริบมัดจำ) ถูกยัดรวมเป็นก้อนเดียวลงช่องเดียว
+    // ทั้งที่ฟอร์มจริงมีแถว (1) และ (2) แยกกันตามประเภทเงินได้ ทำให้ยอดที่ ก. รวมมาไม่ตรงกับที่ควรจะกรอกแยก)
     const utilitiesNet = data.utilities408 - data.deductionUtilities408
-    setField("Text70", "ค่าสาธารณูปโภคและบริการ")
+    const utilIsActual = data.utilitiesDeductionMethod === "actual"
+    const utilDeductionPct = data.utilities408 > 0 ? Math.round((data.deductionUtilities408 / data.utilities408) * 100) : 0
+    setField("Text70", "ค่าน้ำไฟและบริการ")
     setField("Text40.0", Math.round(data.utilities408).toString())
     setField("Text40.1", Math.round(data.deductionUtilities408).toString())
     setField("Text40.2", Math.round(utilitiesNet).toString())
+    setField("Text73.0", utilIsActual ? "" : utilDeductionPct.toString())
+    selectRadioWidget("Radio Button22", utilIsActual ? 1 : 0)
+
+    // มาตรา 40(8) ข้อ 7(2) รายได้อื่น (ปรับ/ริบมัดจำ) - หน้า 3 (กฎหมายไม่ให้หักค่าใช้จ่ายแบบเหมาสำหรับเงินได้ประเภทนี้ ใช้ "จริง" เสมอ)
+    const other408 = data.other408 || 0
+    if (other408 > 0) {
+      const deductionOther408 = data.deductionOther408 || 0
+      const otherNet = other408 - deductionOther408
+      setField("Text71", "รายได้อื่น (ปรับ/รับมัดจำ)")
+      setField("Text40.3", Math.round(other408).toString())
+      setField("Text40.4", Math.round(deductionOther408).toString())
+      setField("Text40.5", Math.round(otherNet).toString())
+      selectRadioWidget("Radio Button24", 1)
+    }
+
+    // ข้อ 11 การคำนวณภาษี (กล่องสรุปภาษีหน้า 4) — คำนวณภาษีขั้นบันไดจริงแบบเดียวกับ ภ.ง.ด. 94 (thaiTax.ts)
+    // ตำแหน่ง field ตรวจสอบจริงจาก x/y ของทุก field เทียบกับข้อความ label บนหน้า 4 แล้ว (ไม่ได้เดา)
+    // ค่าที่ระบบไม่มีข้อมูล (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ยื่นเพิ่มเติม ฯลฯ) ตั้งเป็น 0 เหมือนที่ทำไว้ใน ภ.ง.ด. 94
+    // หมายเหตุ: ช่องพวกนี้เป็น PDF comb field แบบ "บาท-สตางค์" ที่มีเซลล์ขีดคั่นตายตัวก่อนเลข 2 หลักสุดท้ายเสมอ (Q=right-justify
+    // แต่ pdf-lib ไม่ auto จัดชิดขวาให้ comb field) จึงต้องเติมช่องว่างด้านหน้าเองให้ครบความยาวเซลล์ทั้งหมดเพื่อดันตัวเลขชนขวา
+    const fmtComb = (n: number, totalLen: number) => {
+      const val = Math.max(0, Number.isFinite(n) ? n : 0)
+      const [intPart, decPart] = (Math.round(val * 100) / 100).toFixed(2).split(".")
+      const bahtCells = totalLen - 3 // หัก 1 เซลล์ขีดคั่น + 2 เซลล์สตางค์
+      const bahtDigits = intPart.length > bahtCells ? intPart.slice(-bahtCells) : intPart.padStart(bahtCells, " ")
+      return `${bahtDigits}-${decPart}`
+    }
+    // เลือก radio "ชำระเพิ่มเติม" (ซ้าย, widget 0) เมื่อยอดเป็นบวก หรือ "ชำระไว้เกิน" (ขวา, widget 1) เมื่อติดลบ ไม่เลือกเมื่อเป็น 0
+    const selectDueOrOverpaid = (name: string, amount: number) => {
+      if (amount > 0) selectRadioWidget(name, 0)
+      else if (amount < 0) selectRadioWidget(name, 1)
+    }
+
+    const item1 = data.netIncome
+    const personalDeduction = calculatePersonalDeduction("90", data.taxpayerStatus || "individual", data.partnerCount || 1)
+    const item2 = personalDeduction
+    const item3 = Math.max(0, item1 - item2)
+    const item4 = 0 // หัก เงินบริจาคสนับสนุนการศึกษา/อื่นๆ — ระบบไม่มีข้อมูลส่วนนี้
+    const item5 = item3 - item4
+    const item6 = 0 // หัก เงินบริจาคทั่วไป — ระบบไม่มีข้อมูลส่วนนี้
+    const item7 = Math.max(0, item5 - item6)
+    const grossAssessableFull = data.rent405 + data.utilities408 + other408 // ไม่รวมมาตรา 40(1) (ระบบไม่มีเงินได้ประเภทนี้อยู่แล้ว)
+    const item8 = calculateProgressiveTax(item7)
+    const item9 = calculateMinimumTax(grossAssessableFull)
+    const item10 = calculateFinalTaxDue(item8, item9)
+    const item11 = 0 // ภาษีจากใบแสดงเงินได้ฯ ในเขตพัฒนาพิเศษเฉพาะกิจ — ไม่มีข้อมูล
+    const item12 = item10 + item11
+    const item13 = 0 // หัก ภาษีเงินได้หัก ณ ที่จ่ายและเครดิตภาษี — ไม่มี field แยกในระบบ (เหมือน ภ.ง.ด. 94)
+    const item14 = item12 - item13
+    const item15 = 0 // ยกมาจากข้อ 8 (ขายอสังหาริมทรัพย์แยกยื่น) — ไม่มีข้อมูล
+    const item16 = item14 + item15
+    const item17 = 0 // ยกมาจากข้อ 9 (เงินได้จากการให้/รับ เลือกเสียภาษี 5%) — ไม่มีข้อมูล
+    const item18 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล
+    const item19 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล
+    const item20 = 0 // เฉพาะกรณียื่นเพิ่มเติม (ระบบนี้ยื่นปกติ)
+    const item21 = item16 + item17 + item18 - item19 - item20
+    const item22 = 0 // เงินเพิ่ม — ไม่มีข้อมูล
+    const item23 = item21 + item22
+
+    setField("Text87.2", fmtComb(item1, 13))
+    setField("Text87.3", fmtComb(item2, 13))
+    setField("Text87.4", fmtComb(item3, 13))
+    setField("Text87.5", fmtComb(item4, 13))
+    setField("Text87.6", fmtComb(item5, 13))
+    setField("Text87.7", fmtComb(item6, 13))
+    setField("Text87.8", fmtComb(item7, 13))
+    setField("Text87.9", fmtComb(item8, 13))
+    setField("Text87.10", grossAssessableFull.toFixed(2)) // ฐานสำหรับสูตร "x 0.005" ของข้อ 9 (ไม่ใช่ comb field)
+    setField("Text87.33", fmtComb(item9, 13))
+    setField("Text87.34", fmtComb(item10, 13))
+    setField("Text87.11", fmtComb(item11, 12))
+    setField("Text87.12", fmtComb(item12, 12))
+    setField("Text87.14", fmtComb(item13, 12))
+    setField("Text87.181", fmtComb(item14, 12))
+    selectDueOrOverpaid("Radio Button89", item14)
+    setField("Text87.19", fmtComb(item15, 12))
+    setField("Text87.20", fmtComb(item16, 12))
+    selectDueOrOverpaid("Radio Button93", item16)
+    setField("Text87.21", fmtComb(item17, 12))
+    setField("Text87.23", fmtComb(item18, 12))
+    setField("Text87.24", fmtComb(item19, 12))
+    setField("Text87.25", fmtComb(item20, 12))
+    setField("Text87.26", fmtComb(item21, 12))
+    selectDueOrOverpaid("Radio Button106", item21)
+    setField("Text87.27", fmtComb(item22, 12))
+    setField("Text87.28", fmtComb(item23, 12))
+    selectDueOrOverpaid("Radio Button107", item23)
 
     // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง
     drawText(
-      `* คำนวณโดยระบบ HorSet: รายได้ 40(5) = ${data.rent405.toLocaleString()} บ. | รายได้ 40(8) = ${data.utilities408.toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
+      `* คำนวณโดยระบบ HorSet: รายได้ 40(5) = ${data.rent405.toLocaleString()} บ. | รายได้ 40(8) = ${(data.utilities408 + other408).toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
       45,
       25,
       8
@@ -226,30 +349,6 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     // plan การแก้ไข: Text1.28/Text1.6/Text1.31 ของเดิมผิด (เป็นช่องคู่สมรส/ชื่อกลาง/ไม่มีอยู่จริงตามลำดับ)
     // และ Text4.10.1/4.15/4.18/4.20 ของเดิมเป็นช่องในตาราง "ข. รายการลดหย่อนฯ" ไม่ใช่รายได้ 40(5)-(8) เลย
     const fmt = (n: number) => (Number.isFinite(n) ? n : 0).toFixed(2)
-    // หมายเหตุ: ปุ่มติ๊ก "ร้อยละ"/"จริง" ของฟอร์มนี้ (Radio Button6/7/8) มี option export value ซ้ำกันในบาง field
-    // (เช่น Radio Button6 ทั้งสอง widget ใช้ชื่อ "Yes" เหมือนกันจากมุมมอง getOptions()) ทำให้ .select("Yes") แบบปกติ
-    // เลือกผิด widget ได้ จึงต้องตั้งค่า AS (appearance state) ของแต่ละ widget โดยตรงตามลำดับ index แทน
-    // (index 0 = ตัวเลือก "ร้อยละ" ซ้ายมือ, index 1 = ตัวเลือก "จริง" ขวามือ ตามตำแหน่งจริงบนฟอร์มทั้ง 3 ปุ่ม)
-    const selectRadioWidget = (name: string, widgetIndex: 0 | 1) => {
-      try {
-        const radioGroup = form.getRadioGroup(name)
-        const widgets = radioGroup.acroField.getWidgets()
-        widgets.forEach((w, i) => {
-          const onValue = w.getOnValue()
-          if (i === widgetIndex && onValue) {
-            w.dict.set(PDFName.of("AS"), onValue)
-          } else {
-            w.dict.set(PDFName.of("AS"), PDFName.of("Off"))
-          }
-        })
-        const selectedOn = widgets[widgetIndex]?.getOnValue()
-        if (selectedOn) {
-          radioGroup.acroField.dict.set(PDFName.of("V"), selectedOn)
-        }
-      } catch (e) {
-        console.warn(`ไม่สามารถเลือก radio ${name} (widget ${widgetIndex}):`, e)
-      }
-    }
 
     const addressParts = data.addressParts || {
       building: "", room: "", floor: "", village: "", no: "", moo: "", soi: "", yaek: "",
