@@ -28,6 +28,7 @@
     "test_connection": "เช็คการเชื่อมต่อ Supabase",
     "super_admin": "จัดการส่วน ควบคุมหลัก",
     "super_admin_plans": "จัดการแผนการใช้งาน",
+    "super_admin_tax_templates": "จัดการ Template ภาษี",
     "profile": "แก้ไขโปรไฟล์ & รหัสผ่าน",
     "settings": "ตั้งค่าระบบ"
   },

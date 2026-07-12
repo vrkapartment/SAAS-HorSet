@@ -28,6 +28,7 @@
     "test_connection": "Supabase Connection",
     "super_admin": "Super Admin Control",
     "super_admin_plans": "Manage Subscription Plans",
+    "super_admin_tax_templates": "Manage Tax Templates",
     "profile": "Edit Profile & Password",
     "settings": "System Settings"
   },
