@@ -114,7 +114,7 @@ export default function SuperAdminPage() {
   const [supportGrants, setSupportGrants] = useState<{ [key: string]: string }>({})
 
   // ค้นหาและคัดกรอง
-  const [activeTab, setActiveTab] = useState<"workspaces" | "users" | "invites" | "settings">("workspaces")
+  const [activeTab, setActiveTab] = useState<"workspaces" | "users" | "invites" | "settings" | "taxTemplates">("workspaces")
   const [searchWorkspace, setSearchWorkspace] = useState("")
   const [searchProfile, setSearchProfile] = useState("")
 
@@ -892,7 +892,8 @@ export default function SuperAdminPage() {
             { id: "workspaces", label: "พื้นที่ทำงาน", icon: Building },
             { id: "users", label: "บัญชีผู้ใช้งาน", icon: Users },
             { id: "invites", label: "เชิญชวน & มอบสิทธิ์", icon: Key },
-            { id: "settings", label: "ตั้งค่าระบบ", icon: Settings }
+            { id: "settings", label: "ตั้งค่าระบบ", icon: Settings },
+            { id: "taxTemplates", label: "จัดการ Template ภาษี", icon: FileText }
           ].map((tab) => {
             const TabIcon = tab.icon
             const isTabActive = activeTab === tab.id
@@ -1558,7 +1559,12 @@ export default function SuperAdminPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
 
+        {/* แท็บจัดการ Template ภาษี */}
+        {activeTab === "taxTemplates" && (
+          <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
             {/* กล่องอัปโหลด PDF Template แบบฟอร์ม ภ.ง.ด. 90 */}
             <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-transparent pointer-events-none" />
