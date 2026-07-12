@@ -33,7 +33,6 @@ export function useDynamicTranslation(text: string | null | undefined) {
     const fetchTranslation = async () => {
       setIsTranslating(true)
       try {
-        console.debug("Requesting translation:", { text, locale })
         const response = await fetch("/api/translate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

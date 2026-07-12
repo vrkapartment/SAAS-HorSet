@@ -76,9 +76,11 @@ export const ADMIN_DEFAULT_PERMISSIONS: StaffPermissions = {
 // ตัวเลือกหน้าแรกหลัง login ที่ admin กำหนดให้พนักงานแต่ละคนได้
 // เฉพาะหน้าที่ staff role เข้าถึงได้จริงตาม middleware (src/lib/supabase/middleware.ts)
 // ห้ามใส่หน้าที่อยู่ใน adminPaths (เช่น /daily-bills, /tax) เพราะ staff จะถูกบล็อกจน redirect วนลูปไม่จบ
-export const STAFF_LANDING_PAGE_OPTIONS: { value: string; label: string }[] = [
-  { value: "/billing", label: "จดมิเตอร์ และดูบิล" },
-  { value: "/manage-bills", label: "จัดการใบแจ้งหนี้" },
-  { value: "/rooms", label: "จัดการห้องพัก และผู้เช่า" },
-  { value: "/tenants", label: "จัดการสัญญา ผู้เช่า" }
-]
+export function getStaffLandingPageOptions(t: (key: string) => string): { value: string; label: string }[] {
+  return [
+    { value: "/billing", label: t("nav.billing") },
+    { value: "/manage-bills", label: t("nav.manage_bills") },
+    { value: "/rooms", label: t("nav.rooms") },
+    { value: "/tenants", label: t("nav.tenants") }
+  ]
+}

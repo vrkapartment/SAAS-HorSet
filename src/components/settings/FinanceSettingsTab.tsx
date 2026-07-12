@@ -8,6 +8,7 @@ import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRoomTypes, updateRoomTypeDeposit, migrateRoomTypeDeposits } from "@/features/room/actions"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { parseAddress, formatAddress } from "@/lib/thaiAddress"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -18,6 +19,7 @@ function getCookie(name: string): string | undefined {
 }
 
 export default function FinanceSettingsTab() {
+  const { t } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -67,6 +69,7 @@ export default function FinanceSettingsTab() {
   const [workspaceId, setWorkspaceId] = useState<string>("")
   const [isDatabaseBacked, setIsDatabaseBacked] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastIsError, setToastIsError] = useState(false)
   const [hasEditPermission, setHasEditPermission] = useState(true)
 
   // โหลดค่าเริ่มต้นจาก Database (ผูกตาม Workspace ID ปัจจุบัน)
@@ -245,11 +248,11 @@ export default function FinanceSettingsTab() {
           })
           setRoomTypeDeposits(rtDeposits)
         } else {
-          setErrorMsg("ไม่พบข้อมูล Workspace ID ของบัญชีผู้ใช้งานนี้")
+          setErrorMsg(t("finance_settings_tab.err_no_workspace"))
         }
       } catch (err) {
         console.error("Failed to load settings:", err)
-        setErrorMsg("เกิดข้อผิดพลาดในการโหลดข้อมูลการเงิน")
+        setErrorMsg(t("finance_settings_tab.err_load_finance"))
       } finally {
         setLoading(false)
       }
@@ -261,23 +264,23 @@ export default function FinanceSettingsTab() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"), true)
       return
     }
 
     // ล้างข้อมูลและตรวจเช็คเบื้องต้น
     const cleanedPPId = promptPayId.replace(/[^0-9]/g, "")
     if (promptPayType === "phone" && cleanedPPId.length !== 10) {
-      alert("กรุณากรอกเบอร์มือถือพร้อมเพย์ให้ครบ 10 หลัก (เช่น 0899999999)")
+      alert(t("finance_settings_tab.err_promptpay_phone_digits"))
       return
     }
     if (promptPayType === "national_id" && cleanedPPId.length !== 13) {
-      alert("กรุณากรอกเลขบัตรประชาชนพร้อมเพย์ให้ครบ 13 หลัก (เช่น 1100100222333)")
+      alert(t("finance_settings_tab.err_promptpay_id_digits"))
       return
     }
 
     if (taxId.replace(/[^0-9]/g, "").length !== 13) {
-      alert("กรุณากรอกเลขประจำตัวผู้เสียภาษีอากรให้ครบ 13 หลัก")
+      alert(t("finance_settings_tab.err_tax_id_digits"))
       return
     }
 
@@ -334,19 +337,20 @@ export default function FinanceSettingsTab() {
         }
         clearWorkspaceCache(workspaceId)
         setCachedData(workspaceId, "finance_settings", payload)
-        showToast("บันทึกข้อมูลเข้าสู่เซิร์ฟเวอร์ระบบคลาวด์สำเร็จเรียบร้อย!")
+        showToast(t("finance_settings_tab.save_success"))
       } else {
-        setErrorMsg(res.error || "ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบสิทธิ์ผู้ใช้งาน")
+        setErrorMsg(res.error || t("finance_settings_tab.err_save_generic"))
       }
     } catch (err) {
-      setErrorMsg("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์")
+      setErrorMsg(t("finance_settings_tab.err_server_connection"))
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, isError = false) => {
     setToastMessage(msg)
+    setToastIsError(isError)
     setTimeout(() => {
       setToastMessage(null)
     }, 3000)
@@ -357,7 +361,7 @@ export default function FinanceSettingsTab() {
       {/* Toast แจ้งเตือน */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
-          {toastMessage.includes("ไม่มีสิทธิ์") ? (
+          {toastIsError ? (
             <>
               <AlertCircle className="w-4 h-4 text-rose-400 animate-pulse" />
               <span className="text-rose-400">{toastMessage}</span>
@@ -374,9 +378,9 @@ export default function FinanceSettingsTab() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-3">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-sans">ตั้งค่าการเงินและบัญชีรับเงิน</h2>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-sans">{t("finance_settings_tab.header_title")}</h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5">
-            ระบุข้อมูลผู้เสียภาษีและพร้อมเพย์เพื่อสร้างบิลสแกนจ่ายจริงและออกใบยื่นแบบภาษี ภ.ง.ด. รายหอพัก
+            {t("finance_settings_tab.header_desc")}
           </p>
         </div>
         
@@ -395,7 +399,7 @@ export default function FinanceSettingsTab() {
       {loading ? (
         <div className="w-full min-h-[400px] flex flex-col items-center justify-center gap-3">
           <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
-          <p className="text-sm text-slate-400">กำลังโหลดข้อมูลการตั้งค่าการเงินของหอพักนี้...</p>
+          <p className="text-sm text-slate-400">{t("finance_settings_tab.loading_finance")}</p>
         </div>
       ) : (
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -405,7 +409,7 @@ export default function FinanceSettingsTab() {
             {/* กล่อง 1: ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <User className="w-5 h-5 text-blue-400" /> ข้อมูลผู้ยื่นเสียภาษีเงินได้บุคคลธรรมดา
+                <User className="w-5 h-5 text-blue-400" /> {t("finance_settings_tab.taxpayer_info_title")}
               </h3>
 
               {errorMsg && (
@@ -417,21 +421,21 @@ export default function FinanceSettingsTab() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">ชื่อจริง</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.first_name_label")}</label>
                   <input
                     type="text"
                     required
-                    placeholder="ชื่อจริง (เช่น สมเจตน์)"
+                    placeholder={t("finance_settings_tab.first_name_placeholder")}
                     className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">นามสกุล</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.last_name_label")}</label>
                   <input
                     type="text"
-                    placeholder="นามสกุล (เช่น แสนสุข)"
+                    placeholder={t("finance_settings_tab.last_name_placeholder")}
                     className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
@@ -440,7 +444,7 @@ export default function FinanceSettingsTab() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm text-slate-400 font-bold block">เลขประจำตัวผู้เสียภาษีอากร / เลขบัตรประชาชน (13 หลัก)</label>
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.tax_id_label")}</label>
                 <input
                   type="text"
                   required
@@ -454,26 +458,26 @@ export default function FinanceSettingsTab() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">สถานภาพผู้เสียภาษี</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.taxpayer_status_label")}</label>
                   <select
                     className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                     value={taxpayerStatus}
                     onChange={(e) => setTaxpayerStatus(e.target.value as "individual" | "partnership")}
                   >
-                    <option value="individual">บุคคลธรรมดา</option>
-                    <option value="partnership">ห้างหุ้นส่วนสามัญที่มิใช่นิติบุคคล</option>
+                    <option value="individual">{t("finance_settings_tab.status_individual")}</option>
+                    <option value="partnership">{t("finance_settings_tab.status_partnership")}</option>
                   </select>
                   <p className="text-[11px] text-slate-450 dark:text-slate-500">
-                    ใช้กำหนดค่าลดหย่อนส่วนตัวในแบบฟอร์ม ภ.ง.ด. 90/94 ให้ถูกต้องตามสถานภาพ
+                    {t("finance_settings_tab.taxpayer_status_hint")}
                   </p>
                 </div>
                 {taxpayerStatus === "partnership" && (
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">จำนวนหุ้นส่วน</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.partner_count_label")}</label>
                     <input
                       type="number"
                       min={1}
-                      placeholder="เช่น 2"
+                      placeholder={t("finance_settings_tab.partner_count_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={partnerCount}
                       onChange={(e) => setPartnerCount(Math.max(1, Number(e.target.value) || 1))}
@@ -484,7 +488,7 @@ export default function FinanceSettingsTab() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">เบอร์โทรศัพท์ติดต่อ</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.contact_phone_label")}</label>
                   <input
                     type="text"
                     required
@@ -498,48 +502,48 @@ export default function FinanceSettingsTab() {
 
               {/* ฟอร์มกรอกที่อยู่แบบแยกประเภท */}
               <div className="space-y-4 border-t border-slate-200 dark:border-slate-900/40 pt-4">
-                <label className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold block uppercase tracking-wide">ที่อยู่ตามทะเบียนบ้าน (เพื่อกรอกในแบบยื่นภาษีกรมสรรพากร)</label>
-                
+                <label className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold block uppercase tracking-wide">{t("finance_settings_tab.address_title")}</label>
+
                 <p className="text-[11px] text-slate-450 dark:text-slate-500 -mt-2">
-                  แยกกรอกทีละช่องตามแบบฟอร์มจริงของกรมสรรพากร (ช่องไหนไม่มีเว้นว่างได้ ยกเว้น &quot;เลขที่&quot;)
+                  {t("finance_settings_tab.address_hint")}
                 </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">อาคาร</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.building_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น ตึกเอ"
+                      placeholder={t("finance_settings_tab.building_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressBuilding}
                       onChange={(e) => setAddressBuilding(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ห้องเลขที่</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.room_no_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น 101"
+                      placeholder={t("finance_settings_tab.room_no_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressRoom}
                       onChange={(e) => setAddressRoom(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ชั้นที่</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.floor_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น 2"
+                      placeholder={t("finance_settings_tab.floor_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressFloor}
                       onChange={(e) => setAddressFloor(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">หมู่บ้าน</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.village_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น หมู่บ้านสวนสน"
+                      placeholder={t("finance_settings_tab.village_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressVillage}
                       onChange={(e) => setAddressVillage(e.target.value)}
@@ -549,41 +553,41 @@ export default function FinanceSettingsTab() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">เลขที่</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.house_no_label")}</label>
                     <input
                       type="text"
                       required
-                      placeholder="เช่น 21"
+                      placeholder={t("finance_settings_tab.house_no_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressNo}
                       onChange={(e) => setAddressNo(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">หมู่ที่</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.moo_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น 5"
+                      placeholder={t("finance_settings_tab.moo_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressMoo}
                       onChange={(e) => setAddressMoo(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ตรอก/ซอย</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.soi_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น หงษ์อ่อน"
+                      placeholder={t("finance_settings_tab.soi_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressSoi}
                       onChange={(e) => setAddressSoi(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">แยก</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.yaek_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น 3"
+                      placeholder={t("finance_settings_tab.yaek_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressYaek}
                       onChange={(e) => setAddressYaek(e.target.value)}
@@ -593,32 +597,32 @@ export default function FinanceSettingsTab() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ถนน (ถ้าไม่มีให้ใส่ -)</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.road_label")}</label>
                     <input
                       type="text"
-                      placeholder="เช่น ประชาราษฎร์บำเพ็ญ"
+                      placeholder={t("finance_settings_tab.road_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressRoad}
                       onChange={(e) => setAddressRoad(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ตำบล / แขวง</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.subdistrict_label")}</label>
                     <input
                       type="text"
                       required
-                      placeholder="เช่น ห้วยขวาง"
+                      placeholder={t("finance_settings_tab.subdistrict_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressSubdistrict}
                       onChange={(e) => setAddressSubdistrict(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">อำเภอ / เขต</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.district_label")}</label>
                     <input
                       type="text"
                       required
-                      placeholder="เช่น ห้วยขวาง"
+                      placeholder={t("finance_settings_tab.district_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressDistrict}
                       onChange={(e) => setAddressDistrict(e.target.value)}
@@ -628,23 +632,23 @@ export default function FinanceSettingsTab() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">จังหวัด</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.province_label")}</label>
                     <input
                       type="text"
                       required
-                      placeholder="เช่น กรุงเทพมหานคร"
+                      placeholder={t("finance_settings_tab.province_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                       value={addressProvince}
                       onChange={(e) => setAddressProvince(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">รหัสไปรษณีย์</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.zipcode_label")}</label>
                     <input
                       type="text"
                       required
                       maxLength={5}
-                      placeholder="เช่น 10310"
+                      placeholder={t("finance_settings_tab.zipcode_placeholder")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
                       value={addressZipcode}
                       onChange={(e) => setAddressZipcode(e.target.value)}
@@ -661,11 +665,11 @@ export default function FinanceSettingsTab() {
             {/* กล่อง 3: พร้อมเพย์ */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <CreditCard className="w-5 h-5 text-teal-400" /> ตั้งค่าระบบรับเงินพร้อมเพย์ (PromptPay QR)
+                <CreditCard className="w-5 h-5 text-teal-400" /> {t("finance_settings_tab.promptpay_setup_title")}
               </h3>
 
               <div className="space-y-2.5">
-                <label className="text-xs sm:text-sm text-slate-400 font-bold block">ประเภทพร้อมเพย์</label>
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.promptpay_type_label")}</label>
                 <div className="grid grid-cols-2 gap-3.5">
                   <button
                     type="button"
@@ -679,7 +683,7 @@ export default function FinanceSettingsTab() {
                         : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700"
                     }`}
                   >
-                    เบอร์โทรศัพท์มือถือ
+                    {t("finance_settings_tab.promptpay_type_phone")}
                   </button>
                   <button
                     type="button"
@@ -693,14 +697,14 @@ export default function FinanceSettingsTab() {
                         : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700"
                     }`}
                   >
-                    เลขบัตรประชาชน (13 หลัก)
+                    {t("finance_settings_tab.promptpay_type_national_id")}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs sm:text-sm text-slate-400 font-bold block">
-                  {promptPayType === "phone" ? "หมายเลขโทรศัพท์พร้อมเพย์ (10 หลัก)" : "เลขประจำตัวบัตรประชาชนพร้อมเพย์ (13 หลัก)"}
+                  {promptPayType === "phone" ? t("finance_settings_tab.promptpay_phone_label") : t("finance_settings_tab.promptpay_id_label")}
                 </label>
                 <input
                   type="text"
@@ -713,11 +717,11 @@ export default function FinanceSettingsTab() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm text-slate-400 font-bold block">ชื่อบัญชีรับเงินพร้อมเพย์ (ภาษาไทย/อังกฤษ)</label>
+                <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("finance_settings_tab.promptpay_account_name_label")}</label>
                 <input
                   type="text"
                   required
-                  placeholder="เช่น นายสมเจตน์ แสนสุข"
+                  placeholder={t("finance_settings_tab.promptpay_account_name_placeholder")}
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-teal-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold transition-all"
                   value={promptPayName}
                   onChange={(e) => setPromptPayName(e.target.value)}
@@ -727,7 +731,7 @@ export default function FinanceSettingsTab() {
               <div className="p-4 bg-teal-500/5 border border-teal-500/10 rounded-xl flex items-start gap-3">
                 <ShieldCheck className="w-5.5 h-5.5 text-teal-400 shrink-0 mt-0.5" />
                 <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">สแกนจ่ายได้จริง:</span> ข้อมูลนี้จะนำไปประกอบการสร้าง QR Code ด้วยรูปแบบมาตรฐาน EMVCo ของประเทศไทยโดยตรง เพื่อให้ผู้เช่าสามารถนำโทรศัพท์ไปสแกนและชำระค่าเช่าเข้าบัญชีคุณได้ทันทีในยอดสุทธิที่ถูกต้อง
+                  <span className="font-bold text-slate-700 dark:text-slate-300">{t("finance_settings_tab.scan_note_prefix")}</span> {t("finance_settings_tab.scan_note_desc")}
                 </div>
               </div>
             </div>
@@ -743,11 +747,11 @@ export default function FinanceSettingsTab() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 text-white animate-spin" />
-                  กำลังบันทึกข้อมูลเข้าฐานข้อมูล...
+                  {t("finance_settings_tab.saving_to_db_btn")}
                 </>
               ) : (
                 <>
-                  <Save className="w-5 h-5" /> บันทึกข้อมูลตั้งค่าการเงิน
+                  <Save className="w-5 h-5" /> {t("finance_settings_tab.save_finance_settings_btn")}
                 </>
               )}
             </button>

@@ -40,6 +40,8 @@ import { getFinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { getRooms } from "@/features/room/actions"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -73,6 +75,7 @@ interface OldTenantItem {
 }
 
 export default function TenantsPage() {
+  const { t } = useLanguage()
   const router = useRouter()
   
   // Tabs and State
@@ -143,7 +146,7 @@ export default function TenantsPage() {
   // ฟังก์ชันดาวน์โหลดเทมเพลต CSV ผู้เช่า ดึงเลขห้องพักที่มีจริงใน Workspace
   const handleDownloadTemplate = async () => {
     try {
-      showToast("⏳ กำลังจัดเตรียมข้อมูลเทมเพลต...", "info")
+      showToast(t("tenants.downloading_template"), "info")
       const wsId = getCookie("horset_current_workspace_id") || ""
       const roomsRes = await getRooms(wsId)
       let sortedRooms: any[] = []
@@ -184,13 +187,13 @@ export default function TenantsPage() {
       link.click()
       document.body.removeChild(link)
 
-      showToast("✓ ดาวน์โหลดเทมเพลตสำเร็จ พร้อมดึงข้อมูลห้องแล้ว", "success")
+      showToast(t("tenants.template_downloaded"), "success")
 
       setTimeout(() => {
         setIsTemplateGuideModalOpen(true)
       }, 500)
     } catch (err) {
-      showToast("เกิดข้อผิดพลาดในการสร้างไฟล์เทมเพลต", "error")
+      showToast(t("tenants.err_template_create"), "error")
     }
   }
 
@@ -200,7 +203,7 @@ export default function TenantsPage() {
     if (!file) return
 
     if (!file.name.endsWith(".csv")) {
-      showToast("กรุณาเลือกไฟล์ที่มีนามสกุล .csv เท่านั้น", "error")
+      showToast(t("tenants.err_csv_only"), "error")
       e.target.value = ""
       return
     }
@@ -214,7 +217,7 @@ export default function TenantsPage() {
       reader.onload = async (event) => {
         const text = event.target?.result as string
         if (!text) {
-          showToast("ไม่สามารถเปิดอ่านข้อมูลในไฟล์ CSV นี้ได้", "error")
+          showToast(t("tenants.err_csv_read"), "error")
           setUploadingCsv(false)
           return
         }
@@ -228,7 +231,7 @@ export default function TenantsPage() {
         }
 
         if (rows.length < 2) {
-          showToast("โครงสร้างไฟล์ CSV ไม่ถูกต้อง หรือไม่มีข้อมูลในไฟล์", "error")
+          showToast(t("tenants.err_csv_structure"), "error")
           setUploadingCsv(false)
           return
         }
@@ -240,7 +243,7 @@ export default function TenantsPage() {
         const startIdx = headers.indexOf("lease_start")
 
         if (roomNumIdx === -1 || nameIdx === -1) {
-          showToast("หัวคอลัมน์ไม่ถูกต้อง ในไฟล์ CSV ต้องมีคอลัมน์ room_number และ tenant_name", "error")
+          showToast(t("tenants.err_csv_headers"), "error")
           setUploadingCsv(false)
           return
         }
@@ -285,7 +288,7 @@ export default function TenantsPage() {
         }
 
         if (parsedTenants.length === 0) {
-          showToast("ไม่พบข้อมูลผู้เช่าที่ระบุชื่อผู้เช่าถูกต้องในไฟล์ CSV", "error")
+          showToast(t("tenants.err_csv_no_valid_tenant"), "error")
           setUploadingCsv(false)
           return
         }
@@ -293,20 +296,20 @@ export default function TenantsPage() {
         // ส่งไปบันทึกที่ Server Action
         const res = await createTenantsBatch(parsedTenants, wsId)
         if (res.success) {
-          showToast(`✓ นำเข้าข้อมูลผู้เช่าสำเร็จเรียบร้อย ${res.count} ห้องพัก!`, "success")
+          showToast(t("tenants.csv_import_success").replace("{count}", String(res.count)), "success")
           await loadData(true)
         } else if (res.errors && res.errors.length > 0) {
           setCsvErrors(res.errors)
           setIsErrorModalOpen(true)
-          showToast("⚠️ ไม่สามารถนำเข้าข้อมูลได้เนื่องจากมีข้อผิดพลาดบางจุด", "error")
+          showToast(t("tenants.csv_import_partial_error"), "error")
         } else {
-          showToast(res.error || "เกิดข้อผิดพลาดในการนำเข้าข้อมูลผู้เช่า", "error")
+          showToast(res.error || t("tenants.err_csv_import_generic"), "error")
         }
         setUploadingCsv(false)
       }
       reader.readAsText(file, "UTF-8")
     } catch (err: any) {
-      showToast("เกิดข้อผิดพลาดในการอัปโหลดไฟล์", "error")
+      showToast(t("tenants.err_csv_upload"), "error")
       setUploadingCsv(false)
     } finally {
       e.target.value = ""
@@ -329,13 +332,13 @@ export default function TenantsPage() {
       const action = financeSettings?.lease_expiry_action || "renew"
       if (action === "renew") {
         return {
-          label: "เกินกำหนดระยะสัญญาเดิม",
+          label: t("tenants.status_overdue_renew"),
           style: "bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 font-bold",
           dotColor: "bg-red-500"
         }
       } else {
         return {
-          label: "อยู่ครบตามอายุสัญญา",
+          label: t("rooms.active_contract"),
           style: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 font-bold",
           dotColor: "bg-emerald-500"
         }
@@ -358,11 +361,11 @@ export default function TenantsPage() {
       if (totalMonths <= 2 && totalMonths >= 0) {
         let label = ""
         if (diffDays <= 30) {
-          label = "เหลืออายุสัญญาอีก 1 เดือน"
+          label = t("tenants.status_remaining_1mo")
         } else if (diffDays <= 60) {
-          label = "เหลืออายุสัญญาอีก 2 เดือน"
+          label = t("tenants.status_remaining_2mo")
         } else {
-          label = `เหลืออายุสัญญาอีก ${totalMonths} เดือน`
+          label = t("tenants.status_remaining_months").replace("{n}", String(totalMonths))
         }
         return {
           label: label,
@@ -374,7 +377,7 @@ export default function TenantsPage() {
 
     // สัญญาเช่ายังปกติอยู่
     return {
-      label: "สัญญาปกติ",
+      label: t("tenants.status_normal"),
       style: "bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 font-bold",
       dotColor: "bg-blue-500"
     }
@@ -444,7 +447,7 @@ export default function TenantsPage() {
         setError(oldRes.error)
       }
     } catch (err) {
-      setError("เกิดข้อผิดพลาดในการโหลดข้อมูลผู้เช่า")
+      setError(t("tenants.err_load_tenants"))
     } finally {
       setLoading(false)
       setIsSubmitting(false)
@@ -486,7 +489,7 @@ export default function TenantsPage() {
   // Handle deletion of old tenant history log
   const handleDeleteOldTenant = async (id: string) => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("daily_bills.no_permission_msg"), "error")
       return
     }
     setDeleteSubmitting(true)
@@ -496,10 +499,10 @@ export default function TenantsPage() {
         setDeleteConfirmId(null)
         loadData(true)
       } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการลบประวัติ")
+        alert(res.error || t("tenants.err_delete_history"))
       }
     } catch (err) {
-      alert("เกิดข้อผิดพลาดการเชื่อมต่อ")
+      alert(t("tenants.err_connection_generic"))
     } finally {
       setDeleteSubmitting(false)
     }
@@ -507,7 +510,7 @@ export default function TenantsPage() {
 
   const handleEditClick = (tenant: TenantItem) => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("daily_bills.no_permission_msg"), "error")
       return
     }
     setSelectedTenant(tenant)
@@ -534,34 +537,34 @@ export default function TenantsPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("daily_bills.no_permission_msg"), "error")
       return
     }
     if (!selectedTenant) return
 
     if (!editFullName.trim()) {
-      showToast("กรุณากรอกชื่อ-นามสกุล", "error")
+      showToast(t("tenants.err_name_required"), "error")
       return
     }
     if (!editPhone.trim()) {
-      showToast("กรุณากรอกเบอร์โทรศัพท์", "error")
+      showToast(t("tenants.err_phone_required"), "error")
       return
     }
     if (!editRoomNumber.trim()) {
-      showToast("กรุณากรอกหมายเลขห้องพัก", "error")
+      showToast(t("tenants.err_room_required"), "error")
       return
     }
     if (!editContractStart) {
-      showToast("กรุณาเลือกวันเริ่มสัญญา", "error")
+      showToast(t("tenants.err_start_date_required"), "error")
       return
     }
     if (!editContractEnd) {
-      showToast("กรุณาเลือกวันสิ้นสุดสัญญา", "error")
+      showToast(t("tenants.err_end_date_required"), "error")
       return
     }
 
     if (new Date(editContractEnd) < new Date(editContractStart)) {
-      showToast("วันสิ้นสุดสัญญาต้องไม่เกิดขึ้นก่อนวันเริ่มสัญญา", "error")
+      showToast(t("tenants.err_end_before_start"), "error")
       return
     }
 
@@ -578,15 +581,15 @@ export default function TenantsPage() {
       )
 
       if (res.success) {
-        showToast("แก้ไขข้อมูลผู้เช่าสำเร็จแล้ว", "success")
+        showToast(t("tenants.edit_success"), "success")
         setIsEditModalOpen(false)
         setSelectedTenant(null)
         loadData(true)
       } else {
-        showToast(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error")
+        showToast(res.error || t("tenants.err_save_generic"), "error")
       }
     } catch (err) {
-      showToast("เกิดข้อผิดพลาดการเชื่อมต่อเซิร์ฟเวอร์", "error")
+      showToast(t("tenants.err_server_connection"), "error")
     } finally {
       setEditSubmitting(false)
     }
@@ -670,12 +673,12 @@ export default function TenantsPage() {
 
   // Mask Line User ID
   const getMaskedLine = (lineId: string | null) => {
-    if (!lineId) return "ไม่ได้ผูก LINE"
+    if (!lineId) return t("tenants.line_not_linked")
     if (showSensitiveData) return lineId
     if (lineId.length > 8) {
       return lineId.substring(0, 4) + "..." + lineId.substring(lineId.length - 4)
     }
-    return "ผูก LINE แล้ว"
+    return t("tenants.line_linked")
   }
 
   const formatDateThai = (dateStr: string) => {
@@ -693,8 +696,8 @@ export default function TenantsPage() {
   }
 
   const isOriginalAction = financeSettings?.lease_expiry_action === "original"
-  const expiredCardTitle = isOriginalAction ? "อยู่ครบตามอายุสัญญา" : "เกินกำหนดระยะสัญญาเดิม"
-  const expiredCardSub = isOriginalAction ? "อยู่ครบตามอายุสัญญา" : "เกินกำหนดระยะสัญญาเดิม"
+  const expiredCardTitle = isOriginalAction ? t("rooms.active_contract") : t("tenants.status_overdue_renew")
+  const expiredCardSub = isOriginalAction ? t("rooms.active_contract") : t("tenants.status_overdue_renew")
   const ExpiredIcon = isOriginalAction ? CheckCircle2 : Clock
   const expiredColors = isOriginalAction
     ? {
@@ -848,10 +851,10 @@ export default function TenantsPage() {
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
             <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-            ข้อมูลผู้เช่าและประวัติ
+            {t("tenants.header_title")}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            ดูรายชื่อผู้เช่าปัจจุบัน สัญญาเช่าปัจจุบัน และประวัติผู้เช่าเก่าที่ย้ายออกแล้วอย่างปลอดภัยตามมาตรฐาน PDPA
+            {t("tenants.header_desc")}
           </p>
         </div>
 
@@ -861,12 +864,12 @@ export default function TenantsPage() {
             <button
               type="button"
               onClick={handleDownloadTemplate}
-              title="ดาวน์โหลดเทมเพลตไฟล์ CSV สำหรับจัดการข้อมูลผู้เช่าและสัญญา"
+              title={t("tenants.download_template_tooltip")}
               className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
             >
               <Download className="w-4 h-4 text-blue-500" />
-              <span className="hidden sm:inline">ดาวน์โหลด CSV Template</span>
-              <span className="sm:hidden">เทมเพลต</span>
+              <span className="hidden sm:inline">{t("tenants.download_csv_template_full")}</span>
+              <span className="sm:hidden">{t("tenants.download_csv_template_short")}</span>
             </button>
 
             {hasEditPermission && (
@@ -877,8 +880,8 @@ export default function TenantsPage() {
                   ) : (
                     <Upload className="w-4 h-4 text-emerald-500" />
                   )}
-                  <span className="hidden sm:inline">{uploadingCsv ? "กำลังอัปโหลด..." : "อัปโหลดไฟล์ CSV"}</span>
-                  <span className="sm:hidden">{uploadingCsv ? "..." : "อัปโหลด"}</span>
+                  <span className="hidden sm:inline">{uploadingCsv ? t("tenants.uploading_btn") : t("tenants.upload_csv_full")}</span>
+                  <span className="sm:hidden">{uploadingCsv ? "..." : t("tenants.upload_csv_short")}</span>
                 </span>
                 <input
                   type="file"
@@ -893,12 +896,12 @@ export default function TenantsPage() {
             <button
               type="button"
               onClick={() => setIsTemplateGuideModalOpen(true)}
-              title="เปิดดูคู่มือการกรอกไฟล์เทมเพลต CSV ของผู้เช่า"
+              title={t("tenants.csv_guide_tooltip")}
               className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm flex-1 sm:flex-initial justify-center"
             >
               <HelpCircle className="w-4 h-4 text-indigo-500" />
-              <span className="hidden sm:inline">คู่มือการใช้ CSV</span>
-              <span className="sm:hidden">คู่มือ CSV</span>
+              <span className="hidden sm:inline">{t("tenants.csv_guide_full")}</span>
+              <span className="sm:hidden">{t("tenants.csv_guide_short")}</span>
             </button>
           </div>
 
@@ -915,12 +918,12 @@ export default function TenantsPage() {
               {showSensitiveData ? (
                 <>
                   <EyeOff className="w-4 h-4 text-amber-500" />
-                  ซ่อนข้อมูลส่วนตัว
+                  {t("tenants.hide_sensitive")}
                 </>
               ) : (
                 <>
                   <Eye className="w-4 h-4 text-slate-400" />
-                  แสดงข้อมูลส่วนตัว (PDPA)
+                  {t("tenants.show_sensitive")}
                 </>
               )}
             </button>
@@ -930,7 +933,7 @@ export default function TenantsPage() {
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-850 active:scale-95 text-slate-500 dark:text-slate-350 transition-all cursor-pointer shadow-sm disabled:opacity-50"
-              title="รีเฟรชข้อมูล"
+              title={t("tenants.refresh_tooltip")}
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
             </button>
@@ -943,12 +946,12 @@ export default function TenantsPage() {
         {/* Stat 1: Active Current Tenants */}
         <div className="bg-white dark:bg-slate-850 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
           <div className="space-y-1.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">ผู้เช่าสัญญาปกติ</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{t("tenants.stat_active_title")}</span>
             <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono leading-none">
-              {loading ? "-" : `${stats.activeCount} สัญญา`}
+              {loading ? "-" : t("tenants.contract_count").replace("{count}", String(stats.activeCount))}
             </h3>
             <span className="text-[10px] md:text-xs text-teal-600 dark:text-teal-400 font-bold tracking-wide flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> อยู่ในสัญญาเช่าปกติ
+              <CheckCircle2 className="w-3.5 h-3.5" /> {t("tenants.stat_active_sub")}
             </span>
           </div>
           <div className="p-3 bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 rounded-2xl">
@@ -961,7 +964,7 @@ export default function TenantsPage() {
           <div className="space-y-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{expiredCardTitle}</span>
             <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono leading-none">
-              {loading ? "-" : `${stats.expiredCount} สัญญา`}
+              {loading ? "-" : t("tenants.contract_count").replace("{count}", String(stats.expiredCount))}
             </h3>
             <span className={`text-[10px] md:text-xs font-bold tracking-wide flex items-center gap-1 ${expiredColors.text}`}>
               <ExpiredIcon className="w-3.5 h-3.5" /> {expiredCardSub}
@@ -975,12 +978,12 @@ export default function TenantsPage() {
         {/* Stat 3: Archived Old Tenants */}
         <div className="bg-white dark:bg-slate-850 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
           <div className="space-y-1.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">ประวัติผู้เช่าเก่า</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{t("tenants.stat_old_title")}</span>
             <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono leading-none">
-              {loading ? "-" : `${stats.oldTotalCount} รายชื่อ`}
+              {loading ? "-" : t("tenants.name_count").replace("{count}", String(stats.oldTotalCount))}
             </h3>
             <span className="text-[10px] md:text-xs text-blue-600 dark:text-blue-400 font-bold tracking-wide flex items-center gap-1">
-              <Database className="w-3.5 h-3.5" /> สำรองข้อมูลในระบบถาวร
+              <Database className="w-3.5 h-3.5" /> {t("tenants.stat_old_sub")}
             </span>
           </div>
           <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-2xl">
@@ -998,7 +1001,7 @@ export default function TenantsPage() {
           </span>
           <input
             type="text"
-            placeholder="ค้นหาชื่อ, ห้องพัก, เบอร์โทร..."
+            placeholder={t("tenants.search_placeholder")}
             className="w-full h-11 pl-10 pr-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 dark:text-slate-100 text-xs font-medium transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -1017,10 +1020,10 @@ export default function TenantsPage() {
         <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 w-full xl:w-auto">
           {/* Tab switch buttons as Filter Badges Row */}
           <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">สถานะผู้เช่า:</span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline-block">{t("tenants.tenant_status_label")}</span>
             {[
-              { id: "current", label: `ผู้เช่าปัจจุบัน (${currentTenants.length})`, icon: UserCheck },
-              { id: "old", label: `ผู้เช่าเก่า/ย้ายออก (${stats.oldTotalCount})`, icon: UserMinus }
+              { id: "current", label: t("tenants.current_tenants_tab").replace("{count}", String(currentTenants.length)), icon: UserCheck },
+              { id: "old", label: t("tenants.old_tenants_tab").replace("{count}", String(stats.oldTotalCount)), icon: UserMinus }
             ].map(tab => {
               const Icon = tab.icon
               return (
@@ -1051,7 +1054,7 @@ export default function TenantsPage() {
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
-              <span>บล็อก</span>
+              <span>{t("tenants.view_block")}</span>
             </button>
             <button
               onClick={() => setViewMode("table")}
@@ -1062,7 +1065,7 @@ export default function TenantsPage() {
               }`}
             >
               <List className="w-3.5 h-3.5" />
-              <span>ตาราง</span>
+              <span>{t("tenants.view_table")}</span>
             </button>
           </div>
         </div>
@@ -1088,24 +1091,24 @@ export default function TenantsPage() {
             </div>
             <div className="space-y-2">
               <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                ยังไม่ได้ติดตั้งฐานข้อมูลย้ายออก (Table tenants_old Not Found)
+                {t("tenants.table_not_found_title")}
               </h3>
               <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                ระบบหลังบ้านของท่านยังขาดตาราง <code className="px-1.5 py-0.5 bg-amber-100/50 dark:bg-amber-900/30 rounded font-mono text-xs text-amber-700 dark:text-amber-400 font-bold">public.tenants_old</code> สำหรับสำรองข้อมูลประวัติผู้เช่าเก่า
+                {t("tenants.table_not_found_desc_prefix")} <code className="px-1.5 py-0.5 bg-amber-100/50 dark:bg-amber-900/30 rounded font-mono text-xs text-amber-700 dark:text-amber-400 font-bold">public.tenants_old</code> {t("tenants.table_not_found_desc_suffix")}
               </p>
             </div>
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
             <h4 className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-500" /> ขั้นตอนการติดตั้งง่ายๆ ภายใน 1 นาที:
+              <Sparkles className="w-4 h-4 text-amber-500" /> {t("tenants.setup_steps_title")}
             </h4>
             <ol className="list-decimal list-inside text-xs text-slate-600 dark:text-slate-400 space-y-2.5">
-              <li>เปิดเข้าไปหน้าแดชบอร์ดโครงการของคุณที่ <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-bold inline-flex items-center gap-0.5">Supabase.com</a></li>
-              <li>เมนูด้านซ้าย เลือกเมนู <strong>SQL Editor</strong></li>
-              <li>คลิกปุ่ม <strong>New query</strong> เพื่อเปิดหน้าเขียนสคริปต์ว่างๆ</li>
-              <li>คัดลอกรหัส SQL ในไฟล์ <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono font-bold text-slate-800 dark:text-slate-300 text-[11px]">database_patch_tenants_old.sql</code> ในโฟลเดอร์โปรเจกต์ของคุณไปวางทั้งหมด</li>
-              <li>คลิกปุ่ม <strong>Run</strong> ที่มุมขวาล่างเพื่อสร้างตารางและนโยบาย RLS ในทันที</li>
+              <li>{t("tenants.setup_step1_prefix")} <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-bold inline-flex items-center gap-0.5">Supabase.com</a></li>
+              <li>{t("tenants.setup_step2_prefix")} <strong>SQL Editor</strong></li>
+              <li>{t("tenants.setup_step3_prefix")} <strong>New query</strong> {t("tenants.setup_step3_suffix")}</li>
+              <li>{t("tenants.setup_step4_prefix")} <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono font-bold text-slate-800 dark:text-slate-300 text-[11px]">database_patch_tenants_old.sql</code> {t("tenants.setup_step4_suffix")}</li>
+              <li>{t("tenants.setup_step5_prefix")} <strong>Run</strong> {t("tenants.setup_step5_suffix")}</li>
             </ol>
           </div>
 
@@ -1117,7 +1120,7 @@ export default function TenantsPage() {
               }}
               className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
             >
-              ทดลองเชื่อมต่ออีกครั้ง (Retry Connection)
+              {t("tenants.retry_connection_btn")}
             </button>
           </div>
         </div>
@@ -1125,13 +1128,13 @@ export default function TenantsPage() {
         // Error Display
         <div className="p-8 text-center bg-red-50/30 dark:bg-red-950/10 border border-red-200/50 dark:border-red-900/30 rounded-2xl max-w-xl mx-auto space-y-4">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
-          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">เกิดข้อผิดพลาดในการดึงข้อมูล</h4>
+          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">{t("tenants.err_fetch_generic")}</h4>
           <p className="text-xs text-slate-500 dark:text-slate-400">{error}</p>
           <button
             onClick={() => loadData()}
             className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-bold transition-all cursor-pointer"
           >
-            โหลดข้อมูลใหม่
+            {t("tenants.reload_data_btn")}
           </button>
         </div>
       ) : activeTab === "current" ? (
@@ -1146,39 +1149,39 @@ export default function TenantsPage() {
                     FL {floor}
                   </div>
                   <h3 className="text-base md:text-lg font-black text-slate-850 dark:text-slate-100">
-                    ชั้น {floor}
+                    {t("tenants.floor_simple").replace("{floor}", floor)}
                   </h3>
                   <span className="text-xs md:text-sm text-slate-400 dark:text-slate-500 font-bold ml-auto bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-150 dark:border-slate-800">
-                    ผู้เช่า {currentByFloor[floor].length} ห้อง
+                    {t("tenants.tenant_count_rooms").replace("{count}", String(currentByFloor[floor].length))}
                   </span>
                 </div>
 
                 {/* Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {currentByFloor[floor].map((t) => {
-                    const status = getContractStatus(t.contractStart, t.contractEnd)
+                  {currentByFloor[floor].map((tenant) => {
+                    const status = getContractStatus(tenant.contractStart, tenant.contractEnd)
                     return (
-                      <div 
-                        key={t.id} 
+                      <div
+                        key={tenant.id}
                         className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
                       >
                         <div>
                           {/* Header */}
                           <div className="flex items-start justify-between gap-2 mb-3">
                             <div>
-                              <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องพัก</span>
+                              <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">{t("dashboard.col_room")}</span>
                               <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
-                                ห้อง {t.roomNumber}
+                                {t("billing.room_label").replace("{roomNumber}", tenant.roomNumber)}
                               </h4>
                             </div>
-                            
+
                             {/* Actions */}
                             {hasEditPermission && (
                               <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200/30 dark:border-slate-800/30 opacity-60 group-hover/card:opacity-100 transition-opacity">
                                 <button
-                                  onClick={() => handleEditClick(t)}
+                                  onClick={() => handleEditClick(tenant)}
                                   className="p-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
-                                  title="แก้ไขข้อมูลผู้เช่า"
+                                  title={t("tenants.edit_tenant_tooltip")}
                                 >
                                   <Edit className="w-3.5 h-3.5" />
                                 </button>
@@ -1201,34 +1204,34 @@ export default function TenantsPage() {
                           {/* Details */}
                           <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
                             <div className="flex items-center justify-between text-sm sm:text-base">
-                              <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่า:</span>
-                              <span className="font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5 truncate min-w-0 flex-1 justify-end ml-4" title={t.fullName}>
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">{t("rooms.tenant_label")}</span>
+                              <span className="font-bold text-slate-850 dark:text-slate-200 flex items-center gap-1.5 truncate min-w-0 flex-1 justify-end ml-4" title={tenant.fullName}>
                                 <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                                {t.fullName}
+                                <DynamicText>{tenant.fullName}</DynamicText>
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between text-sm sm:text-base">
-                              <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">{t("rooms.phone_label")}</span>
                               <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
                                 <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                                {getMaskedPhone(t.phone)}
+                                {getMaskedPhone(tenant.phone)}
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between text-sm sm:text-base">
-                              <span className="text-slate-400 dark:text-slate-500 font-medium">สถานะ LINE OA:</span>
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">{t("tenants.line_oa_status_label")}</span>
                               <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
                                 <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
-                                {getMaskedLine(t.lineUserId)}
+                                {getMaskedLine(tenant.lineUserId)}
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between text-sm sm:text-base">
-                              <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะสัญญาเช่า:</span>
+                              <span className="text-slate-400 dark:text-slate-500 font-medium">{t("tenants.lease_term_label")}</span>
                               <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
                                 <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                                {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                                {formatDateThai(tenant.contractStart)} - {formatDateThai(tenant.contractEnd)}
                               </span>
                             </div>
                           </div>
@@ -1242,7 +1245,7 @@ export default function TenantsPage() {
 
             {filteredCurrent.length === 0 && (
               <div className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
-                ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
+                {t("tenants.no_current_tenants")}
               </div>
             )}
           </div>
@@ -1254,47 +1257,47 @@ export default function TenantsPage() {
               <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs sm:text-sm">
-                    {renderSortHeader("ห้องพัก", "room", "py-3.5 px-5")}
-                    {renderSortHeader("ชื่อผู้เช่า", "fullName", "py-3.5 px-4")}
-                    <th className="py-3.5 px-4 select-none">เบอร์โทรศัพท์ (PDPA)</th>
-                    {renderSortHeader("สถานะ LINE OA", "line", "py-3.5 px-4")}
-                    {renderSortHeader("ระยะสัญญาเช่า", "lease", "py-3.5 px-4")}
-                    {renderSortHeader("สถานะ", "status", "py-3.5 px-5 text-center", true)}
-                    {hasEditPermission && <th className="py-3.5 px-5 text-center w-24">จัดการ</th>}
+                    {renderSortHeader(t("dashboard.col_room"), "room", "py-3.5 px-5")}
+                    {renderSortHeader(t("dashboard.col_tenant"), "fullName", "py-3.5 px-4")}
+                    <th className="py-3.5 px-4 select-none">{t("tenants.col_phone_pdpa")}</th>
+                    {renderSortHeader(t("tenants.col_line_oa"), "line", "py-3.5 px-4")}
+                    {renderSortHeader(t("tenants.col_lease_term"), "lease", "py-3.5 px-4")}
+                    {renderSortHeader(t("dashboard.col_status"), "status", "py-3.5 px-5 text-center", true)}
+                    {hasEditPermission && <th className="py-3.5 px-5 text-center w-24">{t("tenants.col_actions")}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
-                  {filteredCurrent.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
+                  {filteredCurrent.map((tenant) => (
+                    <tr key={tenant.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
                       <td className="py-4 px-5 font-black text-slate-900 dark:text-slate-100 text-sm sm:text-base">
-                        ห้อง {t.roomNumber}
+                        {t("billing.room_label").replace("{roomNumber}", tenant.roomNumber)}
                       </td>
                       <td className="py-4 px-4 font-extrabold text-slate-850 dark:text-slate-200">
-                        {t.fullName}
+                        <DynamicText>{tenant.fullName}</DynamicText>
                       </td>
                       <td className="py-4 px-4 font-semibold font-mono text-slate-600 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                          {getMaskedPhone(t.phone)}
+                          {getMaskedPhone(tenant.phone)}
                         </div>
                       </td>
                       <td className="py-4 px-4 font-mono text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <MessageSquare className="w-4 h-4 text-green-500 shrink-0" />
-                          {getMaskedLine(t.lineUserId)}
+                          {getMaskedLine(tenant.lineUserId)}
                         </div>
                       </td>
                       <td className="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                           <span className="font-mono text-xs sm:text-sm">
-                            {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                            {formatDateThai(tenant.contractStart)} - {formatDateThai(tenant.contractEnd)}
                           </span>
                         </div>
                       </td>
                       <td className="py-4 px-5 text-center">
                         {(() => {
-                          const status = getContractStatus(t.contractStart, t.contractEnd)
+                          const status = getContractStatus(tenant.contractStart, tenant.contractEnd)
                           if (!status) return "-"
                           return (
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${status.style}`}>
@@ -1307,9 +1310,9 @@ export default function TenantsPage() {
                       {hasEditPermission && (
                         <td className="py-4 px-5 text-center">
                           <button
-                            onClick={() => handleEditClick(t)}
+                            onClick={() => handleEditClick(tenant)}
                             className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center"
-                            title="แก้ไขข้อมูลผู้เช่า"
+                            title={t("tenants.edit_tenant_tooltip")}
                           >
                             <Edit className="w-4 h-4" />
                           </button>
@@ -1321,7 +1324,7 @@ export default function TenantsPage() {
                   {filteredCurrent.length === 0 && (
                     <tr>
                       <td colSpan={hasEditPermission ? 7 : 6} className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium">
-                        ไม่มีข้อมูลผู้เช่าเช่าอยู่ในขณะนี้
+                        {t("tenants.no_current_tenants")}
                       </td>
                     </tr>
                   )}
@@ -1344,39 +1347,39 @@ export default function TenantsPage() {
                     FL {floor}
                   </div>
                   <h3 className="text-base md:text-lg font-black text-slate-850 dark:text-slate-100">
-                    ชั้น {floor}
+                    {t("tenants.floor_simple").replace("{floor}", floor)}
                   </h3>
                   <span className="text-xs md:text-sm text-slate-400 dark:text-slate-500 font-bold ml-auto bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-150 dark:border-slate-800">
-                    ประวัติ {oldByFloor[floor].length} รายการ
+                    {t("tenants.history_count_items").replace("{count}", String(oldByFloor[floor].length))}
                   </span>
                 </div>
 
                 {/* Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {oldByFloor[floor].map((t) => (
-                    <div 
-                      key={t.id} 
+                  {oldByFloor[floor].map((tenant) => (
+                    <div
+                      key={tenant.id}
                       className="p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group/card bg-white dark:bg-slate-900"
                     >
                       <div>
                         {/* Header */}
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div>
-                            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">ห้องสุดท้ายที่พัก</span>
+                            <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">{t("tenants.last_room_label_detail")}</span>
                             <h4 className="text-base sm:text-lg font-black text-slate-850 dark:text-slate-100 tracking-wide">
-                              ห้อง {t.roomNumber}
+                              {t("billing.room_label").replace("{roomNumber}", tenant.roomNumber)}
                             </h4>
                           </div>
-                          
+
                           {/* Actions */}
                           <div>
                             <button
                               onClick={() => {
                                 if (!hasEditPermission) {
-                                  showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+                                  showToast(t("daily_bills.no_permission_msg"), "error")
                                   return
                                 }
-                                setDeleteConfirmId(t.id)
+                                setDeleteConfirmId(tenant.id)
                               }}
                               disabled={!hasEditPermission}
                               className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
@@ -1384,7 +1387,7 @@ export default function TenantsPage() {
                                   ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-150/40 dark:border-rose-900/30"
                                   : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
                               }`}
-                              title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
+                              title={hasEditPermission ? t("tenants.delete_permanent_tooltip") : t("tenants.no_delete_permission_tooltip")}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1394,34 +1397,34 @@ export default function TenantsPage() {
                         {/* Details */}
                         <div className="pt-3 border-t border-slate-100 dark:border-slate-800/85 space-y-2.5">
                           <div className="flex items-center justify-between text-sm sm:text-base">
-                            <span className="text-slate-400 dark:text-slate-500 font-medium">ชื่อผู้เช่าเก่า:</span>
-                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate min-w-0 flex-1 justify-end ml-4" title={t.fullName}>
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">{t("tenants.old_tenant_name_label")}</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate min-w-0 flex-1 justify-end ml-4" title={tenant.fullName}>
                               <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                              {t.fullName}
+                              <DynamicText>{tenant.fullName}</DynamicText>
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between text-sm sm:text-base">
-                            <span className="text-slate-400 dark:text-slate-500 font-medium">เบอร์โทรศัพท์:</span>
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">{t("rooms.phone_label")}</span>
                             <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono">
                               <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                              {getMaskedPhone(t.phone)}
+                              {getMaskedPhone(tenant.phone)}
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between text-sm sm:text-base">
-                            <span className="text-slate-400 dark:text-slate-500 font-medium">ระยะเวลาที่เคยเช่า:</span>
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">{t("tenants.rental_period_label")}</span>
                             <span className="font-semibold text-slate-750 dark:text-slate-300 flex items-center gap-1.5 font-mono text-xs sm:text-sm">
                               <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                              {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                              {formatDateThai(tenant.contractStart)} - {formatDateThai(tenant.contractEnd)}
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between text-sm sm:text-base">
-                            <span className="text-slate-400 dark:text-slate-500 font-medium">วันที่ย้ายออก:</span>
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">{t("tenants.moved_out_date_label")}</span>
                             <span className="font-bold text-rose-600 dark:text-rose-455 flex items-center gap-1.5 font-mono">
                               <Clock className="w-4 h-4 text-rose-500 shrink-0" />
-                              {formatDateThai(t.movedOutAt)}
+                              {formatDateThai(tenant.movedOutAt)}
                             </span>
                           </div>
                         </div>
@@ -1434,7 +1437,7 @@ export default function TenantsPage() {
 
             {filteredOld.length === 0 && (
               <div className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-850">
-                ไม่มีประวัติข้อมูลผู้เช่าเก่าย้ายออกในตาราง
+                {t("tenants.no_old_tenants")}
               </div>
             )}
           </div>
@@ -1446,34 +1449,34 @@ export default function TenantsPage() {
               <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs sm:text-sm">
-                    <th className="py-3.5 px-5">ห้องสุดท้าย</th>
-                    <th className="py-3.5 px-4">ชื่อผู้เช่าเก่า</th>
-                    <th className="py-3.5 px-4">เบอร์โทรศัพท์ (PDPA)</th>
-                    <th className="py-3.5 px-4">ระยะเวลาที่เคยเช่า</th>
-                    <th className="py-3.5 px-4">วันที่แจ้งคืนห้อง/ย้ายออก</th>
-                    <th className="py-3.5 px-5 text-center w-24">ลบบันทึก</th>
+                    <th className="py-3.5 px-5">{t("tenants.last_room_col")}</th>
+                    <th className="py-3.5 px-4">{t("tenants.old_tenant_name_col")}</th>
+                    <th className="py-3.5 px-4">{t("tenants.col_phone_pdpa")}</th>
+                    <th className="py-3.5 px-4">{t("tenants.rental_period_col")}</th>
+                    <th className="py-3.5 px-4">{t("tenants.moved_out_date_col")}</th>
+                    <th className="py-3.5 px-5 text-center w-24">{t("tenants.delete_record_col")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-650 dark:text-slate-300">
-                  {filteredOld.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
+                  {filteredOld.map((tenant) => (
+                    <tr key={tenant.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
                       <td className="py-4 px-5 font-black text-slate-700 dark:text-slate-300 text-sm sm:text-base">
-                        ห้อง {t.roomNumber}
+                        {t("billing.room_label").replace("{roomNumber}", tenant.roomNumber)}
                       </td>
                       <td className="py-4 px-4 font-extrabold text-slate-850 dark:text-slate-200">
-                        {t.fullName}
+                        <DynamicText>{tenant.fullName}</DynamicText>
                       </td>
                       <td className="py-4 px-4 font-semibold font-mono text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          {getMaskedPhone(t.phone)}
+                          {getMaskedPhone(tenant.phone)}
                         </div>
                       </td>
                       <td className="py-4 px-4 font-semibold text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span className="font-mono text-[11px]">
-                            {formatDateThai(t.contractStart)} - {formatDateThai(t.contractEnd)}
+                            {formatDateThai(tenant.contractStart)} - {formatDateThai(tenant.contractEnd)}
                           </span>
                         </div>
                       </td>
@@ -1481,7 +1484,7 @@ export default function TenantsPage() {
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                           <span className="font-mono text-[11px]">
-                            {formatDateThai(t.movedOutAt)}
+                            {formatDateThai(tenant.movedOutAt)}
                           </span>
                         </div>
                       </td>
@@ -1489,10 +1492,10 @@ export default function TenantsPage() {
                         <button
                           onClick={() => {
                             if (!hasEditPermission) {
-                              showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+                              showToast(t("daily_bills.no_permission_msg"), "error")
                               return
                             }
-                            setDeleteConfirmId(t.id)
+                            setDeleteConfirmId(tenant.id)
                           }}
                           disabled={!hasEditPermission}
                           className={`p-1.5 rounded-lg transition-all inline-flex items-center justify-center border ${
@@ -1500,7 +1503,7 @@ export default function TenantsPage() {
                               ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 dark:text-rose-400 active:scale-95 cursor-pointer border border-rose-100/30 dark:border-rose-900/20"
                               : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-800"
                           }`}
-                          title={hasEditPermission ? "ลบข้อมูลประวัติผู้เช่าถาวร" : "ไม่มีสิทธิ์ในการลบข้อมูล"}
+                          title={hasEditPermission ? t("tenants.delete_permanent_tooltip") : t("tenants.no_delete_permission_tooltip")}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1511,7 +1514,7 @@ export default function TenantsPage() {
                   {filteredOld.length === 0 && (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium">
-                        ไม่มีประวัติข้อมูลผู้เช่าเก่าย้ายออกในตาราง
+                        {t("tenants.no_old_tenants")}
                       </td>
                     </tr>
                   )}
@@ -1527,9 +1530,9 @@ export default function TenantsPage() {
       <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 flex gap-3 items-start">
         <Lock className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
         <div className="space-y-1">
-          <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">มาตรฐานความปลอดภัยข้อมูลผู้เช่า (GDPR & PDPA compliance)</h4>
+          <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">{t("tenants.pdpa_notice_title")}</h4>
           <p className="text-[10px] md:text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
-            ข้อมูลผู้เช่าและเอกสารถูกเข้ารหัสและเข้าถึงโดยจำกัดสิทธิ์เฉพาะแอดมินหรือทีมงานที่ได้รับอนุมัติในตึกนี้ (Workspace-Scoped RLS) ข้อมูลหมายเลขโทรศัพท์และรหัสประจำตัว LINE OA จะได้รับการปกปิด (Masked) เป็นค่าเริ่มต้น เพื่อเพิ่มความปลอดภัยและป้องกันการรั่วไหลของข้อมูลส่วนบุคคล
+            {t("tenants.pdpa_notice_desc")}
           </p>
         </div>
       </div>
@@ -1543,9 +1546,9 @@ export default function TenantsPage() {
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">ยืนยันการลบประวัติถาวร?</h3>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">{t("tenants.confirm_delete_permanent_title")}</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed">
-                  การลบรายชื่อผู้เช่าออกจากประวัติเก่า จะทำลายข้อมูลนี้ออกจากฐานข้อมูลโดยถาวร และไม่สามารถเรียกกลับมาดูใหม่ได้อีก
+                  {t("tenants.confirm_delete_permanent_desc")}
                 </p>
               </div>
             </div>
@@ -1557,7 +1560,7 @@ export default function TenantsPage() {
                 onClick={() => setDeleteConfirmId(null)}
                 className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl cursor-pointer hover:bg-slate-150 dark:hover:bg-slate-700 transition-all disabled:opacity-50"
               >
-                ยกเลิก
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -1570,7 +1573,7 @@ export default function TenantsPage() {
                 ) : (
                   <Trash2 className="w-3.5 h-3.5" />
                 )}
-                ยืนยันลบถาวร
+                {t("tenants.confirm_delete_permanent_btn")}
               </button>
             </div>
           </div>
@@ -1587,8 +1590,8 @@ export default function TenantsPage() {
                   <AlertCircle className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">พบข้อผิดพลาดในการตรวจสอบข้อมูล</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">การบันทึกถูกระงับเพื่อความถูกต้องของข้อมูลทั้งหมด (Atomic Safety)</p>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">{t("tenants.csv_error_title")}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t("tenants.csv_error_desc")}</p>
                 </div>
               </div>
               <button
@@ -1614,7 +1617,7 @@ export default function TenantsPage() {
                 onClick={() => setIsErrorModalOpen(false)}
                 className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-xl cursor-pointer hover:shadow-lg transition-all active:scale-95"
               >
-                รับทราบและปิดหน้าต่าง
+                {t("tenants.acknowledge_close_btn")}
               </button>
             </div>
           </div>
@@ -1632,10 +1635,10 @@ export default function TenantsPage() {
                 </div>
                 <div>
                   <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                    คู่มือการใช้ไฟล์ CSV สำหรับการเพิ่มประวัติผู้เช่า
+                    {t("tenants.csv_guide_modal_title")}
                   </h3>
                   <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 mt-1 font-semibold">
-                    กรุณาอ่านคำแนะนำนี้เพื่อป้องกันไม่ให้ข้อมูลสัญญารวนหรือเกิดข้อผิดพลาด
+                    {t("tenants.csv_guide_modal_desc")}
                   </p>
                 </div>
               </div>
@@ -1656,10 +1659,10 @@ export default function TenantsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
-                    ดึงเลขห้องให้พร้อมใช้งานโดยอัตโนมัติ
+                    {t("tenants.csv_guide_item1_title")}
                   </h4>
                   <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
-                    ระบบดึงเลขห้องพักที่มีอยู่จริงทั้งหมดในตึกของคุณ มากรอกในคอลัมน์ room_number ให้เรียบร้อยแล้วโดยอัตโนมัติ
+                    {t("tenants.csv_guide_item1_desc")}
                   </p>
                 </div>
               </div>
@@ -1671,10 +1674,10 @@ export default function TenantsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
-                    การใส่เบอร์โทรศัพท์
+                    {t("tenants.csv_guide_item2_title")}
                   </h4>
                   <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
-                    สามารถกรอกเบอร์โทรศัพท์ลงไปได้ตามปกติ หากบันทึกผ่าน Excel แล้วเลข 0 ตัวหน้าถูกตัดหายไป ระบบหลังบ้านของเราจะช่วยตรวจสอบและกู้คืนเลข 0 นำหน้ากลับมาให้โดยอัตโนมัติ
+                    {t("tenants.csv_guide_item2_desc")}
                   </p>
                 </div>
               </div>
@@ -1686,16 +1689,16 @@ export default function TenantsPage() {
                 </div>
                 <div className="space-y-2">
                   <h4 className="text-lg md:text-xl font-black text-amber-900 dark:text-amber-300">
-                    ⚠️ ห้ามลบเครื่องหมาย Single Quote (&apos;) ด้านหน้าวันที่ออกเด็ดขาด!
+                    {t("tenants.csv_guide_warning_title")}
                   </h4>
                   <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
-                    คอลัมน์ lease_start ถูกตั้งค่าเริ่มต้นเป็นวันปัจจุบันโดยมีเครื่องหมาย &apos; นำหน้า (เช่น &apos;01/07/2026)
+                    {t("tenants.csv_guide_warning_desc1")}
                   </p>
                   <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
-                    * ห้ามลบเครื่องหมายนี้เด็ดขาด ให้ลบตัวเลขด้านหลังแล้วแก้ไขโดยพิมพ์ต่อท้ายเครื่องหมาย (&apos;) เสมอ
+                    {t("tenants.csv_guide_warning_desc2")}
                   </p>
                   <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
-                    * รูปแบบการพิมพ์ DD/MM/YYYY
+                    {t("tenants.csv_guide_warning_desc3")}
                   </p>
                 </div>
               </div>
@@ -1708,7 +1711,7 @@ export default function TenantsPage() {
                 onClick={() => setIsTemplateGuideModalOpen(false)}
                 className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-base md:text-lg font-bold rounded-2xl shadow-lg hover:shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
               >
-                รับทราบและเข้าใจคำแนะนำ
+                {t("tenants.csv_guide_ack_btn")}
               </button>
             </div>
           </div>
@@ -1726,10 +1729,10 @@ export default function TenantsPage() {
                 </div>
                 <div>
                   <h3 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    แก้ไขข้อมูลผู้เช่า
+                    {t("tenants.edit_tenant_tooltip")}
                   </h3>
                   <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                    ห้อง {selectedTenant.roomNumber} • {selectedTenant.fullName}
+                    {t("billing.room_label").replace("{roomNumber}", selectedTenant.roomNumber)} • <DynamicText>{selectedTenant.fullName}</DynamicText>
                   </p>
                 </div>
               </div>
@@ -1750,7 +1753,7 @@ export default function TenantsPage() {
               {/* Full Name */}
               <div className="space-y-1.5">
                 <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
-                  ชื่อ-นามสกุลผู้เช่า
+                  {t("tenants.full_name_label")}
                 </label>
                 <input
                   type="text"
@@ -1758,14 +1761,14 @@ export default function TenantsPage() {
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-medium"
-                  placeholder="กรุณากรอกชื่อ-นามสกุล"
+                  placeholder={t("tenants.full_name_placeholder")}
                 />
               </div>
 
               {/* Phone */}
               <div className="space-y-1.5">
                 <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
-                  เบอร์โทรศัพท์ผู้เช่า
+                  {t("tenants.phone_label_tenant")}
                 </label>
                 <input
                   type="text"
@@ -1773,14 +1776,14 @@ export default function TenantsPage() {
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-850 dark:text-slate-100 text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold"
-                  placeholder="กรุณากรอกเบอร์โทรศัพท์"
+                  placeholder={t("tenants.phone_placeholder")}
                 />
               </div>
 
               {/* Room Number */}
               <div className="space-y-1.5 relative">
                 <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
-                  หมายเลขห้องพัก (Room Number)
+                  {t("tenants.room_number_label_full")}
                 </label>
                 
                 {/* Custom select trigger button */}
@@ -1790,9 +1793,9 @@ export default function TenantsPage() {
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold cursor-pointer flex justify-between items-center text-slate-850 dark:text-slate-100"
                 >
                   <span>
-                    ห้อง {editRoomNumber}{" "}
+                    {t("billing.room_label").replace("{roomNumber}", editRoomNumber)}{" "}
                     <span className={editRoomNumber === selectedTenant.roomNumber ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
-                      {editRoomNumber === selectedTenant.roomNumber ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
+                      {editRoomNumber === selectedTenant.roomNumber ? t("tenants.current_room_suffix") : t("tenants.vacant_room_suffix")}
                     </span>
                   </span>
                   <ChevronDown className={`w-4 h-4 text-slate-450 transition-transform duration-200 ${isRoomDropdownOpen ? "rotate-180" : ""}`} />
@@ -1820,9 +1823,9 @@ export default function TenantsPage() {
                                 : "text-slate-750 dark:text-slate-200"
                             }`}
                           >
-                            <span>ห้อง {roomNum}</span>
+                            <span>{t("billing.room_label").replace("{roomNumber}", roomNum)}</span>
                             <span className={isCurrent ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
-                              {isCurrent ? " (ห้องปัจจุบัน)" : " (ห้องว่าง)"}
+                              {isCurrent ? t("tenants.current_room_suffix") : t("tenants.vacant_room_suffix")}
                             </span>
                           </button>
                         )
@@ -1836,7 +1839,7 @@ export default function TenantsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
-                    วันเริ่มสัญญา
+                    {t("tenants.lease_start_label")}
                   </label>
                   <input
                     type="date"
@@ -1848,7 +1851,7 @@ export default function TenantsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
-                    วันสิ้นสุดสัญญา
+                    {t("tenants.lease_end_label")}
                   </label>
                   <input
                     type="date"
@@ -1864,14 +1867,14 @@ export default function TenantsPage() {
               <div className="space-y-1.5">
                 <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block flex items-center justify-between">
                   <span>LINE User ID</span>
-                  <span className="text-[10px] text-red-500 dark:text-red-400 font-bold uppercase tracking-wider">ล็อคสิทธิ์แก้ไข</span>
+                  <span className="text-[10px] text-red-500 dark:text-red-400 font-bold uppercase tracking-wider">{t("tenants.line_locked_label")}</span>
                 </label>
                 <input
                   type="text"
                   disabled
-                  value={editLineUserId || "ไม่มีข้อมูลการเชื่อมต่อ LINE"}
+                  value={editLineUserId || t("tenants.no_line_connection")}
                   className="w-full px-4 py-3 bg-slate-100/85 dark:bg-slate-950/45 border border-slate-200/50 dark:border-slate-800/80 rounded-xl text-slate-500 dark:text-slate-400 text-sm md:text-base outline-none font-mono cursor-not-allowed select-all"
-                  placeholder="ไม่มีข้อมูลการเชื่อมต่อ LINE"
+                  placeholder={t("tenants.no_line_connection")}
                 />
               </div>
 
@@ -1886,7 +1889,7 @@ export default function TenantsPage() {
                   }}
                   className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs md:text-sm font-extrabold rounded-xl transition-all cursor-pointer"
                 >
-                  ยกเลิก
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="submit"
@@ -1896,10 +1899,10 @@ export default function TenantsPage() {
                   {editSubmitting ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      กำลังบันทึก...
+                      {t("daily_bills.saving_btn")}
                     </>
                   ) : (
-                    "บันทึกการแก้ไข"
+                    t("tenants.save_edit_btn")
                   )}
                 </button>
               </div>

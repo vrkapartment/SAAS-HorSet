@@ -31,6 +31,7 @@ import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { createClient } from "@/lib/supabase/client"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -73,7 +74,7 @@ function AdminDashboardContent() {
   const fetchCounterRef = useRef(0)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [isDemo, setIsDemo] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -313,13 +314,13 @@ function AdminDashboardContent() {
     const cycleYear = cycle.split("-")[0]
     const cycleMonth = cycle.split("-")[1]
     const thaiMonthObj = THAI_MONTHS.find(m => m.value === cycleMonth)
-    const cycleLabel = thaiMonthObj ? `${thaiMonthObj.label} ${Number(cycleYear) + 543}` : cycle
+    const cycleLabel = thaiMonthObj ? `${t("dashboard.month_" + thaiMonthObj.value)} ${Number(cycleYear) + 543}` : cycle
 
     setRoomStats([
       {
-        title: "ห้องทั้งหมด",
-        value: `${totalRooms} ห้อง`,
-        change: `ห้องพักหลักของอาคาร`,
+        title: t("dashboard.stat_all_rooms_title"),
+        value: t("dashboard.room_count").replace("{count}", String(totalRooms)),
+        change: t("dashboard.stat_all_rooms_change"),
         isPositive: true,
         icon: Home,
         color: "text-blue-500 dark:text-blue-400",
@@ -327,9 +328,9 @@ function AdminDashboardContent() {
         path: "/rooms"
       },
       {
-        title: "ห้องว่าง",
-        value: `${availableRooms} ห้อง`,
-        change: `พร้อมต้อนรับผู้เช่าใหม่`,
+        title: t("dashboard.stat_vacant_title"),
+        value: t("dashboard.room_count").replace("{count}", String(availableRooms)),
+        change: t("dashboard.stat_vacant_change"),
         isPositive: true,
         icon: Home,
         color: "text-emerald-500 dark:text-emerald-400",
@@ -337,9 +338,9 @@ function AdminDashboardContent() {
         path: "/rooms?filter=available"
       },
       {
-        title: "มีผู้เช่า",
-        value: `${occupiedRooms} ห้อง`,
-        change: `อัตราเข้าพัก ${(totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0).toFixed(1)}%`,
+        title: t("dashboard.stat_occupied_title"),
+        value: t("dashboard.room_count").replace("{count}", String(occupiedRooms)),
+        change: t("dashboard.stat_occupied_change").replace("{rate}", (totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0).toFixed(1)),
         isPositive: true,
         icon: Users,
         color: "text-teal-500 dark:text-teal-400",
@@ -347,9 +348,9 @@ function AdminDashboardContent() {
         path: "/rooms?filter=has_tenant"
       },
       {
-        title: "ค้างชำระ",
-        value: `${unpaidBillsCount} บิล`,
-        change: `ค้างบิลของรอบเดือนนี้`,
+        title: t("dashboard.stat_unpaid_title"),
+        value: t("dashboard.bill_count").replace("{count}", String(unpaidBillsCount)),
+        change: t("dashboard.stat_unpaid_change"),
         isPositive: false,
         icon: Clock,
         color: "text-rose-500 dark:text-rose-400",
@@ -367,12 +368,12 @@ function AdminDashboardContent() {
     })
 
     const formattedTxs = currentMonthBills.slice(0, 4).map((b: any) => ({
-      room: `ห้อง ${b.roomNumber}`,
+      room: t("billing.room_label").replace("{roomNumber}", b.roomNumber),
       tenant: b.tenantName,
-      type: "โอนผ่านพร้อมเพย์",
-      amount: `${b.amount.toLocaleString()} บาท`,
-      status: b.status === "paid" ? "สำเร็จ" : b.status === "pending" ? "รอยืนยัน" : "ค้างชำระ",
-      time: "ล่าสุด"
+      type: t("dashboard.promptpay_transfer"),
+      amount: `${b.amount.toLocaleString()} ${t("daily_bills.baht_unit")}`,
+      status: b.status === "paid" ? "paid" : b.status === "pending" ? "pending" : "overdue",
+      time: t("dashboard.time_latest")
     }))
     setRecentTransactions(formattedTxs)
 
@@ -380,33 +381,33 @@ function AdminDashboardContent() {
     if (tenants.length > 0) {
       const latestTenant = tenants[0]
       activities.push({
-        user: "ระบบอัตโนมัติ",
-        action: `ทำสัญญาเช่าใหม่ ห้อง ${latestTenant.roomNumber} (${latestTenant.fullName})`,
-        time: "ล่าสุด"
+        user: t("dashboard.activity_auto_system"),
+        action: t("dashboard.activity_new_contract").replace("{room}", latestTenant.roomNumber).replace("{name}", latestTenant.fullName),
+        time: t("dashboard.time_latest")
       })
     }
     if (currentMonthBills.length > 0) {
       const pendingCount = currentMonthBills.filter((b: any) => b.status === "pending").length
       if (pendingCount > 0) {
         activities.push({
-          user: "ผู้เช่า",
-          action: `มีบิลอัปโหลดสลิปรอการตรวจสอบจำนวน ${pendingCount} รายการ`,
-          time: "ล่าสุด"
+          user: t("dashboard.activity_tenant"),
+          action: t("dashboard.activity_pending_slips").replace("{count}", String(pendingCount)),
+          time: t("dashboard.time_latest")
         })
       }
     }
     if (currentMonthExpenses.length > 0) {
       const latestExpense = currentMonthExpenses[0]
       activities.push({
-        user: "ระบบค่าใช้จ่าย",
-        action: `เพิ่มรายจ่ายด่วน: ${latestExpense.title} (${latestExpense.amount.toLocaleString()} บาท)`,
-        time: "ล่าสุด"
+        user: t("dashboard.activity_expense_system"),
+        action: t("dashboard.activity_new_expense").replace("{title}", latestExpense.title).replace("{amount}", latestExpense.amount.toLocaleString()),
+        time: t("dashboard.time_latest")
       })
     }
     activities.push({
-      user: "ระบบเชื่อมต่อ",
-      action: "เชื่อมต่อฐานข้อมูล Supabase สำเร็จ ทำการดึงข้อมูลสดเรียบร้อยแล้ว",
-      time: "เชื่อมต่อแล้ว"
+      user: t("dashboard.activity_connection_system"),
+      action: t("dashboard.activity_db_connected"),
+      time: t("dashboard.time_connected")
     })
     setRecentActivities(activities)
   }
@@ -427,7 +428,7 @@ function AdminDashboardContent() {
           userProfile = userRes.data
           setCachedData("global", "profile", userRes.data)
         } else if (userRes.success === false) {
-          throw new Error(userRes.error || "เกิดข้อผิดพลาดในการดึงข้อมูลโปรไฟล์ผู้ใช้")
+          throw new Error(userRes.error || t("dashboard.error_profile_fetch"))
         }
       }
 
@@ -504,18 +505,18 @@ function AdminDashboardContent() {
           }
         }
 
-        const name = userProfile.full_name || userProfile.email || "ผู้ดูแลระบบ"
+        const name = userProfile.full_name || userProfile.email || t("dashboard.default_admin_name")
         if (userProfile.role === "super_admin") {
           setWelcomeName(`Super Admin ${name}`)
         } else if (userProfile.role === "admin") {
-          setWelcomeName(name.startsWith("คุณ") || name.startsWith("แอดมิน") ? name : `แอดมิน ${name}`)
+          setWelcomeName(locale === "th" ? (name.startsWith("คุณ") || name.startsWith("แอดมิน") ? name : `แอดมิน ${name}`) : name)
         } else if (userProfile.role === "staff") {
-          setWelcomeName(name.startsWith("คุณ") ? name : `คุณ ${name}`)
+          setWelcomeName(locale === "th" ? (name.startsWith("คุณ") ? name : `คุณ ${name}`) : name)
         } else {
           setWelcomeName(name)
         }
       } else {
-        setWelcomeName("แอดมินสมเจตน์")
+        setWelcomeName(t("dashboard.default_admin_name"))
       }
 
       // ถ้าเป็นการ Force Refresh ให้ล้างแคชเก่าออก
@@ -539,7 +540,7 @@ function AdminDashboardContent() {
 
         const res = await getDashboardData(currentYear, wsId || "")
         if (res && res.success === false) {
-          throw new Error(res.error || "ไม่สามารถเชื่อมต่อดึงข้อมูลแดชบอร์ดได้")
+          throw new Error(res.error || t("dashboard.error_dashboard_fetch"))
         }
 
         rooms = res.rooms || []
@@ -583,7 +584,7 @@ function AdminDashboardContent() {
       const isRealSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
       if (isRealSupabase) {
         setIsDemo(false)
-        setDbError(e instanceof Error ? e.message : "การเชื่อมต่อ Database มีปัญหา กรุณาลองใหม่อีกครั้ง")
+        setDbError(e instanceof Error ? e.message : t("dashboard.error_db_generic"))
         setRawRooms([])
         setRawTenants([])
         setRawBills([])
@@ -606,7 +607,7 @@ function AdminDashboardContent() {
     const cycleYear = cycle.split("-")[0]
     const cycleMonth = cycle.split("-")[1]
     const thaiMonthObj = THAI_MONTHS.find(m => m.value === cycleMonth)
-    const cycleLabel = thaiMonthObj ? `${thaiMonthObj.label} ${Number(cycleYear) + 543}` : cycle
+    const cycleLabel = thaiMonthObj ? `${t("dashboard.month_" + thaiMonthObj.value)} ${Number(cycleYear) + 543}` : cycle
 
     let occupiedRooms = 22
     let totalRooms = 24
@@ -651,9 +652,9 @@ function AdminDashboardContent() {
 
     setRoomStats([
       {
-        title: "ห้องทั้งหมด",
-        value: `${totalRooms} ห้อง`,
-        change: `อสังหาริมทรัพย์รวมเดโม`,
+        title: t("dashboard.stat_all_rooms_title"),
+        value: t("dashboard.room_count").replace("{count}", String(totalRooms)),
+        change: t("dashboard.stat_all_rooms_change"),
         isPositive: true,
         icon: Home,
         color: "text-blue-500 dark:text-blue-400",
@@ -661,9 +662,9 @@ function AdminDashboardContent() {
         path: "/rooms"
       },
       {
-        title: "ห้องว่าง",
-        value: `${availableRooms} ห้อง`,
-        change: `พร้อมต้อนรับผู้เช่าใหม่`,
+        title: t("dashboard.stat_vacant_title"),
+        value: t("dashboard.room_count").replace("{count}", String(availableRooms)),
+        change: t("dashboard.stat_vacant_change"),
         isPositive: true,
         icon: Home,
         color: "text-emerald-500 dark:text-emerald-400",
@@ -671,9 +672,9 @@ function AdminDashboardContent() {
         path: "/rooms?filter=available"
       },
       {
-        title: "มีผู้เช่า",
-        value: `${occupiedRooms} ห้อง`,
-        change: `อัตราเข้าพัก ${occupancyRate.toFixed(1)}%`,
+        title: t("dashboard.stat_occupied_title"),
+        value: t("dashboard.room_count").replace("{count}", String(occupiedRooms)),
+        change: t("dashboard.stat_occupied_change").replace("{rate}", occupancyRate.toFixed(1)),
         isPositive: true,
         icon: Users,
         color: "text-teal-500 dark:text-teal-400",
@@ -681,9 +682,9 @@ function AdminDashboardContent() {
         path: "/rooms?filter=has_tenant"
       },
       {
-        title: "ค้างชำระ",
-        value: `${unpaidBillsCount} บิล`,
-        change: `ค้างบิลของรอบเดือนนี้`,
+        title: t("dashboard.stat_unpaid_title"),
+        value: t("dashboard.bill_count").replace("{count}", String(unpaidBillsCount)),
+        change: t("dashboard.stat_unpaid_change"),
         isPositive: false,
         icon: Clock,
         color: "text-rose-500 dark:text-rose-400",
@@ -702,28 +703,28 @@ function AdminDashboardContent() {
 
     if (cycleMonth === "06") {
       setRecentTransactions([
-        { room: "ห้อง 101", tenant: "คุณวิภาวี", type: "โอนผ่านพร้อมเพย์", amount: "5,400 บาท", status: "สำเร็จ", time: "10 นาทีที่แล้ว" },
-        { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: "โอนผ่านพร้อมเพย์", amount: "6,200 บาท", status: "สำเร็จ", time: "1 ชั่วโมงที่แล้ว" },
-        { room: "ห้อง 105", tenant: "คุณณัฐพล", type: "อัปโหลดสลิปค้างยืนยัน", amount: "5,800 บาท", status: "รอยืนยัน", time: "2 ชั่วโมงที่แล้ว" },
-        { room: "ห้อง 302", tenant: "คุณรภัสสร", type: "ยังไม่ได้ชำระ", amount: "5,600 บาท", status: "ค้างชำระ", time: "1 วันที่แล้ว" }
+        { room: "ห้อง 101", tenant: "คุณวิภาวี", type: t("dashboard.promptpay_transfer"), amount: "5,400 " + t("daily_bills.baht_unit"), status: "paid", time: "10 นาทีที่แล้ว" },
+        { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: t("dashboard.promptpay_transfer"), amount: "6,200 " + t("daily_bills.baht_unit"), status: "paid", time: "1 ชั่วโมงที่แล้ว" },
+        { room: "ห้อง 105", tenant: "คุณณัฐพล", type: t("dashboard.promptpay_transfer"), amount: "5,800 " + t("daily_bills.baht_unit"), status: "pending", time: "2 ชั่วโมงที่แล้ว" },
+        { room: "ห้อง 302", tenant: "คุณรภัสสร", type: t("dashboard.promptpay_transfer"), amount: "5,600 " + t("daily_bills.baht_unit"), status: "overdue", time: "1 วันที่แล้ว" }
       ])
     } else if (cycleMonth === "05") {
       setRecentTransactions([
-        { room: "ห้อง 101", tenant: "คุณวิภาวี", type: "โอนผ่านพร้อมเพย์", amount: "5,400 บาท", status: "สำเร็จ", time: "เมื่อเดือนที่แล้ว" },
-        { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: "โอนผ่านพร้อมเพย์", amount: "6,200 บาท", status: "สำเร็จ", time: "เมื่อเดือนที่แล้ว" },
-        { room: "ห้อง 302", tenant: "คุณรภัสสร", type: "ยังไม่ได้ชำระ", amount: "5,600 บาท", status: "ค้างชำระ", time: "เมื่อเดือนที่แล้ว" }
+        { room: "ห้อง 101", tenant: "คุณวิภาวี", type: t("dashboard.promptpay_transfer"), amount: "5,400 " + t("daily_bills.baht_unit"), status: "paid", time: "เมื่อเดือนที่แล้ว" },
+        { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: t("dashboard.promptpay_transfer"), amount: "6,200 " + t("daily_bills.baht_unit"), status: "paid", time: "เมื่อเดือนที่แล้ว" },
+        { room: "ห้อง 302", tenant: "คุณรภัสสร", type: t("dashboard.promptpay_transfer"), amount: "5,600 " + t("daily_bills.baht_unit"), status: "overdue", time: "เมื่อเดือนที่แล้ว" }
       ])
     } else {
       setRecentTransactions([
-        { room: "ห้อง 101", tenant: "คุณวิภาวี", type: "โอนผ่านพร้อมเพย์", amount: "5,400 บาท", status: "สำเร็จ", time: "2 เดือนที่แล้ว" },
-        { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: "โอนผ่านพร้อมเพย์", amount: "6,200 บาท", status: "สำเร็จ", time: "2 เดือนที่แล้ว" }
+        { room: "ห้อง 101", tenant: "คุณวิภาวี", type: t("dashboard.promptpay_transfer"), amount: "5,400 " + t("daily_bills.baht_unit"), status: "paid", time: "2 เดือนที่แล้ว" },
+        { room: "ห้อง 203", tenant: "คุณกิตติศักดิ์", type: t("dashboard.promptpay_transfer"), amount: "6,200 " + t("daily_bills.baht_unit"), status: "paid", time: "2 เดือนที่แล้ว" }
       ])
     }
 
     setRecentActivities([
       { user: "พนักงานสมชาย", action: "บันทึกตัวเลขมิเตอร์น้ำไฟรอบเดโมสำเร็จ", time: "เมื่อวานนี้" },
-      { user: "ระบบอัตโนมัติ", action: "ส่งใบแจ้งหนี้จำลองไปยังแผงควบคุมหลักสำเร็จ", time: "2 วันก่อน" },
-      { user: "แอดมินสมเจตน์", action: "ทดสอบเลือกช่วงเวลาเดโม " + cycleLabel, time: "ล่าสุด" }
+      { user: t("dashboard.activity_auto_system"), action: "ส่งใบแจ้งหนี้จำลองไปยังแผงควบคุมหลักสำเร็จ", time: "2 วันก่อน" },
+      { user: "แอดมินสมเจตน์", action: "ทดสอบเลือกช่วงเวลาเดโม " + cycleLabel, time: t("dashboard.time_latest") }
     ])
   }
 
@@ -752,13 +753,13 @@ function AdminDashboardContent() {
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
             {welcomeName ? (
-              `ยินดีต้อนรับกลับ ${welcomeName}!`
+              t("dashboard.welcome_back").replace("{name}", welcomeName)
             ) : (
               <span className="inline-block bg-slate-200 dark:bg-slate-700 rounded-lg w-64 h-8 animate-pulse" />
             )}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            ข้อมูลสรุปและสถานะภาพรวมของหอพัก {workspaceName} ประจำวันนี้ ติดตามความเคลื่อนไหวได้แบบเรียลไทม์
+            {t("dashboard.overview_desc").replace("{workspace}", workspaceName)}
           </p>
         </div>
         
@@ -772,7 +773,7 @@ function AdminDashboardContent() {
               className="flex-1 sm:flex-none px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             >
               {THAI_MONTHS.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
+                <option key={m.value} value={m.value}>{t("dashboard.month_" + m.value)}</option>
               ))}
             </select>
 
@@ -782,7 +783,7 @@ function AdminDashboardContent() {
               className="flex-1 sm:flex-none px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             >
               {YEARS.map(y => (
-                <option key={y.value} value={y.value}>พ.ศ. {y.label}</option>
+                <option key={y.value} value={y.value}>{t("dashboard.buddhist_era_prefix")} {y.label}</option>
               ))}
             </select>
           </div>
@@ -793,7 +794,7 @@ function AdminDashboardContent() {
             className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
             <Receipt className="w-4 h-4" />
-            <span>ออกบิลเดือนนี้</span>
+            <span>{t("dashboard.issue_bill_btn")}</span>
           </button>
 
           {/* ระบบเชื่อมต่อคลาวด์ปลอดภัย */}
@@ -801,7 +802,7 @@ function AdminDashboardContent() {
             <span className="relative flex h-2 w-2">
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span>ระบบเชื่อมต่อคลาวด์ปลอดภัย</span>
+            <span>{t("dashboard.secure_cloud_connected")}</span>
           </div>
         </div>
       </div>
@@ -815,7 +816,7 @@ function AdminDashboardContent() {
           </div>
           <div className="space-y-2">
             <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-              การเชื่อมต่อ Database มีปัญหา
+              {t("dashboard.db_error_title")}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
               {dbError}
@@ -829,7 +830,7 @@ function AdminDashboardContent() {
               }}
               className="px-6 py-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold text-sm rounded-xl shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer"
             >
-              ลองเชื่อมต่อใหม่อีกครั้ง (Retry)
+              {t("dashboard.retry_btn")}
             </button>
           </div>
         </div>
@@ -883,30 +884,30 @@ function AdminDashboardContent() {
                 <div className="space-y-3 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
-                      รายรับเดือนนี้
+                      {t("dashboard.revenue_title")}
                     </span>
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-extrabold">
-                      เงินที่เก็บได้แล้ว
+                      {t("dashboard.revenue_subtitle")}
                     </span>
                   </div>
                   <h3 className="text-3xl sm:text-4xl lg:text-5xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                    {financialStats.totalRevenue.toLocaleString()} <span className="text-xs sm:text-sm font-bold text-emerald-500/80">บาท</span>
+                    {financialStats.totalRevenue.toLocaleString()} <span className="text-xs sm:text-sm font-bold text-emerald-500/80">{t("daily_bills.baht_unit")}</span>
                   </h3>
-                  
+
                   {/* Progress Bar */}
                   <div className="space-y-1.5 pt-1 max-w-xs">
                     <div className="flex justify-between text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                      <span>เก็บเงินได้แล้ว</span>
+                      <span>{t("dashboard.collected_label")}</span>
                       <span>{financialStats.collectionsRate.toFixed(1)}%</span>
                     </div>
                     <div className="w-full bg-emerald-200/40 dark:bg-emerald-900/30 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                      <div
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500"
                         style={{ width: `${financialStats.collectionsRate}%` }}
                       />
                     </div>
                     <p className="text-xs sm:text-sm text-emerald-500/85 font-bold mt-1">
-                      ยอดเรียกเก็บทั้งหมด {financialStats.totalBilled.toLocaleString()} บาท
+                      {t("dashboard.total_billed_label").replace("{amount}", financialStats.totalBilled.toLocaleString())}
                     </p>
                   </div>
                 </div>
@@ -925,23 +926,23 @@ function AdminDashboardContent() {
                 <div className="space-y-3 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider block">
-                      บิลค้างชำระ
+                      {t("dashboard.unpaid_title")}
                     </span>
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 font-extrabold">
-                      ที่ยังไม่จ่าย
+                      {t("dashboard.unpaid_subtitle")}
                     </span>
                   </div>
                   <h3 className="text-3xl sm:text-4xl lg:text-5xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                    {financialStats.unpaidAmount.toLocaleString()} <span className="text-xs sm:text-sm font-bold text-rose-500/80">บาท</span>
+                    {financialStats.unpaidAmount.toLocaleString()} <span className="text-xs sm:text-sm font-bold text-rose-500/80">{t("daily_bills.baht_unit")}</span>
                   </h3>
-                  
+
                   <div className="space-y-2 pt-1 max-w-xs">
                     <div className="flex items-center gap-1.5 text-xs sm:text-sm text-rose-600 dark:text-rose-400 font-bold">
                       <Clock className="w-3.5 h-3.5 animate-pulse" />
-                      <span>ค้างชำระทั้งหมด {financialStats.unpaidBillsCount} รายการ</span>
+                      <span>{t("dashboard.unpaid_count_label").replace("{count}", String(financialStats.unpaidBillsCount))}</span>
                     </div>
                     <p className="text-xs sm:text-sm text-rose-500/85 font-bold mt-1">
-                      สามารถจัดส่งใบแจ้งเตือนทาง LINE OA เพื่อกระตุ้นยอดค้างจ่ายได้ทันที
+                      {t("dashboard.unpaid_line_hint")}
                     </p>
                   </div>
                 </div>
@@ -1077,7 +1078,7 @@ function AdminDashboardContent() {
                 }`}
                 style={{ minHeight: "44px" }}
               >
-                บิลล่าสุด ({recentTransactions.length})
+                {t("dashboard.recent_bills_title").replace("{count}", String(recentTransactions.length))}
               </button>
               <button
                 type="button"
@@ -1089,7 +1090,7 @@ function AdminDashboardContent() {
                 }`}
                 style={{ minHeight: "44px" }}
               >
-                กิจกรรมในระบบ ({recentActivities.length})
+                {t("dashboard.recent_activities_title").replace("{count}", String(recentActivities.length))}
               </button>
             </div>
           </div>
@@ -1101,14 +1102,14 @@ function AdminDashboardContent() {
             <div className={`md:col-span-2 bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 md:p-6 flex flex-col shadow-sm ${activeTab === "transactions" ? "block" : "hidden md:flex"}`}>
               <div className="flex justify-between items-center mb-5 md:mb-6">
                 <h3 className="text-xs sm:text-sm lg:text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
-                  <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" /> สถานะบิลและการรับเงินล่าสุด
+                  <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" /> {t("dashboard.bills_status_title")}
                 </h3>
-                <button 
+                <button
                   onClick={() => router.push(`/manage-bills?month=${selectedMonth}&year=${selectedYear}&cycle=${selectedYear}-${selectedMonth}`)}
                   className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline cursor-pointer py-2 px-3"
                   style={{ minHeight: "36px" }}
                 >
-                  ดูทั้งหมด
+                  {t("dashboard.view_all")}
                 </button>
               </div>
 
@@ -1117,28 +1118,28 @@ function AdminDashboardContent() {
                 <table className="hidden md:table w-full text-left text-xs sm:text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider">
-                      <th className="pb-3 pl-2">ห้องพัก</th>
-                      <th className="pb-3">ชื่อผู้เช่า</th>
-                      <th className="pb-3">วิธีการ</th>
-                      <th className="pb-3 text-right">ยอดชำระ</th>
-                      <th className="pb-3 text-center">สถานะ</th>
-                      <th className="pb-3 text-right pr-2">เวลา</th>
+                      <th className="pb-3 pl-2">{t("dashboard.col_room")}</th>
+                      <th className="pb-3">{t("dashboard.col_tenant")}</th>
+                      <th className="pb-3">{t("dashboard.col_method")}</th>
+                      <th className="pb-3 text-right">{t("dashboard.col_paid_amount")}</th>
+                      <th className="pb-3 text-center">{t("dashboard.col_status")}</th>
+                      <th className="pb-3 text-right pr-2">{t("dashboard.col_time")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-600 dark:text-slate-300">
                     {recentTransactions.map((tx, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 group transition-all duration-150">
-                        <td className="py-3.5 pl-2 font-bold text-slate-800 dark:text-slate-200">{tx.room}</td>
-                        <td className="py-3.5 text-slate-500 dark:text-slate-400">{tx.tenant}</td>
+                        <td className="py-3.5 pl-2 font-bold text-slate-800 dark:text-slate-200"><DynamicText>{tx.room}</DynamicText></td>
+                        <td className="py-3.5 text-slate-500 dark:text-slate-400"><DynamicText>{tx.tenant}</DynamicText></td>
                         <td className="py-3.5 text-slate-500 dark:text-slate-400">{tx.type}</td>
                         <td className="py-3.5 text-right font-mono font-extrabold text-slate-800 dark:text-slate-200">{tx.amount}</td>
                         <td className="py-3.5 text-center">
                           <span className={`inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full ${
-                            tx.status === "สำเร็จ" ? "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30" :
-                            tx.status === "รอยืนยัน" ? "bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 border border-amber-100/40 dark:border-amber-900/30" :
+                            tx.status === "paid" ? "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30" :
+                            tx.status === "pending" ? "bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 border border-amber-100/40 dark:border-amber-900/30" :
                             "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-100/40 dark:border-red-900/30"
                           }`}>
-                            {tx.status}
+                            {t(`dashboard.status_${tx.status}`)}
                           </span>
                         </td>
                         <td className="py-3.5 text-right pr-2 text-slate-400 dark:text-slate-500 font-mono text-xs sm:text-sm">{tx.time}</td>
@@ -1147,7 +1148,7 @@ function AdminDashboardContent() {
                     {recentTransactions.length === 0 && (
                       <tr>
                         <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500 font-medium">
-                          ไม่มีข้อมูลธุรกรรมหรือบิลในรอบบัญชีนี้
+                          {t("dashboard.no_transactions")}
                         </td>
                       </tr>
                     )}
@@ -1157,36 +1158,36 @@ function AdminDashboardContent() {
                 {/* MOBILE VIEW CARD-BASED LIST (visible on mobile, hidden on desktop < 768px) */}
                 <div className="block md:hidden space-y-4">
                   {recentTransactions.map((tx, idx) => (
-                    <div 
+                    <div
                       key={idx}
                       className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 shadow-sm space-y-3 hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all duration-300"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{tx.room}</span>
+                        <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100"><DynamicText>{tx.room}</DynamicText></span>
                         <span className={`inline-block text-[9px] font-extrabold px-2.5 py-1 rounded-full ${
-                          tx.status === "สำเร็จ" ? "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30" :
-                          tx.status === "รอยืนยัน" ? "bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 border border-amber-100/40 dark:border-amber-900/30" :
+                          tx.status === "paid" ? "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30" :
+                          tx.status === "pending" ? "bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 border border-amber-100/40 dark:border-amber-900/30" :
                           "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-100/40 dark:border-red-900/30"
                         }`}>
-                          {tx.status}
+                          {t(`dashboard.status_${tx.status}`)}
                         </span>
                       </div>
-                      
+
                       <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-2 text-xs text-slate-600 dark:text-slate-400">
                         <div className="flex justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium">ผู้เช่า:</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">{tx.tenant}</span>
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">{t("billing.tenant_label")}</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-200"><DynamicText>{tx.tenant}</DynamicText></span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium">วิธีการจ่าย:</span>
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">{t("dashboard.pay_method_label")}</span>
                           <span className="text-slate-700 dark:text-slate-200">{tx.type}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium">ยอดจ่าย:</span>
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">{t("dashboard.pay_amount_label")}</span>
                           <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm font-mono">{tx.amount}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium">เวลาบันทึก:</span>
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">{t("dashboard.record_time_label")}</span>
                           <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">{tx.time}</span>
                         </div>
                       </div>
@@ -1194,7 +1195,7 @@ function AdminDashboardContent() {
                   ))}
                   {recentTransactions.length === 0 && (
                     <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-xs">
-                      ไม่มีข้อมูลธุรกรรมหรือบิลในรอบบัญชีนี้
+                      {t("dashboard.no_transactions")}
                     </div>
                   )}
                 </div>
@@ -1205,7 +1206,7 @@ function AdminDashboardContent() {
             <div className={`bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 md:p-6 flex flex-col shadow-sm ${activeTab === "activities" ? "block" : "hidden md:flex"}`}>
               <div className="flex justify-between items-center mb-5 md:mb-6">
                 <h3 className="text-xs sm:text-sm lg:text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
-                  <TrendingUp className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> กิจกรรมล่าสุดในระบบ
+                  <TrendingUp className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> {t("dashboard.recent_activities_section_title")}
                 </h3>
               </div>
 
@@ -1217,7 +1218,7 @@ function AdminDashboardContent() {
                     <div className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 dark:bg-blue-400 ring-4 ring-white dark:ring-slate-850 shrink-0" />
                     <div className="space-y-1">
                       <p className="text-slate-700 dark:text-slate-250 leading-relaxed">
-                        <span className="font-bold text-slate-900 dark:text-slate-100">{act.user}</span>: {act.action}
+                        <span className="font-bold text-slate-900 dark:text-slate-100"><DynamicText>{act.user}</DynamicText></span>: <DynamicText>{act.action}</DynamicText>
                       </p>
                       <span className="text-xs font-mono text-slate-400 dark:text-slate-500 block">{act.time}</span>
                     </div>
@@ -1225,7 +1226,7 @@ function AdminDashboardContent() {
                 ))}
                 {recentActivities.length === 0 && (
                   <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-xs">
-                    ไม่มีประวัติกิจกรรมล่าสุด
+                    {t("dashboard.no_activities")}
                   </div>
                 )}
               </div>

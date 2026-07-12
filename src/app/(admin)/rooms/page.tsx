@@ -2151,7 +2151,7 @@ function RoomsContent() {
                             </div>
                             
                             <h4 className="text-base font-extrabold text-slate-800 dark:text-slate-100 truncate">
-                              {room.tenantName}
+                              <DynamicText>{room.tenantName}</DynamicText>
                             </h4>
                             <p className="text-xs text-slate-500 dark:text-slate-455 mt-1.5 flex items-center gap-1.5">
                               <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -2273,7 +2273,7 @@ function RoomsContent() {
                                           <span className="text-slate-400 dark:text-slate-500 font-medium">ผู้เช่า:</span>
                                           <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 truncate max-w-[150px]" title={room.tenantName || ""}>
                                             <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            {room.tenantName}
+                                            <DynamicText>{room.tenantName}</DynamicText>
                                           </span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm sm:text-base">
@@ -2433,7 +2433,7 @@ function RoomsContent() {
                                     <div className="flex flex-col gap-1.5">
                                       <div className="flex items-center gap-1.5 text-sm sm:text-base text-slate-800 dark:text-slate-200 font-bold">
                                         <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                                        <span className="truncate max-w-[140px]" title={room.tenantName}>{room.tenantName}</span>
+                                        <span className="truncate max-w-[140px]" title={room.tenantName}><DynamicText>{room.tenantName}</DynamicText></span>
                                       </div>
                                       {room.tenantPhone && (
                                         <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-mono">
@@ -2593,7 +2593,7 @@ function RoomsContent() {
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400 dark:text-slate-500 font-medium">ประเภท & ค่าเช่า:</span>
                             <span className="font-semibold text-slate-800 dark:text-slate-100">
-                              {room.roomTypeName} • {room.baseRent.toLocaleString()} บ.
+                              <DynamicText>{room.roomTypeName}</DynamicText> • {room.baseRent.toLocaleString()} บ.
                             </span>
                           </div>
                           
@@ -2603,7 +2603,7 @@ function RoomsContent() {
                             <span className="font-bold text-slate-800 dark:text-slate-100">
                               {room.tenantName ? (
                                 <span className="flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200">
-                                  <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {room.tenantName}
+                                  <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" /> <DynamicText>{room.tenantName}</DynamicText>
                                 </span>
                               ) : (
                                 <span className="text-slate-400 dark:text-slate-600 font-normal">-</span>
@@ -2764,7 +2764,7 @@ function RoomsContent() {
                     {activeCancelledContracts.map((c) => (
                       <tr key={c.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/5 transition-colors">
                         <td className="py-3.5 px-4 font-bold text-slate-700 dark:text-slate-300">
-                          ห้อง {c.roomNumber} - {c.tenantName}
+                          ห้อง {c.roomNumber} - <DynamicText>{c.tenantName}</DynamicText>
                         </td>
                         <td className="py-3.5 px-4 text-center text-slate-500 dark:text-slate-400 font-semibold font-mono text-xs sm:text-sm">
                           {c.cancellationDate ? new Date(c.cancellationDate).toLocaleDateString("th-TH", {
@@ -3338,7 +3338,7 @@ function RoomsContent() {
                   {/* Room Info Preview */}
                   <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
                     <div className="space-y-0.5">
-                      <span className="font-bold text-slate-700 dark:text-slate-300">ประเภท: {selectedRoom.roomTypeName}</span>
+                      <span className="font-bold text-slate-700 dark:text-slate-300">ประเภท: <DynamicText>{selectedRoom.roomTypeName}</DynamicText></span>
                     </div>
                     <div className="font-extrabold text-slate-850 dark:text-slate-200">
                       อัตราค่าเช่า: {selectedRoom.baseRent.toLocaleString()} บาท/เดือน
@@ -3479,7 +3479,7 @@ function RoomsContent() {
                   <div className="flex justify-between py-2">
                     <span className="text-slate-400">ชื่อผู้เช่า:</span> 
                     <span className={selectedRoom.tenantName ? "font-extrabold text-slate-850 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 italic font-semibold"}>
-                      {selectedRoom.tenantName || "(รอผู้เช่าลงทะเบียนกรอกข้อมูล)"}
+                      <DynamicText>{selectedRoom.tenantName || "(รอผู้เช่าลงทะเบียนกรอกข้อมูล)"}</DynamicText>
                     </span>
                   </div>
                   <div className="flex justify-between py-2">
@@ -3672,7 +3672,7 @@ function RoomsContent() {
                       </div>
                       <div className="flex justify-between py-2.5 items-center border-t border-slate-150 dark:border-slate-800">
                         <span className="text-slate-400 dark:text-slate-500">ประเภทห้อง & ค่าเช่า:</span> 
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedRoom.roomTypeName} • {selectedRoom.baseRent.toLocaleString()} บาท/เดือน</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200"><DynamicText>{selectedRoom.roomTypeName}</DynamicText> • {selectedRoom.baseRent.toLocaleString()} บาท/เดือน</span>
                       </div>
 
                       {/* Lease start */}
@@ -3705,19 +3705,19 @@ function RoomsContent() {
                     <>
                       <div className="flex justify-between py-2.5">
                         <span className="text-slate-400 dark:text-slate-500">ชื่อผู้เช่า:</span> 
-                        <span className="font-extrabold text-slate-850 dark:text-slate-200">{selectedRoom.tenantName}</span>
+                        <span className="font-extrabold text-slate-850 dark:text-slate-200"><DynamicText>{selectedRoom.tenantName}</DynamicText></span>
                       </div>
                       <div className="flex justify-between py-2.5">
-                        <span className="text-slate-400 dark:text-slate-500">เบอร์โทรศัพท์:</span> 
+                        <span className="text-slate-400 dark:text-slate-500">เบอร์โทรศัพท์:</span>
                         <span className="font-mono font-bold text-slate-850 dark:text-slate-200">{selectedRoom.tenantPhone}</span>
                       </div>
                       <div className="flex justify-between py-2.5">
-                        <span className="text-slate-400 dark:text-slate-500">หมายเลขห้องพัก:</span> 
+                        <span className="text-slate-400 dark:text-slate-500">หมายเลขห้องพัก:</span>
                         <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span>
                       </div>
                       <div className="flex justify-between py-2.5">
-                        <span className="text-slate-400 dark:text-slate-500">ประเภทห้อง & ค่าเช่า:</span> 
-                        <span className="font-semibold">{selectedRoom.roomTypeName} • {selectedRoom.baseRent.toLocaleString()} บาท/เดือน</span>
+                        <span className="text-slate-400 dark:text-slate-500">ประเภทห้อง & ค่าเช่า:</span>
+                        <span className="font-semibold"><DynamicText>{selectedRoom.roomTypeName}</DynamicText> • {selectedRoom.baseRent.toLocaleString()} บาท/เดือน</span>
                       </div>
                       <div className="flex justify-between py-2.5">
                         <span className="text-slate-400 dark:text-slate-500">ระยะสัญญาเริ่มต้น:</span> 
@@ -3837,7 +3837,7 @@ function RoomsContent() {
                   </h3>
                   <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed space-y-2">
                     <p>
-                      คุณแน่ใจหรือไม่ที่จะหยุดเชื่อมต่อบัญชี LINE ของผู้เช่าคุณ <strong className="text-slate-850 dark:text-slate-100 font-extrabold">{selectedRoom.tenantName}</strong> (ห้อง {selectedRoom.roomNumber})?
+                      คุณแน่ใจหรือไม่ที่จะหยุดเชื่อมต่อบัญชี LINE ของผู้เช่าคุณ <strong className="text-slate-850 dark:text-slate-100 font-extrabold"><DynamicText>{selectedRoom.tenantName}</DynamicText></strong> (ห้อง {selectedRoom.roomNumber})?
                     </p>
                     <p className="bg-amber-500/10 text-amber-600 dark:text-amber-400 p-3 rounded-xl border border-amber-500/20 font-medium">
                       💡 <strong>ข้อดี:</strong> หากผู้เช่าเปลี่ยนบัญชี LINE ใหม่ คุณสามารถกดหยุดเชื่อมต่อตรงนี้แล้วเจนลิงก์ใหม่ให้ผู้เช่าสแกนเพื่อผูกบัญชีได้ทันที <strong>โดยไม่ต้องย้ายออกหรือทำลายสัญญาเช่าเดิม</strong>
@@ -3915,11 +3915,11 @@ function RoomsContent() {
                 <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/60 rounded-xl text-xs space-y-2 text-slate-650 dark:text-slate-455">
                   <div className="flex justify-between font-bold">
                     <span>ห้องเช่าพัก:</span>
-                    <span className="text-slate-850 dark:text-slate-200 font-extrabold">ห้อง {selectedRoom.roomNumber} ({selectedRoom.roomTypeName})</span>
+                    <span className="text-slate-850 dark:text-slate-200 font-extrabold">ห้อง {selectedRoom.roomNumber} (<DynamicText>{selectedRoom.roomTypeName}</DynamicText>)</span>
                   </div>
                   <div className="flex justify-between font-bold">
                     <span>ผู้เช่าปัจจุบัน:</span>
-                    <span className="text-blue-600 dark:text-blue-450 font-extrabold">{selectedRoom.tenantName}</span>
+                    <span className="text-blue-600 dark:text-blue-450 font-extrabold"><DynamicText>{selectedRoom.tenantName}</DynamicText></span>
                   </div>
                   <div className="flex justify-between border-t border-slate-155 dark:border-slate-800 pt-2 text-[11px] font-semibold">
                     <span>ค่าเช่ารายเดือน:</span>
@@ -4003,7 +4003,7 @@ function RoomsContent() {
                     <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100">
                       จัดการเคลียร์บัญชีและคืนเงินประกัน
                     </h3>
-                    <p className="text-xs text-slate-405 dark:text-slate-500 mt-0.5 font-bold uppercase tracking-wider">ห้อง {refundingRoom.roomNumber} • ผู้เช่า: {refundingRoom.tenantName}</p>
+                    <p className="text-xs text-slate-405 dark:text-slate-500 mt-0.5 font-bold uppercase tracking-wider">ห้อง {refundingRoom.roomNumber} • ผู้เช่า: <DynamicText>{refundingRoom.tenantName}</DynamicText></p>
                   </div>
                 </div>
                 <button 

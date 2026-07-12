@@ -38,26 +38,48 @@ import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
 
-// คู่มือรายจ่ายยอดนิยมและคำอธิบายประเภทภาษี
-const commonExpensesGuide = [
-  { name: "ค่าสีทาตึกภายนอก / ภายใน", category: "40_5", categoryText: "40(5) ค่าเช่า", desc: "การปรับปรุงหรือทาสีโครงสร้างตึกหลัก ถือเป็นค่าใช้จ่ายซ่อมแซมรักษาอาคารของผู้ให้เช่า" },
-  { name: "ค่าซ่อมแซมหลังคารั่วซึม", category: "40_5", categoryText: "40(5) ค่าเช่า", desc: "การบำรุงรักษาและซ่อมแซมโครงสร้างใหญ่ของอาคารเพื่อรักษาสภาพตึกให้ใช้งานได้ปลอดภัย" },
-  { name: "ค่าซ่อมแซมลิฟต์โดยสาร", category: "40_5", categoryText: "40(5) ค่าเช่า", desc: "การบำรุงรักษาลิฟต์ซึ่งถือเป็นสิ่งปลูกสร้างหรืออุปกรณ์ควบอาคารส่วนโครงสร้างหลัก" },
-  { name: "ค่าเบี้ยประกันภัยตึก (อัคคีภัย / วินาศภัย)", category: "40_5", categoryText: "40(5) ค่าเช่า", desc: "ค่าประกันภัยคุ้มครองโครงสร้างอสังหาริมทรัพย์และตัวอาคารหอพัก" },
-  { name: "ดอกเบี้ยเงินกู้ยืมเพื่อซื้อ / สร้างหอพัก", category: "40_5", categoryText: "40(5) ค่าเช่า", desc: "ดอกเบี้ยจ่ายจากสัญญากู้เงินเพื่อลงทุนก่อสร้างอาคารหอพัก (หักเฉพาะดอกเบี้ย ห้ามหักเงินต้น)" },
-  { name: "ภาษีที่ดินและสิ่งปลูกสร้าง", category: "40_5", categoryText: "40(5) ค่าเช่า", desc: "ภาษีทางตรงเกี่ยวกับอสังหาริมทรัพย์ที่ผู้ให้เช่ามีหน้าที่ต้องชำระตามกฎหมายประจำปี" },
-  { name: "ค่าจ้างแม่บ้านทำความสะอาดพื้นที่ส่วนกลาง", category: "40_8", categoryText: "40(8) บริการ", desc: "ค่าตอบแทนงานบริการดูแลพื้นที่ส่วนกลาง ทางเดิน บันได และดูแลความสะอาดทั่วไปของตึก" },
-  { name: "ค่าจ้างพนักงานรักษาความปลอดภัย (รปภ.)", category: "40_8", categoryText: "40(8) บริการ", desc: "งานจ้างดูแลความปลอดภัยในตัวตึกและลานจอดรถ ซึ่งเกี่ยวข้องกับการให้บริการของหอพัก" },
-  { name: "ค่าน้ำประปาจ่ายหลวง (บิลการประปา)", category: "40_8", categoryText: "40(8) บริการ", desc: "ค่าน้ำดิบที่ทางหอพักชำระโดยตรงให้กับการประปานครหลวงหรือภูมิภาคส่วนกลางตึก" },
-  { name: "ค่าไฟฟ้าส่วนกลาง (บิลการไฟฟ้า)", category: "40_8", categoryText: "40(8) บริการ", desc: "บิลค่าไฟฟ้าส่วนกลาง ลิฟต์ ทางเดิน และไฟปั๊มน้ำที่จ่ายตรงให้การไฟฟ้านครหลวงหรือภูมิภาค" },
-  { name: "ค่าซ่อมแซมระบบประปา / ท่อน้ำแตก", category: "40_8", categoryText: "40(8) บริการ", desc: "งานซ่อมแซมบำรุงรักษาท่อน้ำดี-น้ำเสียและเครื่องปั๊มน้ำที่คอยให้บริการสุขาภิบาล" },
-  { name: "ค่าจัดซื้อหลอดไฟส่องสว่างทางเดิน", category: "40_8", categoryText: "40(8) บริการ", desc: "ค่าใช้จ่ายจัดซื้อวัสดุอุปกรณ์สิ้นเปลืองสำหรับงานบริการดูแลพื้นที่ส่วนกลางและทางเดิน" },
-  { name: "ค่าบริการอินเทอร์เน็ต Wifi ในหอพัก", category: "40_8", categoryText: "40(8) บริการ", desc: "ค่าสัญญาณอินเทอร์เน็ตที่แชร์ให้ห้องพักต่าง ๆ ใช้งาน ซึ่งนับเป็นส่วนหนึ่งของการให้บริการ" },
-  { name: "ค่าซ่อมแซมระบบคีย์การ์ด / กล้องวงจรปิด", category: "40_8", categoryText: "40(8) บริการ", desc: "ค่าบำรุงรักษาอุปกรณ์อำนวยความสะดวกและรักษาความปลอดภัยส่วนกลางตึก" },
-  { name: "ค่ากำจัดปลวกและแมลงรบกวน", category: "40_5", categoryText: "40(5) ค่าเช่า", desc: "การฉีดพ่นเคมีรักษาเนื้อไม้และโครงสร้างตึก เพื่อถนอมและปกป้องสภาพโครงสร้างสิ่งปลูกสร้างหลัก" },
-  { name: "ค่าถุงขยะสีดำและอุปกรณ์ล้างพื้น", category: "40_8", categoryText: "40(8) บริการ", desc: "ค่าวัสดุสิ้นเปลืองใช้ในการทำความสะอาดพื้นที่ส่วนกลางเพื่อรักษาระดับการบริการของหอพัก" }
-]
+// คู่มือรายจ่ายยอดนิยมและคำอธิบายประเภทภาษี (แยกตามภาษา)
+const commonExpensesGuideByLocale: Record<"th" | "en", { name: string; category: "40_5" | "40_8"; desc: string }[]> = {
+  th: [
+    { name: "ค่าสีทาตึกภายนอก / ภายใน", category: "40_5", desc: "การปรับปรุงหรือทาสีโครงสร้างตึกหลัก ถือเป็นค่าใช้จ่ายซ่อมแซมรักษาอาคารของผู้ให้เช่า" },
+    { name: "ค่าซ่อมแซมหลังคารั่วซึม", category: "40_5", desc: "การบำรุงรักษาและซ่อมแซมโครงสร้างใหญ่ของอาคารเพื่อรักษาสภาพตึกให้ใช้งานได้ปลอดภัย" },
+    { name: "ค่าซ่อมแซมลิฟต์โดยสาร", category: "40_5", desc: "การบำรุงรักษาลิฟต์ซึ่งถือเป็นสิ่งปลูกสร้างหรืออุปกรณ์ควบอาคารส่วนโครงสร้างหลัก" },
+    { name: "ค่าเบี้ยประกันภัยตึก (อัคคีภัย / วินาศภัย)", category: "40_5", desc: "ค่าประกันภัยคุ้มครองโครงสร้างอสังหาริมทรัพย์และตัวอาคารหอพัก" },
+    { name: "ดอกเบี้ยเงินกู้ยืมเพื่อซื้อ / สร้างหอพัก", category: "40_5", desc: "ดอกเบี้ยจ่ายจากสัญญากู้เงินเพื่อลงทุนก่อสร้างอาคารหอพัก (หักเฉพาะดอกเบี้ย ห้ามหักเงินต้น)" },
+    { name: "ภาษีที่ดินและสิ่งปลูกสร้าง", category: "40_5", desc: "ภาษีทางตรงเกี่ยวกับอสังหาริมทรัพย์ที่ผู้ให้เช่ามีหน้าที่ต้องชำระตามกฎหมายประจำปี" },
+    { name: "ค่าจ้างแม่บ้านทำความสะอาดพื้นที่ส่วนกลาง", category: "40_8", desc: "ค่าตอบแทนงานบริการดูแลพื้นที่ส่วนกลาง ทางเดิน บันได และดูแลความสะอาดทั่วไปของตึก" },
+    { name: "ค่าจ้างพนักงานรักษาความปลอดภัย (รปภ.)", category: "40_8", desc: "งานจ้างดูแลความปลอดภัยในตัวตึกและลานจอดรถ ซึ่งเกี่ยวข้องกับการให้บริการของหอพัก" },
+    { name: "ค่าน้ำประปาจ่ายหลวง (บิลการประปา)", category: "40_8", desc: "ค่าน้ำดิบที่ทางหอพักชำระโดยตรงให้กับการประปานครหลวงหรือภูมิภาคส่วนกลางตึก" },
+    { name: "ค่าไฟฟ้าส่วนกลาง (บิลการไฟฟ้า)", category: "40_8", desc: "บิลค่าไฟฟ้าส่วนกลาง ลิฟต์ ทางเดิน และไฟปั๊มน้ำที่จ่ายตรงให้การไฟฟ้านครหลวงหรือภูมิภาค" },
+    { name: "ค่าซ่อมแซมระบบประปา / ท่อน้ำแตก", category: "40_8", desc: "งานซ่อมแซมบำรุงรักษาท่อน้ำดี-น้ำเสียและเครื่องปั๊มน้ำที่คอยให้บริการสุขาภิบาล" },
+    { name: "ค่าจัดซื้อหลอดไฟส่องสว่างทางเดิน", category: "40_8", desc: "ค่าใช้จ่ายจัดซื้อวัสดุอุปกรณ์สิ้นเปลืองสำหรับงานบริการดูแลพื้นที่ส่วนกลางและทางเดิน" },
+    { name: "ค่าบริการอินเทอร์เน็ต Wifi ในหอพัก", category: "40_8", desc: "ค่าสัญญาณอินเทอร์เน็ตที่แชร์ให้ห้องพักต่าง ๆ ใช้งาน ซึ่งนับเป็นส่วนหนึ่งของการให้บริการ" },
+    { name: "ค่าซ่อมแซมระบบคีย์การ์ด / กล้องวงจรปิด", category: "40_8", desc: "ค่าบำรุงรักษาอุปกรณ์อำนวยความสะดวกและรักษาความปลอดภัยส่วนกลางตึก" },
+    { name: "ค่ากำจัดปลวกและแมลงรบกวน", category: "40_5", desc: "การฉีดพ่นเคมีรักษาเนื้อไม้และโครงสร้างตึก เพื่อถนอมและปกป้องสภาพโครงสร้างสิ่งปลูกสร้างหลัก" },
+    { name: "ค่าถุงขยะสีดำและอุปกรณ์ล้างพื้น", category: "40_8", desc: "ค่าวัสดุสิ้นเปลืองใช้ในการทำความสะอาดพื้นที่ส่วนกลางเพื่อรักษาระดับการบริการของหอพัก" }
+  ],
+  en: [
+    { name: "Exterior / interior building paint", category: "40_5", desc: "Repainting or refurbishing the main building structure is a landlord's building-maintenance expense" },
+    { name: "Roof leak repair", category: "40_5", desc: "Maintenance and repair of the building's major structure to keep it safe for use" },
+    { name: "Passenger elevator repair", category: "40_5", desc: "Elevator maintenance, treated as a fixture or equipment attached to the main structure" },
+    { name: "Building insurance premium (fire / disaster)", category: "40_5", desc: "Insurance covering the property structure and the dormitory building itself" },
+    { name: "Loan interest to buy / build the dormitory", category: "40_5", desc: "Interest paid on a loan taken to invest in constructing the dormitory building (interest only, not principal)" },
+    { name: "Land and building tax", category: "40_5", desc: "Direct property tax the landlord is legally required to pay annually" },
+    { name: "Common-area cleaning staff wages", category: "40_8", desc: "Wages for staff maintaining common areas, hallways, stairs, and general building cleanliness" },
+    { name: "Security guard wages", category: "40_8", desc: "Security staff for the building and parking area, part of the dormitory's service offering" },
+    { name: "Common-area water bill", category: "40_8", desc: "Raw water paid directly to the metropolitan or regional waterworks authority for common areas" },
+    { name: "Common-area electricity bill", category: "40_8", desc: "Electricity bill for common areas, elevators, hallways, and water pumps paid directly to the electricity authority" },
+    { name: "Plumbing repair / burst pipe repair", category: "40_8", desc: "Maintenance and repair of clean/waste water pipes and pumps servicing sanitation" },
+    { name: "Hallway light bulb purchase", category: "40_8", desc: "Consumable materials purchased for maintaining common areas and hallways" },
+    { name: "Dormitory Wifi/internet service", category: "40_8", desc: "Shared internet service used by tenant rooms, considered part of the service offering" },
+    { name: "Keycard system / CCTV repair", category: "40_8", desc: "Maintenance of common-area convenience and security equipment" },
+    { name: "Termite and pest control", category: "40_5", desc: "Chemical treatment protecting the woodwork and building structure, preserving the main structure's condition" },
+    { name: "Black garbage bags and floor-cleaning supplies", category: "40_8", desc: "Consumable materials used to clean common areas, maintaining the dormitory's service level" }
+  ]
+}
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -68,6 +90,8 @@ function getCookie(name: string): string | undefined {
 }
 
 export default function DailyBillsPage() {
+  const { t, locale } = useLanguage()
+  const commonExpensesGuide = commonExpensesGuideByLocale[locale]
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -266,7 +290,7 @@ export default function DailyBillsPage() {
   // จัดการฟอร์มบันทึกบิล
   const handleOpenAddModal = () => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     setEditingExpense(null)
@@ -286,7 +310,7 @@ export default function DailyBillsPage() {
 
   const handleOpenEditModal = (item: ExpenseItem) => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     setEditingExpense(item)
@@ -311,16 +335,16 @@ export default function DailyBillsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     if (!formTitle.trim()) {
-      setFormError("กรุณากรอกรายละเอียดของบิลค่าใช้จ่าย")
+      setFormError(t("daily_bills.validation_title_required"))
       return
     }
     const amt = Number(formAmount)
     if (isNaN(amt) || amt <= 0) {
-      setFormError("กรุณากรอกจำนวนเงินให้ถูกต้องและมากกว่า 0 บาท")
+      setFormError(t("daily_bills.validation_amount_invalid"))
       return
     }
 
@@ -364,10 +388,10 @@ export default function DailyBillsPage() {
         }
         await loadData(taxYear, true)
       } else {
-        setFormError(res.error || "เกิดข้อผิดพลาดในการบันทึกรายการ")
+        setFormError(res.error || t("daily_bills.save_error_generic"))
       }
     } catch (err) {
-      setFormError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์")
+      setFormError(t("daily_bills.save_error_connection"))
     } finally {
       setSubmitting(false)
     }
@@ -376,7 +400,7 @@ export default function DailyBillsPage() {
   // เรียกใช้ Trigger เพื่อแสดง Custom Delete Modal แทน confirm ดั้งเดิม
   const handleDeleteTrigger = (item: ExpenseItem) => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     setDeleteTarget(item)
@@ -385,7 +409,7 @@ export default function DailyBillsPage() {
 
   const handleConfirmDelete = async () => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     if (!deleteTarget) return
@@ -408,10 +432,10 @@ export default function DailyBillsPage() {
         }
         await loadData(taxYear, true)
       } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการลบรายการ")
+        alert(res.error || t("daily_bills.delete_error_generic"))
       }
     } catch (err) {
-      alert("เกิดข้อผิดพลาดในการทำงาน")
+      alert(t("daily_bills.delete_error_action"))
     } finally {
       setDeleting(false)
     }
@@ -491,13 +515,13 @@ export default function DailyBillsPage() {
             <Lock className="w-10 h-10 animate-pulse" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-lg font-bold text-slate-100">พื้นที่จำกัดสิทธิ์เฉพาะการเข้าช่วยเหลือระบบ</h3>
+            <h3 className="text-lg font-bold text-slate-100">{t("daily_bills.restricted_title")}</h3>
             <p className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
-              ขออภัย บัญชีสิทธิ์ <span className="text-red-400 font-semibold font-mono">Super Admin</span> ของคุณจำเป็นต้องมีสถานะได้รับการอนุมัติช่วยเหลือจึงจะสามารถเข้าดูหรือบันทึกบิลรายจ่ายรายวันใน Workspace นี้ได้
+              {t("daily_bills.restricted_desc")}
             </p>
           </div>
           <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 text-[11px] text-slate-500 leading-relaxed max-w-sm mx-auto">
-            💡 กรุณาเปิดแผงควบคุมหลักด้านซ้าย แล้วเลือก <strong>"ส่งคำขอเข้าช่วยเหลือระบบ"</strong> และได้รับการยืนยันสิทธิ์จากเจ้าของระบบก่อนดำเนินการเข้าสลับหอพัก
+            💡 {t("daily_bills.restricted_hint_prefix")} <strong>"{t("daily_bills.restricted_hint_action")}"</strong> {t("daily_bills.restricted_hint_suffix")}
           </div>
         </div>
       </>
@@ -517,17 +541,17 @@ export default function DailyBillsPage() {
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
             <Coins className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-            บันทึกและจัดการบิลค่าใช้จ่าย
+            {t("daily_bills.title")}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            สมุดจดรายจ่ายประจำวัน แยกสัดส่วนเพื่อนำไปหักลดหย่อนภาษีอัตโนมัติ ป้องกันข้อมูลตกหล่น
+            {t("daily_bills.desc")}
           </p>
         </div>
 
         {/* ตัวเลือกปีภาษีและปุ่มเพิ่ม (สลับปุ่มเพิ่มเป็นซ่อนบนมือถือเพราะมี Sticky Bottom แทน) */}
         <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto shrink-0 pt-1 md:pt-0">
           <div className="flex items-center gap-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus-within:border-teal-500 focus-within:ring-1 focus-within:ring-teal-500/30 transition-all h-11 md:h-9 shadow-sm flex-1 md:flex-initial">
-            <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-550 uppercase tracking-wider shrink-0 select-none">ปีภาษี</span>
+            <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-550 uppercase tracking-wider shrink-0 select-none">{t("daily_bills.tax_year_label")}</span>
             <select
               value={taxYear}
               onChange={(e) => setTaxYear(e.target.value)}
@@ -545,7 +569,7 @@ export default function DailyBillsPage() {
               !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "cursor-pointer"
             }`}
           >
-            <Plus className="w-4 h-4" /> บันทึกบิลรายวันใหม่
+            <Plus className="w-4 h-4" /> {t("daily_bills.add_new_btn")}
           </button>
         </div>
       </div>
@@ -556,12 +580,12 @@ export default function DailyBillsPage() {
         <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 flex items-center justify-between shadow-sm shadow-blue-500/5 hover:-translate-y-0.5 transition-all duration-300">
           <div className="space-y-1.5">
             <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 font-mono uppercase bg-blue-50 dark:bg-blue-950/40 px-2.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30 tracking-wider">
-              ค่าเช่า มาตรา 40(5)
+              {t("daily_bills.summary_405_label")}
             </span>
             <h4 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono pt-1">
-              {total405.toLocaleString()} <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">บาท</span>
+              {total405.toLocaleString()} <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t("daily_bills.baht_unit")}</span>
             </h4>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500">รวมค่าใช้จ่ายจริงเกี่ยวกับตัวตึกและสิ่งปลูกสร้างหลัก</p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">{t("daily_bills.summary_405_desc")}</p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/20 shrink-0">
             <FileText className="w-5 h-5" />
@@ -572,12 +596,12 @@ export default function DailyBillsPage() {
         <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 flex items-center justify-between shadow-sm shadow-teal-500/5 hover:-translate-y-0.5 transition-all duration-300">
           <div className="space-y-1.5">
             <span className="text-[10px] font-extrabold text-teal-600 dark:text-teal-400 font-mono uppercase bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded border border-teal-100 dark:border-teal-900/30 tracking-wider">
-              บริการ มาตรา 40(8)
+              {t("daily_bills.summary_408_label")}
             </span>
             <h4 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono pt-1">
-              {total408.toLocaleString()} <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">บาท</span>
+              {total408.toLocaleString()} <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t("daily_bills.baht_unit")}</span>
             </h4>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500">รวมค่าน้ำ/ไฟ/พนักงานบริการส่วนกลางของตึก</p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">{t("daily_bills.summary_408_desc")}</p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-100 dark:border-teal-900/20 shrink-0">
             <Coins className="w-5 h-5" />
@@ -588,12 +612,12 @@ export default function DailyBillsPage() {
         <div className="bg-white dark:bg-slate-850 rounded-2xl border border-amber-200/50 dark:border-amber-900/30 bg-gradient-to-br from-white to-amber-500/5 dark:from-slate-850 dark:to-amber-950/10 p-5 flex items-center justify-between shadow-sm shadow-amber-500/5 hover:-translate-y-0.5 transition-all duration-300">
           <div className="space-y-1.5">
             <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 font-mono uppercase bg-amber-50 dark:bg-amber-950/40 px-2.5 py-0.5 rounded border border-amber-150 dark:border-amber-900/30 tracking-wider">
-              ยอดรายจ่ายบิลสะสมรวม
+              {t("daily_bills.summary_total_label")}
             </span>
             <h4 className="text-2xl font-extrabold text-teal-600 dark:text-teal-400 font-mono pt-1">
-              {grandTotal.toLocaleString()} <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">บาท</span>
+              {grandTotal.toLocaleString()} <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">{t("daily_bills.baht_unit")}</span>
             </h4>
-            <p className="text-[10px] text-slate-550 dark:text-slate-400">รวมรายจ่ายบิลทั้งหมดในปีภาษี {taxYear}</p>
+            <p className="text-[10px] text-slate-550 dark:text-slate-400">{t("daily_bills.summary_total_desc").replace("{year}", taxYear)}</p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/20 shrink-0">
             <TrendingUp className="w-5 h-5 animate-pulse" />
@@ -613,7 +637,7 @@ export default function DailyBillsPage() {
                 : "text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             }`}
           >
-            รายการบิล ({filteredExpenses.length})
+            {t("daily_bills.tab_bills").replace("{count}", String(filteredExpenses.length))}
           </button>
           <button
             type="button"
@@ -624,7 +648,7 @@ export default function DailyBillsPage() {
                 : "text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             }`}
           >
-            แนะนำการเลือกบิล ({filteredGuide.length})
+            {t("daily_bills.tab_guide").replace("{count}", String(filteredGuide.length))}
           </button>
         </div>
       </div>
@@ -637,7 +661,7 @@ export default function DailyBillsPage() {
             {/* Filter and search control section (Touch-friendly and Adaptive layout) */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <h3 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 uppercase tracking-wider">
-                <Bookmark className="w-4 h-4 text-teal-500" /> สมุดบันทึกรายการประจำปี {taxYear}
+                <Bookmark className="w-4 h-4 text-teal-500" /> {t("daily_bills.notebook_title").replace("{year}", taxYear)}
               </h3>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
@@ -646,7 +670,7 @@ export default function DailyBillsPage() {
                   <Search className="w-4 h-4 md:w-3.5 md:h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="ค้นหาบิล..."
+                    placeholder={t("daily_bills.search_placeholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full sm:w-[160px] pl-9 md:pl-8 pr-3 py-2.5 md:py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 transition-all h-11 md:h-9 text-base md:text-xs"
@@ -662,7 +686,7 @@ export default function DailyBillsPage() {
                       categoryFilter === "all" ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-500 hover:text-slate-700"
                     }`}
                   >
-                    ทั้งหมด
+                    {t("daily_bills.filter_all")}
                   </button>
                   <button
                     type="button"
@@ -695,8 +719,8 @@ export default function DailyBillsPage() {
                   <HelpCircle className="w-6 h-6" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-bold">ไม่พบบิลค่าใช้จ่ายที่ต้องการค้นหา</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500">กรุณาคลิกเพื่อบันทึกรายการแรกของคุณหรือเปลี่ยนเงื่อนไขการค้นหา</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-bold">{t("daily_bills.empty_title")}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">{t("daily_bills.empty_desc")}</p>
                 </div>
               </div>
             ) : (
@@ -706,32 +730,32 @@ export default function DailyBillsPage() {
                   <table className="w-full text-left border-collapse text-sm sm:text-base">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800/80 text-xs sm:text-sm font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                        <th className="py-3.5 pl-3">รายละเอียดรายการบิลจ่าย</th>
-                        <th className="py-3.5 text-center">ประเภทภาษี</th>
-                        <th className="py-3.5 text-right">จำนวนเงิน</th>
-                        <th className="py-3.5 text-center">วันที่บันทึก</th>
-                        <th className="py-3.5 text-center pr-3">การจัดการ</th>
+                        <th className="py-3.5 pl-3">{t("daily_bills.col_desc")}</th>
+                        <th className="py-3.5 text-center">{t("daily_bills.col_category")}</th>
+                        <th className="py-3.5 text-right">{t("daily_bills.col_amount")}</th>
+                        <th className="py-3.5 text-center">{t("daily_bills.col_date")}</th>
+                        <th className="py-3.5 text-center pr-3">{t("daily_bills.col_actions")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                       {filteredExpenses.map((item) => (
                         <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 group transition-all duration-150">
                           <td className="py-4 pl-3 font-semibold text-slate-800 dark:text-slate-200">
-                            {item.title}
+                            <DynamicText>{item.title}</DynamicText>
                           </td>
                           <td className="py-4 text-center">
                             {item.category === "40_5" ? (
                               <span className="inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100/40 dark:border-blue-900/30">
-                                40(5) ค่าเช่า
+                                {t("daily_bills.category_405_full")}
                               </span>
                             ) : (
                               <span className="inline-block text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100/40 dark:border-teal-900/30">
-                                40(8) บริการ
+                                {t("daily_bills.category_408_full")}
                               </span>
                             )}
                           </td>
                           <td className="py-4 text-right font-mono text-slate-800 dark:text-slate-200 font-extrabold">
-                            {item.amount.toLocaleString()} บาท
+                            {item.amount.toLocaleString()} {t("daily_bills.baht_unit")}
                           </td>
                           <td className="py-4 text-center font-mono text-xs sm:text-sm text-slate-400 dark:text-slate-500">
                             {new Date(item.created_at).toLocaleDateString("th-TH", {
@@ -745,14 +769,14 @@ export default function DailyBillsPage() {
                               <button
                                 onClick={() => handleOpenEditModal(item)}
                                 className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                                title="แก้ไขบิล"
+                                title={t("daily_bills.edit_tooltip")}
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteTrigger(item)}
                                 className="p-1.5 rounded-lg bg-slate-50 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/30 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors cursor-pointer"
-                                title="ลบบิล"
+                                title={t("daily_bills.delete_tooltip")}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -773,27 +797,27 @@ export default function DailyBillsPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">รายละเอียดรายการบิล</span>
-                          <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-wide">{item.title}</span>
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">{t("daily_bills.mobile_desc_label")}</span>
+                          <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-wide"><DynamicText>{item.title}</DynamicText></span>
                         </div>
                         {item.category === "40_5" ? (
                           <span className="inline-block text-[9px] font-extrabold px-2.5 py-1 rounded-full bg-blue-50/80 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 shrink-0">
-                            40(5) ค่าเช่า
+                            {t("daily_bills.category_405_full")}
                           </span>
                         ) : (
                           <span className="inline-block text-[9px] font-extrabold px-2.5 py-1 rounded-full bg-teal-50/80 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-900/40 shrink-0">
-                            40(8) บริการ
+                            {t("daily_bills.category_408_full")}
                           </span>
                         )}
                       </div>
 
                       <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-2.5 text-xs text-slate-600 dark:text-slate-350">
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium">จำนวนเงิน:</span>
-                          <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm font-mono">{item.amount.toLocaleString()} บาท</span>
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">{t("daily_bills.amount_label")}</span>
+                          <span className="font-extrabold text-slate-850 dark:text-slate-100 text-sm font-mono">{item.amount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium">วันที่บันทึก:</span>
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">{t("daily_bills.date_label")}</span>
                           <span className="font-mono text-slate-600 dark:text-slate-350">
                             {new Date(item.created_at).toLocaleDateString("th-TH", {
                               day: "2-digit",
@@ -810,13 +834,13 @@ export default function DailyBillsPage() {
                           onClick={() => handleOpenEditModal(item)}
                           className="flex-1 py-3 px-4 text-xs font-bold text-teal-600 dark:text-teal-400 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 rounded-xl border border-slate-200/60 dark:border-slate-800/80 transition-all flex items-center justify-center gap-2 h-11 active:scale-95 duration-200 cursor-pointer"
                         >
-                          <Edit className="w-4 h-4" /> แก้ไขรายการ
+                          <Edit className="w-4 h-4" /> {t("daily_bills.edit_action")}
                         </button>
                         <button
                           onClick={() => handleDeleteTrigger(item)}
                           className="flex-1 py-3 px-4 text-xs font-bold text-red-600 dark:text-red-400 bg-slate-50 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/20 rounded-xl border border-slate-200/60 dark:border-slate-800/80 transition-all flex items-center justify-center gap-2 h-11 active:scale-95 duration-200 cursor-pointer"
                         >
-                          <Trash2 className="w-4 h-4" /> ลบรายการ
+                          <Trash2 className="w-4 h-4" /> {t("daily_bills.delete_action")}
                         </button>
                       </div>
                     </div>
@@ -832,10 +856,10 @@ export default function DailyBillsPage() {
           <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 md:p-6 space-y-4 shadow-sm flex flex-col h-full max-h-[640px]">
             <div>
               <h3 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 uppercase tracking-wider">
-                <Bookmark className="w-4 h-4 text-blue-500" /> แนะนำการเลือกประเภทบิล
+                <Bookmark className="w-4 h-4 text-blue-500" /> {t("daily_bills.guide_title")}
               </h3>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5 leading-relaxed">
-                พิมพ์ค้นหารายการบิลค่าใช้จ่ายของหอพัก เพื่อดูคำแนะนำว่าต้องยื่นหักเป็นประเภท 40(5) หรือ 40(8) และกดคัดลอกได้ทันที
+                {t("daily_bills.guide_desc")}
               </p>
             </div>
 
@@ -844,7 +868,7 @@ export default function DailyBillsPage() {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="เช่น ค่าน้ำ, หลอดไฟ, ทาสี..."
+                placeholder={t("daily_bills.guide_search_placeholder")}
                 value={guideSearch}
                 onChange={(e) => setGuideSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all text-base md:text-xs h-11 md:h-9 shadow-sm"
@@ -860,7 +884,7 @@ export default function DailyBillsPage() {
                   activeGuideCategory === "all" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm" : "text-slate-500 dark:text-slate-550"
                 }`}
               >
-                ทั้งหมด
+                {t("daily_bills.filter_all")}
               </button>
               <button
                 type="button"
@@ -869,7 +893,7 @@ export default function DailyBillsPage() {
                   activeGuideCategory === "40_5" ? "bg-blue-500 dark:bg-blue-600/30 text-white dark:text-blue-400 shadow-sm" : "text-slate-500 dark:text-slate-550"
                 }`}
               >
-                40(5) ค่าเช่า
+                {t("daily_bills.category_405_full")}
               </button>
               <button
                 type="button"
@@ -878,7 +902,7 @@ export default function DailyBillsPage() {
                   activeGuideCategory === "40_8" ? "bg-teal-500 dark:bg-teal-600/30 text-white dark:text-teal-400 shadow-sm" : "text-slate-500 dark:text-slate-550"
                 }`}
               >
-                40(8) บริการ
+                {t("daily_bills.category_408_full")}
               </button>
             </div>
 
@@ -886,7 +910,7 @@ export default function DailyBillsPage() {
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
               {filteredGuide.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 dark:text-slate-500 text-[11px] leading-relaxed">
-                  ไม่พบข้อแนะนำสำหรับ "{guideSearch}"<br />กรุณาลองพิมพ์คำสำคัญคำอื่น เช่น น้ำ, ไฟ, ซ่อม, ปูน
+                  {t("daily_bills.guide_no_result").replace("{query}", guideSearch)}<br />{t("daily_bills.guide_no_result_hint")}
                 </div>
               ) : (
                 filteredGuide.map((item, idx) => (
@@ -901,18 +925,18 @@ export default function DailyBillsPage() {
                         onClick={() => applyGuideToForm(item.name, item.category as "40_5" | "40_8")}
                         className="text-[9px] font-extrabold text-teal-600 dark:text-teal-400 group-hover:text-teal-500 dark:group-hover:text-teal-350 flex items-center gap-0.5 whitespace-nowrap bg-teal-50 dark:bg-teal-500/5 px-2 py-0.5 rounded border border-teal-100 dark:border-teal-500/10 opacity-90 group-hover:opacity-100 transition-all duration-150 cursor-pointer h-7"
                       >
-                        ใช้รายการนี้ <ArrowRight className="w-2.5 h-2.5" />
+                        {t("daily_bills.guide_use_item")} <ArrowRight className="w-2.5 h-2.5" />
                       </button>
                     </div>
-                    
+
                     <div className="flex items-center gap-1.5 mt-1">
                       {item.category === "40_5" ? (
                         <span className="text-[8px] font-extrabold uppercase tracking-wide bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.2 rounded font-mono border border-blue-100/30 dark:border-blue-900/10">
-                          มาตรา {item.categoryText}
+                          {t("daily_bills.guide_section_prefix")} {t("daily_bills.category_405_full")}
                         </span>
                       ) : (
                         <span className="text-[8px] font-extrabold uppercase tracking-wide bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 px-1.5 py-0.2 rounded font-mono border border-teal-100/30 dark:border-teal-900/10">
-                          มาตรา {item.categoryText}
+                          {t("daily_bills.guide_section_prefix")} {t("daily_bills.category_408_full")}
                         </span>
                       )}
                     </div>
@@ -936,7 +960,7 @@ export default function DailyBillsPage() {
             !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "cursor-pointer"
           }`}
         >
-          <Plus className="w-5 h-5" /> บันทึกบิลรายวันใหม่
+          <Plus className="w-5 h-5" /> {t("daily_bills.add_new_btn")}
         </button>
       </div>
 
@@ -952,9 +976,9 @@ export default function DailyBillsPage() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm tracking-tight">
-                    {editingExpense ? "แก้ไขบิลค่าใช้จ่ายรายวัน" : "บันทึกบิลค่าใช้จ่ายรายวันใหม่"}
+                    {editingExpense ? t("daily_bills.modal_edit_title") : t("daily_bills.modal_add_title")}
                   </h3>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">ปีภาษี {taxYear}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t("daily_bills.modal_tax_year").replace("{year}", taxYear)}</p>
                 </div>
               </div>
               <button
@@ -976,11 +1000,11 @@ export default function DailyBillsPage() {
 
               {/* รายละเอียดบิล */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">รายละเอียดรายการบิลจ่าย <span className="text-red-400">*</span></label>
+                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">{t("daily_bills.form_desc_label")} <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   required
-                  placeholder="เช่น ค่าทาสีห้องพัก, หลอดไฟทางเดิน"
+                  placeholder={t("daily_bills.form_desc_placeholder")}
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 md:px-3.5 md:py-2 text-base md:text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all h-12 md:h-10 shadow-sm"
@@ -989,7 +1013,7 @@ export default function DailyBillsPage() {
 
               {/* จำนวนเงิน */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">จำนวนเงินบิล (บาท) <span className="text-red-400">*</span></label>
+                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">{t("daily_bills.form_amount_label")} <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <input
                     type="number"
@@ -1003,14 +1027,14 @@ export default function DailyBillsPage() {
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-4 pr-12 py-3 md:pl-3.5 md:pr-12 md:py-2 text-base md:text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all h-12 md:h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-sm"
                   />
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 md:pr-3.5 pointer-events-none text-sm md:text-xs text-slate-400 dark:text-slate-500 font-medium">
-                    บาท
+                    {t("daily_bills.baht_unit")}
                   </div>
                 </div>
               </div>
 
               {/* วันที่บันทึกบิล */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">วันที่บันทึกบิล <span className="text-red-400">*</span></label>
+                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">{t("daily_bills.form_date_label")} <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <input
                     type="date"
@@ -1024,7 +1048,7 @@ export default function DailyBillsPage() {
 
               {/* ประเภทค่าใช้จ่าย */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">ประเภทค่าใช้จ่ายหักตามจริง <span className="text-red-400">*</span></label>
+                <label className="text-xs font-semibold md:font-medium text-slate-700 dark:text-slate-300">{t("daily_bills.form_category_label")} <span className="text-red-400">*</span></label>
                 <div className="grid grid-cols-2 gap-3">
                   {/* 40(5) */}
                   <button
@@ -1037,15 +1061,15 @@ export default function DailyBillsPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 font-mono">ม. 40(5)</span>
+                      <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 font-mono">{t("daily_bills.cat_405_code")}</span>
                       <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
                         formCategory === "40_5" ? "border-blue-500 bg-blue-500" : "border-slate-300 dark:border-slate-600"
                       }`}>
                         {formCategory === "40_5" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </div>
                     </div>
-                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">ค่าเช่าอาคาร</span>
-                    <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-relaxed mt-0.5">โครงสร้างตึกและสิ่งปลูกสร้างหลัก</span>
+                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">{t("daily_bills.cat_405_name")}</span>
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-relaxed mt-0.5">{t("daily_bills.cat_405_hint")}</span>
                   </button>
 
                   {/* 40(8) */}
@@ -1059,15 +1083,15 @@ export default function DailyBillsPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-[10px] font-extrabold text-teal-600 dark:text-teal-400 font-mono">ม. 40(8)</span>
+                      <span className="text-[10px] font-extrabold text-teal-600 dark:text-teal-400 font-mono">{t("daily_bills.cat_408_code")}</span>
                       <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
                         formCategory === "40_8" ? "border-teal-500 bg-teal-500" : "border-slate-300 dark:border-slate-600"
                       }`}>
                         {formCategory === "40_8" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </div>
                     </div>
-                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">บริการ/สาธารณูปโภค</span>
-                    <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-relaxed mt-0.5">น้ำไฟส่วนกลาง และพนักงานดูแลตึก</span>
+                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">{t("daily_bills.cat_408_name")}</span>
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-relaxed mt-0.5">{t("daily_bills.cat_408_hint")}</span>
                   </button>
                 </div>
               </div>
@@ -1076,15 +1100,15 @@ export default function DailyBillsPage() {
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 space-y-1">
                 <div className="flex items-center gap-1 font-bold text-slate-700 dark:text-slate-200">
                   <Info className={`w-3.5 h-3.5 ${formCategory === "40_5" ? "text-blue-500" : "text-teal-500"}`} />
-                  <span>เกร็ดความรู้ภาษี:</span>
+                  <span>{t("daily_bills.tax_tip_label")}</span>
                 </div>
                 {formCategory === "40_5" ? (
                   <p>
-                    <span className="text-blue-600 dark:text-blue-400 font-bold">มาตรา 40(5)</span> สรรพากรยอมให้เลือกหักค่าใช้จ่ายเหมา 30% ได้ หากรายจ่ายบิลจริงรวมกันทั้งปีไม่ถึง 30% แนะนำให้ยื่นหักแบบเหมาจะประหยัดกว่า
+                    <span className="text-blue-600 dark:text-blue-400 font-bold">{t("daily_bills.tax_tip_405_prefix")}</span> {t("daily_bills.tax_tip_405_body")}
                   </p>
                 ) : (
                   <p>
-                    <span className="text-teal-600 dark:text-teal-400 font-bold">มาตรา 40(8)</span> สรรพากรบังคับหักตามจริงเท่านั้น และต้องมีหลักฐานใบกำกับภาษีหรือใบเสร็จอย่างเป็นทางการเก็บไว้อย่างน้อย 5 ปี ห้ามใช้การหักเหมา
+                    <span className="text-teal-600 dark:text-teal-400 font-bold">{t("daily_bills.tax_tip_408_prefix")}</span> {t("daily_bills.tax_tip_408_body")}
                   </p>
                 )}
               </div>
@@ -1097,7 +1121,7 @@ export default function DailyBillsPage() {
                 onClick={() => setModalOpen(false)}
                 className="flex-1 sm:flex-none h-12 md:h-9 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-850 rounded-xl text-sm md:text-xs font-bold md:font-semibold transition-all cursor-pointer"
               >
-                ยกเลิก
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -1108,12 +1132,12 @@ export default function DailyBillsPage() {
                 {submitting ? (
                   <>
                     <div className="w-4 h-4 md:w-3.5 md:h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    กำลังบันทึก...
+                    {t("daily_bills.saving_btn")}
                   </>
                 ) : (
                   <>
                     <FileCheck className="w-4.5 h-4.5" />
-                    บันทึกรายการบิล
+                    {t("daily_bills.save_bill_btn")}
                   </>
                 )}
               </button>
@@ -1133,10 +1157,10 @@ export default function DailyBillsPage() {
               
               <div className="space-y-1.5 flex-1 min-w-0">
                 <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100">
-                  ยืนยันการลบบิลค่าใช้จ่าย
+                  {t("daily_bills.delete_modal_title")}
                 </h3>
                 <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                  คุณแน่ใจหรือไม่ที่จะลบรายการบิลจ่ายเงิน <strong className="text-slate-850 dark:text-slate-100 font-extrabold">"{deleteTarget.title}"</strong> จำนวนเงิน <strong className="text-teal-600 font-extrabold font-mono">{deleteTarget.amount.toLocaleString()} บาท</strong>? การดำเนินการนี้จะลบข้อมูลออกอย่างถาวรและไม่สามารถย้อนคืนได้
+                  {t("daily_bills.delete_modal_confirm_prefix")} <strong className="text-slate-850 dark:text-slate-100 font-extrabold">"<DynamicText>{deleteTarget.title}</DynamicText>"</strong> {t("daily_bills.delete_modal_confirm_amount_prefix")} <strong className="text-teal-600 font-extrabold font-mono">{deleteTarget.amount.toLocaleString()} {t("daily_bills.baht_unit")}</strong>{t("daily_bills.delete_modal_confirm_suffix")}
                 </p>
               </div>
             </div>
@@ -1152,7 +1176,7 @@ export default function DailyBillsPage() {
                 disabled={deleting}
                 className="order-2 sm:order-1 flex-1 h-12 md:h-9.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-850 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-550 dark:text-slate-400 text-sm md:text-xs font-bold md:font-semibold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
               >
-                ยกเลิก
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -1163,10 +1187,10 @@ export default function DailyBillsPage() {
                 {deleting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-red-600/30 border-t-red-600 rounded-full animate-spin" />
-                    กำลังลบ...
+                    {t("daily_bills.deleting_btn")}
                   </>
                 ) : (
-                  "ยืนยันลบข้อมูลถาวร"
+                  t("daily_bills.confirm_delete_btn")
                 )}
               </button>
             </div>

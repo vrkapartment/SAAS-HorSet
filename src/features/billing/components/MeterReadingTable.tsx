@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
 import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, AlertTriangle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
@@ -958,7 +959,7 @@ Thank you 🙏`
                       </div>
                       {mode !== "meters" && (
                         <div className={`text-xs mt-1 font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          {item.tenantName || <span className="italic opacity-60">{t("billing.vacant_room")}</span>}
+                          {item.tenantName ? <DynamicText>{item.tenantName}</DynamicText> : <span className="italic opacity-60">{t("billing.vacant_room")}</span>}
                         </div>
                       )}
                     </div>
@@ -1719,7 +1720,7 @@ Thank you 🙏`
                         ) : (
                           <>
                             <div className={`font-medium text-sm xl:text-base 2xl:text-lg truncate max-w-[160px] xl:max-w-[200px] 2xl:max-w-[240px] ${isDark ? "text-slate-200" : "text-slate-700"}`} title={item.tenantName || (locale === "en" ? "No tenant info" : "ไม่มีผู้เช่า")}>
-                              {item.tenantName || <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>{t("billing.no_tenant_info")}</span>}
+                              {item.tenantName ? <DynamicText>{item.tenantName}</DynamicText> : <span className={isDark ? "text-slate-600 italic" : "text-slate-400 italic"}>{t("billing.no_tenant_info")}</span>}
                             </div>
                             <div className={`text-xs xl:text-sm 2xl:text-base mt-0.5 font-mono ${isDark ? "text-slate-450" : "text-slate-500"}`}>
                               {item.tenantName ? (
@@ -1727,7 +1728,7 @@ Thank you 🙏`
                                   {locale === "en" ? "Rent" : "ค่าเช่า"} {item.baseRent.toLocaleString()} {t("billing.baht_unit")}
                                   {extraExpenses.map((exp: any, index: number) => (
                                     <div key={index} className="text-[10px] xl:text-xs 2xl:text-sm text-slate-500 dark:text-slate-440 font-medium mt-0.5">
-                                      {exp.name} +{Number(exp.amount || 0).toLocaleString()}.-
+                                      <DynamicText>{exp.name}</DynamicText> +{Number(exp.amount || 0).toLocaleString()}.-
                                     </div>
                                   ))}
                                   {Number(item.otherServiceAmount || 0) > 0 && (
@@ -2521,7 +2522,7 @@ Thank you 🙏`
                               {t("billing.room_label").replace("{roomNumber}", item.roomNumber)}
                             </span>
                             <span className={`font-extrabold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                              {item.tenantName}
+                              <DynamicText>{item.tenantName}</DynamicText>
                             </span>
                             <span className={`text-sm font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                               ({item.billAmount?.toLocaleString()}.-)
@@ -2648,7 +2649,7 @@ Thank you 🙏`
                               ห้อง {item.roomNumber}
                             </span>
                             <span className={`font-extrabold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                              {item.tenantName}
+                              <DynamicText>{item.tenantName}</DynamicText>
                             </span>
                             <span className={`text-sm font-mono font-semibold shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                               ({item.billAmount?.toLocaleString()}.-)

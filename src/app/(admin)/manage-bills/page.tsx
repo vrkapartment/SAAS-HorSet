@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from "react"
 import { useTheme } from "next-themes"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { createClient } from "@/lib/supabase/client"
 import {
   Receipt,
@@ -118,7 +119,7 @@ function getCycleFromTimestamp(timestampStr: string): string {
   }
 }
 
-function getBillingCycleOptions(registrationCycle?: string): { value: string; label: string }[] {
+function getBillingCycleOptions(registrationCycle: string | undefined, t: (key: string) => string): { value: string; label: string }[] {
   const options = []
   const d = new Date()
   // เจนรอบบิลล่วงหน้า 1 เดือน, เดือนปัจจุบัน และย้อนหลัง 11 เดือน (รวม 13 ตัวเลือก)
@@ -127,7 +128,7 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
     const y = targetDate.getFullYear()
     const m = String(targetDate.getMonth() + 1).padStart(2, "0")
     const val = `${y}-${m}`
-    
+
     // กรองไม่ให้แสดงรอบบิลก่อนเดือนที่สมัครใช้งาน
     if (registrationCycle && val < registrationCycle) {
       continue
@@ -135,26 +136,32 @@ function getBillingCycleOptions(registrationCycle?: string): { value: string; la
 
     options.push({
       value: val,
-      label: `รอบบิล ${formatBillingCycleThai(val)}`
+      label: `${t("manage_bills.cycle_prefix")} ${t("dashboard.month_" + m)} ${y}`
     })
   }
   return options
 }
 
+function ManageBillsFallback() {
+  const { t } = useLanguage()
+  return (
+    <div className="py-32 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center min-h-[60vh]">
+      <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+      <span>{t("manage_bills.loading_page")}</span>
+    </div>
+  )
+}
+
 export default function ManageBillsPage() {
   return (
-    <Suspense fallback={
-      <div className="py-32 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center min-h-[60vh]">
-        <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-        <span>กำลังเปิดหน้าจัดการใบแจ้งหนี้...</span>
-      </div>
-    }>
+    <Suspense fallback={<ManageBillsFallback />}>
       <ManageBillsContent />
     </Suspense>
   )
 }
 
 function ManageBillsContent() {
+  const { t } = useLanguage()
   const router = useRouter()
   const loadDataSeqRef = useRef(0)
   // true ระหว่างที่ผู้ใช้เพิ่งเปลี่ยนเดือนจาก dropdown เอง แต่ URL (router.replace) ยังไล่ตามไม่ทัน
@@ -715,7 +722,7 @@ function ManageBillsContent() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsaved) {
         e.preventDefault()
-        e.returnValue = "คุณยังมีข้อมูลที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?"
+        e.returnValue = t("manage_bills.confirm_unsaved_leave")
         return e.returnValue
       }
     }
@@ -969,7 +976,7 @@ function ManageBillsContent() {
   // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
   const handleSaveLateDays = async (roomNumber: string) => {
     if (!userPermissions.manage_bills_edit) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     console.log("🚀 [Client] handleSaveLateDays started for room:", roomNumber)
@@ -977,13 +984,13 @@ function ManageBillsContent() {
     
     if (!item) {
       console.error("❌ [Client] Room item not found in unifiedItems for room:", roomNumber)
-      alert(`⚠️ ไม่พบข้อมูลสำหรับห้อง ${roomNumber} กรุณาลองใหม่อีกครั้ง`)
+      alert(t("manage_bills.err_no_room_data").replace("{room}", roomNumber))
       return
     }
     
     if (!item.billId) {
       console.error("❌ [Client] billId is missing for room:", roomNumber, "item:", item)
-      alert(`⚠️ ห้อง ${roomNumber} ไม่มีรหัสบิล (Bill ID) บนระบบ กรุณาลองรีเฟรชหน้าเว็บ หรือกดสร้างบิลก่อนทำการบันทึกค่าปรับ`)
+      alert(t("manage_bills.err_no_bill_id").replace("{room}", roomNumber))
       return
     }
     
@@ -1016,7 +1023,7 @@ function ManageBillsContent() {
       console.log("✅ [Client] updateBillPenalty responded:", res)
       
       if (res.success) {
-        showToast(`บันทึกจำนวนวันปรับล่าช้าห้อง ${roomNumber} สำเร็จ!`)
+        showToast(t("manage_bills.saved_late_days").replace("{room}", roomNumber))
         const formatted = formatDbBillToCamelCase(res.data)
         updateLocalStateAndCache(roomNumber, undefined, formatted)
         setUnifiedItems(prev =>
@@ -1025,11 +1032,11 @@ function ManageBillsContent() {
         console.log("👉 [Client] Local state & cache updated successfully")
       } else {
         console.error("❌ [Client] Server Action returned success=false:", res.error)
-        alert(`❌ บันทึกไม่สำเร็จ: ${res.error || "เกิดข้อผิดพลาดในการบันทึกค่าปรับ"}`)
+        alert(t("manage_bills.err_save_failed_prefix") + (res.error || t("manage_bills.err_penalty_generic")))
       }
     } catch (err) {
       console.error("💥 [Client] Exception caught in handleSaveLateDays:", err)
-      alert(`💥 เกิดข้อผิดพลาดร้ายแรงในการบันทึกค่าปรับ:\n${err instanceof Error ? err.message : String(err)}`)
+      alert(t("manage_bills.err_penalty_fatal_prefix") + (err instanceof Error ? err.message : String(err)))
     } finally {
       setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
       console.log("🏁 [Client] handleSaveLateDays finished execution flow")
@@ -1058,16 +1065,16 @@ function ManageBillsContent() {
 
   const handleApproveSlip = async (id: string) => {
     if (!userPermissions.manage_bills_edit) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     const res = await updateBillStatus(id, "paid")
     if (res.success) {
-      showToast("อนุมัติรายการชำระเงินเรียบร้อยแล้ว!")
+      showToast(t("manage_bills.approved_payment"))
       const formatted = formatDbBillToCamelCase(res.data)
       updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
     } else {
-      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      alert(res.error || t("manage_bills.err_update_bill_status"))
       return
     }
     closeSlipModal()
@@ -1075,16 +1082,16 @@ function ManageBillsContent() {
 
   const handleRejectSlip = async (id: string) => {
     if (!userPermissions.manage_bills_edit) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     const res = await updateBillStatus(id, "unpaid", null)
     if (res.success) {
-      showToast("ปฏิเสธสลิปแล้ว บิลจะกลับเป็นสถานะค้างชำระ")
+      showToast(t("manage_bills.rejected_slip"))
       const formatted = formatDbBillToCamelCase(res.data)
       updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
     } else {
-      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      alert(res.error || t("manage_bills.err_update_bill_status"))
       return
     }
     closeSlipModal()
@@ -1092,24 +1099,24 @@ function ManageBillsContent() {
 
   const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
     if (!userPermissions.manage_bills_edit) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
-    if (!confirm(`คุณต้องการเปลี่ยนสถานะบิลของห้อง ${roomNumber} เป็น "ชำระเงินแล้ว" ใช่หรือไม่? (โปรดยืนยันหากได้รับเงินแล้ว)`)) return
+    if (!confirm(t("manage_bills.confirm_mark_paid").replace("{room}", roomNumber))) return
 
     const res = await updateBillStatus(billId, "paid")
     if (res.success) {
-      showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
+      showToast(t("manage_bills.marked_paid").replace("{room}", roomNumber))
       const formatted = formatDbBillToCamelCase(res.data)
       updateLocalStateAndCache(roomNumber, undefined, formatted)
     } else {
-      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      alert(res.error || t("manage_bills.err_update_bill_status"))
     }
   }
 
   const handleSaveRow = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
     if (!userPermissions.manage_bills_edit) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     const item = unifiedItems.find(i => i.roomNumber === roomNumber)
@@ -1136,12 +1143,12 @@ function ManageBillsContent() {
     if (type === "electric" || type === "all") {
       if (elecVal === "" || isNaN(elecVal as number)) {
         if (type === "electric") {
-          alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าให้ครบถ้วน")
+          alert(t("manage_bills.err_elec_required"))
           return
         }
       } else {
         if (isNaN(elecPrevVal)) {
-          alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+          alert(t("manage_bills.err_prev_invalid"))
           return
         }
         if (repElec) {
@@ -1152,7 +1159,7 @@ function ManageBillsContent() {
           eUnits = getUnits(Number(elecVal), elecPrevVal)
         }
         if (eUnits > 3000) {
-          alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง (คำนวณแล้วเกิน 3,000 หน่วย)")
+          alert(t("manage_bills.err_units_exceed"))
           return
         }
       }
@@ -1161,12 +1168,12 @@ function ManageBillsContent() {
     if (type === "water" || type === "all") {
       if (waterVal === "" || isNaN(waterVal as number)) {
         if (type === "water") {
-          alert("กรุณากรอกตัวเลขมิเตอร์น้ำประปาให้ครบถ้วน")
+          alert(t("manage_bills.err_water_required"))
           return
         }
       } else {
         if (isNaN(waterPrevVal)) {
-          alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+          alert(t("manage_bills.err_prev_invalid"))
           return
         }
         if (repWater) {
@@ -1177,14 +1184,14 @@ function ManageBillsContent() {
           wUnits = getUnits(Number(waterVal), waterPrevVal)
         }
         if (wUnits > 3000) {
-          alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง (คำนวณแล้วเกิน 3,000 หน่วย)")
+          alert(t("manage_bills.err_units_exceed"))
           return
         }
       }
     }
 
     if (type === "all" && (elecVal === "" || waterVal === "")) {
-      alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
+      alert(t("manage_bills.err_both_required"))
       return
     }
 
@@ -1205,7 +1212,7 @@ function ManageBillsContent() {
       )
 
       if (!meterResult.success) {
-        alert(meterResult.error || "บันทึกข้อมูลมิเตอร์ไม่สำเร็จ")
+        alert(meterResult.error || t("manage_bills.err_meter_save_failed"))
         setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
         return
       }
@@ -1246,20 +1253,20 @@ function ManageBillsContent() {
         )
 
         if (!billResult.success) {
-          alert(billResult.error || "สร้างบิลไม่สำเร็จ แต่บันทึกมิเตอร์สำเร็จแล้ว")
+          alert(billResult.error || t("manage_bills.err_bill_create_failed_meter_ok"))
           setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
           return
         }
         createdBillObj = billResult.data
       }
 
-      showToast(`บันทึกมิเตอร์และใบแจ้งยอดห้อง ${roomNumber} สำเร็จ!`)
+      showToast(t("manage_bills.saved_meter_bill").replace("{room}", roomNumber))
       const formattedMeter = formatDbMeterToCamelCase(meterResult.data)
       const formattedBill = createdBillObj ? formatDbBillToCamelCase(createdBillObj) : undefined
       updateLocalStateAndCache(roomNumber, formattedMeter, formattedBill)
     } catch (e) {
       console.error(e)
-      alert("เกิดข้อผิดพลาดไม่คาดคิด")
+      alert(t("manage_bills.err_unexpected"))
     } finally {
       setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
     }
@@ -1269,7 +1276,7 @@ function ManageBillsContent() {
   // ส่งข้อมูลเข้า LINE OA ของจริง
   const handleSendLine = async (roomNumber: string) => {
     if (!userPermissions.billing_send_line) {
-      alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(t("manage_bills.err_no_permission_line"))
       return
     }
 
@@ -1278,24 +1285,24 @@ function ManageBillsContent() {
     const lineUserId = roomInfo?.lineUserId
 
     if (!lineUserId) {
-      showToast(`ไม่สามารถส่ง LINE ได้ เนื่องจากผู้เช่าห้อง ${roomNumber} ยังไม่ได้ลงทะเบียนผูก LINE ID`)
+      showToast(t("manage_bills.err_line_not_linked").replace("{room}", roomNumber))
       return
     }
 
     // 2. ค้นหาบิลประจำงวดของห้องนั้นๆ
     const item = unifiedItems.find((x: any) => x.roomNumber === roomNumber)
     if (!item) {
-      showToast(`ไม่พบข้อมูลค่าใช้จ่ายของห้อง ${roomNumber}`)
+      showToast(t("manage_bills.err_no_bill_data_room").replace("{room}", roomNumber))
       return
     }
 
     if (item.billStatus === "not_created") {
-      showToast(`กรุณากดคำนวณบิลห้อง ${roomNumber} ให้เสร็จสิ้นก่อนส่งข้อความ`)
+      showToast(t("manage_bills.err_calc_bill_first").replace("{room}", roomNumber))
       return
     }
 
     if (item.billStatus === "paid") {
-      alert(`ห้อง ${roomNumber} ชำระเงินแล้ว`)
+      alert(t("manage_bills.info_already_paid").replace("{room}", roomNumber))
       return
     }
 
@@ -1347,19 +1354,19 @@ function ManageBillsContent() {
       })
 
       if (result.success) {
-        showToast(`ส่งยอดบิล และลิงก์ชำระเงินไปยัง LINE ผู้เช่าห้อง ${roomNumber} สำเร็จแล้ว!`)
+        showToast(t("manage_bills.sent_line_success").replace("{room}", roomNumber))
       } else {
-        showToast(`ส่ง LINE ล้มเหลว: ${result.error}`)
+        showToast(t("manage_bills.err_line_send_failed_prefix") + result.error)
       }
     } catch (err: any) {
       console.error(err)
-      showToast("เกิดข้อผิดพลาดในการเรียกส่งข้อมูลผ่าน LINE")
+      showToast(t("manage_bills.err_line_send_exception"))
     }
   }
 
   const handleDownloadBillPdf = async (item: UnifiedRoomBillingItem) => {
     if (!userPermissions.billing_download_pdf) {
-      alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(t("manage_bills.err_no_permission_pdf"))
       return
     }
     setDownloadingPdfId(item.roomNumber)
@@ -1431,10 +1438,10 @@ function ManageBillsContent() {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      showToast(`ดาวน์โหลดบิล PDF ห้อง ${item.roomNumber} เรียบร้อย!`)
+      showToast(t("manage_bills.downloaded_pdf").replace("{room}", item.roomNumber))
     } catch (e) {
       console.error(e)
-      alert("เกิดข้อผิดพลาดในการสร้างไฟล์ PDF บิลค่าเช่า")
+      alert(t("manage_bills.err_pdf_generate"))
     } finally {
       setDownloadingPdfId(null)
     }
@@ -1442,12 +1449,12 @@ function ManageBillsContent() {
 
   const handleDownloadAllBillsPdf = async () => {
     if (!userPermissions.billing_download_pdf) {
-      alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(t("manage_bills.err_no_permission_pdf"))
       return
     }
 
     if (unifiedItems.length === 0) {
-      alert("ไม่มีรายการบิลที่จะดาวน์โหลด")
+      alert(t("manage_bills.err_no_bills_download"))
       return
     }
 
@@ -1528,7 +1535,7 @@ function ManageBillsContent() {
       }
 
       if (addedCount === 0) {
-        alert("ไม่มีข้อมูลบิลสำหรับผู้เช่าห้องใดๆ")
+        alert(t("manage_bills.err_no_tenant_bills"))
         setDownloadingAllPdf(false)
         return
       }
@@ -1541,10 +1548,10 @@ function ManageBillsContent() {
       link.click()
       document.body.removeChild(link)
 
-      showToast(`ดาวน์โหลดบิล PDF ครบทุกห้องเรียบร้อยแล้ว (${addedCount} บิล)!`)
+      showToast(t("manage_bills.downloaded_all_pdf").replace("{count}", String(addedCount)))
     } catch (e) {
       console.error(e)
-      alert("เกิดข้อผิดพลาดในการดาวน์โหลดบิลทั้งหมด")
+      alert(t("manage_bills.err_download_all_failed"))
     } finally {
       setDownloadingAllPdf(false)
     }
@@ -1553,7 +1560,7 @@ function ManageBillsContent() {
   const handleCreateBillManual = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!userPermissions.manage_bills_edit) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("daily_bills.no_permission_msg"))
       return
     }
     
@@ -1575,7 +1582,7 @@ function ManageBillsContent() {
     }
 
     if (!targetTenant) {
-      alert("ห้องพักนี้ยังไม่มีผู้เช่า หรือสัญญาหมดอายุ ไม่สามารถออกบิลได้")
+      alert(t("manage_bills.err_no_tenant_or_expired"))
       return
     }
 
@@ -1590,10 +1597,10 @@ function ManageBillsContent() {
       otherServiceAmountManual
     )
     if (res.success) {
-      showToast(`สร้างบิลแบบกำหนดเองห้อง ${newRoomNumber} สำเร็จ!`)
+      showToast(t("manage_bills.created_manual_bill").replace("{room}", newRoomNumber))
       await loadData(billingCycle, true)
     } else {
-      alert(res.error || "ออกใบแจ้งยอดไม่สำเร็จ")
+      alert(res.error || t("manage_bills.err_bill_create_failed"))
       return
     }
 
@@ -1634,10 +1641,10 @@ function ManageBillsContent() {
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
             <Receipt className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-            จัดการใบแจ้งหนี้
+            {t("manage_bills.header_title")}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            ระบบจัดการใบแจ้งหนี้ค่าเช่าหอพัก ตรวจสอบสลิปโอนเงิน ส่งบิลเข้า LINE OA หรือปรับสถานะและบันทึกรายละเอียดเพิ่มเติม
+            {t("manage_bills.header_desc")}
           </p>
         </div>
         
@@ -1657,8 +1664,8 @@ function ManageBillsContent() {
             >
               <Plus className="w-4 h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 shrink-0" />
               <span className="truncate">
-                <span className="hidden sm:inline">สร้างบิลด้วยตนเอง</span>
-                <span className="inline sm:hidden">สร้างบิลพิเศษ</span>
+                <span className="hidden sm:inline">{t("manage_bills.create_bill_btn_full")}</span>
+                <span className="inline sm:hidden">{t("manage_bills.create_bill_btn_short")}</span>
               </span>
             </button>
           )}
@@ -1693,7 +1700,7 @@ function ManageBillsContent() {
               router.replace(`?${params.toString()}`, { scroll: false })
             }}
           >
-            {getBillingCycleOptions(registrationCycle).map(opt => (
+            {getBillingCycleOptions(registrationCycle, t).map(opt => (
               <option key={opt.value} value={opt.value} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{opt.label}</option>
             ))}
           </select>
@@ -1714,13 +1721,13 @@ function ManageBillsContent() {
       <div className="flex flex-wrap items-center justify-between gap-3 mt-6 mb-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-xs xl:text-xs 2xl:text-sm font-bold uppercase tracking-wider mr-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-            ตัวกรองบิล:
+            {t("manage_bills.filter_label")}
           </span>
           {[
-            { id: "all", label: "ทั้งหมด", count: unifiedItems.length },
-            { id: "unpaid", label: "ค้างชำระเงิน", count: unpaidCount },
-            { id: "pending", label: "รอตรวจสอบสลิป", count: pendingCount },
-            { id: "paid", label: "ชำระเงินแล้ว", count: paidCount }
+            { id: "all", label: t("daily_bills.filter_all"), count: unifiedItems.length },
+            { id: "unpaid", label: t("manage_bills.filter_unpaid"), count: unpaidCount },
+            { id: "pending", label: t("manage_bills.filter_pending"), count: pendingCount },
+            { id: "paid", label: t("manage_bills.filter_paid"), count: paidCount }
           ].map(tab => (
             <button
               key={tab.id}

@@ -1270,14 +1270,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                             <div className="flex-1 min-w-0 pr-4">
                               <div className="flex items-baseline justify-between gap-1">
                                 <p className={`text-[13px] font-bold truncate ${isUnread ? "text-slate-800 dark:text-slate-200" : "text-slate-600 dark:text-slate-400"}`}>
-                                  {notification.title}
+                                  <DynamicText>{notification.title}</DynamicText>
                                 </p>
                                 <span className="text-[10px] text-slate-400 whitespace-nowrap">
                                   {formatNotificationTime(notification.timestamp)}
                                 </span>
                               </div>
                               <p className={`text-[12px] mt-0.5 leading-normal ${isUnread ? "text-slate-600 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-400"}`}>
-                                {notification.message}
+                                <DynamicText>{notification.message}</DynamicText>
                               </p>
                             </div>
 

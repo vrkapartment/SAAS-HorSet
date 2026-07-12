@@ -43,9 +43,11 @@ import {
 import {
   type StaffPermissions,
   DEFAULT_STAFF_PERMISSIONS,
-  STAFF_LANDING_PAGE_OPTIONS
+  getStaffLandingPageOptions
 } from "@/features/permissions/types"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
 
 interface StaffMember {
   id: string
@@ -59,6 +61,7 @@ interface StaffMember {
 }
 
 export default function PermissionsTab() {
+  const { t } = useLanguage()
   const router = useRouter()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -107,14 +110,14 @@ WHERE role IN ('admin', 'super_admin');`
       try {
         const res = await getCurrentUserProfileClient()
         if (!res.success || !res.data) {
-          setError("กรุณาเข้าสู่ระบบก่อนใช้งานหน้านี้")
+          setError(t("permissions_tab.err_login_required"))
           setLoading(false)
           return
         }
 
         const profile = res.data
         if (profile.role !== "admin" && profile.role !== "super_admin") {
-          setError("เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถจัดการสิทธิ์ได้")
+          setError(t("permissions_tab.err_admin_only"))
           setLoading(false)
           return
         }
@@ -123,7 +126,7 @@ WHERE role IN ('admin', 'super_admin');`
         await loadStaffData()
       } catch (err: any) {
         console.error("Initialization error:", err)
-        setError(`ไม่สามารถโหลดสิทธิ์การเข้าใช้งานของคุณได้: ${err?.message || String(err)}`)
+        setError(t("permissions_tab.err_load_permissions_prefix") + (err?.message || String(err)))
         setLoading(false)
       }
     }
@@ -138,7 +141,7 @@ WHERE role IN ('admin', 'super_admin');`
     if (result.success && result.data) {
       setStaffList(result.data as StaffMember[])
     } else {
-      setError(result.error || "เกิดข้อผิดพลาดในการดึงรายชื่อ Staff")
+      setError(result.error || t("permissions_tab.err_fetch_staff_list"))
     }
     setLoading(false)
   }
@@ -147,7 +150,7 @@ WHERE role IN ('admin', 'super_admin');`
   const handleAddStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!addEmail || !addFullName) {
-      setError("กรุณากรอกอีเมลและชื่อ-นามสกุล")
+      setError(t("permissions_tab.err_email_name_required"))
       return
     }
 
@@ -164,7 +167,7 @@ WHERE role IN ('admin', 'super_admin');`
     })
 
     if (result.success) {
-      setSuccess("เพิ่ม Staff สำเร็จเรียบร้อยแล้ว!")
+      setSuccess(t("permissions_tab.add_staff_success"))
       setShowAddModal(false)
       // Reset Form
       setAddEmail("")
@@ -175,7 +178,7 @@ WHERE role IN ('admin', 'super_admin');`
       // Refresh Data
       await loadStaffData()
     } else {
-      setError(result.error || "เกิดข้อผิดพลาดในการสร้างบัญชี Staff")
+      setError(result.error || t("permissions_tab.err_create_staff"))
     }
     setFormLoading(false)
   }
@@ -205,12 +208,12 @@ WHERE role IN ('admin', 'super_admin');`
     })
 
     if (result.success) {
-      setSuccess(`บันทึกการแก้ไขสิทธิ์ของคุณ ${editFullName} เรียบร้อยแล้ว!`)
+      setSuccess(t("permissions_tab.edit_staff_success").replace("{name}", editFullName))
       setShowEditModal(false)
       setSelectedStaff(null)
       await loadStaffData()
     } else {
-      setError(result.error || "เกิดข้อผิดพลาดในการอัปเดตข้อมูล Staff")
+      setError(result.error || t("permissions_tab.err_update_staff"))
     }
     setFormLoading(false)
   }
@@ -229,12 +232,12 @@ WHERE role IN ('admin', 'super_admin');`
 
     const result = await deleteStaffAction(staffToDelete)
     if (result.success) {
-      setSuccess("ลบบัญชี Staff ออกจากระบบเรียบร้อยแล้ว")
+      setSuccess(t("permissions_tab.delete_staff_success"))
       setShowDeleteConfirm(false)
       setStaffIdToDelete(null)
       await loadStaffData()
     } else {
-      setError(result.error || "เกิดข้อผิดพลาดในการลบ Staff")
+      setError(result.error || t("permissions_tab.err_delete_staff"))
       setShowDeleteConfirm(false)
     }
     setFormLoading(false)
@@ -285,65 +288,65 @@ WHERE role IN ('admin', 'super_admin');`
       {
         key: "manage_rooms_tenants",
         editKey: "manage_rooms_tenants_edit",
-        name: "จัดการห้องพัก และข้อมูลผู้เช่า",
-        description: "เข้าดูรายชื่อห้องพัก รายละเอียด และประวัติข้อมูลผู้เช่าทั้งหมด",
-        editDescription: "เพิ่ม แก้ไขข้อมูลห้อง ทำสัญญาเช่า หรือทำรายการย้ายออก",
+        name: t("permissions_tab.mod_rooms_name"),
+        description: t("permissions_tab.mod_rooms_desc"),
+        editDescription: t("permissions_tab.mod_rooms_edit_desc"),
         icon: Home,
       },
       {
         key: "manage_meters_bills",
         editKey: "manage_meters_bills_edit",
-        name: "จดมิเตอร์ และดูบิล",
-        description: "เข้าดูมิเตอร์น้ำ/ไฟ และดูรายงานคำนวณสรุปค่าใช้จ่ายประจำเดือน",
-        editDescription: "กรอกเลขอัตรามิเตอร์ และสร้างสรุปบิลเก็บเงินผู้เช่า",
+        name: t("permissions_tab.mod_meters_name"),
+        description: t("permissions_tab.mod_meters_desc"),
+        editDescription: t("permissions_tab.mod_meters_edit_desc"),
         icon: Scroll,
       },
       {
         key: "manage_bills",
         editKey: "manage_bills_edit",
-        name: "จัดการใบแจ้งหนี้",
-        description: "เข้าดูใบแจ้งหนี้ค่าเช่า ตรวจสอบสถานะการจ่ายเงินของผู้เช่า",
-        editDescription: "ยืนยันยอดโอน แก้ไข หรือยกเลิกใบแจ้งหนี้ค่าเช่า",
+        name: t("permissions_tab.mod_bills_name"),
+        description: t("permissions_tab.mod_bills_desc"),
+        editDescription: t("permissions_tab.mod_bills_edit_desc"),
         icon: Receipt,
       },
       {
         key: "manage_finance_expenses",
         editKey: "manage_finance_expenses_edit",
-        name: "บันทึกบิลค่าใช้จ่าย",
-        description: "เข้าดูประวัติบันทึกค่าใช้จ่าย และบิลเงินออกประจำหอพัก",
-        editDescription: "บันทึกเพิ่มรายการรายจ่ายรายวัน หรือแก้ไขบิลรายจ่าย",
+        name: t("permissions_tab.mod_expenses_name"),
+        description: t("permissions_tab.mod_expenses_desc"),
+        editDescription: t("permissions_tab.mod_expenses_edit_desc"),
         icon: Coins,
       },
       {
         key: "access_tax",
         editKey: "access_tax_edit",
-        name: "จัดการภาษี ภ.ง.ด.",
-        description: "เข้าดูรายงานสรุปรายได้สะสมเพื่อวัตถุประสงค์ในการคำนวณภาษี",
-        editDescription: "เพิ่ม/แก้ไข และบันทึกข้อมูลยื่นแบบรายการภาษีเงินได้",
+        name: t("permissions_tab.mod_tax_name"),
+        description: t("permissions_tab.mod_tax_desc"),
+        editDescription: t("permissions_tab.mod_tax_edit_desc"),
         icon: FileText,
       },
       {
         key: "manage_finance_settings",
         editKey: "manage_finance_settings_edit",
-        name: "ตั้งค่าระบบการเงิน",
-        description: "เข้าดูการตั้งค่าบัญชีธนาคาร และวิธีการชำระเงินของหอพัก",
-        editDescription: "แก้ไข เพิ่ม หรือลบการตั้งค่าบัญชีรับโอนเงิน/พร้อมเพย์",
+        name: t("permissions_tab.mod_finance_settings_name"),
+        description: t("permissions_tab.mod_finance_settings_desc"),
+        editDescription: t("permissions_tab.mod_finance_settings_edit_desc"),
         icon: Landmark,
       },
       {
         key: "manage_property_settings",
         editKey: "manage_property_settings_edit",
-        name: "ตั้งค่าข้อมูลหอพัก",
-        description: "เข้าดูอัตราราคาน้ำ/ไฟ ค่าบริการรายเดือน และข้อมูลหอพัก",
-        editDescription: "ปรับเปลี่ยนเรตราคาน้ำไฟ แก้ไขค่าบริการ และรายละเอียดตึก",
+        name: t("permissions_tab.mod_property_settings_name"),
+        description: t("permissions_tab.mod_property_settings_desc"),
+        editDescription: t("permissions_tab.mod_property_settings_edit_desc"),
         icon: Building,
       },
       {
         key: "manage_staff_permissions",
         editKey: "manage_staff_permissions_edit",
-        name: "จัดการสิทธิ์พนักงาน (Staff)",
-        description: "เข้าดูรายชื่อพนักงาน ข้อมูลติดต่อ และระดับสิทธิ์ของพนักงาน",
-        editDescription: "เพิ่มลบพนักงาน หรือปรับสิทธิ์การทำงานของทีมงานในหอพัก",
+        name: t("permissions_tab.mod_staff_perms_name"),
+        description: t("permissions_tab.mod_staff_perms_desc"),
+        editDescription: t("permissions_tab.mod_staff_perms_edit_desc"),
         icon: Shield,
       },
     ] as const
@@ -355,10 +358,10 @@ WHERE role IN ('admin', 'super_admin');`
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 dark:border-slate-850">
             <span className="text-xs sm:text-sm font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2">
               <Settings className="w-5 h-5 text-blue-500" />
-              <span>สิทธิ์การเข้าใช้งานรายหน้าต่าง ๆ</span>
+              <span>{t("permissions_tab.section_page_access_title")}</span>
             </span>
             <span className="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline">
-              * ต้องให้สิทธิ์ "เข้าดูหน้า" ก่อน จึงจะปรับสิทธิ์แก้ไขได้
+              {t("permissions_tab.section_page_access_hint")}
             </span>
           </div>
 
@@ -370,15 +373,15 @@ WHERE role IN ('admin', 'super_admin');`
                   <LayoutDashboard className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-200">ดูแดชบอร์ดสถิติภาพรวม</h4>
+                  <h4 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-200">{t("permissions_tab.dashboard_stats_name")}</h4>
                   <p className="text-xs sm:text-sm text-slate-440 dark:text-slate-500 mt-1 leading-relaxed">
-                    เข้าดูหน้าแดชบอร์ด รายได้ค้างจ่าย และสถิติสถานะผู้เช่า (จำกัดดูอย่างเดียวเท่านั้น)
+                    {t("permissions_tab.dashboard_stats_desc")}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-4.5 self-end sm:self-auto shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">เปิดเข้าดู</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">{t("permissions_tab.toggle_view_label")}</span>
                   <button
                     type="button"
                     onClick={() => handlePermissionChange(type, "view_dashboard_stats")}
@@ -393,7 +396,7 @@ WHERE role IN ('admin', 'super_admin');`
                 </div>
                 <div className="w-28 text-center">
                   <span className="text-xs px-3 py-1 rounded-md font-bold bg-slate-100 dark:bg-slate-950 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-900">
-                    ดูได้อย่างเดียว
+                    {t("permissions_tab.view_only_badge")}
                   </span>
                 </div>
               </div>
@@ -430,7 +433,7 @@ WHERE role IN ('admin', 'super_admin');`
                               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
                               : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                           }`}>
-                            {hasEdit ? "แก้ไขได้" : "ดูอย่างเดียว"}
+                            {hasEdit ? t("permissions_tab.edit_access_badge") : t("permissions_tab.view_only_badge")}
                           </span>
                         )}
                       </h4>
@@ -444,7 +447,7 @@ WHERE role IN ('admin', 'super_admin');`
                   <div className="flex items-center gap-5 self-end sm:self-auto shrink-0">
                     {/* View Toggle */}
                     <div className="flex items-center gap-2.5">
-                      <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">เข้าหน้าเว็บ</span>
+                      <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">{t("permissions_tab.toggle_enter_page_label")}</span>
                       <button
                         type="button"
                         onClick={() => handlePermissionChange(type, m.key)}
@@ -463,7 +466,7 @@ WHERE role IN ('admin', 'super_admin');`
                       <span className={`text-xs sm:text-sm ${
                         hasView ? "text-slate-400 dark:text-slate-500" : "text-slate-300 dark:text-slate-700"
                       }`}>
-                        การทำงาน
+                        {t("permissions_tab.action_label")}
                       </span>
                       <button
                         type="button"
@@ -477,7 +480,7 @@ WHERE role IN ('admin', 'super_admin');`
                               : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-850 hover:bg-slate-200"
                         }`}
                       >
-                        {!hasView ? "ไม่มีสิทธิ์เข้าถึง" : hasEdit ? "เขียน/แก้ไขได้" : "ดูได้อย่างเดียว"}
+                        {!hasView ? t("permissions_tab.no_access_badge") : hasEdit ? t("permissions_tab.write_edit_badge") : t("permissions_tab.view_only_badge")}
                       </button>
                     </div>
                   </div>
@@ -491,7 +494,7 @@ WHERE role IN ('admin', 'super_admin');`
         <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-4">
           <span className="text-xs sm:text-sm font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2 border-b border-slate-200 dark:border-slate-850 pb-2.5">
             <ShieldAlert className="w-5 h-5 text-indigo-500" />
-            <span>สิทธิ์การทำรายการพิเศษ</span>
+            <span>{t("permissions_tab.section_special_actions_title")}</span>
           </span>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -502,8 +505,8 @@ WHERE role IN ('admin', 'super_admin');`
                   <Send className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">ส่งบิล Line OA</h5>
-                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">ส่งบิลให้ผู้เช่าทางแชทไลน์</p>
+                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">{t("permissions_tab.send_line_name")}</h5>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">{t("permissions_tab.send_line_desc")}</p>
                 </div>
               </div>
               <button
@@ -526,8 +529,8 @@ WHERE role IN ('admin', 'super_admin');`
                   <Download className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">ดาวน์โหลด PDF</h5>
-                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">เซฟไฟล์ใบแจ้งหนี้เป็น PDF</p>
+                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">{t("permissions_tab.download_pdf_name")}</h5>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">{t("permissions_tab.download_pdf_desc")}</p>
                 </div>
               </div>
               <button
@@ -550,8 +553,8 @@ WHERE role IN ('admin', 'super_admin');`
                   <Copy className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">คัดลอกข้อความสรุป</h5>
-                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">ก๊อปปี้สรุปบิลไปส่งในแชทอื่น</p>
+                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 truncate">{t("permissions_tab.copy_summary_name")}</h5>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">{t("permissions_tab.copy_summary_desc")}</p>
                 </div>
               </div>
               <button
@@ -573,24 +576,24 @@ WHERE role IN ('admin', 'super_admin');`
         <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-4">
           <span className="text-xs sm:text-sm font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2 border-b border-slate-200 dark:border-slate-850 pb-2.5">
             <LogIn className="w-5 h-5 text-blue-500" />
-            <span>หน้าแรกหลัง Login</span>
+            <span>{t("permissions_tab.section_landing_title")}</span>
           </span>
 
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850/80 rounded-2xl space-y-2">
             <label className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300">
-              พาพนักงานคนนี้ไปหน้าไหนทันทีหลัง Login
+              {t("permissions_tab.landing_page_label")}
             </label>
             <select
               value={permissions.landing_page || "/billing"}
               onChange={(e) => setPerms(prev => ({ ...prev, landing_page: e.target.value }))}
               className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-bold focus:outline-none focus:border-blue-500"
             >
-              {STAFF_LANDING_PAGE_OPTIONS.map(opt => (
+              {getStaffLandingPageOptions(t).map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
             <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">
-              ควรเลือกหน้าที่พนักงานคนนี้มีสิทธิ์เข้าถึงจริงตามที่ตั้งไว้ด้านบน ไม่เช่นนั้นจะเข้าไม่ได้ทันทีที่ Login
+              {t("permissions_tab.landing_page_hint")}
             </p>
           </div>
         </div>
@@ -602,7 +605,7 @@ WHERE role IN ('admin', 'super_admin');`
     return (
       <div className="py-24 text-center text-slate-500 text-xs">
         <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" />
-        <span>กำลังเตรียมข้อมูลการจัดการสิทธิ์พนักงาน...</span>
+        <span>{t("permissions_tab.loading_page")}</span>
       </div>
     )
   }
@@ -613,7 +616,7 @@ WHERE role IN ('admin', 'super_admin');`
         <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center border border-rose-500/20 mx-auto">
           <AlertCircle className="w-8 h-8" />
         </div>
-        <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">ไม่สามารถเข้าใช้งานสิทธิ์ได้</h3>
+        <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">{t("permissions_tab.err_cannot_access_title")}</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400">{error}</p>
       </div>
     )
@@ -626,10 +629,10 @@ WHERE role IN ('admin', 'super_admin');`
         <div>
           <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
             <Shield className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-            <span>ระบบจัดการสิทธิ์การใช้งาน (Staff Permissions)</span>
+            <span>{t("permissions_tab.header_title")}</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-            กำหนดบทบาทและสิทธิ์ของ Staff ประจำหอพักได้อย่างละเอียด เพื่อควบคุมสิทธิ์ในการเข้าถึงหน้าข้อมูลห้องพัก บิลค่าเช่า การเงิน และส่วนข้อมูลภาษี
+            {t("permissions_tab.header_desc")}
           </p>
         </div>
         <button
@@ -637,7 +640,7 @@ WHERE role IN ('admin', 'super_admin');`
           className="h-12 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-sm flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/10 active:scale-[0.98] shrink-0 self-stretch sm:self-auto justify-center"
         >
           <UserPlus className="w-5 h-5" />
-          <span>เพิ่ม Staff ใหม่</span>
+          <span>{t("permissions_tab.add_new_staff_btn")}</span>
         </button>
       </div>
 
@@ -662,8 +665,8 @@ WHERE role IN ('admin', 'super_admin');`
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">Staff ทั้งหมด</span>
-            <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{staffList.length} คน</h3>
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">{t("permissions_tab.stat_total_staff")}</span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{t("permissions_tab.person_count").replace("{count}", String(staffList.length))}</h3>
           </div>
         </div>
 
@@ -672,8 +675,8 @@ WHERE role IN ('admin', 'super_admin');`
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">สิทธิ์การทำงานละเอียด</span>
-            <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">7 ด้านแยกอิสระ</h3>
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">{t("permissions_tab.stat_detailed_perms")}</span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{t("permissions_tab.perms_areas_count")}</h3>
           </div>
         </div>
 
@@ -682,7 +685,7 @@ WHERE role IN ('admin', 'super_admin');`
             <Building className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">บทบาทปัจจุบันของคุณ</span>
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">{t("permissions_tab.stat_current_role")}</span>
             <h3 className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
               {currentUser?.role === "super_admin" ? "SUPER ADMIN" : "WORKSPACE ADMIN"}
             </h3>
@@ -693,7 +696,7 @@ WHERE role IN ('admin', 'super_admin');`
       {/* 4. Active Staff Members Section */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-3xl p-6 shadow-sm">
         <h3 className="text-base font-black text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2.5">
-          <span>รายชื่อ Staff ประจำ Workspace ของคุณ</span>
+          <span>{t("permissions_tab.staff_list_title")}</span>
           {loading && <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />}
         </h3>
 
@@ -708,7 +711,7 @@ WHERE role IN ('admin', 'super_admin');`
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <h4 className="text-base font-black text-slate-800 dark:text-slate-200">
-                      {staff.full_name || <span className="text-slate-450 italic">ไม่มีข้อมูลชื่อ</span>}
+                      {staff.full_name ? <DynamicText>{staff.full_name}</DynamicText> : <span className="text-slate-450 italic">{t("permissions_tab.no_name_data")}</span>}
                     </h4>
                     <div className="flex flex-col gap-2 mt-2.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-mono font-bold">
                       <span className="flex items-center gap-2">
@@ -731,23 +734,23 @@ WHERE role IN ('admin', 'super_admin');`
                 {/* Staff Permissions Visual List */}
                 <div className="pt-3.5 border-t border-slate-200 dark:border-slate-850 space-y-2">
                   <span className="text-[11px] sm:text-xs font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
-                    สิทธิ์ที่ได้รับมอบหมาย:
+                    {t("permissions_tab.assigned_permissions_label")}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
                       const items = [
-                        { key: "view_dashboard_stats", editKey: null, label: "ดูสถิติภาพรวม" },
-                        { key: "manage_rooms_tenants", editKey: "manage_rooms_tenants_edit", label: "จัดการห้องพัก & ผู้เช่า" },
-                        { key: "manage_meters_bills", editKey: "manage_meters_bills_edit", label: "จดมิเตอร์ & สรุปบิล" },
-                        { key: "manage_bills", editKey: "manage_bills_edit", label: "จัดการใบแจ้งหนี้" },
-                        { key: "manage_finance_expenses", editKey: "manage_finance_expenses_edit", label: "จัดการรายจ่าย" },
-                        { key: "access_tax", editKey: "access_tax_edit", label: "จัดการภาษี ภ.ง.ด." },
-                        { key: "manage_finance_settings", editKey: "manage_finance_settings_edit", label: "ตั้งค่าบัญชี/การเงิน" },
-                        { key: "manage_property_settings", editKey: "manage_property_settings_edit", label: "ตั้งค่าหอพัก" },
-                        { key: "manage_staff_permissions", editKey: "manage_staff_permissions_edit", label: "จัดการสิทธิ์พนักงาน" },
-                        { key: "billing_send_line", editKey: null, label: "ส่ง Line OA" },
-                        { key: "billing_download_pdf", editKey: null, label: "ดาวน์โหลด PDF" },
-                        { key: "billing_copy_summary", editKey: null, label: "คัดลอกสรุปบิล" }
+                        { key: "view_dashboard_stats", editKey: null, label: t("permissions_tab.perm_view_stats") },
+                        { key: "manage_rooms_tenants", editKey: "manage_rooms_tenants_edit", label: t("permissions_tab.perm_rooms_tenants") },
+                        { key: "manage_meters_bills", editKey: "manage_meters_bills_edit", label: t("permissions_tab.perm_meters_bills") },
+                        { key: "manage_bills", editKey: "manage_bills_edit", label: t("permissions_tab.perm_manage_bills") },
+                        { key: "manage_finance_expenses", editKey: "manage_finance_expenses_edit", label: t("permissions_tab.perm_expenses") },
+                        { key: "access_tax", editKey: "access_tax_edit", label: t("permissions_tab.perm_tax") },
+                        { key: "manage_finance_settings", editKey: "manage_finance_settings_edit", label: t("permissions_tab.perm_finance_settings") },
+                        { key: "manage_property_settings", editKey: "manage_property_settings_edit", label: t("permissions_tab.perm_property_settings") },
+                        { key: "manage_staff_permissions", editKey: "manage_staff_permissions_edit", label: t("permissions_tab.perm_staff_perms") },
+                        { key: "billing_send_line", editKey: null, label: t("permissions_tab.perm_send_line") },
+                        { key: "billing_download_pdf", editKey: null, label: t("permissions_tab.perm_download_pdf") },
+                        { key: "billing_copy_summary", editKey: null, label: t("permissions_tab.perm_copy_summary") }
                       ] as const;
 
                       const sortedItems = [...items].sort((a, b) => {
@@ -764,7 +767,7 @@ WHERE role IN ('admin', 'super_admin');`
                         
                         let displayLabel = item.label;
                         if (hasPermission && item.editKey) {
-                          displayLabel += hasEdit ? " (แก้ไขได้)" : " (ดูอย่างเดียว)";
+                          displayLabel += hasEdit ? t("permissions_tab.edit_suffix") : t("permissions_tab.view_only_suffix");
                         }
 
                         return (
@@ -794,14 +797,14 @@ WHERE role IN ('admin', 'super_admin');`
                     className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-250 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer"
                   >
                     <Edit3 className="w-4 h-4 text-slate-500" />
-                    <span>แก้ไขสิทธิ์</span>
+                    <span>{t("permissions_tab.edit_perms_btn")}</span>
                   </button>
                   <button
                     onClick={() => handleDeleteClick(staff.id)}
                     className="h-10 px-4 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>ลบ Staff</span>
+                    <span>{t("permissions_tab.delete_staff_btn")}</span>
                   </button>
                 </div>
               </div>
@@ -810,9 +813,9 @@ WHERE role IN ('admin', 'super_admin');`
         ) : (
           <div className="py-16 text-center border-2 border-dashed border-slate-250 dark:border-slate-800/80 rounded-2xl max-w-xl mx-auto">
             <Users className="w-14 h-14 text-slate-400 mx-auto mb-3" />
-            <h4 className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-300">ยังไม่มีรายชื่อ Staff ใน Workspace นี้</h4>
+            <h4 className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-300">{t("permissions_tab.no_staff_title")}</h4>
             <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed font-bold">
-              คุณสามารถสร้างและจัดการบัญชีให้กับผู้ช่วยหรือผู้จดมิเตอร์ประจำหอพักของคุณได้ง่าย ๆ โดยคลิกปุ่ม **"เพิ่ม Staff ใหม่"** ด้านบนได้ทันทีครับ
+              {t("permissions_tab.no_staff_desc")}
             </p>
           </div>
         )}
@@ -824,9 +827,9 @@ WHERE role IN ('admin', 'super_admin');`
           <div className="flex gap-3.5">
             <Database className="w-7 h-7 text-amber-500 shrink-0" />
             <div>
-              <h4 className="text-base font-black text-slate-800 dark:text-slate-200">คู่มือการติดตั้งคอลัมน์สิทธิ์ในฐานข้อมูลจริง (Supabase SQL Setup)</h4>
+              <h4 className="text-base font-black text-slate-800 dark:text-slate-200">{t("permissions_tab.sql_guide_title")}</h4>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                เนื่องจากระบบเพิ่งติดตั้งฟังก์ชันกำหนดสิทธิ์อย่างละเอียดแบบ JSONB หากใช้งานในฐานข้อมูล Supabase แอดมินต้องทำการรันคำสั่ง SQL ด้านล่างนี้ในหน้า **SQL Editor** ของเครื่องตนเองเพื่อเพิ่มคอลัมน์ `permissions` เสียก่อนครับ
+                {t("permissions_tab.sql_guide_desc")}
               </p>
             </div>
           </div>
@@ -841,7 +844,7 @@ WHERE role IN ('admin', 'super_admin');`
             </button>
           </div>
           {sqlCopied && (
-            <span className="text-xs sm:text-sm font-bold text-emerald-500 block">คัดลอกสคริปต์ SQL ลงคลิปบอร์ดแล้ว! นำไปรันในช่อง SQL Editor ของ Supabase Dashboard ได้ทันที</span>
+            <span className="text-xs sm:text-sm font-bold text-emerald-500 block">{t("permissions_tab.sql_copied_msg")}</span>
           )}
         </div>
       )}
@@ -865,17 +868,17 @@ WHERE role IN ('admin', 'super_admin');`
             <div>
               <h3 className="text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-blue-500" />
-                <span>เพิ่มบัญชี Staff ใหม่</span>
+                <span>{t("permissions_tab.add_modal_title")}</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                สร้างบัญชีผู้ใช้งานระบบและกำหนดสิทธิ์เข้าทำงานส่วนต่าง ๆ
+                {t("permissions_tab.add_modal_desc")}
               </p>
             </div>
 
             {/* Inputs */}
             <div className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">อีเมลสำหรับใช้เข้าสู่ระบบ (Email)</label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{t("permissions_tab.email_label")}</label>
                 <div className="relative font-bold">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -890,12 +893,12 @@ WHERE role IN ('admin', 'super_admin');`
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">รหัสผ่านเริ่มต้น (Default Password)</label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{t("permissions_tab.password_label")}</label>
                 <div className="relative font-bold">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type={showAddPassword ? "text" : "password"}
-                    placeholder="ไม่ระบุ: ใช้รหัสผ่านดีฟอลต์ 123456"
+                    placeholder={t("permissions_tab.password_placeholder")}
                     className="w-full pl-9 pr-10 py-2 border rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border-slate-250 dark:border-slate-850 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-mono font-bold"
                     value={addPassword}
                     onChange={(e) => setAddPassword(e.target.value)}
@@ -911,11 +914,11 @@ WHERE role IN ('admin', 'super_admin');`
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">ชื่อ - นามสกุลจริง (Full Name)</label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{t("permissions_tab.full_name_label_staff")}</label>
                 <input
                   type="text"
                   required
-                  placeholder="เช่น สมชาย แสนดี"
+                  placeholder={t("permissions_tab.full_name_placeholder_example")}
                   className="w-full px-4 py-2 border rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border-slate-250 dark:border-slate-850 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-bold"
                   value={addFullName}
                   onChange={(e) => setAddFullName(e.target.value)}
@@ -923,10 +926,10 @@ WHERE role IN ('admin', 'super_admin');`
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">เบอร์โทรศัพท์ (Phone Number)</label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{t("permissions_tab.phone_label_staff")}</label>
                 <input
                   type="text"
-                  placeholder="เช่น 0812345678"
+                  placeholder={t("permissions_tab.phone_placeholder_example")}
                   className="w-full px-4 py-2 border rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border-slate-250 dark:border-slate-850 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-mono font-bold"
                   value={addPhone}
                   onChange={(e) => setAddPhone(e.target.value)}
@@ -936,7 +939,7 @@ WHERE role IN ('admin', 'super_admin');`
 
             {/* Permissions Toggles */}
             <div className="pt-3 border-t border-slate-200 dark:border-slate-850 space-y-3">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block font-bold">กำหนดสิทธิ์ทีมงาน:</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block font-bold">{t("permissions_tab.assign_team_perms_label")}</span>
               {renderPermissionsSettings("add")}
             </div>
 
@@ -947,7 +950,7 @@ WHERE role IN ('admin', 'super_admin');`
                 onClick={() => setShowAddModal(false)}
                 className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 hover:text-slate-800 transition-all font-bold text-xs cursor-pointer"
               >
-                ยกเลิก
+                {t("common.cancel")}
               </button>
               <button
                 type="submit"
@@ -957,10 +960,10 @@ WHERE role IN ('admin', 'super_admin');`
                 {formSubmitting ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>กำลังสร้าง...</span>
+                    <span>{t("permissions_tab.creating_btn")}</span>
                   </>
                 ) : (
-                  <span>สร้างบัญชี Staff</span>
+                  <span>{t("permissions_tab.create_staff_btn")}</span>
                 )}
               </button>
             </div>
@@ -990,21 +993,21 @@ WHERE role IN ('admin', 'super_admin');`
             <div>
               <h3 className="text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-indigo-500" />
-                <span>ปรับเปลี่ยนแก้ไขสิทธิ์ Staff</span>
+                <span>{t("permissions_tab.edit_modal_title")}</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                คุณกำลังแก้ไขข้อมูลของทีมงาน: **{selectedStaff.email}**
+                {t("permissions_tab.edit_modal_desc_prefix")} <strong>{selectedStaff.email}</strong>
               </p>
             </div>
 
             {/* Inputs */}
             <div className="space-y-3.5 font-bold">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">ชื่อ - นามสกุลจริง (Full Name)</label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{t("permissions_tab.full_name_label_staff")}</label>
                 <input
                   type="text"
                   required
-                  placeholder="สมชาย แสนดี"
+                  placeholder={t("permissions_tab.full_name_placeholder_example")}
                   className="w-full px-4 py-2 border rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border-slate-250 dark:border-slate-850 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-bold"
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
@@ -1012,7 +1015,7 @@ WHERE role IN ('admin', 'super_admin');`
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">เบอร์โทรศัพท์ (Phone Number)</label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{t("permissions_tab.phone_label_staff")}</label>
                 <input
                   type="text"
                   placeholder="0812345678"
@@ -1025,7 +1028,7 @@ WHERE role IN ('admin', 'super_admin');`
 
             {/* Permissions Toggles */}
             <div className="pt-3 border-t border-slate-200 dark:border-slate-850 space-y-3">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block font-bold">ปรับสิทธิ์การเข้าทำรายการ:</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block font-bold">{t("permissions_tab.adjust_action_perms_label")}</span>
               {renderPermissionsSettings("edit")}
             </div>
 
@@ -1039,7 +1042,7 @@ WHERE role IN ('admin', 'super_admin');`
                 }}
                 className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 hover:text-slate-800 transition-all font-bold text-xs cursor-pointer"
               >
-                ยกเลิก
+                {t("common.cancel")}
               </button>
               <button
                 type="submit"
@@ -1049,10 +1052,10 @@ WHERE role IN ('admin', 'super_admin');`
                 {formSubmitting ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>กำลังบันทึก...</span>
+                    <span>{t("daily_bills.saving_btn")}</span>
                   </>
                 ) : (
-                  <span>บันทึกการแก้ไข</span>
+                  <span>{t("tenants.save_edit_btn")}</span>
                 )}
               </button>
             </div>
@@ -1069,9 +1072,9 @@ WHERE role IN ('admin', 'super_admin');`
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">ยืนยันลบบัญชีผู้ใช้ Staff?</h3>
+              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">{t("permissions_tab.confirm_delete_staff_title")}</h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
-                การลบบัญชี Staff จะส่งผลให้ทีมงานคนดังกล่าวไม่สามารถล็อกอินเข้าสู่ระบบหอพัก HorSet ได้อีกต่อไป และไม่สามารถกู้ข้อมูลการทำงานคืนได้
+                {t("permissions_tab.confirm_delete_staff_desc")}
               </p>
             </div>
 
@@ -1084,7 +1087,7 @@ WHERE role IN ('admin', 'super_admin');`
                 }}
                 className="flex-1 h-10 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-all cursor-pointer font-bold"
               >
-                ยกเลิก
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -1092,7 +1095,7 @@ WHERE role IN ('admin', 'super_admin');`
                 disabled={formSubmitting}
                 className="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md shadow-rose-600/10 font-bold"
               >
-                {formSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "ยืนยันลบ Staff"}
+                {formSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : t("permissions_tab.confirm_delete_staff_btn")}
               </button>
             </div>
           </div>

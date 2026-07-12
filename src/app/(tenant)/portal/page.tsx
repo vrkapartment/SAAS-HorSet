@@ -40,6 +40,9 @@ import { getTenantPortalData, getTenantPortalDataNoLoginAction } from "@/feature
 import { updateBillStatus } from "@/features/billing/actions"
 import { createClient } from "@/lib/supabase/client"
 import PullToRefresh from "@/components/PullToRefresh"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { DynamicText } from "@/lib/translations/DynamicText"
+import { LanguageToggle } from "@/components/LanguageToggle"
 
 
 interface BillHistoryItem {
@@ -101,6 +104,7 @@ const optimizeImage = (file: File): Promise<Blob> => {
 };
 
 export default function TenantPortal() {
+  const { t } = useLanguage()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   
@@ -152,13 +156,9 @@ export default function TenantPortal() {
     if (!cycleStr) return ""
     if (cycleStr.includes("-")) {
       const [year, month] = cycleStr.split("-")
-      const monthsThai = [
-        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-      ]
       const monthIdx = parseInt(month, 10) - 1
       if (monthIdx >= 0 && monthIdx < 12) {
-        return `${monthsThai[monthIdx]} ${year}`
+        return `${t("dashboard.month_" + month)} ${year}`
       }
     }
     return cycleStr
@@ -192,7 +192,7 @@ export default function TenantPortal() {
       if (res.success && res.data) {
         setIsDemo(false)
         const data = res.data
-        setRoomNumber(data.roomNumber || "ไม่มีห้อง")
+        setRoomNumber(data.roomNumber || t("tenant_portal.room_fallback"))
         setTenantName(data.tenantName)
         setBaseRent(data.baseRent)
         if (data.promptPayId) {
@@ -270,7 +270,7 @@ export default function TenantPortal() {
           setBill(null)
           setBillStatus("paid") // default to clean state if no bills
           setUploadedSlip(null)
-          setBillingCycle("ยังไม่มีรอบบิล")
+          setBillingCycle(t("tenant_portal.no_cycle_yet"))
           setHistory([])
         }
       } else if ((res as any).fallback) {
@@ -488,14 +488,14 @@ export default function TenantPortal() {
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `QR ชำระเงิน ห้อง ${roomNumber}`,
-          text: `QR Code สำหรับชำระเงินค่าเช่าห้องพักห้อง ${roomNumber} ยอดชำระ ${totalAmount.toLocaleString()} บาท`,
+          title: t("tenant_portal.share_title").replace("{room}", roomNumber),
+          text: t("tenant_portal.share_text_full").replace("{room}", roomNumber).replace("{amount}", totalAmount.toLocaleString()),
         })
       } else {
         // Fallback text share if files are not shareable but text is
         await navigator.share({
-          title: `QR ชำระเงิน ห้อง ${roomNumber}`,
-          text: `QR Code ชำระเงิน ห้อง ${roomNumber} ยอดชำระ ${totalAmount.toLocaleString()} บาท`,
+          title: t("tenant_portal.share_title").replace("{room}", roomNumber),
+          text: t("tenant_portal.share_text_fallback").replace("{room}", roomNumber).replace("{amount}", totalAmount.toLocaleString()),
           url: window.location.href
         })
       }
@@ -545,7 +545,7 @@ export default function TenantPortal() {
       document.body.removeChild(link)
     } catch (e) {
       console.error(e)
-      alert("เกิดข้อผิดพลาดในการสร้างไฟล์ PDF ใบแจ้งหนี้")
+      alert(t("tenant_portal.err_pdf_generate_invoice"))
     } finally {
       setDownloadingPdf(false)
     }
@@ -562,7 +562,7 @@ export default function TenantPortal() {
       
       // Safety Check: Ensure size is under 1MB
       if (optimizedBlob.size > 1024 * 1024) {
-        alert("ไฟล์รูปภาพมีขนาดใหญ่เกินไป (เกิน 1MB) แม้จะทำการบีบอัดแล้ว กรุณาลองใหม่อีกครั้ง")
+        alert(t("tenant_portal.err_image_too_large"))
         setUploading(false)
         return
       }
@@ -589,11 +589,11 @@ export default function TenantPortal() {
           }
         }
         setUploading(false)
-        alert("อัปโหลดสลิปสำเร็จ (โหมดสาธิต)! ระบบจำลองการแนบสลิปของคุณเพื่อรอการตรวจสอบแล้ว")
+        alert(t("tenant_portal.upload_success_demo"))
       } else {
         if (!bill) {
           setUploading(false)
-          alert("ไม่พบบิลของท่านในเดือนนี้")
+          alert(t("tenant_portal.err_no_bill_this_month"))
           return
         }
 
@@ -636,15 +636,15 @@ export default function TenantPortal() {
         if (res.success) {
           setUploadedSlip(publicUrl)
           setBillStatus("pending")
-          alert("อัปโหลดสลิปของคุณเรียบร้อยแล้ว! ระบบกำลังส่งข้อมูลไปยังผู้ดูแลเพื่อตรวจสอบและปรับสถานะบิลของคุณ")
+          alert(t("tenant_portal.upload_success"))
           loadPortalData()
         } else {
-          alert(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปลงฐานข้อมูล")
+          alert(res.error || t("tenant_portal.err_save_slip_db"))
         }
       }
     } catch (err: any) {
       console.error("Error optimizing/uploading image:", err)
-      alert(err?.message || "เกิดข้อผิดพลาดในการอัปโหลดภาพสลิป กรุณาลองใหม่อีกครั้ง")
+      alert(err?.message || t("tenant_portal.err_upload_image_generic"))
       setUploading(false)
     }
   }
@@ -661,8 +661,8 @@ export default function TenantPortal() {
             <Building className="absolute w-6 h-6 text-emerald-500 animate-bounce" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-lg font-bold tracking-wide text-slate-100 animate-pulse">กำลังโหลดข้อมูลบิลของคุณ...</h2>
-            <p className="text-xs text-slate-400">กรุณารอสักครู่ ระบบกำลังดึงรายละเอียดค่าเช่าและบริการ</p>
+            <h2 className="text-lg font-bold tracking-wide text-slate-100 animate-pulse">{t("tenant_portal.loading_bill")}</h2>
+            <p className="text-xs text-slate-400">{t("tenant_portal.loading_wait")}</p>
           </div>
           <div className="text-[10px] text-slate-500 tracking-wider uppercase border border-slate-900/60 rounded-full px-3 py-1 bg-slate-950/40">
             Secure Connection • SAAS HorSet
@@ -680,25 +680,26 @@ export default function TenantPortal() {
         <div className="flex items-center gap-2">
           <Building className="w-5 h-5 text-blue-500" />
           <div>
-            <h1 className="text-sm font-bold">ห้องพัก {roomNumber}</h1>
-            <p className="text-[9px] text-slate-400">{tenantName} • ผู้เช่า</p>
+            <h1 className="text-sm font-bold">{t("tenant_portal.room_prefix_label").replace("{room}", roomNumber)}</h1>
+            <p className="text-[9px] text-slate-400"><DynamicText>{tenantName}</DynamicText> • {t("tenant_portal.role_tenant")}</p>
           </div>
         </div>
 
-        {!isLoginFree && (
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <LanguageToggle />
+          {!isLoginFree && (
             <button
               onClick={() => {
                 document.cookie = "horset_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
                 router.push("/login")
               }}
               className="p-2 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-900/50"
-              title="ออกจากระบบ"
+              title={t("common.logout")}
             >
               <LogOut className="w-4 h-4" />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       {/* กล่องเนื้อหาแบบโมบาย (Mobile Layout Wrapper) */}
@@ -710,11 +711,11 @@ export default function TenantPortal() {
           
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] text-slate-400 font-semibold uppercase">ใบแจ้งหนี้รอบประจำเดือน</span>
+              <span className="text-[10px] text-slate-400 font-semibold uppercase">{t("tenant_portal.invoice_cycle_label")}</span>
               <h2 className="text-lg font-bold text-slate-200 mt-0.5">{billingCycle}</h2>
               {bill && (bill.invoiceId || bill.invoice_id) && (
                 <div className="text-[10px] text-blue-400 font-semibold mt-1 flex items-center gap-1">
-                  <span>รหัสใบแจ้งหนี้ (Invoice ID):</span>
+                  <span>{t("tenant_portal.invoice_id_label")}</span>
                   <span className="font-mono bg-blue-500/10 px-1.5 py-0.5 rounded text-[10px] text-blue-300">
                     {bill.invoiceId || bill.invoice_id}
                   </span>
@@ -727,7 +728,7 @@ export default function TenantPortal() {
               billStatus === "pending" ? "bg-amber-500/10 text-amber-400 animate-pulse" :
               "bg-red-500/10 text-red-400"
             }`}>
-              {billStatus === "paid" ? "ชำระเงินแล้ว" : billStatus === "pending" ? "รอยืนยันสลิป" : "ค้างชำระ"}
+              {billStatus === "paid" ? t("tenant_portal.status_paid_full") : billStatus === "pending" ? t("tenant_portal.status_pending_slip") : t("dashboard.status_overdue")}
             </span>
           </div>
 
@@ -737,9 +738,9 @@ export default function TenantPortal() {
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
               <div className="flex items-center gap-1.5 text-slate-400">
                 <Building className="w-3.5 h-3.5 text-blue-400" />
-                <span>1. ค่าเช่าห้องพัก (Room Rent)</span>
+                <span>{t("tenant_portal.item_rent")}</span>
               </div>
-              <span className="font-semibold text-slate-200">{rentPrice.toLocaleString()} บาท</span>
+              <span className="font-semibold text-slate-200">{rentPrice.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* 2. ค่าไฟฟ้า */}
@@ -747,11 +748,11 @@ export default function TenantPortal() {
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 text-slate-400">
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
-                  <span>2. ค่าไฟฟ้า (Electricity)</span>
+                  <span>{t("tenant_portal.item_electric")}</span>
                 </div>
-                <p className="text-[10px] text-slate-500 pl-5">ปริมาณไฟสะสมที่ใช้: {elecUnits} หน่วย</p>
+                <p className="text-[10px] text-slate-500 pl-5">{t("tenant_portal.electric_units_used").replace("{units}", String(elecUnits))}</p>
               </div>
-              <span className="font-semibold text-slate-200">{elecAmount.toLocaleString()} บาท</span>
+              <span className="font-semibold text-slate-200">{elecAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* 3. ค่าน้ำประปา */}
@@ -759,20 +760,20 @@ export default function TenantPortal() {
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 text-slate-400">
                   <Droplet className="w-3.5 h-3.5 text-teal-400" />
-                  <span>3. ค่าน้ำประปา (Water)</span>
+                  <span>{t("tenant_portal.item_water")}</span>
                 </div>
-                <p className="text-[10px] text-slate-500 pl-5">ปริมาณน้ำสะสมที่ใช้: {waterUnits} หน่วย</p>
+                <p className="text-[10px] text-slate-500 pl-5">{t("tenant_portal.water_units_used").replace("{units}", String(waterUnits))}</p>
               </div>
-              <span className="font-semibold text-slate-200">{waterAmount.toLocaleString()} บาท</span>
+              <span className="font-semibold text-slate-200">{waterAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* 4. ค่าส่วนกลาง */}
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
               <div className="flex items-center gap-1.5 text-slate-400">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>4. ค่าส่วนกลาง (Common Area Fee)</span>
+                <span>{t("tenant_portal.item_common_fee")}</span>
               </div>
-              <span className="font-semibold text-slate-200">{commonAreaFee.toLocaleString()} บาท</span>
+              <span className="font-semibold text-slate-200">{commonAreaFee.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* ค่าใช้จ่ายเสริมรายเดือน (ถ้ามี) */}
@@ -780,9 +781,9 @@ export default function TenantPortal() {
               <div key={index} className="flex justify-between items-center pb-2.5 border-b border-slate-900">
                 <div className="flex items-center gap-1.5 text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>➕ {exp.name}</span>
+                  <span>➕ <DynamicText>{exp.name}</DynamicText></span>
                 </div>
-                <span className="font-semibold text-slate-200">{Number(exp.amount || 0).toLocaleString()} บาท</span>
+                <span className="font-semibold text-slate-200">{Number(exp.amount || 0).toLocaleString()} {t("daily_bills.baht_unit")}</span>
               </div>
             ))}
 
@@ -791,9 +792,9 @@ export default function TenantPortal() {
               <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
                 <div className="flex items-center gap-1.5 text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
-                  <span>ค่าบริการอื่น ๆ (Other Services)</span>
+                  <span>{t("tenant_portal.item_other_services")}</span>
                 </div>
-                <span className="font-semibold text-slate-200">{otherServiceAmount.toLocaleString()} บาท</span>
+                <span className="font-semibold text-slate-200">{otherServiceAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
               </div>
             )}
 
@@ -802,22 +803,22 @@ export default function TenantPortal() {
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 text-slate-400">
                   <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
-                  <span>5. ค่าปรับ (Penalty / Fine)</span>
+                  <span>{t("tenant_portal.item_penalty")}</span>
                 </div>
                 {lateDays > 0 && (
-                  <p className="text-[10px] text-rose-400 pl-5">จ่ายล่าช้าเกินวันที่ 5 ของเดือนถัดไป เป็นเวลา: {lateDays} วัน (ปรับวันละ {latePenaltyRate} บาท)</p>
+                  <p className="text-[10px] text-rose-400 pl-5">{t("tenant_portal.late_days_note").replace("{days}", String(lateDays)).replace("{rate}", String(latePenaltyRate))}</p>
                 )}
                 {lateDays === 0 && penaltyAmount > 0 && (
-                  <p className="text-[10px] text-rose-400 pl-5">ค่าปรับล่าช้าสะสมที่บันทึกไว้</p>
+                  <p className="text-[10px] text-rose-400 pl-5">{t("tenant_portal.accumulated_penalty_note")}</p>
                 )}
               </div>
-              <span className="font-semibold text-slate-200">{penaltyAmount.toLocaleString()} บาท</span>
+              <span className="font-semibold text-slate-200">{penaltyAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* ยอดเงินรวมสุทธิ */}
             <div className="flex justify-between items-center pt-2">
-              <span className="font-bold text-slate-300">ยอดชำระเงินสุทธิ (Total Amount)</span>
-              <span className="text-lg font-bold text-blue-400">{totalAmount.toLocaleString()} บาท</span>
+              <span className="font-bold text-slate-300">{t("tenant_portal.net_total_label")}</span>
+              <span className="text-lg font-bold text-blue-400">{totalAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* ปุ่มดาวน์โหลดบิล PDF */}
@@ -831,7 +832,7 @@ export default function TenantPortal() {
               ) : (
                 <>
                   <Download className="w-4 h-4 text-blue-400" />
-                  <span>ดาวน์โหลดใบแจ้งหนี้แบบ PDF</span>
+                  <span>{t("tenant_portal.download_invoice_pdf_btn")}</span>
                 </>
               )}
             </button>
@@ -842,7 +843,7 @@ export default function TenantPortal() {
         {billStatus !== "paid" && (
           <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-5">
             <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-              <QrCode className="w-5 h-5 text-blue-400" /> สแกนจ่ายด้วยพร้อมเพย์ QR
+              <QrCode className="w-5 h-5 text-blue-400" /> {t("tenant_portal.scan_promptpay_title")}
             </h3>
 
             {/* ดีไซน์การ์ด พร้อมเพย์สไตล์หรูหรา */}
@@ -857,7 +858,7 @@ export default function TenantPortal() {
                 {isQrLoading ? (
                   <div className="flex flex-col items-center justify-center space-y-2">
                     <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
-                    <span className="text-[9px] text-slate-400 font-medium">กำลังโหลด...</span>
+                    <span className="text-[9px] text-slate-400 font-medium">{t("tenant_portal.qr_loading")}</span>
                   </div>
                 ) : (
                   <img
@@ -870,14 +871,14 @@ export default function TenantPortal() {
 
               <div className="text-center space-y-1">
                 <p className="text-[10px] text-slate-400">
-                  บัญชีพร้อมเพย์หอพัก: <span className="font-bold text-slate-200">
+                  {t("tenant_portal.promptpay_account_label")} <span className="font-bold text-slate-200">
                     {promptPayId.length === 10
                       ? promptPayId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")
                       : promptPayId.replace(/(\d{1})(\d{4})(\d{5})(\d{2})(\d{1})/, "$1-$2-$3-$4-$5")}
                   </span>
                 </p>
-                <p className="text-sm font-bold text-slate-200">ยอดชำระ: {totalAmount.toLocaleString()} บาท</p>
-                <p className="text-[9px] text-slate-500 font-medium">(มีจำนวนระบุยอดโอนให้อัตโนมัติ ไม่ต้องกรอกราคาเอง)</p>
+                <p className="text-sm font-bold text-slate-200">{t("tenant_portal.amount_to_pay_label").replace("{amount}", totalAmount.toLocaleString())}</p>
+                <p className="text-[9px] text-slate-500 font-medium">{t("tenant_portal.auto_amount_note")}</p>
               </div>
 
               {/* Action Buttons for QR Code */}
@@ -888,7 +889,7 @@ export default function TenantPortal() {
                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-all shadow-md active:scale-[0.98]"
                   >
                     <Share2 className="w-3.5 h-3.5" />
-                    <span>แชร์ภาพ / บันทึกลงเครื่อง</span>
+                    <span>{t("tenant_portal.share_save_btn")}</span>
                   </button>
                 </div>
               )}
@@ -900,7 +901,7 @@ export default function TenantPortal() {
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
                     <Upload className="w-4 h-4 text-blue-400" />
-                    <span>อัปโหลดภาพใบสลิปโอนเงินเพื่อยืนยัน</span>
+                    <span>{t("tenant_portal.upload_slip_title")}</span>
                   </h4>
                   <span className="flex h-2 w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -924,7 +925,7 @@ export default function TenantPortal() {
                   {uploading ? (
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-8 h-8 border-3 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-                      <span className="text-[11px] text-slate-400 font-medium">กำลังประมวลผลและอัปโหลดไฟล์...</span>
+                      <span className="text-[11px] text-slate-400 font-medium">{t("tenant_portal.processing_upload")}</span>
                     </div>
                   ) : (
                     <>
@@ -933,14 +934,14 @@ export default function TenantPortal() {
                       </div>
                       <div className="space-y-1 text-center">
                         <p className="font-semibold text-[13px] text-slate-200 group-hover:text-blue-400 transition-colors">
-                          กดเลือกสลิป หรือแตะที่นี่เพื่อถ่ายรูป
+                          {t("tenant_portal.tap_to_select_slip")}
                         </p>
                         <p className="text-[10px] text-slate-400">
-                          ระบบจะส่งสลิปให้หอพักตรวจสอบเพื่ออัปเดตบิล
+                          {t("tenant_portal.upload_hint")}
                         </p>
                       </div>
                       <span className="text-[9px] text-slate-500 font-medium bg-slate-950/60 px-3 py-1 rounded-full border border-slate-900">
-                        รองรับ .jpg, .png, .webp (บีบอัดภาพอัตโนมัติ)
+                        {t("tenant_portal.supported_formats")}
                       </span>
                     </>
                   )}
@@ -950,8 +951,8 @@ export default function TenantPortal() {
               <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 text-xs text-amber-400">
                 <Clock className="w-5 h-5 shrink-0 animate-spin" />
                 <div className="space-y-0.5">
-                  <p className="font-bold">สลิปของคุณอยู่ระหว่างการตรวจสอบ</p>
-                  <p className="text-[10px] text-slate-400">เจ้าหน้าที่หอพักจะทำการยืนยันยอดเงินและปรับสถานะบิลให้เร็วที่สุดครับ</p>
+                  <p className="font-bold">{t("tenant_portal.slip_under_review_title")}</p>
+                  <p className="text-[10px] text-slate-400">{t("tenant_portal.slip_under_review_desc")}</p>
                 </div>
               </div>
             )}
@@ -963,10 +964,10 @@ export default function TenantPortal() {
           <div className="glass-card rounded-2xl border border-slate-900/60 p-8 text-center space-y-4">
             <CheckCircle2 className="w-16 h-16 text-teal-400 mx-auto animate-bounce" />
             <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-100">ยอดชำระของคุณเสร็จเรียบร้อย!</h3>
+              <h3 className="text-lg font-bold text-slate-100">{t("tenant_portal.payment_complete_title")}</h3>
               <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                ขอบคุณสำหรับการชำระเงินรอบเดือนนี้<br />
-                ทาง {workspaceName || "แสนสุขแมนชั่น"} ได้รับเงินโอนเรียบร้อยแล้ว
+                {t("tenant_portal.payment_complete_thanks")}<br />
+                {t("tenant_portal.payment_complete_received_prefix")} <DynamicText>{workspaceName || "แสนสุขแมนชั่น"}</DynamicText> {t("tenant_portal.payment_complete_received_suffix")}
               </p>
             </div>
           </div>
@@ -975,7 +976,7 @@ export default function TenantPortal() {
         {/* ประวัติการรับบิลย้อนหลัง */}
         <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-4">
           <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <History className="w-5 h-5 text-indigo-400" /> ประวัติการรับบิลย้อนหลัง
+            <History className="w-5 h-5 text-indigo-400" /> {t("tenant_portal.history_title")}
           </h3>
 
           <div className="space-y-3 text-xs">
@@ -986,13 +987,13 @@ export default function TenantPortal() {
                   <span className="font-medium text-slate-300">{h.cycle}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-slate-300">{h.amount.toLocaleString()} บาท</span>
+                  <span className="font-bold text-slate-300">{h.amount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
                   <span className={`inline-block text-[8px] font-bold px-2 py-0.5 rounded-full ${
                     h.status === "paid" ? "bg-teal-500/10 text-teal-400" :
                     h.status === "pending" ? "bg-amber-500/10 text-amber-400 animate-pulse" :
                     "bg-red-500/10 text-red-400"
                   }`}>
-                    {h.status === "paid" ? "ชำระแล้ว" : h.status === "pending" ? "รอตรวจสอบ" : "ค้างชำระ"}
+                    {h.status === "paid" ? t("tenant_portal.status_paid_history") : h.status === "pending" ? t("tenant_portal.status_pending_history") : t("dashboard.status_overdue")}
                   </span>
                 </div>
               </div>

@@ -2,10 +2,12 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 export default function MeterRedirectPage() {
   const router = useRouter()
-  
+  const { t } = useLanguage()
+
   useEffect(() => {
     router.replace("/billing")
   }, [router])
@@ -15,7 +17,7 @@ export default function MeterRedirectPage() {
       <div className="text-center space-y-4">
         <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-slate-400 text-sm font-medium animate-pulse">
-          กำลังย้ายไปหน้าจดมิเตอร์และจัดการบิลในหน้าเดียว...
+          {t("meter.redirecting")}
         </p>
       </div>
     </div>

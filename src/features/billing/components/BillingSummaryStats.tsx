@@ -1,5 +1,6 @@
 import React from "react"
 import { Gauge, CheckCircle, Clock, AlertCircle } from "lucide-react"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 interface BillingSummaryStatsProps {
   isDark: boolean
@@ -20,6 +21,7 @@ export default function BillingSummaryStats({
   unpaidCount = 0,
   showOnlyMeterSaved = false
 }: BillingSummaryStatsProps) {
+  const { t } = useLanguage()
   if (showOnlyMeterSaved) {
     return (
       <div className="grid grid-cols-1 md:max-w-xs gap-4 sm:gap-5 lg:gap-6 mt-6 mb-2">
@@ -37,9 +39,9 @@ export default function BillingSummaryStats({
           <div className="min-w-0 flex-1">
             <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-300 ${
               isDark ? "text-slate-400 group-hover:text-blue-400" : "text-slate-500 group-hover:text-blue-600"
-            }`}>บันทึกมิเตอร์แล้ว</p>
+            }`}>{t("manage_bills.stat_meter_recorded")}</p>
             <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-slate-100" : "text-slate-850"}`}>
-              {billedCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">/ {totalOccupied} ห้อง</span>
+              {billedCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">/ {totalOccupied} {t("manage_bills.unit_room")}</span>
             </p>
           </div>
         </div>
@@ -63,9 +65,9 @@ export default function BillingSummaryStats({
         <div className="min-w-0 flex-1">
           <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-300 ${
             isDark ? "text-slate-400 group-hover:text-blue-400" : "text-slate-500 group-hover:text-blue-600"
-          }`}>บันทึกมิเตอร์แล้ว</p>
+          }`}>{t("manage_bills.stat_meter_recorded")}</p>
           <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-slate-100" : "text-slate-850"}`}>
-            {billedCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">/ {totalOccupied} ห้อง</span>
+            {billedCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">/ {totalOccupied} {t("manage_bills.unit_room")}</span>
           </p>
         </div>
       </div>
@@ -84,9 +86,9 @@ export default function BillingSummaryStats({
         <div className="min-w-0 flex-1">
           <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
             isDark ? "text-slate-400 group-hover:text-emerald-400" : "text-slate-500 group-hover:text-emerald-600"
-          }`}>ชำระเงินเรียบร้อย</p>
+          }`}>{t("manage_bills.stat_paid")}</p>
           <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-slate-100" : "text-slate-850"}`}>
-            {paidCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
+            {paidCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">{t("manage_bills.unit_room")}</span>
           </p>
         </div>
       </div>
@@ -106,13 +108,13 @@ export default function BillingSummaryStats({
         <div className="min-w-0 flex-1">
           <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
             isDark ? "text-slate-400 group-hover:text-amber-400" : "text-slate-500 group-hover:text-amber-600"
-          }`}>รอตรวจสอบสลิป</p>
+          }`}>{t("manage_bills.filter_pending")}</p>
           <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${
             pendingCount > 0 
               ? `animate-pulse ${isDark ? "text-amber-400" : "text-amber-600"}` 
               : (isDark ? "text-slate-450" : "text-slate-800")
           }`}>
-            {pendingCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
+            {pendingCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">{t("manage_bills.unit_room")}</span>
           </p>
         </div>
       </div>
@@ -131,9 +133,9 @@ export default function BillingSummaryStats({
         <div className="min-w-0 flex-1">
           <p className={`text-[10px] sm:text-xs xl:text-sm font-bold uppercase tracking-wider truncate transition-colors duration-305 ${
             isDark ? "text-slate-400 group-hover:text-rose-400" : "text-slate-500 group-hover:text-rose-600"
-          }`}>ค้างชำระเงิน</p>
+          }`}>{t("manage_bills.filter_unpaid")}</p>
           <p className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-black mt-0.5 tracking-tight truncate ${isDark ? "text-rose-400" : "text-rose-600"}`}>
-            {unpaidCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">ห้อง</span>
+            {unpaidCount} <span className="text-xs sm:text-sm xl:text-base font-semibold text-slate-400 dark:text-slate-500">{t("manage_bills.unit_room")}</span>
           </p>
         </div>
       </div>

@@ -35,7 +35,6 @@ import { getFinanceSettings } from "@/features/finance/actions"
 
 import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISSIONS } from "@/features/permissions/types"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
-import { DynamicText } from "@/lib/translations/DynamicText"
 
 // Extracted Billing Sub-components
 import BillingSummaryStats from "@/features/billing/components/BillingSummaryStats"
