@@ -130,7 +130,7 @@ function getCycleFromTimestamp(timestampStr: string): string {
   }
 }
 
-function getBillingCycleOptions(locale: string = "th", registrationCycle?: string): { value: string; label: string }[] {
+function getBillingCycleOptions(t: any, locale: string = "th", registrationCycle?: string): { value: string; label: string }[] {
   const options = []
   const d = new Date()
   // เจนรอบบิลล่วงหน้า 1 เดือน, เดือนปัจจุบัน และย้อนหลัง 11 เดือน (รวม 13 ตัวเลือก)
@@ -147,7 +147,7 @@ function getBillingCycleOptions(locale: string = "th", registrationCycle?: strin
 
     options.push({
       value: val,
-      label: locale === "en" ? `Cycle: ${formatBillingCycle(val, "en")}` : `รอบบิล ${formatBillingCycle(val, "th")}`
+      label: t("billing.select_cycle_option").replace("{cycle}", formatBillingCycle(val, locale))
     })
   }
   return options
@@ -699,7 +699,7 @@ function UnifiedBillingContent() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsaved) {
         e.preventDefault()
-        e.returnValue = "คุณยังมีข้อมูลที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?"
+        e.returnValue = t("manage_bills.confirm_unsaved_leave")
         return e.returnValue
       }
     }
@@ -711,7 +711,7 @@ function UnifiedBillingContent() {
         ;(window as any).__hasUnsavedChanges = false
       }
     }
-  }, [unifiedItems])
+  }, [unifiedItems, t])
 
   useEffect(() => {
     async function loadFinance(forceRefresh = false) {
@@ -967,13 +967,13 @@ function UnifiedBillingContent() {
     
     if (!item) {
       console.error("❌ [Client] Room item not found in unifiedItems for room:", roomNumber)
-      alert(`⚠️ ไม่พบข้อมูลสำหรับห้อง ${roomNumber} กรุณาลองใหม่อีกครั้ง`)
+      alert(t("manage_bills.err_no_room_data").replace("{room}", roomNumber))
       return
     }
     
     if (!item.billId) {
       console.error("❌ [Client] billId is missing for room:", roomNumber, "item:", item)
-      alert(`⚠️ ห้อง ${roomNumber} ไม่มีรหัสบิล (Bill ID) บนระบบ กรุณาลองรีเฟรชหน้าเว็บ หรือกดสร้างบิลก่อนทำการบันทึกค่าปรับ`)
+      alert(t("manage_bills.err_no_bill_id").replace("{room}", roomNumber))
       return
     }
     
@@ -1003,7 +1003,7 @@ function UnifiedBillingContent() {
       console.log("✅ [Client] updateBillPenalty responded:", res)
       
       if (res.success) {
-        showToast(`บันทึกจำนวนวันปรับล่าช้าห้อง ${roomNumber} สำเร็จ!`)
+        showToast(t("manage_bills.saved_late_days").replace("{room}", roomNumber))
         const formatted = formatDbBillToCamelCase(res.data)
         updateLocalStateAndCache(roomNumber, undefined, formatted)
         setUnifiedItems(prev =>
@@ -1012,11 +1012,11 @@ function UnifiedBillingContent() {
         console.log("👉 [Client] Local state & cache updated successfully")
       } else {
         console.error("❌ [Client] Server Action returned success=false:", res.error)
-        alert(`❌ บันทึกไม่สำเร็จ: ${res.error || "เกิดข้อผิดพลาดในการบันทึกค่าปรับ"}`)
+        alert(`${t("manage_bills.err_save_failed_prefix")}${res.error || t("manage_bills.err_penalty_generic")}`)
       }
     } catch (err) {
       console.error("💥 [Client] Exception caught in handleSaveLateDays:", err)
-      alert(`💥 เกิดข้อผิดพลาดร้ายแรงในการบันทึกค่าปรับ:\n${err instanceof Error ? err.message : String(err)}`)
+      alert(`${t("manage_bills.err_penalty_fatal_prefix")}${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
       console.log("🏁 [Client] handleSaveLateDays finished execution flow")
@@ -1046,16 +1046,16 @@ function UnifiedBillingContent() {
   // อนุมัติสลิปโอนเงิน
   const handleApproveSlip = async (id: string) => {
     if (currentUserRole === "staff") {
-      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์อนุมัติสลิปโอนเงิน")
+      alert(t("billing.err_admin_only_approve"))
       return
     }
     const res = await updateBillStatus(id, "paid")
     if (res.success) {
-      showToast("อนุมัติรายการชำระเงินเรียบร้อยแล้ว!")
+      showToast(t("manage_bills.approved_payment"))
       const formatted = formatDbBillToCamelCase(res.data)
       updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
     } else {
-      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      alert(res.error || t("manage_bills.err_update_bill_status"))
       return
     }
     closeSlipModal()
@@ -1064,16 +1064,16 @@ function UnifiedBillingContent() {
   // ปฏิเสธสลิปโอนเงิน
   const handleRejectSlip = async (id: string) => {
     if (currentUserRole === "staff") {
-      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์ปฏิเสธสลิปโอนเงิน")
+      alert(t("billing.err_admin_only_reject"))
       return
     }
     const res = await updateBillStatus(id, "unpaid", null)
     if (res.success) {
-      showToast("ปฏิเสธสลิปแล้ว บิลจะกลับเป็นสถานะค้างชำระ")
+      showToast(t("manage_bills.rejected_slip"))
       const formatted = formatDbBillToCamelCase(res.data)
       updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
     } else {
-      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      alert(res.error || t("manage_bills.err_update_bill_status"))
       return
     }
     closeSlipModal()
@@ -1082,18 +1082,18 @@ function UnifiedBillingContent() {
   // เปลี่ยนสถานะเป็นชำระเงินแล้วโดยตรง (สำหรับกรณีแอดมินรับเงินสด/โอนตรง)
   const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
     if (currentUserRole === "staff") {
-      alert("⚠️ ขออภัย เฉพาะ Admin เท่านั้นที่มีสิทธิ์กดรับเงินและบันทึกการชำระเงินโดยตรง")
+      alert(t("billing.err_admin_only_cash"))
       return
     }
-    if (!confirm(`คุณต้องการเปลี่ยนสถานะบิลของห้อง ${roomNumber} เป็น "ชำระเงินแล้ว" ใช่หรือไม่? (โปรดยืนยันหากได้รับเงินแล้ว)`)) return
+    if (!confirm(t("manage_bills.confirm_mark_paid").replace("{room}", roomNumber))) return
 
     const res = await updateBillStatus(billId, "paid")
     if (res.success) {
-      showToast(`เปลี่ยนสถานะห้อง ${roomNumber} เป็นชำระเงินแล้ว!`)
+      showToast(t("manage_bills.marked_paid").replace("{room}", roomNumber))
       const formatted = formatDbBillToCamelCase(res.data)
       updateLocalStateAndCache(roomNumber, undefined, formatted)
     } else {
-      alert(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล")
+      alert(res.error || t("manage_bills.err_update_bill_status"))
     }
   }
 
@@ -1122,12 +1122,12 @@ function UnifiedBillingContent() {
     if (type === "electric" || type === "all") {
       if (elecVal === "" || isNaN(elecVal as number)) {
         if (type === "electric") {
-          alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าให้ครบถ้วน")
+          alert(t("manage_bills.err_elec_required"))
           return
         }
       } else {
         if (isNaN(elecPrevVal)) {
-          alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+          alert(t("manage_bills.err_prev_invalid"))
           return
         }
         if (repElec) {
@@ -1138,7 +1138,7 @@ function UnifiedBillingContent() {
           eUnits = getUnits(Number(elecVal), elecPrevVal)
         }
         if (eUnits > 3000) {
-          alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง (คำนวณแล้วเกิน 3,000 หน่วย)")
+          alert(t("manage_bills.err_units_exceed"))
           return
         }
       }
@@ -1147,12 +1147,12 @@ function UnifiedBillingContent() {
     if (type === "water" || type === "all") {
       if (waterVal === "" || isNaN(waterVal as number)) {
         if (type === "water") {
-          alert("กรุณากรอกตัวเลขมิเตอร์น้ำประปาให้ครบถ้วน")
+          alert(t("manage_bills.err_water_required"))
           return
         }
       } else {
         if (isNaN(waterPrevVal)) {
-          alert("กรุณากรอกตัวเลขมิเตอร์ก่อนหน้าให้เป็นตัวเลขที่ถูกต้อง")
+          alert(t("manage_bills.err_prev_invalid"))
           return
         }
         if (repWater) {
@@ -1163,14 +1163,14 @@ function UnifiedBillingContent() {
           wUnits = getUnits(Number(waterVal), waterPrevVal)
         }
         if (wUnits > 3000) {
-          alert("ข้อมูลผิดพลาด กรอกเลขมิเตอร์ไม่ถูกต้อง (คำนวณแล้วเกิน 3,000 หน่วย)")
+          alert(t("manage_bills.err_units_exceed"))
           return
         }
       }
     }
 
     if (type === "all" && (elecVal === "" || waterVal === "")) {
-      alert("กรุณากรอกตัวเลขมิเตอร์ไฟฟ้าและค่าน้ำประปาให้ครบถ้วน")
+      alert(t("manage_bills.err_both_required"))
       return
     }
 
@@ -1206,14 +1206,14 @@ function UnifiedBillingContent() {
         waterVal
       )
       if (!meterRes.success) {
-        alert(meterRes.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลมิเตอร์")
+        alert(meterRes.error || t("manage_bills.err_meter_save_failed"))
         setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
         return
       }
 
       // 2. สร้าง/อัปเดตบิลใน DB (เฉพาะกรณีมีผู้เช่าเท่านั้น)
       if (!item.tenantName) {
-        showToast(`บันทึกข้อมูลมิเตอร์ห้อง ${roomNumber} สำเร็จ! (ไม่มีผู้เช่า จึงไม่ได้ออกบิล)`)
+        showToast(t("billing.toast_save_meter_no_tenant").replace("{room}", roomNumber))
         const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
         updateLocalStateAndCache(roomNumber, formattedMeter, undefined)
         setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
@@ -1231,18 +1231,18 @@ function UnifiedBillingContent() {
         otherServiceVal
       )
       if (!billRes.success) {
-        alert(billRes.error || "เกิดข้อผิดพลาดในการออกใบแจ้งหนี้")
+        alert(billRes.error || t("manage_bills.err_bill_create_failed"))
         setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
         return
       }
 
-      showToast(`บันทึกมิเตอร์และประมวลผลบิลห้อง ${roomNumber} สำเร็จ!`)
+      showToast(t("manage_bills.saved_meter_bill").replace("{room}", roomNumber))
       const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
       const formattedBill = formatDbBillToCamelCase(billRes.data)
       updateLocalStateAndCache(roomNumber, formattedMeter, formattedBill)
     } catch (err) {
       console.error(err)
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
+      alert(t("manage_bills.err_unexpected"))
     } finally {
       setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
     }
@@ -1298,13 +1298,13 @@ function UnifiedBillingContent() {
     })
 
     if (invalidItems.length > 0) {
-      const typeText = type === "electric" ? "ไฟฟ้า" : "น้ำประปา"
-      alert(`ไม่สามารถประมวลผลทั้งหมดได้ เนื่องจากมี ${invalidItems.length} ห้องพักที่ข้อมูลเลขมิเตอร์${typeText}ไม่ครบถ้วน หรือคำนวณแล้วมีปริมาณหน่วยเกิน 3,000 หน่วย`)
+      const typeText = type === "electric" ? t("billing.elec_meter") : t("billing.water_meter")
+      alert(t("billing.err_bulk_save_invalid").replace("{count}", String(invalidItems.length)).replace("{type}", typeText))
       return
     }
 
     setSavingAll(true)
-    setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: "กำลังบันทึกทั้งหมด..." })
+    setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: t("billing.saving_all_progress") })
 
     try {
       const items: BulkBillItem[] = unifiedItems.map(item => ({
@@ -1322,7 +1322,7 @@ function UnifiedBillingContent() {
       const result = await saveAllBillsForCycle(billingCycle, items)
 
       if (!result.success) {
-        alert(`เกิดข้อผิดพลาดในการบันทึก: ${result.error}`)
+        alert(`${t("manage_bills.err_save_failed_prefix")}${result.error}`)
         setSavingAll(false)
         return
       }
@@ -1403,11 +1403,11 @@ function UnifiedBillingContent() {
         setCachedData(currentWorkspaceId, `bills_${billingCycle}`, updatedBills)
       }
 
-      const successText = type === "electric" ? "มิเตอร์ไฟ" : "มิเตอร์น้ำ"
-      showToast(`บันทึกข้อมูล${successText}และคำนวณบิลสำเร็จเรียบร้อย!`)
+      const successText = type === "electric" ? t("billing.elec_meter") : t("billing.water_meter")
+      showToast(t("billing.toast_bulk_save_success").replace("{type}", successText))
     } catch (err) {
       console.error(err)
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
+      alert(t("manage_bills.err_unexpected"))
     } finally {
       setSavingAll(false)
     }
@@ -1416,7 +1416,7 @@ function UnifiedBillingContent() {
   // ส่งข้อมูลเข้า LINE OA ของจริง
   const handleSendLine = async (roomNumber: string) => {
     if (!userPermissions.billing_send_line) {
-      alert("คุณไม่มีสิทธิ์ในการส่งยอด LINE OA กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(t("manage_bills.err_no_permission_line"))
       return
     }
 
@@ -1425,24 +1425,24 @@ function UnifiedBillingContent() {
     const lineUserId = roomInfo?.lineUserId
 
     if (!lineUserId) {
-      showToast(`ไม่สามารถส่ง LINE ได้ เนื่องจากผู้เช่าห้อง ${roomNumber} ยังไม่ได้ลงทะเบียนผูก LINE ID`)
+      showToast(t("manage_bills.err_line_not_linked").replace("{room}", roomNumber))
       return
     }
 
     // 2. ค้นหาบิลประจำงวดของห้องนั้นๆ
     const item = unifiedItems.find((x: any) => x.roomNumber === roomNumber)
     if (!item) {
-      showToast(`ไม่พบข้อมูลค่าใช้จ่ายของห้อง ${roomNumber}`)
+      showToast(t("manage_bills.err_no_bill_data_room").replace("{room}", roomNumber))
       return
     }
 
     if (item.billStatus === "not_created") {
-      showToast(`กรุณากดคำนวณบิลห้อง ${roomNumber} ให้เสร็จสิ้นก่อนส่งข้อความ`)
+      showToast(t("manage_bills.err_calc_bill_first").replace("{room}", roomNumber))
       return
     }
 
     if (item.billStatus === "paid") {
-      alert(`ห้อง ${roomNumber} ชำระเงินแล้ว`)
+      alert(t("manage_bills.info_already_paid").replace("{room}", roomNumber))
       return
     }
 
@@ -1471,20 +1471,20 @@ function UnifiedBillingContent() {
       })
 
       if (result.success) {
-        showToast(`ส่งยอดบิล และลิงก์ชำระเงินไปยัง LINE ผู้เช่าห้อง ${roomNumber} สำเร็จแล้ว!`)
+        showToast(t("manage_bills.sent_line_success").replace("{room}", roomNumber))
       } else {
-        showToast(`ส่ง LINE ล้มเหลว: ${result.error}`)
+        showToast(`${t("manage_bills.err_line_send_failed_prefix")}${result.error}`)
       }
     } catch (err: any) {
       console.error(err)
-      showToast("เกิดข้อผิดพลาดในการเรียกส่งข้อมูลผ่าน LINE")
+      showToast(t("manage_bills.err_line_send_exception"))
     }
   }
 
   // ดาวน์โหลดบิล PDF
   const handleDownloadBillPdf = async (item: UnifiedRoomBillingItem) => {
     if (!userPermissions.billing_download_pdf) {
-      alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(t("manage_bills.err_no_permission_pdf"))
       return
     }
     setDownloadingPdfId(item.roomNumber)
@@ -1537,10 +1537,10 @@ function UnifiedBillingContent() {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      showToast(`ดาวน์โหลดบิล PDF ห้อง ${item.roomNumber} เรียบร้อย!`)
+      showToast(t("manage_bills.downloaded_pdf").replace("{room}", item.roomNumber))
     } catch (e) {
       console.error(e)
-      alert("เกิดข้อผิดพลาดในการสร้างไฟล์ PDF บิลค่าเช่า")
+      alert(t("manage_bills.err_pdf_generate"))
     } finally {
       setDownloadingPdfId(null)
     }
@@ -1549,12 +1549,12 @@ function UnifiedBillingContent() {
   // ดาวน์โหลดบิล PDF ทุกห้องพร้อมกันเป็นไฟล์ ZIP
   const handleDownloadAllBillsPdf = async () => {
     if (!userPermissions.billing_download_pdf) {
-      alert("คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
+      alert(t("manage_bills.err_no_permission_pdf"))
       return
     }
 
     if (unifiedItems.length === 0) {
-      alert("ไม่มีรายการบิลที่จะดาวน์โหลด")
+      alert(t("manage_bills.err_no_bills_download"))
       return
     }
 
@@ -1617,7 +1617,7 @@ function UnifiedBillingContent() {
       }
 
       if (addedCount === 0) {
-        alert("ไม่มีข้อมูลบิลสำหรับผู้เช่าห้องใดๆ")
+        alert(t("manage_bills.err_no_tenant_bills"))
         setDownloadingAllPdf(false)
         return
       }
@@ -1631,10 +1631,10 @@ function UnifiedBillingContent() {
       link.click()
       document.body.removeChild(link)
 
-      showToast(`ดาวน์โหลดบิล PDF ครบทุกห้องเรียบร้อยแล้ว (${addedCount} บิล)!`)
+      showToast(t("manage_bills.downloaded_all_pdf").replace("{count}", String(addedCount)))
     } catch (e) {
       console.error(e)
-      alert("เกิดข้อผิดพลาดในการดาวน์โหลดบิลทั้งหมด")
+      alert(t("manage_bills.err_download_all_failed"))
     } finally {
       setDownloadingAllPdf(false)
     }
@@ -1662,7 +1662,7 @@ function UnifiedBillingContent() {
     }
 
     if (!targetTenant) {
-      alert("ห้องพักนี้ยังไม่มีผู้เช่า หรือสัญญาหมดอายุ ไม่สามารถออกบิลได้")
+      alert(t("manage_bills.err_no_tenant_or_expired"))
       return
     }
 
@@ -1677,11 +1677,11 @@ function UnifiedBillingContent() {
       otherServiceAmountManual
     )
     if (res.success) {
-      showToast(`สร้างบิลแบบกำหนดเองห้อง ${newRoomNumber} สำเร็จ!`)
+      showToast(t("manage_bills.created_manual_bill").replace("{room}", newRoomNumber))
       const formatted = formatDbBillToCamelCase(res.data)
       updateLocalStateAndCache(newRoomNumber, undefined, formatted)
     } else {
-      alert(res.error || "ออกใบแจ้งยอดไม่สำเร็จ")
+      alert(res.error || t("manage_bills.err_bill_create_failed"))
       return
     }
 
@@ -1741,7 +1741,7 @@ function UnifiedBillingContent() {
               router.replace(`?${params.toString()}`, { scroll: false })
             }}
           >
-            {getBillingCycleOptions(locale, registrationCycle).map(opt => (
+            {getBillingCycleOptions(t, locale, registrationCycle).map(opt => (
               <option key={opt.value} value={opt.value} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{opt.label}</option>
             ))}
           </select>
@@ -2152,11 +2152,12 @@ function UnifiedBillingContent() {
 }
 
 export default function UnifiedBillingPage() {
+  const { t } = useLanguage()
   return (
     <Suspense fallback={
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
-        <span className="text-sm font-semibold text-slate-500">กำลังเปิดหน้าจดมิเตอร์และบิล...</span>
+        <span className="text-sm font-semibold text-slate-500">{t("billing.loading_billing_page")}</span>
       </div>
     }>
       <UnifiedBillingContent />

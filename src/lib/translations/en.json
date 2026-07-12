@@ -781,7 +781,16 @@
     "new_meter_start_label": "New Meter Starting Reading:",
     "example_new_meter": "e.g., 0",
     "save_replacement": "Save Replacement",
-    "delete_replacement": "Delete Replacement (Revert to normal)"
+    "delete_replacement": "Delete Replacement (Revert to normal)",
+    "select_cycle_option": "Cycle: {cycle}",
+    "toast_save_meter_no_tenant": "Meter reading for room {room} saved! (No tenant, so no bill was created)",
+    "err_bulk_save_invalid": "Cannot process all bills because there are {count} rooms with incomplete {type} meter readings, or calculated usage exceeds 3,000 units.",
+    "saving_all_progress": "Saving all records...",
+    "toast_bulk_save_success": "{type} readings saved and bills calculated successfully!",
+    "err_admin_only_approve": "⚠️ Sorry, only Admin has permission to approve transfer slips.",
+    "err_admin_only_reject": "⚠️ Sorry, only Admin has permission to reject transfer slips.",
+    "err_admin_only_cash": "⚠️ Sorry, only Admin has permission to accept cash and record payments directly.",
+    "loading_billing_page": "Opening meter reading and billing page..."
   },
   "rooms": {
     "title": "Manage Rooms & Tenants",
