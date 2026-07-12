@@ -27,8 +27,10 @@ import {
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getSlipOkSettings, saveSlipOkSettings, getSlipOkQuota, type SlipOkQuota } from "@/features/slipok/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 export default function SlipOkSettingsTab() {
+  const { t, locale } = useLanguage()
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
   const [workspaceId, setWorkspaceId] = useState<string>("")
@@ -78,7 +80,7 @@ export default function SlipOkSettingsTab() {
       }
 
       if (!wsId) {
-        setQuotaError("ไม่พบรหัสหอพัก (workspace)")
+        setQuotaError(t("slipok_settings.err_no_workspace"))
         return
       }
 
@@ -87,11 +89,11 @@ export default function SlipOkSettingsTab() {
         setQuota(res.data)
       } else {
         setQuota(null)
-        setQuotaError(res.error || "ไม่สามารถตรวจสอบโควต้าได้")
+        setQuotaError(res.error || t("slipok_settings.err_quota_fetch"))
       }
     } catch (err) {
       console.error("Error checking SlipOK quota:", err)
-      setQuotaError("เกิดข้อผิดพลาดในการตรวจสอบโควต้า")
+      setQuotaError(t("slipok_settings.err_quota_exception"))
     } finally {
       setQuotaLoading(false)
     }
@@ -118,7 +120,7 @@ export default function SlipOkSettingsTab() {
 
         const profileRes = await getCurrentUserProfileClient()
         if (!profileRes.success || !profileRes.data?.workspace_id) {
-          setLoadError("ไม่สามารถระบุหอพัก (workspace) ของท่านได้ กรุณาล็อกอินใหม่อีกครั้ง")
+          setLoadError(t("slipok_settings.err_no_workspace"))
           setLoading(false)
           return
         }
@@ -145,7 +147,7 @@ export default function SlipOkSettingsTab() {
             setTimeout(() => handleCheckQuota(wsId), 100)
           }
         } else {
-          setLoadError(res.error || "ไม่สามารถโหลดการตั้งค่า SlipOK ได้")
+          setLoadError(res.error || t("slipok_settings.err_load_settings"))
         }
 
         if (financeRes.success && financeRes.data) {
@@ -155,7 +157,7 @@ export default function SlipOkSettingsTab() {
         }
       } catch (err) {
         console.error("Error loading SlipOK settings:", err)
-        setLoadError("เกิดข้อผิดพลาดในการโหลดการตั้งค่า SlipOK")
+        setLoadError(t("slipok_settings.err_load_finance"))
       } finally {
         setLoading(false)
       }
@@ -177,11 +179,11 @@ export default function SlipOkSettingsTab() {
       }
 
       if (!workspaceId) {
-        setSaveError("ไม่พบรหัสหอพัก (workspace)")
+        setSaveError(t("slipok_settings.err_no_workspace"))
         return
       }
       if (!hasApiKey && !apiKeyInput.trim()) {
-        setSaveError("กรุณากรอก API Key ของ SlipOK ก่อนบันทึก")
+        setSaveError(t("slipok_settings.err_api_key_missing"))
         return
       }
 
@@ -205,11 +207,11 @@ export default function SlipOkSettingsTab() {
         // บันทึกเสร็จแล้วรีเฟรชโควต้าให้สดใหม่ทันที (เผื่อเปลี่ยน Branch ID/API Key มา)
         handleCheckQuota(workspaceId)
       } else {
-        setSaveError(res.error || "ไม่สามารถบันทึกการตั้งค่าได้")
+        setSaveError(res.error || t("slipok_settings.err_save_settings"))
       }
     } catch (err) {
       console.error("Error saving SlipOK settings:", err)
-      setSaveError("เกิดข้อผิดพลาดในการบันทึกการตั้งค่า")
+      setSaveError(t("slipok_settings.err_save_exception"))
     } finally {
       setSaving(false)
     }
@@ -225,29 +227,29 @@ export default function SlipOkSettingsTab() {
     return (
       <div className="py-24 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center min-h-[40vh]">
         <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-4" />
-        <span>กำลังโหลดการตั้งค่า SlipOK...</span>
+        <span>{t("slipok_settings.loading")}</span>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       
       {/* 1. Page Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 p-6 rounded-3xl border border-blue-500/20 shadow-sm backdrop-blur-md">
         <div className="flex-1">
-          <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5 font-sans">
+          <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
             <ShieldCheck className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-            <span>เชื่อมต่อ SlipOK (ตรวจสอบสลิปอัตโนมัติ)</span>
+            <span>{t("slipok_settings.title")}</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed font-sans font-semibold">
-            เชื่อมต่อสาขาและ API Key ของ SlipOK เพื่อเปิดใช้งานการสแกนและตรวจสอบความถูกต้องของสลิปโอนเงินโดยอัตโนมัติ ป้องกันสลิปปลอมและสลิปซ้ำได้อย่างแม่นยำ
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed font-semibold">
+            {t("slipok_settings.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
           {enabled && hasApiKey && (
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-xs font-bold text-teal-600 dark:text-teal-400 shadow-sm">
-              <CheckCircle2 className="w-3.5 h-3.5" /> เชื่อมต่อแล้ว
+              <CheckCircle2 className="w-3.5 h-3.5" /> {t("slipok_settings.connected")}
             </span>
           )}
           <button
@@ -258,12 +260,12 @@ export default function SlipOkSettingsTab() {
             {showManual ? (
               <>
                 <EyeOff className="w-4 h-4" />
-                <span>ซ่อนคู่มือการตั้งค่า</span>
+                <span>{t("slipok_settings.hide_manual")}</span>
               </>
             ) : (
               <>
                 <Eye className="w-4 h-4" />
-                <span>แสดงคู่มือการตั้งค่า</span>
+                <span>{t("slipok_settings.show_manual")}</span>
               </>
             )}
           </button>
@@ -287,7 +289,7 @@ export default function SlipOkSettingsTab() {
           <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-900 pb-3">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <Gauge className="w-5 h-5 text-blue-500" /> โควต้าคงเหลือเดือนนี้
+                <Gauge className="w-5 h-5 text-blue-500" /> {t("slipok_settings.quota_title")}
               </h3>
               <button
                 type="button"
@@ -314,7 +316,9 @@ export default function SlipOkSettingsTab() {
                       <CreditCard className="w-3 h-3 text-slate-400" />
                     )}
                     <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
-                      พร้อมเพย์ ({accountType === "phone" ? "เบอร์โทรศัพท์" : "เลขบัตรประชาชน"}) · {accountId}
+                      {t("slipok_settings.promptpay_format")
+                        .replace("{type}", accountType === "phone" ? t("slipok_settings.type_phone") : t("slipok_settings.type_national_id"))
+                        .replace("{id}", accountId)}
                     </span>
                   </div>
                 </div>
@@ -332,20 +336,20 @@ export default function SlipOkSettingsTab() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-                    <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">โควต้าคงเหลือ</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">{t("slipok_settings.quota_remaining")}</p>
                     <p className="text-lg sm:text-xl font-black text-emerald-500">{quota.quota.toLocaleString()}</p>
                   </div>
                   <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-                    <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">ใช้เกินโควต้า</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">{t("slipok_settings.quota_exceeded")}</p>
                     <p className="text-lg sm:text-xl font-black text-rose-500">{quota.overQuota.toLocaleString()}</p>
                   </div>
                   <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-                    <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">โควต้าพิเศษ</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1">{t("slipok_settings.quota_special")}</p>
                     <p className="text-lg sm:text-xl font-black text-blue-500">{quota.specialQuota.toLocaleString()}</p>
                   </div>
                   <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
                     <p className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1 flex items-center justify-center gap-1">
-                      <CalendarClock className="w-3 h-3" /> หมดอายุแพ็กเกจ
+                      <CalendarClock className="w-3 h-3" /> {t("slipok_settings.quota_expiry")}
                     </p>
                     <p className="text-xs sm:text-sm font-black text-slate-700 dark:text-slate-200">{quota.endDate}</p>
                   </div>
@@ -354,7 +358,7 @@ export default function SlipOkSettingsTab() {
                 {percentageUsed !== null ? (
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs sm:text-sm font-extrabold text-slate-500 dark:text-slate-400">
-                      <span>เปอร์เซ็นต์โควต้าที่ใช้ไป</span>
+                      <span>{t("slipok_settings.quota_percent_used")}</span>
                       <span className={`${percentageUsed >= 85 ? "text-rose-500 animate-pulse" : "text-blue-500"} font-black`}>{percentageUsed}%</span>
                     </div>
                     <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-800/35">
@@ -366,19 +370,21 @@ export default function SlipOkSettingsTab() {
                       />
                     </div>
                     <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
-                      ใช้ไปแล้ว {(monthlyPackageQuota - quota.quota).toLocaleString()} จาก {monthlyPackageQuota.toLocaleString()} ครั้ง/เดือน
+                      {t("slipok_settings.quota_usage_summary")
+                        .replace("{used}", (monthlyPackageQuota - quota.quota).toLocaleString())
+                        .replace("{total}", monthlyPackageQuota.toLocaleString())}
                     </p>
                   </div>
                 ) : (
                   <p className="text-[10px] sm:text-xs text-amber-500 font-bold text-center py-1">
-                    กรอก &ldquo;เพดานแพ็กเกจ/เดือน&rdquo; ด้านล่างเพื่อให้ระบบคำนวณแถบ % โควต้าที่ใช้ไปให้
+                    {t("slipok_settings.quota_setup_hint")}
                   </p>
                 )}
               </div>
             ) : (
               !quotaError && (
                 <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold text-center py-4">
-                  {hasApiKey && enabled ? "กำลังดึงข้อมูลโควต้าล่าสุดจาก SlipOK..." : "เชื่อมต่อ SlipOK ให้เสร็จก่อน ระบบจะดึงข้อมูลโควต้าให้อัตโนมัติ"}
+                  {hasApiKey && enabled ? t("slipok_settings.quota_loading") : t("slipok_settings.quota_setup_first")}
                 </p>
               )
             )}
@@ -386,18 +392,18 @@ export default function SlipOkSettingsTab() {
             {/* เพดานแพ็กเกจ/เดือน */}
             <div className="pt-2 border-t border-slate-200 dark:border-slate-900 space-y-2">
               <label className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5" /> เพดานแพ็กเกจ/เดือน (จำนวนครั้งตรวจสอบสลิปที่สมัครไว้กับ SlipOK)
+                <Package className="w-3.5 h-3.5" /> {t("slipok_settings.package_limit_label")}
               </label>
               <input
                 type="number"
                 min={0}
                 value={monthlyPackageQuota || ""}
                 onChange={(e) => setMonthlyPackageQuota(Number(e.target.value) || 0)}
-                placeholder="เช่น 100"
+                placeholder={t("slipok_settings.package_limit_placeholder")}
                 className="w-full sm:w-56 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
               />
               <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
-                กรอกตามแพ็กเกจที่สมัครไว้กับ SlipOK (เช็คได้จากหน้าเว็บ SlipOK) แก้แล้วกดปุ่ม &ldquo;บันทึกการตั้งค่า&rdquo; ด้านล่างเพื่อบันทึก
+                {t("slipok_settings.package_limit_desc")}
               </p>
             </div>
           </div>
@@ -405,15 +411,15 @@ export default function SlipOkSettingsTab() {
           {/* Card: Branch ID + API Key */}
           <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
             <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-              <Key className="w-5 h-5 text-blue-500" /> ข้อมูล API ของ SlipOK
+              <Key className="w-5 h-5 text-blue-500" /> {t("slipok_settings.api_header")}
             </h3>
 
             {/* Enable toggle */}
             <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm transition-all">
               <div className="space-y-0.5">
-                <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">เปิดใช้งานการตรวจสอบสลิปอัตโนมัติ</h5>
+                <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">{t("slipok_settings.api_enable_label")}</h5>
                 <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                  {enabled ? "🟢 เปิดใช้งาน: ระบบจะเรียก SlipOK ตรวจสอบทุกสลิปที่ผู้เช่าอัปโหลด" : "🔴 ปิดใช้งาน: จะข้ามการตรวจสอบอัตโนมัติ (staff ยังตรวจสลิปเองได้ตามปกติ)"}
+                  {enabled ? t("slipok_settings.api_enabled_desc") : t("slipok_settings.api_disabled_desc")}
                 </p>
               </div>
               <button
@@ -434,24 +440,24 @@ export default function SlipOkSettingsTab() {
 
             <div className="space-y-2">
               <label className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <Hash className="w-3.5 h-3.5" /> Branch ID
+                <Hash className="w-3.5 h-3.5" /> {t("slipok_settings.branch_id_label")}
               </label>
               <input
                 type="text"
                 value={branchId}
                 onChange={(e) => setBranchId(e.target.value)}
-                placeholder="เช่น 123456"
+                placeholder={t("slipok_settings.branch_id_placeholder")}
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5" /> API Key
+                <Key className="w-3.5 h-3.5" /> {t("slipok_settings.api_key_label")}
               </label>
               {hasApiKey && !apiKeyInput && (
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-bold">
-                  คีย์ปัจจุบัน: <span className="font-mono">{apiKeyPreview}</span> — กรอกช่องด้านล่างเฉพาะเมื่อต้องการเปลี่ยนคีย์ใหม่
+                  {t("slipok_settings.api_key_current_prefix")} <span className="font-mono">{apiKeyPreview}</span> {t("slipok_settings.api_key_current_suffix")}
                 </p>
               )}
               <div className="relative">
@@ -459,7 +465,7 @@ export default function SlipOkSettingsTab() {
                   type={showApiKey ? "text" : "password"}
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder={hasApiKey ? "กรอกเฉพาะถ้าต้องการเปลี่ยนคีย์ใหม่" : "กรอก API Key จาก SlipOK"}
+                  placeholder={hasApiKey ? t("slipok_settings.api_key_placeholder_exists") : t("slipok_settings.api_key_placeholder_empty")}
                   className="w-full px-3.5 py-2.5 pr-11 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
                 />
                 <button
@@ -475,14 +481,14 @@ export default function SlipOkSettingsTab() {
             {/* เลือกรายการที่จะให้ SlipOK ตรวจสอบ */}
             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-900">
               <h4 className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <ListChecks className="w-3.5 h-3.5" /> เลือกรายการที่จะให้ตรวจสอบ
+                <ListChecks className="w-3.5 h-3.5" /> {t("slipok_settings.verify_options_header")}
               </h4>
 
               <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
                 <div className="space-y-0.5">
-                  <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">เช็คยอดเงินให้ตรงกับสลิป</h5>
+                  <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">{t("slipok_settings.verify_amount_label")}</h5>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                    ถ้าเปิดไว้ ยอดเงินในบิลต้องตรงกับยอดในสลิปเป๊ะ ไม่ตรง = ตรวจไม่ผ่าน
+                    {t("slipok_settings.verify_amount_desc")}
                   </p>
                 </div>
                 <button
@@ -503,9 +509,9 @@ export default function SlipOkSettingsTab() {
 
               <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
                 <div className="space-y-0.5">
-                  <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">เช็คบัญชีผู้รับ + กันสลิปซ้ำ</h5>
+                  <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">{t("slipok_settings.verify_receiver_label")}</h5>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                    ต้องไปตั้งค่าบัญชีรับเงินของสาขานี้ไว้ในหน้าเว็บ SlipOK ก่อน ไม่งั้นจะตรวจไม่ผ่านทุกครั้ง
+                    {t("slipok_settings.verify_receiver_desc")}
                   </p>
                 </div>
                 <button
@@ -531,7 +537,7 @@ export default function SlipOkSettingsTab() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-[11px] font-bold text-blue-500 hover:text-blue-400 transition-colors pl-1"
                 >
-                  <ExternalLink className="w-3 h-3" /> ไปตั้งค่าบัญชีรับเงินที่หน้าเว็บ SlipOK
+                  <ExternalLink className="w-3 h-3" /> {t("slipok_settings.verify_link_portal")}
                 </a>
               )}
             </div>
@@ -539,16 +545,16 @@ export default function SlipOkSettingsTab() {
             {/* ป้องกันค่าใช้จ่ายส่วนเกินโควต้า */}
             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-900">
               <h4 className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <ShieldAlert className="w-3.5 h-3.5" /> ป้องกันค่าใช้จ่ายส่วนเกิน
+                <ShieldAlert className="w-3.5 h-3.5" /> {t("slipok_settings.prevent_header")}
               </h4>
 
               <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
                 <div className="space-y-0.5">
-                  <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">ปิดการตรวจสอบอัตโนมัติเมื่อโควต้าหมด</h5>
+                  <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">{t("slipok_settings.prevent_overrun_label")}</h5>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
                     {autoDisableOnQuotaExceeded
-                      ? "🟢 เปิดไว้: ถ้าโควต้า SlipOK เดือนนี้หมด ระบบจะปิดการตรวจสอบให้อัตโนมัติทันที เพื่อไม่ให้เสียค่าใช้จ่ายส่วนเกิน"
-                      : "🔴 ปิดไว้: ต่อให้โควต้าหมดแล้ว ระบบจะยังพยายามตรวจสอบต่อไป (อาจมีค่าใช้จ่ายส่วนเกินตามแพ็กเกจของ SlipOK)"}
+                      ? t("slipok_settings.prevent_overrun_enabled")
+                      : t("slipok_settings.prevent_overrun_disabled")}
                   </p>
                 </div>
                 <button
@@ -577,7 +583,7 @@ export default function SlipOkSettingsTab() {
             {saveSuccess && (
               <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-2.5 text-emerald-500 text-xs sm:text-sm font-bold">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>บันทึกการตั้งค่า SlipOK สำเร็จแล้ว</span>
+                <span>{t("slipok_settings.save_success")}</span>
               </div>
             )}
 
@@ -585,17 +591,17 @@ export default function SlipOkSettingsTab() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-black flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-black flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shadow-md"
             >
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
+              {saving ? t("slipok_settings.saving") : t("slipok_settings.save_btn")}
             </button>
           </div>
         </div>
 
         {/* Right Column: Setup Manual Guide */}
         {showManual && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6">
             {/* Card: คู่มือการเชื่อมต่อ SlipOK */}
             <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -605,10 +611,10 @@ export default function SlipOkSettingsTab() {
                   </div>
                   <div>
                     <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
-                      คู่มือการตั้งค่าเพื่อเชื่อมต่อ SlipOK
+                      {t("slipok_settings.guide_header")}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
-                      ขั้นตอนการรับ API Key และตั้งค่าตรวจสอบสลิปให้ปลอดภัยและรัดกุม
+                      {t("slipok_settings.guide_subtitle")}
                     </p>
                   </div>
                 </div>
@@ -624,7 +630,7 @@ export default function SlipOkSettingsTab() {
                   }}
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0"
                 >
-                  {openStep1 && openStep2 && openStep3 && openStep4 ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
+                  {openStep1 && openStep2 && openStep3 && openStep4 ? t("slipok_settings.guide_collapse") : t("slipok_settings.guide_expand")}
                 </button>
               </div>
 
@@ -642,7 +648,7 @@ export default function SlipOkSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         1
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ สมัครสมาชิกและเข้าสู่ระบบ SlipOK</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("slipok_settings.guide_step1_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep1 ? "rotate-180" : ""}`} />
                   </button>
@@ -651,9 +657,9 @@ export default function SlipOkSettingsTab() {
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3 animate-fadeIn">
                       <ul className="list-disc pl-5 space-y-2 text-slate-600 dark:text-slate-300 font-semibold">
                         <li>
-                          สมัคร SlipOK โดยแอดไลน์ <a href="https://line.me/R/ti/p/%40slipok" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 font-black underline inline-flex items-center gap-1">@slipok <ExternalLink className="w-3.5 h-3.5 inline" /></a>
+                          {t("slipok_settings.guide_step1_line1")} <a href="https://line.me/R/ti/p/%40slipok" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 font-black underline inline-flex items-center gap-1">@slipok <ExternalLink className="w-3.5 h-3.5 inline" /></a>
                         </li>
-                        <li>ทำตามขั้นตอนการสมัครของ SlipOK</li>
+                        <li>{t("slipok_settings.guide_step1_line2")}</li>
                       </ul>
                     </div>
                   )}
@@ -670,7 +676,7 @@ export default function SlipOkSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         2
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ เติมเครดิตแพ็กเกจการใช้งาน</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("slipok_settings.guide_step2_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep2 ? "rotate-180" : ""}`} />
                   </button>
@@ -678,11 +684,11 @@ export default function SlipOkSettingsTab() {
                   {openStep2 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-2.5 leading-relaxed animate-fadeIn">
                       <ul className="list-disc pl-5 space-y-2 text-slate-600 dark:text-slate-300 font-semibold">
-                        <li>หากท่านมีห้องพักไม่เกิน 100 ห้อง ท่านสามารถกดเลือก <span className="font-black text-slate-800 dark:text-slate-100">แพ็คเกจ OK BASIC</span> ได้เลย</li>
-                        <li>หากท่านมีจำนวนห้องพักมากกว่า 100 ห้อง ควรเลือก <span className="font-black text-slate-800 dark:text-slate-100">OK START</span> เพื่อใช้งานได้เต็มประสิทธิภาพ</li>
+                        <li>{t("slipok_settings.guide_step2_line1")}</li>
+                        <li>{t("slipok_settings.guide_step2_line2")}</li>
                       </ul>
                       <p className="bg-slate-100 dark:bg-slate-950 p-3 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 mt-2.5">
-                        📌 <span className="font-extrabold text-slate-700 dark:text-slate-300">หมายเหตุ :</span> โควต้าการใช้งาน ชำระโดยตรงกับ SlipOK
+                        📌 {t("slipok_settings.guide_step2_note")}
                       </p>
                     </div>
                   )}
@@ -699,17 +705,17 @@ export default function SlipOkSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         3
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ดึงค่า Branch ID และ API Key</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("slipok_settings.guide_step3_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep3 ? "rotate-180" : ""}`} />
                   </button>
                   
                   {openStep3 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3 leading-relaxed animate-fadeIn">
-                      <p className="mb-2 font-semibold">เมื่อเข้าสู่ระบบแล้ว ให้ไปที่หน้า <span className="font-black text-slate-800 dark:text-slate-100">ข้อมูลสาขา (Branch)</span> จากนั้นคัดลอกข้อมูลเหล่านี้:</p>
+                      <p className="mb-2 font-semibold">{t("slipok_settings.guide_step3_desc")}</p>
                       <ul className="list-disc pl-5 space-y-2 text-slate-600 dark:text-slate-300 font-semibold">
-                        <li>คัดลอกชุดตัวเลข 5 ตัวสุดท้ายของ API นำมาใส่ใน <span className="font-black text-slate-800 dark:text-slate-100">Branch ID</span> ทางด้านซ้าย</li>
-                        <li>คัดลอก <span className="font-black text-slate-800 dark:text-slate-100">API Key</span> นำมาใส่ใน API Key ทางด้านซ้าย</li>
+                        <li>{t("slipok_settings.guide_step3_item1")}</li>
+                        <li>{t("slipok_settings.guide_step3_item2")}</li>
                       </ul>
                     </div>
                   )}
@@ -726,22 +732,14 @@ export default function SlipOkSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         4
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ตั้งค่าบัญชีรับเงินป้องกันกลโกง ⚠️</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("slipok_settings.guide_step4_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep4 ? "rotate-180" : ""}`} />
                   </button>
                   
                   {openStep4 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3 leading-relaxed animate-fadeIn">
-                      <p className="text-rose-500 font-extrabold">
-                        ข้อแนะนำที่สำคัญมากเพื่อความปลอดภัยสูงสุดในการเงินของหอพัก:
-                      </p>
-                      <p className="font-semibold">
-                        ให้เข้าไปตั้งค่าข้อมูลบัญชีธนาคารหรือพร้อมเพย์รับเงินของท่านใน <span className="font-black text-slate-800 dark:text-slate-100">หน้าเว็บ SlipOK</span> 
-                      </p>
-                      <p className="font-semibold">
-                        โดยให้ข้อมูลบัญชีธนาคารตรงกันกับระบบ <span className="font-black text-blue-500">HorSet</span> เพื่อความถูกต้องในการตรวจสอบสลิป
-                      </p>
+                      <p className="font-semibold">{t("slipok_settings.guide_step4_desc")}</p>
                     </div>
                   )}
                 </div>

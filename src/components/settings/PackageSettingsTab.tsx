@@ -18,29 +18,25 @@ import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorks
 import { cancelWorkspaceSubscription, type SaasPlan } from "@/features/subscription/actions"
 import { useSupportAccessContext } from "@/context/SupportAccessContext"
 import PricingModal from "@/features/subscription/components/PricingModal"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 type FeatureKey = keyof NonNullable<SaasPlan["features"]>
 
-const FEATURE_LABELS: Array<{ key: FeatureKey; label: string }> = [
-  { key: "line_notify", label: "แจ้งเตือนบิลอัตโนมัติผ่าน LINE" },
-  { key: "tax_export", label: "Export รายงานภาษี ภ.ง.ด. 90/94" },
-  { key: "slipok_auto_verify", label: "ตรวจสอบสลิปโอนเงินอัตโนมัติด้วย SlipOK" }
-]
-
-const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  trial: { label: "ทดลองใช้", className: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25" },
-  active: { label: "ใช้งานอยู่", className: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25" },
-  past_due: { label: "ค้างชำระ", className: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/25" },
-  read_only: { label: "ดูข้อมูลได้อย่างเดียว", className: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25" },
-  cancelled: { label: "ยกเลิกแล้ว", className: "bg-slate-500/15 text-slate-500 dark:text-slate-400 border border-slate-500/25" }
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  trial: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25",
+  active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25",
+  past_due: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/25",
+  read_only: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25",
+  cancelled: "bg-slate-500/15 text-slate-500 dark:text-slate-400 border border-slate-500/25"
 }
 
-function formatThaiDate(dateStr: string | null): string {
+function formatThaiDate(dateStr: string | null, locale: string): string {
   if (!dateStr) return "-"
-  return new Date(dateStr).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })
+  return new Date(dateStr).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", { year: "numeric", month: "long", day: "numeric" })
 }
 
 export default function PackageSettingsTab() {
+  const { t, locale } = useLanguage()
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
   const [workspaceId, setWorkspaceId] = useState("")
@@ -71,14 +67,14 @@ export default function PackageSettingsTab() {
         }
         const res = await getCurrentUserProfileClient()
         if (!res.success || !res.data?.workspace_id) {
-          setProfileError("ไม่สามารถระบุหอพัก (workspace) ของท่านได้ กรุณาล็อกอินใหม่อีกครั้ง")
+          setProfileError(t("package_settings.err_workspace"))
           return
         }
         setWorkspaceId(res.data.workspace_id)
         setUserRole(res.data.role === "super_admin" ? "super_admin" : "admin")
       } catch (err) {
         console.error("Error loading profile in PackageSettingsTab:", err)
-        setProfileError("เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ใช้งาน")
+        setProfileError(t("package_settings.err_profile"))
       } finally {
         setProfileLoading(false)
       }
@@ -90,11 +86,7 @@ export default function PackageSettingsTab() {
   const { supportStatus, handleRequestSupport, handleDecideSupport } = useSupportAccessContext()
 
   const handleCancelAccount = async () => {
-    if (
-      !confirm(
-        "คุณต้องการยกเลิกการใช้งานบัญชีหอพักนี้ใช่หรือไม่? บัญชีจะยังใช้งานได้ตามปกติจนถึงวันหมดอายุปัจจุบัน จากนั้นจะถูกจำกัดสิทธิ์เป็นแบบดูข้อมูลอย่างเดียว"
-      )
-    ) {
+    if (!confirm(t("package_settings.confirm_cancel"))) {
       return
     }
     setCancelling(true)
@@ -106,10 +98,10 @@ export default function PackageSettingsTab() {
         setCancelSuccess(true)
         refetch()
       } else {
-        setCancelError(res.error || "ไม่สามารถยกเลิกบัญชีได้")
+        setCancelError(res.error || t("package_settings.err_cancel_failed"))
       }
     } catch (err) {
-      setCancelError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการยกเลิกบัญชี")
+      setCancelError(err instanceof Error ? err.message : t("package_settings.err_cancel_generic"))
     } finally {
       setCancelling(false)
     }
@@ -119,7 +111,7 @@ export default function PackageSettingsTab() {
     return (
       <div className="py-24 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center min-h-[40vh]">
         <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-4" />
-        <span>กำลังโหลดข้อมูลแพ็กเกจของคุณ...</span>
+        <span>{t("package_settings.loading")}</span>
       </div>
     )
   }
@@ -128,14 +120,13 @@ export default function PackageSettingsTab() {
     return (
       <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-3 text-rose-500 text-sm font-bold">
         <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-        <span>{profileError || subError || "ไม่สามารถโหลดข้อมูลแพ็กเกจได้"}</span>
+        <span>{profileError || subError || t("package_settings.err_load_failed")}</span>
       </div>
     )
   }
 
   const plan = subscription.plan
   const status = subscription.status
-  const statusBadge = STATUS_BADGE[status]
   const isTrial = status === "trial"
   const expiryDate = isTrial ? subscription.trialEndsAt : subscription.currentPeriodEnd
   const daysRemaining = expiryDate && nowMs !== null
@@ -149,15 +140,23 @@ export default function PackageSettingsTab() {
 
   const canManageBilling = userRole === "admin" || userRole === "super_admin"
 
+  const FEATURE_LABELS: Array<{ key: FeatureKey; label: string }> = [
+    { key: "line_notify", label: t("package_settings.feature_line") },
+    { key: "tax_export", label: t("package_settings.feature_tax") },
+    { key: "slipok_auto_verify", label: t("package_settings.feature_slipok") }
+  ]
+
+  const statusLabel = t(`package_settings.status_${status}`)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div>
-        <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-sans flex items-center gap-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <Package className="w-7 h-7 text-blue-500" />
-          แพ็กเกจการใช้งาน
+          {t("package_settings.title")}
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-1">
-          ดูสถานะแพ็กเกจปัจจุบัน อัปเกรด หรือจัดการบัญชีการใช้งานของหอพักนี้
+          {t("package_settings.subtitle")}
         </p>
       </div>
 
@@ -165,23 +164,21 @@ export default function PackageSettingsTab() {
       <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-5 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="space-y-1.5">
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider">แพ็กเกจปัจจุบัน</p>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider">{t("package_settings.current_plan")}</p>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">{plan?.name || "-"}</h3>
-              {statusBadge && (
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${statusBadge.className}`}>
-                  {statusBadge.label}
-                </span>
-              )}
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${STATUS_BADGE_CLASSES[status] || ""}`}>
+                {statusLabel}
+              </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-bold leading-relaxed max-w-md">
               {isTrial
-                ? `ทดลองใช้สิทธิ์แผน ${plan?.name || "Starter"} ฟรี — สมัครแพ็กเกจก่อนหมดอายุเพื่อใช้งานต่อ`
+                ? t("package_settings.desc_trial", { plan: plan?.name || "Starter" })
                 : status === "read_only"
-                  ? "บัญชีถูกจำกัดสิทธิ์เป็นแบบดูข้อมูลได้อย่างเดียว กรุณาชำระเงินเพื่อใช้งานต่อ"
+                  ? t("package_settings.desc_read_only")
                   : status === "cancelled"
-                    ? "บัญชีนี้ตั้งไว้ให้ยกเลิกเมื่อครบกำหนด ยังใช้งานได้ตามปกติจนถึงวันหมดอายุ"
-                    : "ขอบคุณที่ใช้งาน HorSet ต่อเนื่อง"}
+                    ? t("package_settings.desc_cancelled")
+                    : t("package_settings.desc_active")}
             </p>
           </div>
 
@@ -191,7 +188,7 @@ export default function PackageSettingsTab() {
                 {Math.max(0, daysRemaining)}
               </p>
               <p className="text-[11px] text-slate-400 font-bold flex items-center gap-1 justify-end">
-                <Clock className="w-3 h-3" /> วันที่เหลือ
+                <Clock className="w-3 h-3" /> {t("package_settings.days_remaining")}
               </p>
             </div>
           )}
@@ -201,10 +198,10 @@ export default function PackageSettingsTab() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
               <span className="flex items-center gap-1.5">
-                <DoorOpen className="w-3.5 h-3.5" /> ห้องที่ใช้งาน
+                <DoorOpen className="w-3.5 h-3.5" /> {t("package_settings.rooms_used_label")}
               </span>
               <span className={roomsOverQuota ? "text-rose-500" : "text-slate-700 dark:text-slate-200"}>
-                {roomsUsed.toLocaleString("th-TH")} / {roomsMax.toLocaleString("th-TH")} ห้อง
+                {roomsUsed.toLocaleString(locale === "th" ? "th-TH" : "en-US")} / {roomsMax.toLocaleString(locale === "th" ? "th-TH" : "en-US")} {t("package_settings.rooms_unit")}
               </span>
             </div>
             <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-900 overflow-hidden">
@@ -217,38 +214,38 @@ export default function PackageSettingsTab() {
         )}
 
         {expiryDate && (
-          <p className="text-xs text-slate-400 font-bold">หมดอายุ: {formatThaiDate(expiryDate)}</p>
+          <p className="text-xs text-slate-400 font-bold">{t("package_settings.expiry_label")}: {formatThaiDate(expiryDate, locale)}</p>
         )}
       </div>
 
       {/* Card: สิ่งที่รวมอยู่ในแพ็กเกจ */}
       <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-4 shadow-xl">
         <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-          <Sparkles className="w-5 h-5 text-blue-500" /> สิ่งที่รวมอยู่ในแพ็กเกจของคุณ
+          <Sparkles className="w-5 h-5 text-blue-500" /> {t("package_settings.features_header")}
         </h3>
 
         <div className="flex items-center justify-between text-xs sm:text-sm py-1">
-          <span className="text-slate-500 dark:text-slate-400 font-bold">ห้องพัก</span>
+          <span className="text-slate-500 dark:text-slate-400 font-bold">{t("package_settings.rooms_limit_label")}</span>
           <span className="font-black text-emerald-600 dark:text-emerald-400">
-            {roomsMax === null ? "ไม่จำกัด" : `สูงสุด ${roomsMax.toLocaleString("th-TH")} ห้อง`}
+            {roomsMax === null ? t("package_settings.unlimited") : t("package_settings.max_rooms", { count: roomsMax.toLocaleString(locale === "th" ? "th-TH" : "en-US") })}
           </span>
         </div>
         <div className="flex items-center justify-between text-xs sm:text-sm py-1">
-          <span className="text-slate-500 dark:text-slate-400 font-bold">ออกใบแจ้งหนี้ / บิล PDF</span>
+          <span className="text-slate-500 dark:text-slate-400 font-bold">{t("package_settings.feature_pdf")}</span>
           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
         </div>
         <div className="flex items-center justify-between text-xs sm:text-sm py-1">
-          <span className="text-slate-500 dark:text-slate-400 font-bold">บันทึกมิเตอร์น้ำ-ไฟ</span>
+          <span className="text-slate-500 dark:text-slate-400 font-bold">{t("package_settings.feature_meter")}</span>
           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
         </div>
         {FEATURE_LABELS.map(({ key, label }) => {
-          const enabled = Boolean(plan?.features?.[key])
+          const isEnabled = Boolean(plan?.features?.[key])
           return (
             <div key={key} className="flex items-center justify-between text-xs sm:text-sm py-1">
-              <span className={enabled ? "text-slate-500 dark:text-slate-400 font-bold" : "text-slate-300 dark:text-slate-700 font-bold"}>
+              <span className={isEnabled ? "text-slate-500 dark:text-slate-400 font-bold" : "text-slate-300 dark:text-slate-700 font-bold"}>
                 {label}
               </span>
-              {enabled ? (
+              {isEnabled ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               ) : (
                 <span className="text-slate-300 dark:text-slate-700 text-lg leading-none">—</span>
@@ -263,7 +260,7 @@ export default function PackageSettingsTab() {
             onClick={() => setShowPricingModal(true)}
             className="w-full h-12 mt-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-black flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
           >
-            อัพเกรดแพ็กเกจ <span aria-hidden>→</span>
+            {t("package_settings.upgrade_btn")} <span aria-hidden>→</span>
           </button>
         )}
       </div>
@@ -272,10 +269,10 @@ export default function PackageSettingsTab() {
       {userRole === "admin" && (
         <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-3 shadow-xl">
           <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-blue-500" /> ให้ทีม support เข้าดูช่วยแก้ปัญหา
+            <ShieldCheck className="w-5 h-5 text-blue-500" /> {t("package_settings.support_header")}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
-            ติดต่อ support แล้ว? เปิดสิทธิ์ให้ admin เข้าดูข้อมูลของคุณชั่วคราวเพื่อช่วยตรวจสอบ — admin จะแก้ไขข้อมูลไม่ได้ มีเพียงสิทธิ์ดูเท่านั้น และจะหมดอายุอัตโนมัติภายใน 24 ชั่วโมง
+            {t("package_settings.support_desc")}
           </p>
           {supportStatus === "approved" ? (
             <button
@@ -283,11 +280,11 @@ export default function PackageSettingsTab() {
               onClick={() => handleDecideSupport(false)}
               className="px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-black transition-colors cursor-pointer"
             >
-              ระงับสิทธิ์เข้าดูทันที
+              {t("package_settings.support_revoke")}
             </button>
           ) : supportStatus === "pending" ? (
             <span className="inline-block px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-black">
-              ⏳ รอการอนุมัติ
+              {t("package_settings.support_pending")}
             </span>
           ) : (
             <button
@@ -295,7 +292,7 @@ export default function PackageSettingsTab() {
               onClick={handleRequestSupport}
               className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-black transition-colors cursor-pointer"
             >
-              เปิดสิทธิ์ให้ admin เข้าดูชั่วคราว
+              {t("package_settings.support_grant")}
             </button>
           )}
         </div>
@@ -304,9 +301,9 @@ export default function PackageSettingsTab() {
       {/* Danger zone: ยกเลิกบัญชี */}
       {userRole === "admin" && status !== "cancelled" && (
         <div className="rounded-2xl border-2 border-rose-300 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/10 p-6 space-y-3">
-          <h3 className="text-sm font-black text-rose-600 dark:text-rose-400">ยกเลิกบัญชี</h3>
+          <h3 className="text-sm font-black text-rose-600 dark:text-rose-400">{t("package_settings.danger_header")}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
-            บัญชีจะใช้งานได้จนถึงวันหมดอายุ จากนั้นจะมีช่วงเก็บข้อมูล 90 วันก่อนลบถาวร
+            {t("package_settings.danger_desc")}
           </p>
           {cancelError && (
             <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2 text-rose-500 text-xs font-bold">
@@ -317,7 +314,7 @@ export default function PackageSettingsTab() {
           {cancelSuccess && (
             <div className="p-3 bg-slate-500/10 border border-slate-500/20 rounded-xl flex items-start gap-2 text-slate-600 dark:text-slate-300 text-xs font-bold">
               <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>ตั้งค่ายกเลิกบัญชีเรียบร้อยแล้ว บัญชีจะยังใช้งานได้จนถึงวันหมดอายุปัจจุบัน</span>
+              <span>{t("package_settings.success_cancel")}</span>
             </div>
           )}
           <button
@@ -327,7 +324,7 @@ export default function PackageSettingsTab() {
             className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-black flex items-center gap-2 transition-all cursor-pointer"
           >
             {cancelling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            ยกเลิกบัญชี
+            {t("package_settings.cancel_btn")}
           </button>
         </div>
       )}

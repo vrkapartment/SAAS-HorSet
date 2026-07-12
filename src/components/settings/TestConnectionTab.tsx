@@ -67,15 +67,15 @@ export default function TestConnectionTab() {
     setDiagnosticStepProgress(10)
     
     // จำลองความคืบหน้าเพื่อความเท่และพรีเมียม
-    setDiagnosticStep("กำลังตรวจสอบไฟล์กำหนดค่าสภาพแวดล้อม (Local Environment Variables)...")
+    setDiagnosticStep(t("test_connection.diagnostic_env") || "กำลังตรวจสอบไฟล์กำหนดค่าสภาพแวดล้อม (Local Environment Variables)...")
     await new Promise(r => setTimeout(r, 600))
     setDiagnosticStepProgress(40)
     
-    setDiagnosticStep("กำลังเชื่อมโยงและทดสอบการตอบสนองของเซิร์ฟเวอร์หลัก (Authentication Service)...")
+    setDiagnosticStep(t("test_connection.diagnostic_auth") || "กำลังเชื่อมโยงและทดสอบการตอบสนองของเซิร์ฟเวอร์หลัก (Authentication Service)...")
     await new Promise(r => setTimeout(r, 700))
     setDiagnosticStepProgress(70)
     
-    setDiagnosticStep("กำลังคิวรี่โครงสร้างระบบตารางและความถูกต้องของสิทธิ์ (Database RLS Policy)...")
+    setDiagnosticStep(t("test_connection.diagnostic_db") || "กำลังคิวรี่โครงสร้างระบบตารางและความถูกต้องของสิทธิ์ (Database RLS Policy)...")
     await new Promise(r => setTimeout(r, 600))
     setDiagnosticStepProgress(95)
 
@@ -122,7 +122,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
   ON public.profiles FOR UPDATE USING (auth.uid() = id);`
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative font-sans">
       {/* เอฟเฟกต์แสงไฟเรืองแสงด้านหลัง (Ambient Background Glow) */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[20%] left-[-10%] w-[400px] h-[400px] bg-indigo-500/5 dark:bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -135,7 +135,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
             <span className="text-slate-600 dark:text-slate-500 text-xs">•</span>
             <span className="text-slate-500 text-xs font-mono">v1.2.0</span>
           </div>
-          <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 font-sans tracking-tight flex items-center gap-2">
+          <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
             <Network className="w-6 h-6 text-blue-500 animate-pulse" />
             {t("test_connection.title")}
           </h2>
@@ -145,7 +145,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
         </div>
         <div className="text-xs md:text-[11px] font-extrabold px-4 py-3 md:py-2 bg-slate-900/85 border border-slate-800/80 rounded-xl flex items-center gap-2.5 backdrop-blur-md shadow-md text-slate-300 w-full md:w-auto justify-center md:justify-start">
           <span className={`w-2.5 h-2.5 md:w-2 md:h-2 rounded-full ${loading ? "bg-blue-500 animate-ping" : result?.success ? "bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.5)]" : "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]"}`} />
-          {loading ? "กำลังตรวจสอบระบบ..." : result?.success ? "Supabase ออนไลน์ปกติ" : "ระบบตัดการเชื่อมต่อ"}
+          {loading ? t("test_connection.checking") : result?.success ? t("test_connection.supabase_online") : t("test_connection.disconnected")}
         </div>
       </div>
 
@@ -182,7 +182,9 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                 
                 <div className="space-y-2 max-w-sm">
                   <p className="text-sm md:text-xs font-bold text-slate-800 dark:text-slate-200 animate-pulse">{diagnosticStep}</p>
-                  <p className="text-xs md:text-[10px] text-slate-500 font-mono">ความคืบหน้า: {diagnosticProgress}%</p>
+                  <p className="text-xs md:text-[10px] text-slate-500 font-mono">
+                    {t("test_connection.progress").replace("{progress}", String(diagnosticProgress))}
+                  </p>
                 </div>
 
                 {/* Progress Bar หลอดวิเคราะห์ระบบ */}
@@ -221,8 +223,8 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                 {/* แผนภาพ Node Graph / Network Flow Map */}
                 <div className="p-5 md:p-4 bg-slate-950/45 border border-slate-900/60 rounded-2xl space-y-4">
                   <div className="text-xs md:text-[10px] text-slate-500 font-extrabold uppercase tracking-wider flex justify-between">
-                    <span>แอนิเมชันโครงข่ายเชื่อมโยงระบบ (Network Flow Map)</span>
-                    <span className="text-slate-600 font-mono text-[10px] md:text-[9px]">PING STATUS: OK</span>
+                    <span>{t("test_connection.network_flow_map")}</span>
+                    <span className="text-slate-600 font-mono text-[10px] md:text-[9px]">{t("test_connection.ping_status")}</span>
                   </div>
                   
                   {/* กล่องแสดงผลโครงข่ายสายเชื่อมโยง */}
@@ -235,7 +237,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                         <span className="absolute bottom-[-2px] right-[-2px] w-3.5 h-3.5 md:w-3 md:h-3 bg-teal-400 rounded-full border-2 border-slate-950" />
                       </div>
                       <div className="text-center">
-                        <div className="text-xs md:text-[10px] font-bold text-slate-300">Local App</div>
+                        <div className="text-xs md:text-[10px] font-bold text-slate-300">{t("test_connection.local_app")}</div>
                         <div className="text-[10px] md:text-[9px] text-slate-500 font-mono">localhost:3000</div>
                       </div>
                     </div>
@@ -254,7 +256,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                         <span className={`absolute bottom-[-2px] right-[-2px] w-3.5 h-3.5 md:w-3 md:h-3 rounded-full border-2 border-slate-950 ${result.success ? "bg-teal-400" : "bg-red-400"}`} />
                       </div>
                       <div className="text-center">
-                        <div className="text-xs md:text-[10px] font-bold text-slate-300">Auth Service</div>
+                        <div className="text-xs md:text-[10px] font-bold text-slate-300">{t("test_connection.auth_service")}</div>
                         <div className="text-[10px] md:text-[9px] text-slate-500 font-mono">GoTrue / JWT</div>
                       </div>
                     </div>
@@ -273,8 +275,8 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                         <span className={`absolute bottom-[-2px] right-[-2px] w-3.5 h-3.5 md:w-3 md:h-3 rounded-full border-2 border-slate-950 ${result.success && !result.message.includes("profiles") ? "bg-teal-400" : result.success ? "bg-emerald-400" : "bg-red-400"}`} />
                       </div>
                       <div className="text-center">
-                        <div className="text-xs md:text-[10px] font-bold text-slate-300">PostgreSQL DB</div>
-                        <div className="text-[10px] md:text-[9px] text-slate-500 font-mono">Schema Profiles</div>
+                        <div className="text-xs md:text-[10px] font-bold text-slate-300">{t("test_connection.postgresql_db")}</div>
+                        <div className="text-[10px] md:text-[9px] text-slate-500 font-mono">{t("test_connection.schema_profiles")}</div>
                       </div>
                     </div>
 
@@ -332,11 +334,11 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                       >
                         {showKeys ? (
                           <>
-                            <EyeOff className="w-4 h-4 md:w-3.5 md:h-3.5" /> ซ่อนรหัสความปลอดภัย
+                            <EyeOff className="w-4 h-4 md:w-3.5 md:h-3.5" /> {t("test_connection.hide_keys")}
                           </>
                         ) : (
                           <>
-                            <Eye className="w-4 h-4 md:w-3.5 md:h-3.5" /> แสดงรหัสความปลอดภัย
+                            <Eye className="w-4 h-4 md:w-3.5 md:h-3.5" /> {t("test_connection.show_keys")}
                           </>
                         )}
                       </button>
@@ -405,7 +407,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Code2 className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm md:text-xs font-bold text-slate-800 dark:text-slate-200">Supabase SQL Schema Helper</span>
+                <span className="text-sm md:text-xs font-bold text-slate-800 dark:text-slate-200">{t("test_connection.sql_helper_title")}</span>
               </div>
               <button
                 type="button"
@@ -413,12 +415,12 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                 className="text-sm md:text-xs text-blue-500 hover:text-blue-400 font-bold flex items-center gap-1 py-2 px-3 md:py-0 md:px-0 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 md:border-none rounded-xl md:rounded-none transition-all"
               >
                 {showSql ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                {showSql ? "ย่อสคริปต์" : "กางสคริปต์เพื่อคัดลอก"}
+                {showSql ? t("test_connection.collapse_script") : t("test_connection.expand_script")}
               </button>
             </div>
             
             <p className="text-[11px] md:text-[10px] text-slate-500 leading-relaxed">
-              สำหรับแก้ไขสิทธิ์การใช้งาน (Database Policies) หากผลการดึงตารางล้มเหลว คัดลอกไปวางรันที่แผงควบคุมหลักของ Supabase Database ได้ทันที
+              {t("test_connection.sql_helper_desc")}
             </p>
 
             {showSql && (
@@ -441,7 +443,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                 </div>
                 {copiedKey === "schema_sql" && (
                   <div className="text-xs md:text-[10px] text-emerald-650 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/5 border border-emerald-500/10 p-2.5 rounded-lg justify-center animate-scale-up">
-                    <CheckCircle2 className="w-4 h-4 md:w-3.5 md:h-3.5" /> คัดลอกสคริปต์สคีมาลงคลิปบอร์ดแล้ว!
+                    <CheckCircle2 className="w-4 h-4 md:w-3.5 md:h-3.5" /> {t("test_connection.copied_success")}
                   </div>
                 )}
               </div>
@@ -471,7 +473,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                       : "text-slate-500 hover:text-slate-300"
                   }`}
                 >
-                  ขั้นตอนที่ {stepNum}
+                  {t("test_connection.step_label").replace("{step}", String(stepNum))}
                 </button>
               ))}
             </div>
@@ -498,7 +500,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 font-extrabold text-sm md:text-[11px] group"
                     >
-                      ไปยังเว็บไซต์ Supabase Dashboard <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-all" />
+                      {t("test_connection.go_to_supabase")} <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-all" />
                     </a>
                   </div>
                 </div>
@@ -560,7 +562,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                   
                   <div className="p-4 md:p-3 bg-blue-500/5 rounded-xl border border-blue-500/10 text-xs md:text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed pl-4 md:pl-3.5 relative font-medium">
                     <span className="absolute left-2.5 top-4 md:top-3.5 w-1 h-1 bg-blue-400 rounded-full animate-ping" />
-                    คุณสามารถกดเปิดกล่องช่วยเหลือ <span className="text-slate-750 dark:text-slate-200 font-bold">"Supabase SQL Schema Helper"</span> ด้านซ้ายล่างเพื่อคัดลอกสคริปต์ได้ทันทีโดยไม่ต้องออกไปเปิดไฟล์ในโปรเจกต์
+                    {t("test_connection.sql_helper_hint")}
                   </div>
                 </div>
               )}
@@ -586,7 +588,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                     }}
                     className="w-full py-3.5 md:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-blue-600/15 text-sm md:text-xs transition-all hover:-translate-y-0.5"
                   >
-                    กดทดสอบความเชื่อมต่อเดี๋ยวนี้
+                    {t("test_connection.test_now")}
                   </button>
                 </div>
               )}
@@ -601,7 +603,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                 onClick={() => setActiveStep(p => Math.max(1, p - 1))}
                 className="text-xs md:text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-extrabold disabled:opacity-30 disabled:pointer-events-none transition-all py-2 px-3 md:py-0 md:px-0 bg-slate-100 dark:bg-slate-950 md:bg-transparent rounded-lg md:rounded-none"
               >
-                ← ย้อนกลับ
+                {t("test_connection.prev")}
               </button>
               
               <div className="flex gap-1">
@@ -619,7 +621,7 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
                 onClick={() => setActiveStep(p => Math.min(4, p + 1))}
                 className="text-xs md:text-[10px] text-blue-500 hover:text-blue-400 font-extrabold disabled:opacity-30 disabled:pointer-events-none transition-all py-2 px-3 md:py-0 md:px-0 bg-slate-100 dark:bg-slate-950 md:bg-transparent rounded-lg md:rounded-none"
               >
-                ขั้นตอนถัดไป →
+                {t("test_connection.next")}
               </button>
             </div>
 

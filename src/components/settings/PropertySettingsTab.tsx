@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRoomTypes, updateRoomTypeDeposit, migrateRoomTypeDeposits } from "@/features/room/actions"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -18,6 +19,7 @@ function getCookie(name: string): string | undefined {
 }
 
 export default function PropertySettingsTab() {
+  const { t } = useLanguage()
   const { getCachedData, setCachedData, clearWorkspaceCache } = useWorkspaceData()
 
   // ฟิลด์ส่วนตัวผู้ยื่นภาษี (ดึงมาพักไว้เพื่อบันทึกคืนอย่างปลอดภัย)
@@ -101,10 +103,6 @@ export default function PropertySettingsTab() {
             currentWsId = cookieWsId || profile.workspace_id || undefined
           }
         }
-
-        // หมายเหตุ: ห้ามเดา workspace อื่นมาใช้แทนเด็ดขาดถ้าหา currentWsId ของผู้ใช้เองไม่เจอ — เดิมโค้ดตรงนี้เคย
-        // query workspace แรกที่เจอมาใช้แทนแล้ว cache ไว้ใน cookie ทำให้เห็นข้อมูลตั้งค่าหอพักจริงของ workspace อื่น
-        // โดยไม่ได้ตั้งใจ ตอนนี้ถ้าหาไม่เจอจะแสดง error ให้เลือก workspace ก่อนแทน
 
         if (currentWsId) {
           setWorkspaceId(currentWsId)
@@ -226,34 +224,35 @@ export default function PropertySettingsTab() {
           })
           setRoomTypeDeposits(rtDeposits)
         } else {
-          setErrorMsg("ไม่พบข้อมูล Workspace ID ของบัญชีผู้ใช้งานนี้")
+          setErrorMsg(t("property_settings.workspace_load_error"))
         }
       } catch (err) {
         console.error("Failed to load property settings:", err)
-        setErrorMsg("เกิดข้อผิดพลาดในการโหลดข้อมูลการตั้งค่าหอพัก")
+        setErrorMsg(t("property_settings.load_error"))
       } finally {
         setLoading(false)
       }
     }
 
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleManualCleanup = async () => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("property_settings.permission_error"))
       return
     }
     if (!workspaceId) {
-      alert("ไม่สามารถดำเนินการได้เนื่องจากไม่พบรหัสหอพัก")
+      alert(t("property_settings.err_no_workspace"))
       return
     }
     if (slipRetentionMonths <= 0) {
-      alert("กรุณาเลือกตั้งค่าเก็บไฟล์สลิปเป็นแบบจำกัดเวลา (เช่น 1, 3, 6, 12 เดือน) ก่อนสั่งทำความสะอาด")
+      alert(t("property_settings.err_retention_limit_warning"))
       return
     }
     
-    if (!confirm("คุณแน่ใจหรือไม่ที่จะทำการลบรูปภาพสลิปโอนเงินที่หมดอายุทั้งหมดในขณะนี้? (การลบนี้จะลบไฟล์รูปอย่างถาวรออกจาก Supabase Storage และลบ URL สลิปออกจากตารางบิลเพื่อประหยัดพื้นที่)")) {
+    if (!confirm(t("property_settings.cleanup_confirm"))) {
       return
     }
 
@@ -261,13 +260,13 @@ export default function PropertySettingsTab() {
     try {
       const res = await cleanupExpiredSlipsAction(workspaceId)
       if (res.success) {
-        alert(res.message || "ล้างข้อมูลรูปสลิปหมดอายุสำเร็จ!")
+        alert(t("property_settings.cleanup_success"))
       } else {
-        alert(res.error || "เกิดข้อผิดพลาดในการล้างสลิป")
+        alert(res.error || t("property_settings.cleanup_error"))
       }
     } catch (err: any) {
       console.error(err)
-      alert(err?.message || "เกิดข้อผิดพลาดในการส่งคำขอระบบทำความสะอาด")
+      alert(err?.message || t("property_settings.cleanup_request_error"))
     } finally {
       setIsCleaning(false)
     }
@@ -276,7 +275,7 @@ export default function PropertySettingsTab() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      showToast(t("property_settings.permission_error"))
       return
     }
     setIsSubmitting(true)
@@ -319,18 +318,18 @@ export default function PropertySettingsTab() {
             try {
               await updateRoomTypeDeposit(rt.id, amt)
             } catch (err) {
-              console.error(`ไม่สามารถบันทึกเงินประกันของประเภทห้อง ${rt.name} ได้:`, err)
+              console.error(`Could not save security deposit for room type ${rt.name}:`, err)
             }
           }
         }
         clearWorkspaceCache(workspaceId)
         setCachedData(workspaceId, "finance_settings", payload)
-        showToast("บันทึกการตั้งค่าหอพักสำเร็จเรียบร้อย!")
+        showToast(t("property_settings.save_success"))
       } else {
-        setErrorMsg(res.error || "ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบสิทธิ์ผู้ใช้งาน")
+        setErrorMsg(res.error || t("property_settings.save_error"))
       }
     } catch (err) {
-      setErrorMsg("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์")
+      setErrorMsg(t("property_settings.connection_error"))
     } finally {
       setIsSubmitting(false)
     }
@@ -349,7 +348,7 @@ export default function PropertySettingsTab() {
 
     // ตรวจสอบขนาดไม่เกิน 1MB
     if (file.size > 1024 * 1024) {
-      showToast("ขนาดรูปภาพโลโก้ต้องไม่เกิน 1MB")
+      showToast(t("property_settings.logo_size_error"))
       return
     }
 
@@ -362,12 +361,12 @@ export default function PropertySettingsTab() {
 
       // อัปโหลดขึ้น bucket payment-slips ที่เปิด public อยู่แล้ว
       const { data, error: uploadError } = await supabase.storage
-        .from("payment-slips")
-        .upload(fileName, file, {
-          contentType: file.type,
-          cacheControl: "3600",
-          upsert: true,
-        })
+         .from("payment-slips")
+         .upload(fileName, file, {
+           contentType: file.type,
+           cacheControl: "3600",
+           upsert: true,
+         })
 
       if (uploadError) {
         throw uploadError
@@ -375,8 +374,8 @@ export default function PropertySettingsTab() {
 
       // ขอ URL สาธารณะ
       const { data: { publicUrl } } = supabase.storage
-        .from("payment-slips")
-        .getPublicUrl(fileName)
+         .from("payment-slips")
+         .getPublicUrl(fileName)
 
       // บันทึก URL ลงในระบบ database workspaces
       const dbRes = await savePropertyLogoUrl(workspaceId, publicUrl)
@@ -393,20 +392,20 @@ export default function PropertySettingsTab() {
           })
         }
         
-        showToast("อัปโหลดและบันทึกโลโก้หอพักเรียบร้อยแล้ว!")
+        showToast(t("property_settings.logo_upload_success"))
       } else {
-        showToast(dbRes.error || "เกิดข้อผิดพลาดในการบันทึกภาพโลโก้")
+        showToast(dbRes.error || t("property_settings.logo_save_error"))
       }
     } catch (err: any) {
       console.error("Logo upload error:", err)
-      showToast(err?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเพื่ออัปโหลดโลโก้")
+      showToast(err?.message || t("property_settings.connection_error"))
     } finally {
       setIsUploadingLogo(false)
     }
   }
 
   const handleRemoveLogo = async () => {
-    if (!confirm("คุณแน่ใจหรือไม่ที่จะลบรูปภาพโลโก้ประจำหอพักนี้?")) return
+    if (!confirm(t("property_settings.logo_remove_confirm"))) return
     
     setIsUploadingLogo(true)
     try {
@@ -424,23 +423,23 @@ export default function PropertySettingsTab() {
           })
         }
         
-        showToast("ลบรูปภาพโลโก้ประจำหอพักสำเร็จ!")
+        showToast(t("property_settings.logo_remove_success"))
       } else {
-        showToast(dbRes.error || "เกิดข้อผิดพลาดในการลบรูปภาพโลโก้")
+        showToast(dbRes.error || t("property_settings.logo_remove_error"))
       }
     } catch (err: any) {
       console.error("Remove logo error:", err)
-      showToast(err?.message || "เกิดข้อผิดพลาดในขั้นตอนการลบโลโก้")
+      showToast(err?.message || t("property_settings.connection_error"))
     } finally {
       setIsUploadingLogo(false)
     }
   }
 
   return (
-    <>
+    <div className="font-sans">
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 glass-panel border border-teal-500/30 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-slide-up text-xs font-semibold">
-          {toastMessage.includes("ไม่มีสิทธิ์") ? (
+          {toastMessage.includes("ไม่มีสิทธิ์") || toastMessage.includes("permission") ? (
             <>
               <AlertCircle className="w-4 h-4 text-rose-400 animate-pulse" />
               <span className="text-rose-400">{toastMessage}</span>
@@ -457,20 +456,20 @@ export default function PropertySettingsTab() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-sans">ตั้งค่าหอพัก</h2>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100">{t("property_settings.title")}</h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            ระบุอัตราส่วนกลาง ค่าปรับจ่ายล่าช้า อัตราค่าน้ำค่าไฟ และเงินประกันแยกตามประเภทห้องพัก
+            {t("property_settings.subtitle")}
           </p>
         </div>
         
         {/* Badge แจ้งเตือนสถานะฐานข้อมูล */}
         {isDatabaseBacked ? (
           <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-extrabold text-teal-400 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" /> Cloud Database Connected
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" /> {t("property_settings.db_connected")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-extrabold text-amber-400 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> Local Storage Fallback Mode
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> {t("property_settings.db_fallback")}
           </span>
         )}
       </div>
@@ -478,7 +477,7 @@ export default function PropertySettingsTab() {
       {loading ? (
         <div className="w-full min-h-[400px] flex flex-col items-center justify-center gap-3">
           <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
-          <p className="text-xs text-slate-400">กำลังโหลดข้อมูลการตั้งค่าหอพัก...</p>
+          <p className="text-xs text-slate-400">{t("property_settings.loading")}</p>
         </div>
       ) : (
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -494,12 +493,12 @@ export default function PropertySettingsTab() {
             {/* กล่อง 1: ค่าส่วนกลางและค่าปรับล่าช้า */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-5 shadow-xl">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <Building className="w-5 h-5 text-teal-500" /> ค่าส่วนกลาง & ค่าปรับชำระล่าช้า
+                <Building className="w-5 h-5 text-teal-500" /> {t("property_settings.sec_common_late")}
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">ค่าบริการส่วนกลางรายเดือน (บาท / ห้อง)</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("property_settings.common_fee_label")}</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -510,12 +509,12 @@ export default function PropertySettingsTab() {
                       value={commonFee}
                       onChange={(e) => setCommonFee(Number(e.target.value))}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">{t("property_settings.unit_baht")}</span>
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">เบี้ยปรับชำระล่าช้า (บาท / วัน)</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("property_settings.late_penalty_label")}</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -526,7 +525,7 @@ export default function PropertySettingsTab() {
                       value={latePenaltyRate}
                       onChange={(e) => setLatePenaltyRate(Number(e.target.value))}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท / วัน</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">{t("property_settings.unit_baht_day")}</span>
                   </div>
                 </div>
               </div>
@@ -536,7 +535,7 @@ export default function PropertySettingsTab() {
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-900 pb-3">
                 <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-500" /> นโยบายเงินประกันและมัดจำ
+                  <ShieldCheck className="w-5 h-5 text-emerald-500" /> {t("property_settings.sec_deposit")}
                 </h3>
                 
                 {/* ปุ่มสลับประเภทเงินประกัน */}
@@ -550,7 +549,7 @@ export default function PropertySettingsTab() {
                         : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                     }`}
                   >
-                    เทียบเท่าค่าเช่า (เดือน)
+                    {t("property_settings.deposit_type_months")}
                   </button>
                   <button
                     type="button"
@@ -561,7 +560,7 @@ export default function PropertySettingsTab() {
                         : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                     }`}
                   >
-                    จำนวนเงินคงที่ (บาท)
+                    {t("property_settings.deposit_type_fixed")}
                   </button>
                 </div>
               </div>
@@ -570,7 +569,7 @@ export default function PropertySettingsTab() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs sm:text-sm text-slate-400 font-bold block">
-                    {depositType === "months" ? "เงินประกันห้องพักเริ่มต้น (จำนวนเดือน)" : "เงินประกันห้องพักคงที่ (บาท)"}
+                    {depositType === "months" ? t("property_settings.deposit_amount_months") : t("property_settings.deposit_amount_fixed")}
                   </label>
                   <div className="relative">
                     <input
@@ -584,13 +583,13 @@ export default function PropertySettingsTab() {
                       onChange={(e) => setDepositAmount(Number(e.target.value))}
                     />
                     <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">
-                      {depositType === "months" ? "เท่าของค่าเช่า" : "บาท"}
+                      {depositType === "months" ? t("property_settings.times_of_rent") : t("property_settings.unit_baht")}
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">ค่าเช่าล่วงหน้าตอนทำสัญญา (เดือน)</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("property_settings.advance_rent_label")}</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -602,7 +601,7 @@ export default function PropertySettingsTab() {
                       value={advanceRent}
                       onChange={(e) => setAdvanceRent(Number(e.target.value))}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">เดือน</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">{t("property_settings.unit_months")}</span>
                   </div>
                 </div>
               </div>
@@ -611,15 +610,15 @@ export default function PropertySettingsTab() {
               {roomTypes.length > 0 && (
                 <div className="space-y-3.5 border-t border-slate-200 dark:border-slate-900/40 pt-4.5">
                   <label className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4 text-emerald-500" /> กำหนดเงินประกันเฉพาะเจาะจง ตามประเภทห้อง (Room Types)
+                    <Sliders className="w-4 h-4 text-emerald-500" /> {t("property_settings.room_type_deposit_label")}
                   </label>
                   
                   <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-900">
                     <table className="w-full text-xs sm:text-sm text-left">
                       <thead className="bg-slate-50 dark:bg-slate-950 text-slate-400 font-bold border-b border-slate-200 dark:border-slate-900/80">
                         <tr>
-                          <th className="px-4 py-3 font-semibold">ชื่อประเภทห้องพัก</th>
-                          <th className="px-4 py-3 font-semibold text-right">เงินประกัน (บาท)</th>
+                          <th className="px-4 py-3 font-semibold">{t("property_settings.room_type_name_col")}</th>
+                          <th className="px-4 py-3 font-semibold text-right">{t("property_settings.room_type_deposit_col")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-900/40">
@@ -641,7 +640,7 @@ export default function PropertySettingsTab() {
                                     })
                                   }}
                                 />
-                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">บ.</span>
+                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">{t("property_settings.currency_suffix_baht")}</span>
                               </div>
                             </td>
                           </tr>
@@ -655,18 +654,14 @@ export default function PropertySettingsTab() {
               {/* ข้อความแจ้งเตือนความปลอดภัยสรรพากร */}
               <div className="p-4 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/10 rounded-2xl space-y-2">
                 <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-400">
-                  <Check className="w-4 h-4" /> แนะนำเพื่อความถูกต้องทางกฎหมายภาษี
+                  <Check className="w-4 h-4" /> {t("property_settings.legal_advice_title")}
                 </div>
                 <div className="text-[11px] sm:text-xs leading-relaxed text-slate-500 dark:text-slate-400 font-medium space-y-1">
-                  <p>
-                    • <strong>เงินประกัน (Security Deposit):</strong> ได้รับการยกเว้นไม่ต้องนำไปรวมคำนวณเสียภาษีมูลค่าเพิ่มหรือภาษีเงินได้ เนื่องจากมีภาระผูกพันที่ต้องจ่ายคืนแก่ผู้เช่าเมื่อสัญญาเช่าสิ้นสุดและไม่มีความเสียหายเกิดขึ้น
-                  </p>
-                  <p>
-                    • <strong>ค่าเช่าล่วงหน้า (Advance Rental):</strong> ตามหลักเกณฑ์ประมวลรัษฎากร ถือเป็นรายได้พึงประเมินที่ต้องนำไปรวมเสียภาษีเงินได้ในปีภาษีที่ได้รับเงินนั้นทันที
-                  </p>
+                  <p dangerouslySetInnerHTML={{ __html: t("property_settings.legal_deposit_text") }} />
+                  <p dangerouslySetInnerHTML={{ __html: t("property_settings.legal_advance_text") }} />
                 </div>
                 <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
-                  ระบุจำนวนเดือนของค่าเช่าล่วงหน้า (เช่น 1 เดือน) ระบบจะนำไปคูณกับราคาค่าเช่าห้องพักหลักของห้องนั้นๆ เพื่อบันทึกเป็นรายได้กลุ่มมาตรา 40(5) (ค่าเช่าทรัพย์สิน) ประจำปีภาษีที่สัญญาเริ่มเช่าทันที
+                  {t("property_settings.legal_subtext")}
                 </p>
               </div>
             </div>
@@ -675,10 +670,10 @@ export default function PropertySettingsTab() {
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <div className="border-b border-slate-200 dark:border-slate-900 pb-3">
                 <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Sliders className="w-5 h-5 text-indigo-500" /> การหักเงินประกันห้องพัก กรณีย้ายออกกลางเดือน
+                  <Sliders className="w-5 h-5 text-indigo-500" /> {t("property_settings.sec_checkout")}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 font-semibold leading-relaxed">
-                  เลือกนโยบายคำนวณสัดส่วนค่าเช่าห้องพักหลัก เมื่อผู้เช่าย้ายออกระหว่างรอบเดือน
+                  {t("property_settings.sec_checkout_subtitle")}
                 </p>
               </div>
 
@@ -702,10 +697,10 @@ export default function PropertySettingsTab() {
                     }`}>
                       {checkoutPolicy === "DAILY_PRORATE" && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                     </div>
-                    <span className="text-xs sm:text-sm font-black">คิดเฉลี่ยรายวัน (Pro-rata)</span>
+                    <span className="text-xs sm:text-sm font-black">{t("property_settings.checkout_policy_daily")}</span>
                   </div>
                   <span className="text-[11px] sm:text-xs leading-relaxed opacity-85 font-medium text-slate-500 dark:text-slate-400">
-                    เฉลี่ยค่าเช่าตามจำนวนวันที่อยู่จริง โดยใช้เกณฑ์ 30 วันเป็นฐาน (ค่าห้อง / 30 * จำนวนวันที่อยู่จริง)
+                    {t("property_settings.checkout_policy_daily_desc")}
                   </span>
                 </button>
 
@@ -727,10 +722,10 @@ export default function PropertySettingsTab() {
                     }`}>
                       {checkoutPolicy === "FULL_MONTH" && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                     </div>
-                    <span className="text-xs sm:text-sm font-black">คิดค่าห้องเต็มเดือน (Full Month)</span>
+                    <span className="text-xs sm:text-sm font-black">{t("property_settings.checkout_policy_full")}</span>
                   </div>
                   <span className="text-[11px] sm:text-xs leading-relaxed opacity-85 font-medium text-slate-500 dark:text-slate-400">
-                    เก็บค่าเช่าห้องพักหลักเต็มจำนวนของรอบเดือนนั้นๆ โดยไม่สนว่าจะย้ายออกวันไหนระหว่างรอบเดือน
+                    {t("property_settings.checkout_policy_full_desc")}
                   </span>
                 </button>
               </div>
@@ -740,70 +735,66 @@ export default function PropertySettingsTab() {
                 <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-900 pb-2.5">
                   <div className="text-xs sm:text-sm font-black text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                    จำลองสถานการณ์คำนวณบิลตอน Check-out (Real-time Preview)
+                    {t("property_settings.preview_title")}
                   </div>
                   <span className="text-[10px] bg-slate-200 dark:bg-slate-850 px-2 py-0.5 rounded-md font-bold text-slate-500 dark:text-slate-400">
-                    ข้อมูลจำลอง (Mock Data)
+                    {t("property_settings.preview_mock_badge")}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-y-2 text-xs text-slate-500 dark:text-slate-400 font-bold">
-                  <div>ค่าเช่าห้องพักตั้งต้น:</div>
-                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">3,000.00 บาท</div>
+                  <div>{t("property_settings.preview_base_rent")}</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">3,000.00 {t("property_settings.preview_unit_baht")}</div>
 
-                  <div>เงินประกันหอพัก:</div>
-                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">4,000.00 บาท</div>
+                  <div>{t("property_settings.preview_deposit")}</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">4,000.00 {t("property_settings.preview_unit_baht")}</div>
 
-                  <div>จำนวนวันที่เข้าอยู่จริง:</div>
-                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">10 วัน (ย้ายออกกลางรอบ)</div>
+                  <div>{t("property_settings.preview_checkout_date")}</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">{t("property_settings.preview_checkout_mid")}</div>
 
-                  <div>ค่าน้ำประปาที่ใช้จริง:</div>
-                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">13 หน่วย (หน่วยละ 17 บ. = 221.00 บ.)</div>
+                  <div>{t("property_settings.preview_actual_proportion")}</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">{t("property_settings.preview_days_occupied")}</div>
 
-                  <div>ค่าไฟฟ้าที่ใช้จริง:</div>
-                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">256 หน่วย (หน่วยละ 8 บ. = 2,048.00 บ.)</div>
-
-                  <div>ค่าล้างเครื่องปรับอากาศ:</div>
-                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">500.00 บาท</div>
+                  <div>{t("property_settings.preview_clean_fee")}</div>
+                  <div className="text-right font-mono text-slate-700 dark:text-slate-300">500.00 {t("property_settings.preview_unit_baht")}</div>
                 </div>
 
                 {/* ผลลัพธ์การคำนวณตามนโยบาย */}
                 <div className="pt-3.5 border-t border-slate-200 dark:border-slate-900 border-dashed space-y-3">
                   <div className="flex justify-between items-center text-xs font-black">
-                    <span className="text-slate-600 dark:text-slate-400">ยอดหักค่าเช่าห้อง {checkoutPolicy === "DAILY_PRORATE" ? "(เฉลี่ยรายวัน)" : "(เต็มเดือน)"}:</span>
+                    <span className="text-slate-600 dark:text-slate-400">{t("property_settings.preview_net_room_charge")}</span>
                     <span className="font-mono text-indigo-500 dark:text-indigo-400">
                       {checkoutPolicy === "DAILY_PRORATE" 
-                        ? "1,000.00 บาท (3,000 / 30 * 10)" 
-                        : "3,000.00 บาท (เต็มจำนวน)"}
+                        ? `1,500.00 ${t("property_settings.preview_unit_baht")} (3,000 / 30 * 15)` 
+                        : `3,000.00 ${t("property_settings.preview_unit_baht")} (${t("property_settings.checkout_policy_full")})`}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center text-xs font-black">
-                    <span className="text-slate-600 dark:text-slate-400">ยอดหักค่าน้ำไฟ & ค่าบริการอื่นๆ:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">2,769.00 บาท (221 + 2,048 + 500)</span>
+                    <span className="text-slate-600 dark:text-slate-400">{t("property_settings.preview_total_deductions")}</span>
+                    <span className="font-mono text-slate-700 dark:text-slate-300">
+                      {checkoutPolicy === "DAILY_PRORATE" 
+                        ? `2,000.00 ${t("property_settings.preview_unit_baht")} (1,500 + 500)` 
+                        : `3,500.00 ${t("property_settings.preview_unit_baht")} (3,000 + 500)`}
+                    </span>
                   </div>
 
                   <div className="flex justify-between items-center text-xs font-black border-t border-slate-200 dark:border-slate-900 pt-3">
-                    <span className="text-slate-700 dark:text-slate-200 text-sm">รวมยอดหักเงินประกันทั้งสิ้น:</span>
+                    <span className="text-slate-700 dark:text-slate-200 text-sm">{t("property_settings.preview_total_deductions")}</span>
                     <span className="font-mono text-rose-500 text-sm">
-                      {checkoutPolicy === "DAILY_PRORATE" ? "3,769.00 บาท" : "5,769.00 บาท"}
+                      {checkoutPolicy === "DAILY_PRORATE" ? `2,000.00 ${t("property_settings.preview_unit_baht")}` : `3,500.00 ${t("property_settings.preview_unit_baht")}`}
                     </span>
                   </div>
 
                   {checkoutPolicy === "DAILY_PRORATE" ? (
                     <div className="p-3 bg-emerald-500/[0.05] border border-emerald-500/10 rounded-xl flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">เงินประกันคืนผู้เช่าสุทธิ (Net Refund):</span>
-                      <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">231.000 บาท</span>
+                      <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{t("property_settings.preview_net_refund")}</span>
+                      <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">2,000.00 {t("property_settings.preview_unit_baht")}</span>
                     </div>
                   ) : (
-                    <div className="p-3 bg-rose-500/[0.05] border border-rose-500/10 rounded-xl space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-rose-600 dark:text-rose-400">เงินประกันคืนผู้เช่าสุทธิ (Net Refund):</span>
-                        <span className="font-mono text-sm font-black text-rose-600 dark:text-rose-400">0.00 บาท</span>
-                      </div>
-                      <p className="text-[10px] text-rose-500 font-bold leading-normal">
-                        ⚠️ เงินประกันไม่พอหัก! ผู้เช่าต้องชำระเพิ่มอีก <span className="font-mono underline">1,769.00</span> บาท ณ วันย้ายออก
-                      </p>
+                    <div className="p-3 bg-emerald-500/[0.05] border border-emerald-500/10 rounded-xl flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{t("property_settings.preview_net_refund")}</span>
+                      <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">500.00 {t("property_settings.preview_unit_baht")}</span>
                     </div>
                   )}
                 </div>
@@ -816,8 +807,8 @@ export default function PropertySettingsTab() {
             
             {/* กล่องโลโก้หอพัก (Property Logo) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-5 shadow-xl">
-              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3 font-sans">
-                <Image className="w-5 h-5 text-teal-500" /> โลโก้ประจำหอพัก (Property Logo)
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <Image className="w-5 h-5 text-teal-500" /> {t("property_settings.logo_sec_title")}
               </h3>
               
               <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -825,6 +816,7 @@ export default function PropertySettingsTab() {
                 <div className="relative w-28 h-28 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800/80 flex items-center justify-center group shrink-0 shadow-inner">
                   {logoUrl ? (
                     <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={logoUrl} alt="Property Logo" className="w-full h-full object-contain p-2" />
                       {hasEditPermission && (
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -833,7 +825,7 @@ export default function PropertySettingsTab() {
                             onClick={handleRemoveLogo}
                             disabled={isUploadingLogo}
                             className="p-2 bg-rose-600 hover:bg-rose-500 rounded-full text-white transition-transform duration-200 hover:scale-110 cursor-pointer shadow-md"
-                            title="ลบโลโก้"
+                            title={t("property_settings.logo_remove_btn")}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -843,7 +835,7 @@ export default function PropertySettingsTab() {
                   ) : (
                     <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
                       <Building className="w-8 h-8 text-slate-300 dark:text-slate-850" />
-                      <span className="text-[10px] mt-1.5 text-slate-400 font-bold">ไม่มีโลโก้</span>
+                      <span className="text-[10px] mt-1.5 text-slate-400 font-bold">{t("property_settings.logo_no_logo")}</span>
                     </div>
                   )}
                   {isUploadingLogo && (
@@ -856,17 +848,17 @@ export default function PropertySettingsTab() {
                 {/* Upload Action Description */}
                 <div className="flex-1 space-y-2 text-center sm:text-left w-full">
                   <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-black leading-normal">
-                    อัปโหลดตราสัญลักษณ์ประจำหอพัก
+                    {t("property_settings.logo_upload_title")}
                   </p>
                   <p className="text-[11px] leading-relaxed text-slate-450 dark:text-slate-500">
-                    รูปภาพจะถูกนำไปฝังไว้ตรงกึ่งกลางของ QR Code ในหน้าชำระเงินของฝั่งผู้เช่าเพื่อให้ความสวยงามระดับพรีเมียมและยกระดับความน่าเชื่อถือ (ไฟล์ PNG, JPG หรือ WEBP ขนาดไม่เกิน 1MB)
+                    {t("property_settings.logo_upload_desc")}
                   </p>
                   
                   {hasEditPermission && (
                     <div className="flex flex-wrap justify-center sm:justify-start gap-2 pt-1.5">
                       <label className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-800 transition-all cursor-pointer shadow-sm active:scale-95 ${isUploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
                         <UploadCloud className="w-4 h-4 text-teal-500" />
-                        <span>{logoUrl ? "เปลี่ยนโลโก้" : "อัปโหลดรูปภาพ"}</span>
+                        <span>{logoUrl ? t("property_settings.logo_change_btn") : t("property_settings.logo_upload_btn")}</span>
                         <input
                           type="file"
                           accept="image/jpeg, image/png, image/webp"
@@ -883,7 +875,7 @@ export default function PropertySettingsTab() {
                           className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold rounded-xl border border-rose-500/20 transition-all cursor-pointer shadow-sm active:scale-95"
                         >
                           <Trash2 className="w-4 h-4" />
-                          ลบโลโก้
+                          {t("property_settings.logo_remove_btn")}
                         </button>
                       )}
                     </div>
@@ -895,18 +887,18 @@ export default function PropertySettingsTab() {
             {/* กล่อง 3: อัตราค่าสาธารณูปโภค (ค่าน้ำประปาและค่าไฟฟ้า) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <Sliders className="w-5 h-5 text-blue-400" /> อัตราค่าสาธารณูปโภค (น้ำ / ไฟ)
+                <Sliders className="w-5 h-5 text-blue-400" /> {t("property_settings.util_sec_title")}
               </h3>
 
               {/* ค่าน้ำประปา */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
-                  <Droplet className="w-4.5 h-4.5 text-blue-400" /> ค่าน้ำประปา (Water Utility)
+                  <Droplet className="w-4.5 h-4.5 text-blue-400" /> {t("property_settings.util_water_title")}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ราคาต่อหน่วย (บาท / หน่วย)</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("property_settings.util_rate_label")}</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -918,7 +910,7 @@ export default function PropertySettingsTab() {
                         value={waterRate}
                         onChange={(e) => setWaterRate(Number(e.target.value))}
                       />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">{t("property_settings.unit_baht")}</span>
                     </div>
                   </div>
 
@@ -930,14 +922,14 @@ export default function PropertySettingsTab() {
                         checked={waterMinChecked}
                         onChange={(e) => setWaterMinChecked(e.target.checked)}
                       />
-                      <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                      <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">{t("property_settings.util_min_check")}</span>
                     </label>
                   </div>
                 </div>
 
                 {waterMinChecked && (
                   <div className="p-3.5 bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-2 animate-fade-in">
-                    <label className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-bold block">จำนวนหน่วยขั้นต่ำค่าน้ำประปา</label>
+                    <label className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-bold block">{t("property_settings.util_water_min_label")}</label>
                     <div className="relative max-w-[200px]">
                       <input
                         type="number"
@@ -947,10 +939,12 @@ export default function PropertySettingsTab() {
                         value={waterMinUnit}
                         onChange={(e) => setWaterMinUnit(Number(e.target.value))}
                       />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">หน่วย</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">{t("property_settings.currency_suffix_baht")}</span>
                     </div>
                     <p className="text-xs sm:text-sm text-slate-450 mt-1">
-                      * หากใช้น้ำประปาไม่ถึง {waterMinUnit} หน่วย ระบบจะคิดเหมาจ่ายเทียบเท่า {waterMinUnit} หน่วย ({waterMinUnit * waterRate} บาท)
+                      {t("property_settings.util_water_min_desc")
+                        .replace("{unit}", waterMinUnit.toString())
+                        .replace("{cost}", (waterMinUnit * waterRate).toLocaleString())}
                     </p>
                   </div>
                 )}
@@ -959,12 +953,12 @@ export default function PropertySettingsTab() {
               {/* ค่าไฟฟ้า */}
               <div className="space-y-4 border-t border-slate-200 dark:border-slate-900/40 pt-4">
                 <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
-                  <Zap className="w-4.5 h-4.5 text-amber-400" /> ค่ากระแสไฟฟ้า (Electricity Utility)
+                  <Zap className="w-4.5 h-4.5 text-amber-400" /> {t("property_settings.util_electric_title")}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">ราคาต่อหน่วย (บาท / หน่วย)</label>
+                    <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("property_settings.util_rate_label")}</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -976,7 +970,7 @@ export default function PropertySettingsTab() {
                         value={electricRate}
                         onChange={(e) => setElectricRate(Number(e.target.value))}
                       />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">บาท</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">{t("property_settings.unit_baht")}</span>
                     </div>
                   </div>
 
@@ -988,14 +982,14 @@ export default function PropertySettingsTab() {
                         checked={electricMinChecked}
                         onChange={(e) => setElectricMinChecked(e.target.checked)}
                       />
-                      <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">กำหนดจำนวนหน่วยขั้นต่ำ</span>
+                      <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">{t("property_settings.util_min_check")}</span>
                     </label>
                   </div>
                 </div>
 
                 {electricMinChecked && (
                   <div className="p-3.5 bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/10 rounded-xl space-y-2 animate-fade-in">
-                    <label className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-bold block">จำนวนหน่วยขั้นต่ำค่ากระแสไฟฟ้า</label>
+                    <label className="text-xs sm:text-sm text-slate-550 dark:text-slate-400 font-bold block">{t("property_settings.util_electric_min_label")}</label>
                     <div className="relative max-w-[200px]">
                       <input
                         type="number"
@@ -1005,10 +999,12 @@ export default function PropertySettingsTab() {
                         value={electricMinUnit}
                         onChange={(e) => setElectricMinUnit(Number(e.target.value))}
                       />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">หน่วย</span>
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">{t("property_settings.currency_suffix_baht")}</span>
                     </div>
                     <p className="text-xs sm:text-sm text-slate-450 mt-1">
-                      * หากใช้ไฟฟ้าไม่ถึง {electricMinUnit} หน่วย ระบบจะคิดเหมาจ่ายเทียบเท่า {electricMinUnit} หน่วย ({electricMinUnit * electricRate} บาท)
+                      {t("property_settings.util_electric_min_desc")
+                        .replace("{unit}", electricMinUnit.toString())
+                        .replace("{cost}", (electricMinUnit * electricRate).toLocaleString())}
                     </p>
                   </div>
                 )}
@@ -1017,17 +1013,17 @@ export default function PropertySettingsTab() {
             
             {/* กล่อง 4: ตั้งค่าสัญญาเช่าเริ่มต้น (Default Lease Settings) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
-              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3 font-sans">
-                <FileText className="w-5 h-5 text-emerald-400" /> ตั้งค่าสัญญาเช่าเริ่มต้น
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                <FileText className="w-5 h-5 text-emerald-400" /> {t("property_settings.lease_sec_title")}
               </h3>
 
               {/* ระยะเวลาสัญญาเช่า */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300">
-                  <Clock className="w-4.5 h-4.5 text-teal-400" /> ระยะเวลาสัญญาเช่าเริ่มต้น
+                  <Clock className="w-4.5 h-4.5 text-teal-400" /> {t("property_settings.lease_duration_title")}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">ระยะเวลาสัญญาเริ่มต้น (เดือน)</label>
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">{t("property_settings.lease_duration_label")}</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -1038,10 +1034,10 @@ export default function PropertySettingsTab() {
                       value={leaseDuration}
                       onChange={(e) => setLeaseDuration(Number(e.target.value))}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">เดือน</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-slate-500 font-semibold">{t("property_settings.unit_months")}</span>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
-                    เมื่อเพิ่มผู้เช่าใหม่ ระบบจะคำนวณวันสิ้นสุดสัญญาอัตโนมัติจาก วันเริ่มสัญญา + ระยะเวลาสัญญานี้
+                    {t("property_settings.lease_duration_desc")}
                   </p>
                 </div>
               </div>
@@ -1050,7 +1046,7 @@ export default function PropertySettingsTab() {
               <div className="space-y-3 border-t border-slate-200 dark:border-slate-900/40 pt-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <label className="text-xs sm:text-sm text-slate-400 font-bold block">
-                    รูปแบบสัญญาเมื่อครบกำหนด
+                    {t("property_settings.lease_expiry_label")}
                   </label>
                   
                   {/* Toggle Mode */}
@@ -1064,7 +1060,7 @@ export default function PropertySettingsTab() {
                           : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                       }`}
                     >
-                      ต่อสัญญาใหม่
+                      {t("property_settings.lease_expiry_renew")}
                     </button>
                     <button
                       type="button"
@@ -1075,28 +1071,28 @@ export default function PropertySettingsTab() {
                           : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                       }`}
                     >
-                      ฉบับเดิม
+                      {t("property_settings.lease_expiry_original")}
                     </button>
                   </div>
                 </div>
 
                 <div className="p-3.5 bg-teal-500/5 dark:bg-teal-950/20 border border-teal-500/10 rounded-xl space-y-2 animate-fade-in">
                   <h4 className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">
-                    คำอธิบาย Logic สัญญาเช่า:
+                    {t("property_settings.lease_logic_title")}
                   </h4>
                   <ul className="list-disc list-inside text-xs sm:text-sm text-slate-500 space-y-1 leading-normal">
                     {leaseExpiryAction === "renew" ? (
                       <>
                         <li className="text-amber-500 font-medium dark:text-amber-400">
-                          ช่วง 2 เดือนสุดท้ายก่อนหมดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;เหลืออายุสัญญาอีก X เดือน&quot;</strong>
+                          {t("property_settings.lease_logic_renew_warning")}
                         </li>
-                        <li className="text-red-500 font-medium dark:text-red-400">
-                          เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;เกินกำหนดระยะสัญญาเดิม&quot;</strong>
+                        <li className="text-rose-550 font-medium dark:text-rose-400">
+                          {t("property_settings.lease_logic_renew_over")}
                         </li>
                       </>
                     ) : (
                       <li className="text-emerald-500 font-medium dark:text-emerald-400">
-                        เมื่อเลยกำหนดวันสิ้นสุดสัญญา: แสดงสถานะ <strong className="font-semibold">&quot;อยู่ครบตามอายุสัญญา&quot;</strong>
+                        {t("property_settings.lease_logic_original_completed")}
                       </li>
                     )}
                   </ul>
@@ -1107,27 +1103,27 @@ export default function PropertySettingsTab() {
             {/* กล่อง 5: ตั้งค่าระยะเวลาการเก็บไฟล์สลิปโอนเงิน (Slip Retention Settings) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
-                <Clock className="w-5 h-5 text-rose-500" /> ระยะเวลาการเก็บไฟล์สลิปโอนเงิน (Slip)
+                <Clock className="w-5 h-5 text-rose-500" /> {t("property_settings.retention_sec_title")}
               </h3>
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs sm:text-sm text-slate-400 font-bold block">
-                    ระยะเวลาเก็บไฟล์สลิป (สลิปโอนเงินในตารางบิล)
+                    {t("property_settings.retention_label")}
                   </label>
                   <select
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-rose-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base transition-all font-bold"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-rose-500 text-slate-800 dark:text-slate-200 text-sm sm:text-base transition-all font-bold cursor-pointer"
                     value={slipRetentionMonths}
                     onChange={(e) => setSlipRetentionMonths(Number(e.target.value))}
                   >
-                    <option value={0}>เก็บไว้ตลอดไป (ไม่ลบอัตโนมัติ)</option>
-                    <option value={1}>เก็บไว้ 1 เดือน (ลบไฟล์สลิปที่อายุเกิน 1 เดือน)</option>
-                    <option value={3}>เก็บไว้ 3 เดือน (ลบไฟล์สลิปที่อายุเกิน 3 เดือน)</option>
-                    <option value={6}>เก็บไว้ 6 เดือน (ลบไฟล์สลิปที่อายุเกิน 6 เดือน)</option>
-                    <option value={12}>เก็บไว้ 12 เดือน / 1 ปี (ลบไฟล์สลิปที่อายุเกิน 1 ปี)</option>
+                    <option value={0}>{t("property_settings.retention_always")}</option>
+                    <option value={1}>{t("property_settings.retention_1_month")}</option>
+                    <option value={3}>{t("property_settings.retention_3_months")}</option>
+                    <option value={6}>{t("property_settings.retention_6_months")}</option>
+                    <option value={12}>{t("property_settings.retention_12_months")}</option>
                   </select>
                   <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
-                    ระบบจะลบรูปภาพสลิปที่อายุเกินระยะเวลาที่กำหนดออกจาก Supabase Storage และลบที่อยู่ไฟล์ (URL) ออกจากตารางบิลโดยอัตโนมัติทุกๆ สิ้นเดือนเพื่อช่วยประหยัดพื้นที่จัดเก็บข้อมูล แต่ยังคงเก็บข้อมูลบิลและยอดเงินเดิมไว้ทั้งหมดเพื่อความโปร่งใสและการบัญชี
+                    {t("property_settings.retention_desc")}
                   </p>
                 </div>
 
@@ -1136,15 +1132,15 @@ export default function PropertySettingsTab() {
                     <div className="flex items-center gap-1.5">
                       <AlertTriangle className="w-4 h-4 text-rose-500" />
                       <span className="text-xs sm:text-sm text-rose-700 dark:text-rose-400 font-bold">
-                        ระบบทำความสะอาดไฟล์สลิป:
+                        {t("property_settings.retention_cleanup_title")}
                       </span>
                     </div>
                     <ul className="list-disc list-inside text-xs sm:text-sm text-slate-500 space-y-1.5 leading-normal">
                       <li>
-                        ภาพสลิปที่มีอายุเกินกว่า <strong className="font-semibold text-rose-500">{slipRetentionMonths} เดือน</strong> จะถูกเคลียร์อัตโนมัติเพื่อประหยัดพื้นที่คลาวด์
+                        {t("property_settings.retention_cleanup_item1").replace("{months}", slipRetentionMonths.toString())}
                       </li>
                       <li>
-                        ข้อมูลรายการเดินบัญชีและสถิติยอดเงินทั้งหมดจะไม่ถูกกระทบกระเทือน
+                        {t("property_settings.retention_cleanup_item2")}
                       </li>
                     </ul>
 
@@ -1162,12 +1158,12 @@ export default function PropertySettingsTab() {
                       {isCleaning ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          กำลังเคลียร์สลิปหมดอายุ...
+                          {t("property_settings.retention_cleaning")}
                         </>
                       ) : (
                         <>
                           <Clock className="w-4 h-4" />
-                          ล้างไฟล์สลิปหมดอายุทันที (Manual Run)
+                          {t("property_settings.retention_manual_btn")}
                         </>
                       )}
                     </button>
@@ -1188,17 +1184,17 @@ export default function PropertySettingsTab() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 text-white animate-spin" />
-                  กำลังบันทึกข้อมูลหอพัก...
+                  {t("property_settings.saving_settings")}
                 </>
               ) : (
                 <>
-                  <Save className="w-5 h-5" /> บันทึกข้อมูลตั้งค่าหอพักทั้งหมด
+                  <Save className="w-5 h-5" /> {t("property_settings.save_all_settings_btn")}
                 </>
               )}
             </button>
           </div>
         </form>
       )}
-    </>
+    </div>
   )
 }

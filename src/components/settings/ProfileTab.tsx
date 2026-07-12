@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react"
 import { User, AlertCircle, Check, KeyRound, Lock, RefreshCw, Phone, Eye, EyeOff } from "lucide-react"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { updateUserProfileAction } from "@/features/auth/actions"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 function setCookie(name: string, value: string, days = 7) {
   if (typeof document === "undefined") return
@@ -22,6 +23,7 @@ function getCookie(name: string): string | undefined {
 }
 
 export default function ProfileTab() {
+  const { t } = useLanguage()
   const [profileLoading, setProfileLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -51,7 +53,7 @@ export default function ProfileTab() {
             setProfileName(res.data.full_name || "")
             setProfilePhone(res.data.phone || "")
           } else {
-            setProfileError("ไม่สามารถดึงข้อมูลโปรไฟล์ได้ กรุณาล็อกอินใหม่อีกครั้ง")
+            setProfileError(t("profile_settings.err_profile"))
           }
         } else {
           // Demo Mode
@@ -67,7 +69,7 @@ export default function ProfileTab() {
         }
       } catch (err) {
         console.error("Error loading profile tab:", err)
-        setProfileError("เกิดข้อผิดพลาดในการเชื่อมต่อเพื่อดึงข้อมูลโปรไฟล์")
+        setProfileError(t("profile_settings.err_connection"))
       } finally {
         setProfileLoading(false)
       }
@@ -81,17 +83,17 @@ export default function ProfileTab() {
     setProfileSuccess(null)
 
     if (!profileName.trim()) {
-      setProfileError("กรุณากรอกชื่อ-นามสกุล")
+      setProfileError(t("profile_settings.err_empty_name"))
       return
     }
 
     if (profilePassword) {
       if (profilePassword.length < 6) {
-        setProfileError("รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร")
+        setProfileError(t("profile_settings.err_password_short"))
         return
       }
       if (profilePassword !== profileConfirmPassword) {
-        setProfileError("รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน")
+        setProfileError(t("profile_settings.err_password_mismatch"))
         return
       }
     }
@@ -107,7 +109,7 @@ export default function ProfileTab() {
         })) as any
 
         if (res.success) {
-          setProfileSuccess("✓ อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว!")
+          setProfileSuccess(t("profile_settings.success_update"))
           setProfilePassword("")
           setProfileConfirmPassword("")
           
@@ -119,11 +121,11 @@ export default function ProfileTab() {
             window.dispatchEvent(new CustomEvent("profile-updated", { detail: { name: profileName } }))
           }
         } else {
-          setProfileError(res.error || "เกิดข้อผิดพลาดในการอัปเดตข้อมูล")
+          setProfileError(res.error || t("profile_settings.err_update_generic"))
         }
       } catch (err) {
         console.error("Error updating profile:", err)
-        setProfileError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์")
+        setProfileError(t("profile_settings.err_update_connection"))
       } finally {
         setSubmitting(false)
       }
@@ -133,7 +135,7 @@ export default function ProfileTab() {
         const userRole = getCookie("horset_user_role") || "admin"
         setCookie(`horset_demo_profile_name_${userRole}`, profileName)
         setCookie(`horset_demo_profile_phone_${userRole}`, profilePhone)
-        setProfileSuccess("✓ [Demo Mode] อัปเดตข้อมูลและรหัสผ่านจำลองสำเร็จแล้ว!")
+        setProfileSuccess(t("profile_settings.success_update_demo"))
         setProfilePassword("")
         setProfileConfirmPassword("")
         setSubmitting(false)
@@ -150,7 +152,7 @@ export default function ProfileTab() {
     return (
       <div className="py-24 text-center text-slate-500 text-xs font-bold">
         <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" />
-        <span>กำลังเตรียมข้อมูลโปรไฟล์ส่วนตัว...</span>
+        <span>{t("profile_settings.loading")}</span>
       </div>
     )
   }
@@ -162,10 +164,10 @@ export default function ProfileTab() {
         <div>
           <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
             <User className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-            <span>ตั้งค่าโปรไฟล์ & รหัสผ่าน (Profile & Password)</span>
+            <span>{t("profile_settings.title")}</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-            แก้ไขข้อมูลส่วนตัว รหัสผ่านเพื่อรักษาความปลอดภัย และเบอร์โทรศัพท์ติดต่อของผู้ใช้งานที่เข้าสู่ระบบ
+            {t("profile_settings.subtitle")}
           </p>
         </div>
       </div>
@@ -192,14 +194,14 @@ export default function ProfileTab() {
           {/* Group 1: General Info */}
           <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              ข้อมูลทั่วไป (General Information)
+              {t("profile_settings.general_header")}
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Full name input */}
               <div className="group relative flex flex-col space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-focus-within:text-blue-500">
-                  ชื่อ-นามสกุลจริง
+                  {t("profile_settings.name_label")}
                 </label>
                 <div className="relative font-bold">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-blue-500" />
@@ -209,7 +211,7 @@ export default function ProfileTab() {
                     value={profileName}
                     onChange={(e) => setProfileName(e.target.value)}
                     disabled={submitting}
-                    placeholder="กรอกชื่อ-นามสกุลจริงของคุณ"
+                    placeholder={t("profile_settings.name_placeholder")}
                     className="w-full pl-11 pr-4 py-3 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-850 text-slate-850 dark:text-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold transition-all disabled:opacity-50"
                   />
                 </div>
@@ -218,7 +220,7 @@ export default function ProfileTab() {
               {/* Phone number input */}
               <div className="group relative flex flex-col space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-focus-within:text-blue-500">
-                  เบอร์โทรศัพท์
+                  {t("profile_settings.phone_label")}
                 </label>
                 <div className="relative font-bold">
                   <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-blue-500" />
@@ -228,7 +230,7 @@ export default function ProfileTab() {
                     value={profilePhone}
                     onChange={(e) => setProfilePhone(e.target.value)}
                     disabled={submitting}
-                    placeholder="กรอกเบอร์โทรศัพท์ของคุณ"
+                    placeholder={t("profile_settings.phone_placeholder")}
                     className="w-full pl-11 pr-4 py-3 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-850 text-slate-850 dark:text-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono font-bold transition-all disabled:opacity-50"
                   />
                 </div>
@@ -244,10 +246,10 @@ export default function ProfileTab() {
             <div className="space-y-1">
               <h3 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                 <KeyRound className="w-4 h-4 text-indigo-500" /> 
-                <span>ความปลอดภัย & รหัสผ่านใหม่ (Password Security)</span>
+                <span>{t("profile_settings.security_header")}</span>
               </h3>
               <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-                * กรอกช่องรหัสผ่านด้านล่างเฉพาะเมื่อต้องการอัปเดตรหัสผ่านใหม่เท่านั้น หากไม่ต้องการอัปเดตให้ปล่อยว่างไว้ได้เลยครับ
+                {t("profile_settings.security_desc")}
               </p>
             </div>
 
@@ -255,7 +257,7 @@ export default function ProfileTab() {
               {/* New password input */}
               <div className="group relative flex flex-col space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-focus-within:text-blue-500">
-                  รหัสผ่านใหม่ (ระบุอย่างน้อย 6 ตัวอักษร)
+                  {t("profile_settings.password_label")}
                 </label>
                 <div className="relative font-bold">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-blue-500" />
@@ -264,7 +266,7 @@ export default function ProfileTab() {
                     value={profilePassword}
                     onChange={(e) => setProfilePassword(e.target.value)}
                     disabled={submitting}
-                    placeholder="ป้อนรหัสผ่านใหม่"
+                    placeholder={t("profile_settings.password_placeholder")}
                     className="w-full pl-11 pr-11 py-3 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-850 text-slate-850 dark:text-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold transition-all disabled:opacity-50"
                   />
                   <button
@@ -280,7 +282,7 @@ export default function ProfileTab() {
               {/* Confirm new password input */}
               <div className="group relative flex flex-col space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-focus-within:text-blue-500">
-                  ยืนยันรหัสผ่านใหม่
+                  {t("profile_settings.confirm_password_label")}
                 </label>
                 <div className="relative font-bold">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-blue-500" />
@@ -289,7 +291,7 @@ export default function ProfileTab() {
                     value={profileConfirmPassword}
                     onChange={(e) => setProfileConfirmPassword(e.target.value)}
                     disabled={submitting}
-                    placeholder="ป้อนรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน"
+                    placeholder={t("profile_settings.confirm_password_placeholder")}
                     className="w-full pl-11 pr-11 py-3 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-850 text-slate-850 dark:text-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold transition-all disabled:opacity-50"
                   />
                   <button
@@ -314,11 +316,11 @@ export default function ProfileTab() {
               {submitting ? (
                 <>
                   <RefreshCw className="w-5 h-5 text-white animate-spin" />
-                  <span>กำลังอัปเดตข้อมูลโปรไฟล์...</span>
+                  <span>{t("profile_settings.saving")}</span>
                 </>
               ) : (
                 <>
-                  <span>บันทึกข้อมูลโปรไฟล์</span>
+                  <span>{t("profile_settings.save_btn")}</span>
                 </>
               )}
             </button>

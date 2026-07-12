@@ -27,8 +27,10 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getLineProfilesAction, generateAdminConnectionCodeAction } from "@/features/notification/actions"
+import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 export default function LineSettingsTab() {
+  const { t, locale } = useLanguage()
   const [profileLoading, setProfileLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
@@ -374,7 +376,7 @@ export default function LineSettingsTab() {
             await loadActiveCodesList(workspaceId)
           }
 
-          setSettingsSuccess("🎉 ผูกบัญชี LINE Admin อัตโนมัติสำเร็จเรียบร้อยแล้ว!")
+          setSettingsSuccess(t("line_settings.success_auto_pairing"))
           setConnectionCode(null)
           setCodeExpiresAt(null)
           setShowAddModal(false)
@@ -408,11 +410,11 @@ export default function LineSettingsTab() {
         setCodeExpiresAt(res.expiresAt)
         await loadActiveCodesList(workspaceId)
       } else {
-        setModalError(res.error || "เกิดข้อผิดพลาดในการสร้างรหัส")
+        setModalError(res.error || t("line_settings.err_generate_code"))
       }
     } catch (err: any) {
       console.error("Error generating pairing code:", err)
-      setModalError(err.message || "เกิดข้อผิดพลาดทางเทคนิค")
+      setModalError(err.message || t("line_settings.err_tech"))
     } finally {
       setIsGeneratingCode(false)
     }
@@ -421,15 +423,15 @@ export default function LineSettingsTab() {
   const handleLookupProfile = async () => {
     const trimmedUid = newUidInput.trim()
     if (!trimmedUid) {
-      setModalError("กรุณาระบุ LINE User ID ของแอดมินก่อน")
+      setModalError(t("line_settings.err_empty_uid"))
       return
     }
     if (!trimmedUid.startsWith("U") || trimmedUid.length !== 33) {
-      setModalError("รูปแบบรหัสไม่ถูกต้อง (ต้องขึ้นต้นด้วยอักษร U และมีความยาว 33 ตัวอักษร)")
+      setModalError(t("line_settings.err_invalid_uid_format"))
       return
     }
     if (adminProfiles.some((p: any) => p.userId === trimmedUid)) {
-      setModalError("LINE User ID นี้ได้รับการเพิ่มเชื่อมต่อแอดมินอยู่แล้ว")
+      setModalError(t("line_settings.err_uid_already_added"))
       return
     }
 
@@ -442,7 +444,7 @@ export default function LineSettingsTab() {
         await new Promise((resolve) => setTimeout(resolve, 800))
         setModalProfilePreview({
           userId: trimmedUid,
-          displayName: "แอดมินจำลอง (จากการสืบค้นเดโม)",
+          displayName: locale === "th" ? "แอดมินจำลอง (จากการสืบค้นเดโม)" : "Mock Admin (from Demo lookup)",
           pictureUrl: null,
           success: true
         })
@@ -454,11 +456,11 @@ export default function LineSettingsTab() {
         const profile = res.data[0]
         setModalProfilePreview(profile)
       } else {
-        setModalError(res.error || "ไม่สามารถค้นหาข้อมูลผู้ใช้ได้ (กรุณาเพิ่มเพื่อนบอทและตรวจสอบ ID)")
+        setModalError(res.error || t("line_settings.err_lookup_profile"))
       }
     } catch (err: any) {
       console.error("Error looking up profile:", err)
-      setModalError(err.message || "เกิดข้อผิดพลาดในการตรวจสอบโปรไฟล์")
+      setModalError(err.message || t("line_settings.err_exception_lookup"))
     } finally {
       setModalLoading(false)
     }
@@ -505,7 +507,7 @@ export default function LineSettingsTab() {
 
   const handleDeleteConnectionCode = async (codeToDelete: string) => {
     if (!codeToDelete || !workspaceId) return
-    if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบรหัสเชื่อมต่อ "${codeToDelete}" นี้ออกจากระบบ?`)) return
+    if (!confirm(t("line_settings.confirm_delete_code").replace("{code}", codeToDelete))) return
 
     setModalLoading(true)
     try {
@@ -516,7 +518,7 @@ export default function LineSettingsTab() {
           setConnectionCode(null)
           setCodeExpiresAt(null)
         }
-        setSettingsSuccess("ยกเลิกรหัสเชื่อมต่อสำเร็จ (Demo)")
+        setSettingsSuccess(t("line_settings.success_cancel_code_demo"))
         return
       }
 
@@ -529,13 +531,13 @@ export default function LineSettingsTab() {
 
       if (error) throw error
 
-      setSettingsSuccess(`ยกเลิกรหัสเชื่อมต่อ "${codeToDelete}" สำเร็จเรียบร้อยแล้ว!`)
+      setSettingsSuccess(t("line_settings.success_cancel_code").replace("{code}", codeToDelete))
       
       // Refresh active codes list
       await loadActiveCodesList(workspaceId)
     } catch (err: any) {
       console.error("Error canceling connection code:", err)
-      setSettingsError(err.message || "เกิดข้อผิดพลาดในการยกเลิกรหัส")
+      setSettingsError(err.message || t("line_settings.err_tech"))
     } finally {
       setModalLoading(false)
     }
@@ -569,7 +571,7 @@ export default function LineSettingsTab() {
     try {
       if (isDemo) {
         await new Promise((resolve) => setTimeout(resolve, 300))
-        setSettingsSuccess("อัปเดตการรับแจ้งเตือนสำหรับแอดมินคนนี้สำเร็จ (Demo)!")
+        setSettingsSuccess(t("line_settings.success_toggle_individual_demo"))
         return
       }
 
@@ -584,7 +586,7 @@ export default function LineSettingsTab() {
 
       if (error) throw error
 
-      setSettingsSuccess("อัปเดตการรับแจ้งเตือนสำหรับแอดมินสำเร็จเรียบร้อยแล้ว!")
+      setSettingsSuccess(t("line_settings.success_toggle_individual"))
     } catch (err: any) {
       console.error("Error toggling individual admin notification:", err)
       setDisabledAdminUserIdsInput(savedDisabledAdminUserIds)
@@ -641,11 +643,11 @@ export default function LineSettingsTab() {
           updated_at: data.updated_at
         })
       } else {
-        throw new Error(data?.error || "ไม่สามารถดึงข้อมูลโควตาจากระบบ LINE ได้")
+        throw new Error(data?.error || t("line_settings.err_quota_api"))
       }
     } catch (err: any) {
       console.error("Error fetching LINE quota:", err)
-      setQuotaError(err.message || "เกิดข้อผิดพลาดในการติดต่อ Edge Function")
+      setQuotaError(err.message || t("line_settings.err_quota_edge"))
     } finally {
       setFetchingQuota(false)
     }
@@ -671,7 +673,7 @@ export default function LineSettingsTab() {
     if (isDemo) {
       await new Promise((resolve) => setTimeout(resolve, 300))
       setSavedAdminNotificationActive(nextState)
-      setSettingsSuccess(`อัปเดตสถานะแจ้งเตือนแอดมินเป็น ${nextState ? "เปิด" : "ปิด"} (Demo) สำเร็จ!`)
+      setSettingsSuccess(t("line_settings.success_toggle_admin_demo").replace("{state}", nextState ? (locale === "th" ? "เปิด" : "Enabled") : (locale === "th" ? "ปิด" : "Disabled")))
       setSavingSettings(false)
       return
     }
@@ -715,7 +717,7 @@ export default function LineSettingsTab() {
       if (dbError) throw dbError
 
       setSavedAdminNotificationActive(nextState)
-      setSettingsSuccess(`อัปเดตสถานะแจ้งเตือนแอดมินเป็น ${nextState ? "เปิด" : "ปิด"} เรียบร้อยแล้ว!`)
+      setSettingsSuccess(t("line_settings.success_toggle_admin").replace("{state}", nextState ? (locale === "th" ? "เปิด" : "Enabled") : (locale === "th" ? "ปิด" : "Disabled")))
     } catch (err: any) {
       console.error("Error toggling admin notification:", err)
       setAdminNotificationActive(adminNotificationActive) // Revert state
@@ -725,10 +727,10 @@ export default function LineSettingsTab() {
         err.message.includes("admin_notification_active")
       )) {
         setSettingsError(
-          "⚠️ ไม่สามารถบันทึกสถานะได้เนื่องจากฐานข้อมูลตาราง 'workspace_line_settings' ยังไม่ได้รันสคริปต์ SQL Patch!"
+          t("line_settings.err_db_patch_warning_toggle")
         )
       } else {
-        setSettingsError(err.message || "เกิดข้อผิดพลาดในการเปลี่ยนสถานะการแจ้งเตือน")
+        setSettingsError(err.message || t("line_settings.err_tech"))
       }
     } finally {
       setSavingSettings(false)
@@ -827,7 +829,7 @@ export default function LineSettingsTab() {
       setSavedAdminGroupId(trimmedAdminGroupId)
       setSavedAdminNotificationActive(adminNotificationActive)
       setIsEditing(false)
-      setSettingsSuccess("บันทึกข้อมูลการเชื่อมต่อ LINE OA สำเร็จ!")
+      setSettingsSuccess(t("line_settings.success_save"))
       
       // Reload admin LINE profiles
       if (trimmedAdminUserId && workspaceId) {
@@ -852,10 +854,10 @@ export default function LineSettingsTab() {
         err.message.includes("admin_notification_active")
       )) {
         setSettingsError(
-          "⚠️ ระบบหลังบ้านตรวจพบว่าตาราง 'workspace_line_settings' ยังไม่ได้เพิ่มฟิลด์ใหม่สำหรับแจ้งเตือนแอดมิน\n\nกรุณาแจ้งให้ผู้ดูแลระบบ (Admin) รันไฟล์ SQL Patch 'database_patch_toggle_admin_notifications.sql' ในหน้า Supabase Dashboard SQL Editor เพื่อเตรียมพร้อมตารางก่อน!"
+          t("line_settings.err_db_patch_warning")
         )
       } else {
-        setSettingsError(err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลตั้งค่า")
+        setSettingsError(err.message || t("line_settings.err_tech"))
       }
     } finally {
       setSavingSettings(false)
@@ -877,7 +879,7 @@ export default function LineSettingsTab() {
 
   const handleDeleteSettings = async () => {
     if (!workspaceId) return
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลเชื่อมต่อ LINE OA นี้? ลูกบ้านจะไม่สามารถลงทะเบียนผูก LINE หรือรับบิลได้")) return
+    if (!confirm(t("line_settings.confirm_delete_settings"))) return
 
     setSavingSettings(true)
     setSettingsError(null)
@@ -900,7 +902,7 @@ export default function LineSettingsTab() {
       setIsConfigured(false)
       setIsEditing(false)
       setQuotaData(null)
-      setSettingsSuccess("ลบข้อมูลเชื่อมต่อจำลองเรียบร้อยแล้ว")
+      setSettingsSuccess(t("line_settings.success_delete_demo"))
       setSavingSettings(false)
       return
     }
@@ -937,10 +939,10 @@ export default function LineSettingsTab() {
       setIsConfigured(false)
       setIsEditing(false)
       setQuotaData(null)
-      setSettingsSuccess("ลบการเชื่อมต่อ LINE OA ของคุณเรียบร้อยแล้ว")
+      setSettingsSuccess(t("line_settings.success_delete"))
     } catch (err: any) {
       console.error("Error deleting LINE settings:", err)
-      setSettingsError(err.message || "เกิดข้อผิดพลาดในการลบข้อมูลตั้งค่า")
+      setSettingsError(err.message || t("line_settings.err_tech"))
     } finally {
       setSavingSettings(false)
     }
@@ -948,7 +950,7 @@ export default function LineSettingsTab() {
 
   const handleClearGroupId = async () => {
     if (!workspaceId) return
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการยกเลิกการเชื่อมต่อกับกลุ่ม LINE ปัจจุบัน? ระบบจะหยุดส่งข้อความแจ้งเตือนสลิปเข้ากลุ่มไลน์ทีมงานทันที")) return
+    if (!confirm(t("line_settings.confirm_clear_group"))) return
 
     setSavingSettings(true)
     setSettingsError(null)
@@ -958,7 +960,7 @@ export default function LineSettingsTab() {
       await new Promise((resolve) => setTimeout(resolve, 500))
       setAdminGroupIdInput("")
       setSavedAdminGroupId("")
-      setSettingsSuccess("ยกเลิกการเชื่อมต่อกลุ่ม LINE จำลองสำเร็จ!")
+      setSettingsSuccess(t("line_settings.success_clear_group_demo"))
       setSavingSettings(false)
       return
     }
@@ -977,10 +979,10 @@ export default function LineSettingsTab() {
 
       setAdminGroupIdInput("")
       setSavedAdminGroupId("")
-      setSettingsSuccess("ยกเลิกการเชื่อมต่อกลุ่ม LINE สำเร็จ!")
+      setSettingsSuccess(t("line_settings.success_clear_group"))
     } catch (err: any) {
       console.error("Error clearing group ID:", err)
-      setSettingsError(err.message || "เกิดข้อผิดพลาดในการยกเลิกการเชื่อมต่อกลุ่ม LINE")
+      setSettingsError(err.message || t("line_settings.err_tech"))
     } finally {
       setSavingSettings(false)
     }
@@ -1017,7 +1019,7 @@ export default function LineSettingsTab() {
     return (
       <div className="py-24 text-center text-slate-500 text-xs font-bold flex flex-col items-center justify-center">
         <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
-        <span>กำลังดึงข้อมูลตั้งค่า LINE OA ของหอพักคุณ...</span>
+        <span>{t("line_settings.loading_settings")}</span>
       </div>
     )
   }
@@ -1032,10 +1034,10 @@ export default function LineSettingsTab() {
         <div className="flex-1">
           <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5 font-sans">
             <MessageSquare className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-            <span>เชื่อมต่อ LINE OA (Personal LINE OA Integration)</span>
+            <span>{t("line_settings.title")}</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed font-sans font-semibold">
-            เชื่อมต่อเซิร์ฟเวอร์ LINE Developers และเปิดใช้งาน Messaging API เพื่อส่งบิลแจ้งหนี้ในรูปแบบ Flex Message สุดพรีเมียมให้ลูกบ้านโดยตรงภายใต้แบรนด์หอพักคุณเอง
+            {t("line_settings.subtitle")}
           </p>
         </div>
         <button
@@ -1045,12 +1047,12 @@ export default function LineSettingsTab() {
           {showManual ? (
             <>
               <EyeOff className="w-4 h-4" />
-              <span>ซ่อนคู่มือการตั้งค่า</span>
+              <span>{t("line_settings.hide_manual")}</span>
             </>
           ) : (
             <>
               <Eye className="w-4 h-4" />
-              <span>แสดงคู่มือการตั้งค่า</span>
+              <span>{t("line_settings.show_manual")}</span>
             </>
           )}
         </button>
@@ -1072,7 +1074,7 @@ export default function LineSettingsTab() {
                   </div>
                   <div>
                     <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
-                      <span>ตรวจสอบโควตา LINE OA</span>
+                      <span>{t("line_settings.check_quota")}</span>
                       {quotaData?.displayName && (
                         <span className="text-blue-600 dark:text-blue-400">
                           "{quotaData.displayName}"
@@ -1091,7 +1093,7 @@ export default function LineSettingsTab() {
                       </div>
                     )}
                     <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">
-                      โควตาสำหรับส่งข้อความ Flex Message รายเดือนของคุณ
+                      {t("line_settings.quota_desc")}
                     </p>
                   </div>
                 </div>
@@ -1109,7 +1111,7 @@ export default function LineSettingsTab() {
                 <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs sm:text-sm font-bold flex items-start gap-2.5 shadow-inner">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div className="flex-1 space-y-1">
-                    <span className="block font-extrabold text-rose-600 dark:text-rose-400">ดึงข้อมูลโควตาล่าสุดไม่สำเร็จ (LINE Integration Error):</span>
+                    <span className="block font-extrabold text-rose-600 dark:text-rose-400">{t("line_settings.quota_error_title")}</span>
                     <span className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed block">{quotaError}</span>
                   </div>
                 </div>
@@ -1119,26 +1121,26 @@ export default function LineSettingsTab() {
                 <div className="space-y-4 pt-2">
                   <div className="grid grid-cols-3 gap-3">
                     <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
-                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">ส่งไปแล้ว</span>
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">{t("line_settings.quota_consumed")}</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.consumed.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">{t("line_settings.quota_unit")}</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
-                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">คงเหลือ</span>
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">{t("line_settings.quota_remaining")}</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.remaining.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">{t("line_settings.quota_unit")}</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 rounded-2xl flex flex-col justify-between">
-                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">โควตารวม</span>
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">{t("line_settings.quota_total")}</span>
                       <strong className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200">{quotaData.limit.toLocaleString()}</strong>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">ข้อความ</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold block mt-0.5">{t("line_settings.quota_unit")}</span>
                     </div>
                   </div>
 
                   {/* Progress Bar */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs sm:text-sm font-extrabold text-slate-500 dark:text-slate-400">
-                      <span>เปอร์เซ็นต์โควตาที่ใช้ไป</span>
+                      <span>{t("line_settings.quota_percent")}</span>
                       <span className={`${percentage >= 85 ? "text-rose-500 animate-pulse" : "text-blue-500"} font-black`}>{percentage}%</span>
                     </div>
                     <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-800/35">
@@ -1154,12 +1156,12 @@ export default function LineSettingsTab() {
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-bold pt-1">
                     <span className="flex items-center gap-1.5">
                       {quotaData.cached ? (
-                        <span className="bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">แคชระบบ</span>
+                        <span className="bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t("line_settings.quota_cache")}</span>
                       ) : (
-                        <span className="bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 text-[10px] font-bold uppercase tracking-wider">อัปเดตสด</span>
+                        <span className="bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 text-[10px] font-bold uppercase tracking-wider">{t("line_settings.quota_live")}</span>
                       )}
                       <span>
-                        แหล่งที่มา:{" "}
+                        {t("line_settings.quota_source")}{" "}
                         <span className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wide">
                           {quotaData.source === "api"
                             ? "LINE API"
@@ -1176,24 +1178,24 @@ export default function LineSettingsTab() {
                       </span>
                     </span>
                     <span>
-                      ล่าสุด:{" "}
+                      {t("line_settings.quota_updated")}{" "}
                       {(() => {
                         try {
                           const date = new Date(quotaData.updated_at);
                           return isNaN(date.getTime())
                             ? "--:--:--"
-                            : date.toLocaleTimeString("th-TH", { hour12: false });
+                            : date.toLocaleTimeString(locale === "th" ? "th-TH" : "en-US", { hour12: false });
                         } catch (e) {
                           return "--:--:--";
                         }
                       })()}{" "}
-                      น.
+                      {t("line_settings.quota_unit_suffix")}
                     </span>
                   </div>
                 </div>
               ) : (
                 <div className="py-6 text-center text-slate-400 text-sm font-bold">
-                  <span>ยังไม่มีข้อมูลโควตา LINE บันทึกไว้ กรุณากดปุ่มเพื่อดึงข้อมูลสด</span>
+                  <span>{t("line_settings.quota_none")}</span>
                 </div>
               )}
             </div>
@@ -1208,10 +1210,10 @@ export default function LineSettingsTab() {
                 </div>
                 <div>
                   <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
-                    ตั้งค่าบัญชี LINE OA หอพัก
+                    {t("line_settings.account_config_title")}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                    กำหนดค่าการเชื่อมต่อเพื่อรันระบบบิลและแจ้งเตือนอัตโนมัติ
+                    {t("line_settings.account_config_desc")}
                   </p>
                 </div>
               </div>
@@ -1223,13 +1225,13 @@ export default function LineSettingsTab() {
               <div className="space-y-4 border-b border-slate-100 dark:border-slate-800 pb-5">
                 <h4 className="text-xs sm:text-sm font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  <span>ส่วนที่ 1: บิลค่าเช่าลูกบ้าน (Messaging API & LIFF ID)</span>
+                  <span>{t("line_settings.sec1_title")}</span>
                 </h4>
 
                 {/* Token Input */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    LINE Channel Access Token (Long-Lived)
+                    {t("line_settings.token_label")}
                   </label>
                   <div className="relative flex items-center">
                     <input
@@ -1255,10 +1257,10 @@ export default function LineSettingsTab() {
                 <div className="space-y-2">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                     <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                      LINE LIFF ID
+                      {t("line_settings.liff_label")}
                     </label>
                     <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">
-                      * จำเป็นสำหรับการผูกบัญชีลูกบ้าน
+                      * {t("line_settings.liff_hint")}
                     </span>
                   </div>
                   <input
@@ -1277,7 +1279,7 @@ export default function LineSettingsTab() {
               <div className="space-y-4 pt-1">
                 <h4 className="text-xs sm:text-sm font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                  <span>ส่วนที่ 2: ระบบแจ้งเตือนแอดมิน (Admin Notification Config)</span>
+                  <span>{t("line_settings.sec2_title")}</span>
                 </h4>
 
                 {/* Enable/Disable Admin Notification System Toggle Switch Card */}
@@ -1296,12 +1298,12 @@ export default function LineSettingsTab() {
                     </div>
                     <div className="space-y-0.5">
                       <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">
-                        สถานะระบบแจ้งเตือนแอดมิน
+                        {t("line_settings.admin_notify_status")}
                       </h5>
                       <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold leading-normal">
                         {adminNotificationActive 
-                          ? "🟢 เปิดใช้งาน: บоทจะแจ้งเตือนเมื่อผู้เช่าส่งหลักฐานการโอนเงิน" 
-                          : "🔴 ปิดการแจ้งเตือน: แอดมินจะไม่ได้รับสลิปจนกว่าจะเปิดใช้งานอีกครั้ง"}
+                          ? `🟢 ${t("line_settings.admin_notify_on")}` 
+                          : `🔴 ${t("line_settings.admin_notify_off")}`}
                       </p>
                     </div>
                   </div>
@@ -1331,7 +1333,7 @@ export default function LineSettingsTab() {
                 {workspaceId && (
                   <div className="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 shadow-inner">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Webhook URL สำหรับ LINE Developers:</span>
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t("line_settings.webhook_label")}</span>
                       <button
                         type="button"
                         onClick={handleCopyWebhook}
@@ -1340,14 +1342,14 @@ export default function LineSettingsTab() {
                         }`}
                       >
                         {copiedWebhook ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedWebhook ? "คัดลอกแล้ว!" : "คัดลอก"}</span>
+                        <span>{copiedWebhook ? t("line_settings.copied") : t("line_settings.copy")}</span>
                       </button>
                     </div>
                     <div className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200/50 dark:border-slate-800/80 break-all leading-normal select-all">
                       {typeof window !== "undefined" ? `${window.location.origin}/api/webhook/line?workspace_id=${workspaceId}` : `https://saas-horset.vercel.app/api/webhook/line?workspace_id=${workspaceId}`}
                     </div>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                      💡 นำ URL นี้ไปบันทึกในช่อง Webhook URL ของ Messaging API ใน LINE Developers Console และเปิดใช้งาน "Use Webhook"
+                      💡 {t("line_settings.webhook_hint")}
                     </p>
                   </div>
                 )}
@@ -1375,7 +1377,7 @@ export default function LineSettingsTab() {
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                    * จำเป็นสำหรับตรวจสอบความปลอดภัย (Verify Signature) ของ LINE Webhook
+                    * {t("line_settings.secret_hint")}
                   </p>
                 </div>
 
@@ -1383,10 +1385,10 @@ export default function LineSettingsTab() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                      รายชื่อแอดมินรับแจ้งเตือนสลิปส่วนตัว ({adminProfiles.length}/5 คน)
+                      {t("line_settings.admin_personal_list").replace("{count}", adminProfiles.length.toString())}
                     </label>
                     <span className="text-[10px] bg-blue-500/10 text-blue-500 font-extrabold px-2 py-0.5 rounded-full">
-                      รองรับสูงสุด 5 คน
+                      {t("line_settings.admin_personal_max")}
                     </span>
                   </div>
 
@@ -1399,10 +1401,10 @@ export default function LineSettingsTab() {
                         </div>
                         <div className="space-y-0.5 min-w-0">
                           <h6 className="text-xs font-black text-indigo-600 dark:text-indigo-400">
-                            รหัสเชื่อมต่อแอดมินอัตโนมัติเปิดใช้งานอยู่
+                            {t("line_settings.admin_pairing_active")}
                           </h6>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold truncate">
-                            ส่งรหัสนี้ไปหาบอทเพื่อผูกบัญชี (เหลือเวลา {Math.floor(codeCountdown / 60)}:{(codeCountdown % 60).toString().padStart(2, '0')})
+                            {t("line_settings.admin_pairing_desc").replace("{time}", `${Math.floor(codeCountdown / 60)}:${(codeCountdown % 60).toString().padStart(2, '0')}`)}
                           </p>
                         </div>
                       </div>
@@ -1411,7 +1413,7 @@ export default function LineSettingsTab() {
                         onClick={handleCancelConnectionCode}
                         className="shrink-0 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 hover:border-rose-500/30 text-rose-500 rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm"
                       >
-                        ยกเลิกรหัส
+                        {t("line_settings.cancel_code_btn")}
                       </button>
                     </div>
                   )}
@@ -1463,18 +1465,18 @@ export default function LineSettingsTab() {
                                     isNotificationEnabled ? (
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black rounded">
                                         <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                                        <span>พร้อมใช้งาน</span>
+                                        <span>{t("line_settings.admin_ready")}</span>
                                       </span>
                                     ) : (
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-400 dark:bg-slate-900 dark:text-slate-500 text-[9px] font-black rounded">
                                         <span className="w-1 h-1 rounded-full bg-slate-400" />
-                                        <span>ปิดแจ้งเตือน</span>
+                                        <span>{t("line_settings.admin_muted")}</span>
                                       </span>
                                     )
                                   ) : (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-black rounded" title={p.error}>
                                       <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
-                                      <span>ยังไม่เพิ่มเพื่อน</span>
+                                      <span>{t("line_settings.admin_not_friend")}</span>
                                     </span>
                                   )}
                                 </h5>
@@ -1494,7 +1496,7 @@ export default function LineSettingsTab() {
                                     ? "bg-indigo-500/10 hover:bg-indigo-500/15 border-indigo-500/20 text-indigo-600 dark:text-indigo-400"
                                     : "bg-slate-500/5 hover:bg-slate-500/10 border-slate-200 dark:border-slate-850 text-slate-400"
                                 }`}
-                                title={isNotificationEnabled ? "ปิดการแจ้งเตือนสลิปส่วนตัวสำหรับแอดมินคนนี้" : "เปิดการแจ้งเตือนสลิปส่วนตัวสำหรับแอดมินคนนี้"}
+                                title={isNotificationEnabled ? t("line_settings.mute_admin_tip") : t("line_settings.unmute_admin_tip")}
                               >
                                 {isNotificationEnabled ? (
                                   <Bell className="w-4 h-4" />
@@ -1509,7 +1511,7 @@ export default function LineSettingsTab() {
                                   type="button"
                                   onClick={() => handleDeleteAdmin(p.userId)}
                                   className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer shadow-sm group shrink-0"
-                                  title="ลบผู้ใช้แอดมินท่านนี้"
+                                  title={t("line_settings.delete_admin_tip")}
                                 >
                                   <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
                                 </button>
@@ -1522,9 +1524,9 @@ export default function LineSettingsTab() {
                   ) : (
                     <div className="py-6 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-500 font-semibold text-xs">
                       <Users className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-2 shrink-0 animate-pulse" />
-                      <span>ยังไม่มีการเชื่อมต่อแอดมิน LINE</span>
+                      <span>{t("line_settings.admin_none")}</span>
                       <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1">
-                        คลิกปุ่มด้านล่างเพื่อเพิ่มการเชื่อมต่อแอดมินสำหรับส่งสลิปโอนเงินแจ้งเตือนโดยตรง
+                        {t("line_settings.admin_none_desc")}
                       </p>
                     </div>
                   )}
@@ -1532,7 +1534,7 @@ export default function LineSettingsTab() {
                   {loadingProfiles && (
                     <div className="py-2.5 flex items-center justify-center gap-2 text-slate-400 text-xs font-semibold animate-pulse">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                      <span>กำลังโหลดสถานะโปรไฟล์แอดมิน...</span>
+                      <span>{t("line_settings.admin_loading_profiles")}</span>
                     </div>
                   )}
 
@@ -1542,10 +1544,10 @@ export default function LineSettingsTab() {
                       <div className="flex items-center justify-between">
                         <h6 className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                          <span>รหัสเชื่อมต่อที่ใช้งานได้ ({activeCodesList.length})</span>
+                          <span>{t("line_settings.active_codes_title").replace("{count}", activeCodesList.length.toString())}</span>
                         </h6>
                         <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">
-                          รหัสจะลบออกอัตโนมัติเมื่อหมดอายุ
+                          {t("line_settings.active_codes_expiry_hint")}
                         </span>
                       </div>
 
@@ -1568,7 +1570,7 @@ export default function LineSettingsTab() {
                                 </div>
                                 <div className="min-w-0">
                                   <div className="text-[10px] font-mono text-rose-500 dark:text-rose-400 font-bold">
-                                    ⏱️ {Math.floor(secondsLeft / 60)}:{(secondsLeft % 60).toString().padStart(2, "0")} นาที
+                                    ⏱️ {t("line_settings.seconds_left").replace("{time}", `${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, "0")}`)}
                                   </div>
                                 </div>
                               </div>
@@ -1579,10 +1581,10 @@ export default function LineSettingsTab() {
                                   type="button"
                                   onClick={() => {
                                     navigator.clipboard.writeText(item.code)
-                                    alert("📋 คัดลอกรหัสเชื่อมต่อสำเร็จแล้ว!")
+                                    alert(t("line_settings.copied_code_alert"))
                                   }}
                                   className="p-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 rounded-lg transition-all cursor-pointer shadow-sm"
-                                  title="คัดลอกรหัส"
+                                  title={t("line_settings.copy_code_tip")}
                                 >
                                   <Copy className="w-3.5 h-3.5" />
                                 </button>
@@ -1592,7 +1594,7 @@ export default function LineSettingsTab() {
                                   type="button"
                                   onClick={() => handleDeleteConnectionCode(item.code)}
                                   className="p-1.5 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 hover:border-rose-500/20 text-rose-500 rounded-lg transition-all cursor-pointer shadow-sm"
-                                  title="ยกเลิกรหัสนี้"
+                                  title={t("line_settings.cancel_code_tip")}
                                 >
                                   <X className="w-3.5 h-3.5" />
                                 </button>
@@ -1614,8 +1616,8 @@ export default function LineSettingsTab() {
                       <span className="p-2 bg-slate-100 dark:bg-slate-950 text-slate-400 group-hover:text-blue-500 group-hover:bg-blue-500/10 rounded-full transition-all">
                         <Plus className="w-5 h-5 shrink-0" />
                       </span>
-                      <span className="text-xs font-black">เพิ่มการเชื่อมต่อ Line Admin</span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">เพื่อตรวจจับชื่อโปรไฟล์แอดมินในระบบก่อนผูกการรับแจ้งเตือน</span>
+                      <span className="text-xs font-black">{t("line_settings.add_admin_btn")}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t("line_settings.add_admin_desc")}</span>
                     </button>
                   ) : null}
                 </div>
@@ -1623,7 +1625,7 @@ export default function LineSettingsTab() {
                 {/* LINE Group Alert Connection Box */}
                 <div className="space-y-2 pt-1">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    สถานะการเชื่อมต่อกลุ่ม LINE (แจ้งเตือนสลิปกลุ่มทีมงาน)
+                    {t("line_settings.line_group_status_label")}
                   </label>
                   
                   {adminGroupIdInput ? (
@@ -1633,7 +1635,7 @@ export default function LineSettingsTab() {
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                           <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                             <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <span>เชื่อมต่อกลุ่ม LINE สำเร็จ</span>
+                            <span>{t("line_settings.line_group_success")}</span>
                           </span>
                         </div>
                         <div className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 break-all select-all pl-4">
@@ -1647,7 +1649,7 @@ export default function LineSettingsTab() {
                           onClick={handleClearGroupId}
                           className="shrink-0 px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 hover:border-rose-500/30 text-rose-500 rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm"
                         >
-                          ยกเลิกเชื่อมกลุ่ม
+                          {t("line_settings.clear_group_btn")}
                         </button>
                       )}
                     </div>
@@ -1655,13 +1657,13 @@ export default function LineSettingsTab() {
                     <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 shadow-inner leading-relaxed">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-slate-400" />
-                        <span className="text-sm font-bold text-slate-500 dark:text-slate-400">ยังไม่ได้เชื่อมต่อกับกลุ่ม LINE ทีมงาน</span>
+                        <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{t("line_settings.line_group_not_connected")}</span>
                       </div>
                       
                       {workspaceId ? (
                         <div className="space-y-3.5 pl-4">
                           <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
-                            👉 วิธีเชื่อมต่อ: ดึงบัญชี LINE OA หอพักตัวนี้เข้ากลุ่มแชทไลน์ทีมงาน/กลุ่มไลน์นิติบุคคลของคุณ จากนั้นพิมพ์คำสั่งเชื่อมต่อส่งลงในแชทกลุ่มดังนี้:
+                            👉 {t("line_settings.line_group_connect_how")}
                           </p>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <span className="flex-1 p-2.5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xs md:text-sm text-center tracking-wider rounded-xl select-all">
@@ -1677,15 +1679,15 @@ export default function LineSettingsTab() {
                               }`}
                             >
                               {copiedCode ? <Check className="w-3.5 h-3.5 animate-bounce" /> : <Copy className="w-3.5 h-3.5" />}
-                              <span>{copiedCode ? "คัดลอกแล้ว!" : "คัดลอกคำสั่ง"}</span>
+                              <span>{copiedCode ? t("line_settings.copied") : t("line_settings.copy_command_btn")}</span>
                             </button>
                           </div>
                           <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                            * เมื่อพิมพ์รหัสในกลุ่มสำเร็จ บอทจะลงทะเบียนเชื่อมต่อ Group ID เข้าสู่ระบบหอพักนี้ทันทีแบบอัตโนมัติ
+                            * {t("line_settings.line_group_connect_hint")}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-xs text-rose-500 font-bold pl-4">กรุณาลงทะเบียนหรือเชื่อมต่อ LINE OA สำเร็จก่อนเพื่อรับรหัสเชื่อมต่อกลุ่ม</span>
+                        <span className="text-xs text-rose-500 font-bold pl-4">{t("line_settings.line_group_err_not_configured")}</span>
                       )}
                     </div>
                   )}
@@ -1718,7 +1720,7 @@ export default function LineSettingsTab() {
                     disabled={savingSettings}
                     className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-500 rounded-xl text-sm font-bold cursor-pointer transition-colors"
                   >
-                    ลบการเชื่อมต่อ
+                    {t("line_settings.delete_connection_btn")}
                   </button>
                 )}
 
@@ -1729,7 +1731,7 @@ export default function LineSettingsTab() {
                     disabled={savingSettings}
                     className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold cursor-pointer transition-colors"
                   >
-                    ยกเลิกการแก้ไข
+                    {t("line_settings.cancel_edit_btn")}
                   </button>
                 )}
 
@@ -1745,7 +1747,7 @@ export default function LineSettingsTab() {
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-md shadow-blue-500/10"
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    <span>แก้ไขข้อมูล API & แจ้งเตือน</span>
+                    <span>{t("line_settings.edit_api_btn")}</span>
                   </button>
                 ) : (
                   <button
@@ -1755,7 +1757,7 @@ export default function LineSettingsTab() {
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-blue-500/10"
                   >
                     {savingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>{isConfigured ? "อัปเดตข้อมูลตั้งค่า" : "บันทึกข้อมูลตั้งค่า"}</span>
+                    <span>{isConfigured ? t("line_settings.update_config_btn") : t("line_settings.save_config_btn")}</span>
                   </button>
                 )}
               </div>
@@ -1776,10 +1778,10 @@ export default function LineSettingsTab() {
                   </div>
                   <div>
                     <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
-                      คู่มือเชื่อมต่อระบบ LINE OA ส่วนตัว
+                      {t("line_settings.guide_title_1")}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
-                      ขั้นตอนรับสิทธิ์ส่งบิลและลงทะเบียนผู้เช่าแบบแยกหอพักอิสระ
+                      {t("line_settings.guide_subtitle_1")}
                     </p>
                   </div>
                 </div>
@@ -1796,7 +1798,7 @@ export default function LineSettingsTab() {
                   }}
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0"
                 >
-                  {openStep1 && openStep2 && openStep3 && openWarnings ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
+                  {openStep1 && openStep2 && openStep3 && openWarnings ? t("line_settings.guide_collapse_all") : t("line_settings.guide_expand_all")}
                 </button>
               </div>
 
@@ -1814,7 +1816,7 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         1
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ สร้าง Provider สำหรับหอพัก</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("line_settings.guide_step_1_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep1 ? "rotate-180" : ""}`} />
                   </button>
@@ -1822,7 +1824,7 @@ export default function LineSettingsTab() {
                   {openStep1 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 animate-fadeIn">
                       <p className="leading-relaxed">
-                        เข้าสู่เว็บ <span className="font-bold text-slate-800 dark:text-slate-100">LINE Developers Console</span> สมัครบัญชีผู้พัฒนา
+                        {t("line_settings.guide_step_1_desc_1")}
                       </p>
                       <div className="py-1">
                         <a 
@@ -1832,11 +1834,11 @@ export default function LineSettingsTab() {
                           className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-500/10"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
-                          <span>เข้าสู่ LINE Developers Console 🌐</span>
+                          <span>{t("line_settings.guide_step_1_btn_1")}</span>
                         </a>
                       </div>
                       <p className="leading-relaxed">
-                        กดปุ่ม <strong className="font-extrabold text-slate-800 dark:text-slate-200">Create Provider</strong> (ตั้งชื่อโฟลเดอร์เป็นชื่อหอพักของคุณ เพื่อความเป็นสัดส่วน)
+                        {t("line_settings.guide_step_1_desc_2")}
                       </p>
                     </div>
                   )}
@@ -1853,7 +1855,7 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         2
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ สร้างระบบส่งแจ้งเตือน (Messaging API)</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("line_settings.guide_step_2_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep2 ? "rotate-180" : ""}`} />
                   </button>
@@ -1861,15 +1863,15 @@ export default function LineSettingsTab() {
                   {openStep2 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 animate-fadeIn">
                       <p className="leading-relaxed">
-                        กดเข้า Provider ที่พึ่งสร้าง กดสร้าง Channel ใหม่ เลือกหัวข้อ <strong className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</strong>
+                        {t("line_settings.guide_step_2_desc_1")}
                       </p>
                       <p className="leading-relaxed">
-                        กรอกข้อมูลของบอทหอพักคุณให้เสร็จ
+                        {t("line_settings.guide_step_2_desc_2")}
                       </p>
                       
                       <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-3.5 my-2.5 shadow-inner">
                         <p className="font-extrabold text-emerald-650 dark:text-emerald-400 text-xs sm:text-sm leading-normal">
-                          💡 หากท่านมี Line OA ที่ใช้งานอยู่แล้ว เริ่มที่ขั้นตอนนี้ได้เลย:
+                          💡 {t("line_settings.guide_step_2_tip_title")}
                         </p>
                         <div className="py-1">
                           <a 
@@ -1879,28 +1881,28 @@ export default function LineSettingsTab() {
                             className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-emerald-500/10"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            <span>เข้าสู่ LINE Official Account Manager 🟢</span>
+                            <span>{t("line_settings.guide_step_2_btn_2")}</span>
                           </a>
                         </div>
                         <div className="text-xs leading-relaxed text-slate-600 dark:text-slate-300 space-y-2.5 font-medium pl-1">
-                          <div>• เข้าสู่ระบบและเลือก <span className="font-extrabold text-slate-800 dark:text-slate-200">Line OA ของท่าน</span></div>
-                          <div>• เลื่อนแถบด้านบนฝั่งขวาชื่อ <span className="font-extrabold text-slate-800 dark:text-slate-200">"ตั้งค่า"</span></div>
-                          <div>• ไปที่หัวข้อด้านบนชื่อ <span className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</span></div>
-                          <div>• กดปุ่ม <span className="font-extrabold text-slate-800 dark:text-slate-100">"ใช้ Messaging API"</span></div>
-                          <div>• เลือก Provider ของท่าน และกดยอมรับ</div>
-                          <div>• กลับมาที่หน้า LINE Developers Console อีกรอบ เลือก Provider ของท่าน</div>
-                          <div>• จะมี Messaging API พร้อมชื่อ Line OA ของท่านแสดงขึ้นมา <span className="font-extrabold text-slate-800 dark:text-slate-200">กดเข้าไปที่ชื่อ Line OA ของท่าน</span></div>
+                          <div>{t("line_settings.guide_step_2_tip_item_1")}</div>
+                          <div>{t("line_settings.guide_step_2_tip_item_2")}</div>
+                          <div>{t("line_settings.guide_step_2_tip_item_3")}</div>
+                          <div>{t("line_settings.guide_step_2_tip_item_4")}</div>
+                          <div>{t("line_settings.guide_step_2_tip_item_5")}</div>
+                          <div>{t("line_settings.guide_step_2_tip_item_6")}</div>
+                          <div>{t("line_settings.guide_step_2_tip_item_7")}</div>
                         </div>
                       </div>
 
                       <p className="leading-relaxed">
-                        เลื่อนแถบไปที่หัวข้อด้านบนชื่อ <strong className="font-extrabold text-slate-800 dark:text-slate-200">Messaging API</strong>
+                        {t("line_settings.guide_step_2_desc_3")}
                       </p>
                       <p className="leading-relaxed">
-                        เลื่อนลงไปด้านล่างสุดหัวข้อ <strong className="font-extrabold text-slate-800 dark:text-slate-200">Channel access token (long-lived)</strong>
+                        {t("line_settings.guide_step_2_desc_4")}
                       </p>
                       <p className="leading-relaxed">
-                        กดปุ่ม <strong className="font-extrabold text-slate-800 dark:text-slate-200">Issue</strong> คัดลอกรหัสความปลอดภัยยาว ๆ มากรอกในช่องด้านซ้ายของหน้านี้
+                        {t("line_settings.guide_step_2_desc_5")}
                       </p>
                     </div>
                   )}
@@ -1917,7 +1919,7 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-500/20">
                         3
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ สร้างหน้ายืนยันสิทธิ์ (LINE Login & LIFF)</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("line_settings.guide_step_3_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openStep3 ? "rotate-180" : ""}`} />
                   </button>
@@ -1925,38 +1927,38 @@ export default function LineSettingsTab() {
                   {openStep3 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3.5 animate-fadeIn">
                       <p className="leading-relaxed">
-                        กดเข้า Provider ที่พึ่งสร้าง กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">Create New Channel</strong> เลือกหัวข้อ <strong className="font-extrabold text-slate-800 dark:text-slate-100">LINE Login</strong>
+                        {t("line_settings.guide_step_3_desc_1")}
                       </p>
                       <p className="leading-relaxed">
-                        ตั้งค่าตามที่กำหนด:
+                        {t("line_settings.guide_step_3_desc_2")}
                       </p>
                       
                       <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-700 dark:text-slate-300">
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Region to provide the service</span> = Thailand</div>
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Company or owner's country or region</span> = Thailand</div>
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Channel name</span> = สามารถตั้งชื่อได้ตามที่ท่านต้องการ</div>
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Channel description</span> = สามารถระบุได้ตามที่ท่านต้องการ</div>
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">App types</span> = Web app</div>
+                        <div>{t("line_settings.guide_step_3_config_1")}</div>
+                        <div>{t("line_settings.guide_step_3_config_2")}</div>
+                        <div>{t("line_settings.guide_step_3_config_3")}</div>
+                        <div>{t("line_settings.guide_step_3_config_4")}</div>
+                        <div>{t("line_settings.guide_step_3_config_5")}</div>
                       </div>
 
                       <p className="leading-relaxed">
-                        กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">I agree to the LINE Developers Agreement.</strong>
+                        {t("line_settings.guide_step_3_desc_3")}
                       </p>
                       <p className="leading-relaxed">
-                        กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">I have read and acknowledge LY Corporation Privacy Policy.</strong> และกด <strong className="font-extrabold text-slate-800 dark:text-slate-100">Create</strong>
+                        {t("line_settings.guide_step_3_desc_4")}
                       </p>
                       <p className="leading-relaxed">
-                        ไปที่แท็บด้านบนชื่อ <strong className="font-extrabold text-slate-800 dark:text-slate-100">LIFF</strong> กด <strong className="font-extrabold text-slate-800 dark:text-slate-100">Add</strong>
+                        {t("line_settings.guide_step_3_desc_5")}
                       </p>
                       <p className="leading-relaxed">
-                        ตั้งค่าตามที่กำหนด:
+                        {t("line_settings.guide_step_3_desc_6")}
                       </p>
 
                       <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs space-y-2.5 font-mono shadow-inner leading-relaxed text-slate-700 dark:text-slate-300">
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">LIFF app name</span> = สามารถตั้งชื่อได้ตามที่ท่านต้องการ</div>
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Size</span> = full</div>
+                        <div>{t("line_settings.guide_step_3_config_6")}</div>
+                        <div>{t("line_settings.guide_step_3_config_7")}</div>
                         <div className="space-y-2 border-y border-slate-200/50 dark:border-slate-800/60 py-2.5 my-1">
-                          <div className="flex items-center gap-1.5 font-semibold">• <span className="text-blue-600 dark:text-blue-400 font-bold">Endpoint URL</span> = https://saas-horset.vercel.app/tenant-register</div>
+                          <div className="flex items-center gap-1.5 font-semibold">{t("line_settings.guide_step_3_config_8")}</div>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
                             <span className="flex-1 p-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-blue-600 dark:text-blue-400 text-[11px] select-all break-all leading-normal font-mono">
                               https://saas-horset.vercel.app/tenant-register
@@ -1971,19 +1973,19 @@ export default function LineSettingsTab() {
                               }`}
                             >
                               {copiedEndpoint ? <Check className="w-3.5 h-3.5 animate-bounce" /> : <Copy className="w-3.5 h-3.5" />}
-                              <span>{copiedEndpoint ? "คัดลอกแล้ว!" : "คัดลอกลิงก์"}</span>
+                              <span>{copiedEndpoint ? t("line_settings.copied") : t("line_settings.copy_link_btn")}</span>
                             </button>
                           </div>
                         </div>
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Scopes</span> = profile</div>
-                        <div>• <span className="text-blue-600 dark:text-blue-400 font-bold">Add friend option</span> = Off</div>
+                        <div>{t("line_settings.guide_step_3_config_9")}</div>
+                        <div>{t("line_settings.guide_step_3_config_10")}</div>
                       </div>
 
                       <p className="leading-relaxed">
-                        กดปุ่ม <strong className="font-extrabold text-slate-800 dark:text-slate-100">Add</strong> ด้านล่างสุด
+                        {t("line_settings.guide_step_3_desc_7")}
                       </p>
                       <p className="leading-relaxed">
-                        คัดลอกรหัส <strong className="font-extrabold text-slate-800 dark:text-slate-100">LIFF ID</strong> มากรอกในช่องด้านซ้าย แล้วกดปุ่มบันทึกการตั้งค่า
+                        {t("line_settings.guide_step_3_desc_8")}
                       </p>
                     </div>
                   )}
@@ -1998,7 +2000,7 @@ export default function LineSettingsTab() {
                   >
                     <div className="flex items-center gap-3">
                       <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
-                      <span className="font-extrabold text-rose-700 dark:text-rose-400 text-sm md:text-base">ข้อควรระวังสำคัญที่สุด (ป้องกันระบบทำงานล้มเหลว)</span>
+                      <span className="font-extrabold text-rose-700 dark:text-rose-400 text-sm md:text-base">{t("line_settings.guide_warnings_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-rose-400 transition-transform duration-300 ${openWarnings ? "rotate-180" : ""}`} />
                   </button>
@@ -2010,10 +2012,10 @@ export default function LineSettingsTab() {
                       <div className="space-y-1">
                         <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          1. ต้องเผยแพร่สถานะ LINE Login เสมอ (เปลี่ยนเป็น "Published")
+                          {t("line_settings.guide_warning_1_title")}
                         </strong>
                         <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                          เมื่อเริ่มสร้าง LINE Login ระบบจะตั้งสถานะเริ่มต้นเป็น <strong className="text-slate-700 dark:text-slate-300 font-bold">Developing (สีเทา)</strong> ทำให้เฉพาะตัวแอดมินเท่านั้นที่ใช้งานลิงก์ได้ แต่ผู้เช่าทั่วไปจะเจอปัญหากดสมัครไม่ได้หรือหน้าจอลูปหมุนวนไม่หยุด <strong className="text-emerald-650 dark:text-emerald-400 font-extrabold">วิธีแก้:</strong> คลิกที่แถบสถานะกลม ๆ สีเทามุมขวาบนของหน้า LINE Login ให้เปลี่ยนเป็นสถานะ <strong className="text-emerald-650 dark:text-emerald-400 font-extrabold">Published (สีเขียว)</strong> ก่อนใช้งานจริง
+                          {t("line_settings.guide_warning_1_desc")}
                         </p>
                       </div>
 
@@ -2021,10 +2023,10 @@ export default function LineSettingsTab() {
                       <div className="space-y-1">
                         <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          2. Endpoint URL ของ LIFF ต้องมีสแลช "/tenant-register" เสมอ
+                          {t("line_settings.guide_warning_2_title")}
                         </strong>
                         <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                          ตรวจสอบว่าในช่อง Endpoint URL ตอนลงทะเบียน LIFF มีค่าต่อท้ายครบถ้วน ไม่เป็นเพียงชื่อโดเมนเปล่า ๆ มิฉะนั้นผู้เช่าที่กดลิงก์มาจะหาข้อมูลห้องพักไม่เจอและจะขึ้นแจ้งเตือน <strong className="text-rose-500 font-bold">"ไม่ระบุข้อมูลห้องพัก"</strong> ป้องกันการยืนยันข้อมูล
+                          {t("line_settings.guide_warning_2_desc")}
                         </p>
                       </div>
 
@@ -2032,10 +2034,10 @@ export default function LineSettingsTab() {
                       <div className="space-y-1">
                         <strong className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          3. วิธีส่งต่อลิงก์ลงทะเบียนที่ถูกต้อง
+                          {t("line_settings.guide_warning_3_title")}
                         </strong>
                         <p className="pl-4 leading-relaxed text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                          เมื่อแอดมินคลิกปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"เจนลิงก์ LINE"</strong> ให้ทำการกดปุ่ม <strong className="text-slate-700 dark:text-slate-300 font-bold">"คัดลอกลิงก์"</strong> แล้วส่งให้ผู้เช่าตรง ๆ ทางแชททันที <strong className="text-rose-500 font-bold">ห้ามแอดมินกดเปิดลิงก์ทดสอบก่อนแล้วไปก๊อปปี้ URL บนเว็บเบราว์เซอร์ส่งให้ผู้เช่าเด็ดขาด</strong> เพราะข้อมูลตัวตนของหอพักและหมายเลขห้องพักจะสูญหายทันที
+                          {t("line_settings.guide_warning_3_desc")}
                         </p>
                       </div>
 
@@ -2055,10 +2057,10 @@ export default function LineSettingsTab() {
                   </div>
                   <div>
                     <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
-                      คู่มือเชื่อมต่อระบบแจ้งเตือนฝั่งผู้ให้เช่า
+                      {t("line_settings.guide_title_2")}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold mt-1">
-                      ขั้นตอนเปิดใช้งานแจ้งเตือนสลิปโอนเงินเข้า LINE แอดมินและกลุ่มทีมงาน
+                      {t("line_settings.guide_subtitle_2")}
                     </p>
                   </div>
                 </div>
@@ -2075,7 +2077,7 @@ export default function LineSettingsTab() {
                   }}
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0"
                 >
-                  {openSubStep1 && openSubStep2 && openSubStep3 && openSubStep4 ? "ยุบทั้งหมด" : "ขยายทั้งหมด"}
+                  {openSubStep1 && openSubStep2 && openSubStep3 && openSubStep4 ? t("line_settings.guide_collapse_all") : t("line_settings.guide_expand_all")}
                 </button>
               </div>
 
@@ -2093,15 +2095,15 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
                         1
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ บันทึก Webhook URL</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("line_settings.guide_substep_1_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep1 ? "rotate-180" : ""}`} />
                   </button>
 
                   {openSubStep1 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-3 animate-fadeIn">
-                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-                        คัดลอก <strong className="text-blue-600 dark:text-blue-450 font-extrabold">Webhook URL</strong> จากกล่องสีฟ้าใน ส่วนที่ 2 ทางด้านซ้ายของท่าน
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400 font-medium">
+                        {t("line_settings.guide_substep_1_desc_1")}
                       </p>
                       
                       <div className="py-2.5">
@@ -2112,12 +2114,12 @@ export default function LineSettingsTab() {
                           className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-500/10"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
-                          <span>เข้าสู่ LINE Developers Console 🌐</span>
+                          <span>{t("line_settings.guide_step_1_btn_1")}</span>
                         </a>
                       </div>
 
-                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-                        เลือก <strong className="font-bold">Messaging API Channel</strong> ของท่าน เลื่อนแถบไปที่หัวข้อด้านบนชื่อ <strong className="font-bold">Messaging API</strong> เลือกลงมาตรงคำว่า <strong className="font-bold">Webhook URL</strong> นำข้อมูล Webhook URL ที่ก๊อปปี้ไปวางในช่องและกดคลิก <strong className="font-bold">Update</strong> บันทึกข้อมูล จากนั้นตรวจสอบว่าได้เปิดใช้สวิตช์ <strong className="text-blue-600 font-bold">"Use Webhook"</strong> เป็นที่เรียบร้อยแล้ว
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400 font-medium">
+                        {t("line_settings.guide_substep_1_desc_2")}
                       </p>
                     </div>
                   )}
@@ -2134,15 +2136,15 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
                         2
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ระบุ LINE Channel Secret</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("line_settings.guide_substep_2_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep2 ? "rotate-180" : ""}`} />
                   </button>
 
                   {openSubStep2 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-1.5 animate-fadeIn">
-                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-                        ไปที่แท็บ <strong className="font-bold">Basic settings</strong> เลื่อนลงไปที่ช่อง <strong className="font-bold">Channel secret</strong> คัดลอกรหัสมาวางลงในช่อง <strong className="font-bold">LINE Channel Secret</strong> ด้านซ้าย (เพื่อนำมาใช้ถอดรหัสและ Verify ลายเซ็นดิจิตอลของ LINE Webhook ป้องกันผู้ไม่หวังดีส่ง Request ปลอม)
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400 font-medium">
+                        {t("line_settings.guide_substep_2_desc_1")}
                       </p>
                     </div>
                   )}
@@ -2159,22 +2161,22 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
                         3
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ผูกบัญชีแจ้งเตือน Admin ส่วนตัว</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("line_settings.guide_substep_3_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep3 ? "rotate-180" : ""}`} />
                   </button>
 
                   {openSubStep3 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-2.5 animate-fadeIn">
-                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-                        แอดมินแต่ละท่านต้องทำการแอดเพื่อนบอตและทำตามวิธีใดวิธีหนึ่งดังนี้:
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400 font-medium">
+                        {t("line_settings.guide_substep_3_desc_1")}
                       </p>
                       <div className="space-y-2 text-slate-500 dark:text-slate-400 font-medium pl-2 text-xs sm:text-sm leading-relaxed">
                         <div>
-                          👉 <strong className="text-slate-850 dark:text-slate-200">วิธีที่ 1 (อัตโนมัติ - แนะนำ):</strong> คลิกปุ่ม <strong className="text-blue-600">"เพิ่มการเชื่อมต่อ Line Admin"</strong> ทางฝั่งซ้ายของท่าน แล้วกดยืนยันปุ่มสีฟ้าเพื่อสร้างรหัสตัวเลข 6 หลักชั่วคราวอายุ 5 นาที พิมพ์เฉพาะตัวเลขนี้ส่งหาบอตในห้องแชทไลน์ บอตจะผูกบัญชีให้ท่านโดยอัตโนมัติทันที!
+                          👉 {t("line_settings.guide_substep_3_method_1")}
                         </div>
                         <div className="pt-1">
-                          👉 <strong className="text-slate-850 dark:text-slate-200">วิธีที่ 2 (แบบกรอกรหัสด้วยตัวเอง):</strong> ส่งคำสั่งคุยหาบอตว่า <code className="bg-slate-100 dark:bg-slate-850 px-1.5 py-0.5 rounded font-mono font-bold text-blue-600">#MYID</code> บอตจะส่ง LINE User ID ส่วนตัวของท่านกลับมา นำรหัสยาว 33 ตัวอักษรนั้นมากรอกลงในช่องค้นหาประวัติแบบแมนนวลเพื่อตรวจสอบโปรไฟล์และผูกบัญชีแอดมิน
+                          👉 {t("line_settings.guide_substep_3_method_2")}
                         </div>
                       </div>
                     </div>
@@ -2192,15 +2194,15 @@ export default function LineSettingsTab() {
                       <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xs font-black border border-indigo-500/20">
                         4
                       </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">➡️ ผูกบัญชีแจ้งเตือนกลุ่มนิติบุคคล / กลุ่มทีมงาน</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base">{t("line_settings.guide_substep_4_title")}</span>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${openSubStep4 ? "rotate-180" : ""}`} />
                   </button>
 
                   {openSubStep4 && (
                     <div className="p-4 bg-transparent border-t border-slate-100 dark:border-slate-800/60 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium space-y-1.5 animate-fadeIn">
-                      <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-                        เชิญ LINE OA ของหอพักตัวนี้เข้าไปร่วมในกลุ่มแชทไลน์นิติบุคคล/กลุ่มทีมงาน จากนั้นให้สมาชิกในกลุ่มส่งข้อความคำสั่งรหัสเชื่อมต่อเข้าไปในกลุ่ม (เช่น <code className="bg-indigo-50 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono font-bold text-indigo-600 dark:text-indigo-400 select-all">#CONNECT-...</code>) บอทจะทำการลงทะเบียนรหัสกลุ่มเข้ากับระบบหอพักนี้ทันทีแบบอัตโนมัติพร้อมส่งข้อความตอบกลับเพื่อยืนยันเชื่อมต่อสำเร็จ!
+                      <p className="leading-relaxed text-slate-500 dark:text-slate-400 font-medium">
+                        {t("line_settings.guide_substep_4_desc_1")}
                       </p>
                     </div>
                   )}
@@ -2231,10 +2233,10 @@ export default function LineSettingsTab() {
                   </div>
                   <div>
                     <h4 className="text-base font-black text-slate-800 dark:text-slate-100">
-                      เชื่อมต่อ LINE Admin
+                      {t("line_settings.connect_admin_modal_title")}
                     </h4>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider mt-0.5">
-                      แอดมินแจ้งเตือนส่วนตัว
+                      {t("line_settings.connect_admin_modal_subtitle")}
                     </p>
                   </div>
                 </div>
@@ -2261,7 +2263,7 @@ export default function LineSettingsTab() {
                       : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
                   }`}
                 >
-                  ⚡ ดึงข้อมูลอัตโนมัติ
+                  {t("line_settings.tab_auto")}
                 </button>
                 <button
                   type="button"
@@ -2275,7 +2277,7 @@ export default function LineSettingsTab() {
                       : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
                   }`}
                 >
-                  📝 กรอกรหัสด้วยตัวเอง
+                  {t("line_settings.tab_manual")}
                 </button>
               </div>
 
@@ -2286,7 +2288,7 @@ export default function LineSettingsTab() {
                     {!connectionCode ? (
                       <div className="space-y-4 text-center py-2">
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                          ระบบจะสร้างรหัสผ่าน 6 หลักชั่วคราว ให้คุณส่งรหัสนี้ในแชท LINE บอทของหอพัก เพื่อผูกข้อมูล LINE ID และดึงโปรไฟล์ของคุณมาใช้งานโดยอัตโนมัติ
+                          {t("line_settings.auto_desc")}
                         </p>
                         <button
                           type="button"
@@ -2299,20 +2301,20 @@ export default function LineSettingsTab() {
                           ) : (
                             <Key className="w-4 h-4" />
                           )}
-                          <span>{isGeneratingCode ? "กำลังสร้างรหัสเชื่อมต่อ..." : "สร้างรหัสเชื่อมต่ออัตโนมัติ"}</span>
+                          <span>{isGeneratingCode ? t("line_settings.btn_generating_code") : t("line_settings.btn_generate_code")}</span>
                         </button>
                       </div>
                     ) : (
                       <div className="space-y-4 animate-fadeIn">
                         <div className="bg-indigo-50/50 dark:bg-slate-950/80 border border-indigo-100/80 dark:border-indigo-900/30 rounded-2xl py-5 px-6 shadow-inner text-center space-y-2">
                           <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider block">
-                            ส่งรหัสนี้หา LINE OA บอต
+                            {t("line_settings.send_code_to_bot")}
                           </span>
                           <div className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 font-mono tracking-widest flex justify-center items-center select-all">
                             {connectionCode.split("").join(" ")}
                           </div>
                           <span className="text-xs text-rose-500 dark:text-rose-400 font-bold block">
-                            ⏱️ รหัสหมดอายุในอีก {Math.floor(codeCountdown / 60)}:{(codeCountdown % 60).toString().padStart(2, "0")} นาที
+                            {t("line_settings.code_expires_in").replace("{time}", `${Math.floor(codeCountdown / 60)}:${(codeCountdown % 60).toString().padStart(2, "0")}`)}
                           </span>
                           <button
                             type="button"
@@ -2320,26 +2322,26 @@ export default function LineSettingsTab() {
                             className="mt-2 text-[11px] text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 font-black flex items-center justify-center gap-1 mx-auto transition-all bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 hover:border-rose-500/20 px-3 py-1 rounded-lg"
                           >
                             <X className="w-3.5 h-3.5 shrink-0" />
-                            <span>ยกเลิกรหัสนี้</span>
+                            <span>{t("line_settings.cancel_code_btn")}</span>
                           </button>
                         </div>
 
                         <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex items-start gap-2.5 animate-pulse">
                           <RefreshCw className="w-4 h-4 text-blue-500 shrink-0 mt-0.5 animate-spin" />
                           <div className="space-y-1">
-                            <span className="text-xs font-black text-blue-600 dark:text-blue-450 block">กำลังรอรับรหัสในแชท LINE บอท...</span>
+                            <span className="text-xs font-black text-blue-600 dark:text-blue-450 block">{t("line_settings.waiting_for_code")}</span>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold leading-normal">
-                              เมื่อคุณพิมพ์เลข 6 หลักนี้ส่งในห้องแชท LINE OA ของหอพัก ระบบจะทำการเชื่อมโยงข้อมูลและปิดหน้าจอนี้โดยอัตโนมัติทันที!
+                              {t("line_settings.waiting_for_code_desc")}
                             </p>
                           </div>
                         </div>
 
                         <div className="text-xs space-y-2 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950">
-                          <span className="font-extrabold text-slate-800 dark:text-slate-200">📌 ขั้นตอนทำรายการ:</span>
+                          <span className="font-extrabold text-slate-800 dark:text-slate-200">{t("line_settings.steps_title")}</span>
                           <ol className="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400 font-bold pl-1 text-[11px] sm:text-xs">
-                            <li>แชทคุยกับ LINE OA ของหอพัก</li>
-                            <li>พิมพ์เฉพาะตัวเลข <code className="bg-indigo-50 dark:bg-slate-900 px-1 py-0.5 rounded font-mono text-indigo-600 font-bold">{connectionCode}</code> ส่งหาบอต</li>
-                            <li>ระบบจะทำรายการให้เสร็จสรรพโดยไม่ต้องกดปุ่มอะไรอีก!</li>
+                            <li>{t("line_settings.step_chat_with_bot")}</li>
+                            <li>{t("line_settings.step_send_number").replace("{code}", connectionCode)}</li>
+                            <li>{t("line_settings.step_auto_done")}</li>
                           </ol>
                         </div>
                       </div>
@@ -2349,7 +2351,7 @@ export default function LineSettingsTab() {
                   <div className="space-y-4 animate-fadeIn">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">
-                        ระบุ LINE User ID ของแอดมิน (UID)
+                        {t("line_settings.manual_label")}
                       </label>
                       <div className="flex gap-2">
                         <input
@@ -2369,12 +2371,12 @@ export default function LineSettingsTab() {
                           {modalLoading ? (
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                           ) : (
-                            "ตกลง"
+                            t("line_settings.manual_ok_btn")
                           )}
                         </button>
                       </div>
                       <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold leading-normal">
-                        💡 พิมพ์ส่งคำสั่ง <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-mono text-[10px]">#MYID</code> คุยหาบอทก่อน เพื่อรับรหัสความยาว 33 ตัวอักษร
+                        💡 {t("line_settings.manual_hint")}
                       </p>
                     </div>
 
@@ -2382,7 +2384,7 @@ export default function LineSettingsTab() {
                     {modalProfilePreview && (
                       <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-2xl animate-scaleIn space-y-3.5 shadow-inner">
                         <span className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
-                          ตรวจสอบข้อมูลโปรไฟล์สำเร็จ
+                          {t("line_settings.profile_checked_success")}
                         </span>
                         
                         <div className="flex items-center gap-3.5">
@@ -2411,15 +2413,15 @@ export default function LineSettingsTab() {
                         {modalProfilePreview.success ? (
                           <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                             <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <span className="text-[11px] font-bold">บัญชี LINE นี้เพิ่มเพื่อนบอทแล้ว พร้อมแจ้งเตือน!</span>
+                            <span className="text-[11px] font-bold">{t("line_settings.profile_ready_for_alerts")}</span>
                           </div>
                         ) : (
                           <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2 text-amber-600 dark:text-amber-400 leading-normal">
                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                             <div className="text-[10px] font-bold">
-                              <span>ยังไม่ได้แอดเพื่อนบอท: </span>
+                              <span>{t("line_settings.profile_not_added_bot")} </span>
                               <p className="font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
-                                โปรไฟล์นี้จะไม่ได้รับข้อความแจ้งเตือนจนกว่าจะเพิ่มบอทเป็นเพื่อนใน LINE
+                                {t("line_settings.profile_not_added_bot_desc")}
                               </p>
                             </div>
                           </div>
@@ -2445,7 +2447,7 @@ export default function LineSettingsTab() {
                   onClick={handleCloseAddModal}
                   className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black transition-all cursor-pointer"
                 >
-                  ยกเลิก
+                  {t("line_settings.cancel_btn")}
                 </button>
                 {pairingTab === "manual" && (
                   <button
@@ -2455,7 +2457,7 @@ export default function LineSettingsTab() {
                     disabled={!modalProfilePreview}
                   >
                     <Check className="w-4 h-4" />
-                    <span>ยืนยันการเพิ่ม</span>
+                    <span>{t("line_settings.confirm_add_btn")}</span>
                   </button>
                 )}
               </div>
