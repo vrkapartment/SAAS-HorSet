@@ -856,9 +856,16 @@ export default function TaxPage() {
       const { parseAddress } = await import("@/lib/thaiAddress")
 
       // เช็คว่า Super Admin อัปโหลด PDF template เองไว้หรือไม่ ถ้ามีให้ใช้ไฟล์นั้นแทนไฟล์เริ่มต้นของระบบ
-      const { getActiveTaxFormTemplateAction } = await import("@/features/tax/actions")
+      const { getActiveTaxFormTemplateAction, getTaxFormFieldMappingsAction } = await import("@/features/tax/actions")
       const templateRes = await getActiveTaxFormTemplateAction(type, taxYear)
       const customTemplateUrl = templateRes.success ? templateRes.data?.file_url : undefined
+
+      // ดึง mapping ที่ Super Admin ตั้งไว้สำหรับ template นี้โดยเฉพาะ (ระบบ Visual Field Mapping — ดู pdfHelper.ts)
+      // ถ้ายังไม่มีการ map เลย (mapping ว่างเปล่า หรือไม่มี template ที่ active) generatePndPdf() จะ fallback ไปใช้
+      // DEFAULT_PND90/94_MAPPING ของไฟล์ที่ bundle มากับระบบเอง จึงไม่ต้องกังวลกรณีที่ยังไม่ได้ตั้งค่า mapping
+      const templateId = templateRes.success ? templateRes.data?.id : undefined
+      const mappingRes = templateId ? await getTaxFormFieldMappingsAction(templateId) : null
+      const fieldMapping = mappingRes?.success && mappingRes.data.length > 0 ? mappingRes.data : undefined
 
       // ภ.ง.ด. 90 ใช้ template เดียวข้ามทุกปี: ถ้า Super Admin ตั้งปีภาษีที่จะพิมพ์ลงฟอร์มไว้ ให้ใช้ปีนั้นแทนปีที่ Admin เลือกดูรายงานอยู่
       const printedTaxYear = (type === "90" && templateRes.success && templateRes.data?.tax_year)
@@ -895,7 +902,7 @@ export default function TaxPage() {
         partnerCount,
         rentDeductionMethod: deductionMethod405 === "เหมา 30%" ? "percentage" : "actual",
         utilitiesDeductionMethod: deductionMethod408 === "เหมา 60%" ? "percentage" : "actual",
-      }, customTemplateUrl)
+      }, customTemplateUrl, fieldMapping)
 
       const link = document.createElement("a")
       link.href = URL.createObjectURL(blob)

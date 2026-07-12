@@ -632,3 +632,186 @@ export async function updatePnd90TaxYearAction(taxYear: string) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกปีภาษี" }
   }
 }
+
+// ===== ระบบ Visual Field Mapping — ดูภาพรวมที่ src/lib/pdfHelper.ts (PND_LOGICAL_KEYS, PndFieldMapping) =====
+
+interface SaveFieldMappingParams {
+  templateId: string
+  logicalKey: string
+  fieldKind: "text" | "radio"
+  physicalFieldName: string
+  optionKey?: string | null
+  widgetIndex?: number | null
+  valueFormat?: "raw" | "comb" | "plain_decimal" | null
+}
+
+// บันทึก mapping 1 แถว (text field 1 แถวต่อ logicalKey, radio 1 แถวต่อ optionKey) — หาแถวเดิมก่อนเสมอแล้วค่อย
+// insert/update เอง (ไม่ใช้ .upsert(onConflict) เพราะ unique index เป็น partial index เหมือนกับ tax_form_templates)
+export async function saveFieldMappingAction(params: SaveFieldMappingParams) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    if (params.fieldKind === "text" && !params.valueFormat) {
+      return { success: false, error: "กรุณาระบุรูปแบบข้อมูล (raw/comb/plain_decimal) สำหรับ field ประเภทข้อความ" }
+    }
+    if (params.fieldKind === "radio" && (!params.optionKey || params.widgetIndex === undefined || params.widgetIndex === null)) {
+      return { success: false, error: "กรุณาระบุ option และ widget index สำหรับ field ประเภท radio" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    let existingQuery = supabaseAdmin
+      .from("tax_form_field_mappings")
+      .select("id")
+      .eq("template_id", params.templateId)
+      .eq("logical_key", params.logicalKey)
+      .is("deleted_at", null)
+    existingQuery = params.fieldKind === "radio"
+      ? existingQuery.eq("option_key", params.optionKey!)
+      : existingQuery.is("option_key", null)
+    const { data: existing, error: findError } = await existingQuery.maybeSingle()
+    if (findError) throw findError
+
+    const row = {
+      template_id: params.templateId,
+      logical_key: params.logicalKey,
+      field_kind: params.fieldKind,
+      physical_field_name: params.physicalFieldName,
+      option_key: params.fieldKind === "radio" ? params.optionKey : null,
+      widget_index: params.fieldKind === "radio" ? params.widgetIndex : null,
+      value_format: params.fieldKind === "text" ? params.valueFormat : null,
+      updated_by: profileRes.data.id,
+    }
+
+    if (existing) {
+      const { error: updateError } = await supabaseAdmin
+        .from("tax_form_field_mappings")
+        .update(row)
+        .eq("id", existing.id)
+      if (updateError) throw updateError
+    } else {
+      const { error: insertError } = await supabaseAdmin.from("tax_form_field_mappings").insert(row)
+      if (insertError) throw insertError
+    }
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึก field mapping" }
+  }
+}
+
+// ลบ mapping 1 แถว (soft delete) — ใช้เมื่อ Super Admin ต้องการเลิก map field นั้นแล้วปล่อยว่างไว้
+export async function deleteFieldMappingAction(mappingId: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { error } = await supabaseAdmin
+      .from("tax_form_field_mappings")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", mappingId)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบ field mapping" }
+  }
+}
+
+// ดึง mapping ทั้งหมดของ template หนึ่งไฟล์ (สำหรับหน้า mapping ของ Super Admin แสดงสถานะปัจจุบัน)
+export async function getFieldMappingsAdminAction(templateId: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true, data: [] }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้", data: [] }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data, error } = await supabaseAdmin
+      .from("tax_form_field_mappings")
+      .select("id, logical_key, field_kind, physical_field_name, option_key, widget_index, value_format")
+      .eq("template_id", templateId)
+      .is("deleted_at", null)
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึง field mapping", data: [] }
+  }
+}
+
+// ตรวจ "ความครบถ้วน" ของ mapping เทียบกับคำศัพท์ logical key ที่ระบบต้องใช้ (แทนที่ REQUIRED_PND_FIELDS แบบเดิมที่เช็คแค่
+// ว่าชื่อ field มีอยู่จริงหรือไม่ โดยไม่รู้ว่า field นั้นถูก map ให้ตรงความหมายแล้วหรือยัง) และเช็คด้วยว่า mapping ที่มีอยู่
+// ชี้ไป field ชื่อที่ยังมีอยู่จริงในไฟล์ template หรือไม่ (จับ revision drift ทันทีที่เปิดหน้า mapping)
+export async function getTaxFormMappingCoverageAction(templateId: string, formType: "90" | "94") {
+  try {
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const [{ data: template, error: templateError }, { data: mappings, error: mappingsError }] = await Promise.all([
+      supabaseAdmin.from("tax_form_templates").select("file_url").eq("id", templateId).single(),
+      supabaseAdmin
+        .from("tax_form_field_mappings")
+        .select("logical_key, physical_field_name")
+        .eq("template_id", templateId)
+        .is("deleted_at", null),
+    ])
+    if (templateError) throw templateError
+    if (mappingsError) throw mappingsError
+
+    const { PDFDocument } = await import("pdf-lib")
+    const { PND_LOGICAL_KEYS, repairOrphanedFormFields } = await import("@/lib/pdfHelper")
+
+    const fileResponse = await fetch(template.file_url)
+    if (!fileResponse.ok) throw new Error("ไม่สามารถโหลดไฟล์ template ได้")
+    const bytes = await fileResponse.arrayBuffer()
+    const pdfDoc = await PDFDocument.load(bytes)
+    repairOrphanedFormFields(pdfDoc)
+    const existingFieldNames = new Set(pdfDoc.getForm().getFields().map((f) => f.getName()))
+
+    const mappedKeys = new Set((mappings || []).map((m) => m.logical_key))
+    const unmappedRequiredKeys = PND_LOGICAL_KEYS[formType].filter((key) => !mappedKeys.has(key))
+    const danglingMappings = (mappings || []).filter((m) => !existingFieldNames.has(m.physical_field_name))
+
+    return {
+      success: true,
+      data: {
+        totalRequiredKeys: PND_LOGICAL_KEYS[formType].length,
+        mappedKeyCount: mappedKeys.size,
+        unmappedRequiredKeys,
+        danglingMappings,
+      },
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบความครบถ้วนของ mapping" }
+  }
+}

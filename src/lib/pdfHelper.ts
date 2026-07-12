@@ -151,6 +151,73 @@ export interface PndData {
   utilitiesDeductionMethod?: "percentage" | "actual"
 }
 
+const EMPTY_ADDRESS_PARTS: NonNullable<PndData["addressParts"]> = {
+  building: "", room: "", floor: "", village: "", no: "", moo: "", soi: "", yaek: "",
+  road: "", subdistrict: "", district: "", province: "", zipcode: ""
+}
+
+// ===== ระบบ Visual Field Mapping =====
+// แยก "ชื่อ field ทางกายภาพในไฟล์ PDF" ออกจาก "ความหมายเชิงตรรกะที่ระบบต้องกรอก" เพื่อให้ Super Admin
+// แก้ mapping ได้เองผ่านหน้าเว็บเวลาอัปโหลด template ใหม่ (ดูตาราง tax_form_field_mappings และแผนที่
+// C:\Users\User\.claude\plans\update-template-imperative-orbit.md) แทนที่จะต้องแก้โค้ดทุกครั้งที่ field เปลี่ยนชื่อ/ตำแหน่ง
+
+export type PndFieldFormat = "raw" | "comb" | "plain_decimal"
+
+// ค่าที่คำนวณแล้วสำหรับ 1 ช่องข้อความ — format บอกวิธีแปลงเป็น string ตอนกรอกจริง (ดู fillPdfFromMapping)
+export interface PndTextValue {
+  format: PndFieldFormat
+  amount?: number // ใช้กับ format "comb"/"plain_decimal"
+  text?: string   // ใช้กับ format "raw"
+}
+
+// การ map "ความหมายเชิงตรรกะ 1 อย่าง" ไปยัง "field ทางกายภาพ 1 ช่อง" ของ template หนึ่งไฟล์
+// radio group ใช้หลายแถว share logicalKey เดียวกัน แต่ต่าง optionKey/widgetIndex (ดู DEFAULT_PND90_MAPPING)
+export interface PndFieldMapping {
+  logicalKey: string
+  fieldKind: "text" | "radio"
+  physicalFieldName: string
+  optionKey?: string     // radio เท่านั้น
+  widgetIndex?: number   // radio เท่านั้น
+  valueFormat?: PndFieldFormat // text เท่านั้น
+}
+
+// ผลคำนวณทั้งหมดของ 1 ครั้งที่ generate — เป็น input ให้ fillPdfFromMapping โดยไม่รู้จักชื่อ field จริงเลย
+// text[key] = null/undefined หมายถึง "ไม่มีข้อมูลจริง ปล่อยว่างไว้" (ไม่เรียก setField)
+// radio[key] = null/undefined หมายถึง "ไม่ต้องเลือกตัวเลือกไหนเลย" (ไม่เรียก selectRadioWidget)
+export interface PndComputedValues {
+  text: Record<string, PndTextValue | null | undefined>
+  radio: Record<string, string | null | undefined>
+}
+
+const PND_SHARED_LOGICAL_KEYS = [
+  "personal.tax_id", "personal.first_name", "personal.last_name", "personal.taxpayer_status",
+  "address.building", "address.room", "address.floor", "address.village", "address.no", "address.moo",
+  "address.soi", "address.yaek", "address.road", "address.subdistrict", "address.district", "address.province", "address.zipcode",
+  "rent.payer_tax_id", "rent.description_label", "rent.gross", "rent.deduction", "rent.net", "rent.deduction_method", "rent.deduction_percent",
+  "utilities.payer_tax_id", "utilities.description_label", "utilities.gross", "utilities.deduction", "utilities.net",
+  "utilities.deduction_method", "utilities.deduction_percent",
+  "other.payer_tax_id", "other.description_label", "other.gross", "other.deduction", "other.net",
+  "other.deduction_method", "other.deduction_percent",
+]
+
+// คำศัพท์ logical key ที่ปิดชุดต่อ form type — เปลี่ยนเฉพาะตอนกฎหมาย/โครงสร้างฟอร์มเปลี่ยนจริง (ไม่ใช่ทุกครั้งที่อัปโหลด template ใหม่)
+export const PND_LOGICAL_KEYS: Record<"90" | "94", string[]> = {
+  "90": [
+    ...PND_SHARED_LOGICAL_KEYS,
+    "header.tax_year", "personal.filing_type",
+    "annex.tax_id", "annex.first_name", "annex.last_name", "annex.personal_deduction_item1", "annex.personal_deduction_total",
+    ...Array.from({ length: 25 }, (_, i) => `item.${i + 1}`),
+    "item.9_base",
+    "item.16_sign", "item.18_sign", "item.23_sign", "item.25_sign",
+    "summary.due_amount", "summary.overpaid_amount",
+  ],
+  "94": [
+    ...PND_SHARED_LOGICAL_KEYS,
+    "personal.personal_deduction",
+    ...Array.from({ length: 19 }, (_, i) => `item.${i + 1}`),
+  ],
+}
+
 // ชื่อฟิลด์ PDF AcroForm ที่ generatePndPdf() ต้องใช้กรอกข้อมูลจริง (ดูจุด setField() ด้านล่าง)
 // ใช้เป็น single source of truth ทั้งตอน fill ข้อมูลจริง และตอน Super Admin ตรวจสอบไฟล์ template ที่อัปโหลดใหม่
 export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
@@ -176,7 +243,456 @@ export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
   ],
 }
 
-export async function generatePndPdf(type: "90" | "94", data: PndData, templateUrl?: string) {
+// mapping เริ่มต้นที่ตรงกับ template ที่ bundle มากับระบบวันนี้ (public/templates/PND90_Template.pdf, 250668PIT94.pdf)
+// ใช้เป็น fallback เมื่อยังไม่มี mapping จาก DB สำหรับ template ที่ resolve ได้ (เช่น ก่อน backfill หรือ dev เทสต์ในเครื่อง)
+// เป็น "การ transcribe" ชื่อ field ที่เคย hardcode ไว้แบบ 1:1 ไม่ใช่การตัดสินใจใหม่ — ห้ามแก้ค่าที่นี่โดยไม่ตรวจสอบตำแหน่งจริงก่อน
+export const DEFAULT_PND90_MAPPING: PndFieldMapping[] = [
+  { logicalKey: "header.tax_year", fieldKind: "text", physicalFieldName: "Text11111", valueFormat: "raw" },
+  { logicalKey: "personal.tax_id", fieldKind: "text", physicalFieldName: "Text80.0", valueFormat: "raw" },
+  { logicalKey: "personal.first_name", fieldKind: "text", physicalFieldName: "Text7.0", valueFormat: "raw" },
+  { logicalKey: "personal.last_name", fieldKind: "text", physicalFieldName: "Text7.2", valueFormat: "raw" },
+  { logicalKey: "personal.taxpayer_status", fieldKind: "radio", physicalFieldName: "Radio Button48", optionKey: "individual", widgetIndex: 0 },
+  { logicalKey: "personal.taxpayer_status", fieldKind: "radio", physicalFieldName: "Radio Button48", optionKey: "partnership", widgetIndex: 1 },
+  { logicalKey: "personal.filing_type", fieldKind: "radio", physicalFieldName: "Radio Button999", optionKey: "normal", widgetIndex: 0 },
+  { logicalKey: "address.building", fieldKind: "text", physicalFieldName: "Text9", valueFormat: "raw" },
+  { logicalKey: "address.room", fieldKind: "text", physicalFieldName: "Text100.1", valueFormat: "raw" },
+  { logicalKey: "address.floor", fieldKind: "text", physicalFieldName: "Text100.2", valueFormat: "raw" },
+  { logicalKey: "address.village", fieldKind: "text", physicalFieldName: "Text100.3", valueFormat: "raw" },
+  { logicalKey: "address.no", fieldKind: "text", physicalFieldName: "Text13", valueFormat: "raw" },
+  { logicalKey: "address.moo", fieldKind: "text", physicalFieldName: "Text14", valueFormat: "raw" },
+  { logicalKey: "address.soi", fieldKind: "text", physicalFieldName: "Text155.1", valueFormat: "raw" },
+  { logicalKey: "address.yaek", fieldKind: "text", physicalFieldName: "Text155.2", valueFormat: "raw" },
+  { logicalKey: "address.road", fieldKind: "text", physicalFieldName: "Text155.3", valueFormat: "raw" },
+  { logicalKey: "address.subdistrict", fieldKind: "text", physicalFieldName: "Text155.4", valueFormat: "raw" },
+  { logicalKey: "address.district", fieldKind: "text", physicalFieldName: "Text155.5", valueFormat: "raw" },
+  { logicalKey: "address.province", fieldKind: "text", physicalFieldName: "Text155.6", valueFormat: "raw" },
+  { logicalKey: "address.zipcode", fieldKind: "text", physicalFieldName: "Text20", valueFormat: "raw" },
+  { logicalKey: "rent.payer_tax_id", fieldKind: "text", physicalFieldName: "Text31.1.1", valueFormat: "raw" },
+  { logicalKey: "rent.gross", fieldKind: "text", physicalFieldName: "Text360.1", valueFormat: "comb" },
+  { logicalKey: "rent.deduction", fieldKind: "text", physicalFieldName: "Text360.2", valueFormat: "comb" },
+  { logicalKey: "rent.net", fieldKind: "text", physicalFieldName: "Text360.3", valueFormat: "comb" },
+  { logicalKey: "rent.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button14", optionKey: "percentage", widgetIndex: 0 },
+  { logicalKey: "rent.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button14", optionKey: "actual", widgetIndex: 1 },
+  { logicalKey: "utilities.payer_tax_id", fieldKind: "text", physicalFieldName: "Text38.0", valueFormat: "raw" },
+  { logicalKey: "utilities.description_label", fieldKind: "text", physicalFieldName: "Text70", valueFormat: "raw" },
+  { logicalKey: "utilities.gross", fieldKind: "text", physicalFieldName: "Text40.0", valueFormat: "comb" },
+  { logicalKey: "utilities.deduction", fieldKind: "text", physicalFieldName: "Text40.1", valueFormat: "comb" },
+  { logicalKey: "utilities.net", fieldKind: "text", physicalFieldName: "Text40.2", valueFormat: "comb" },
+  { logicalKey: "utilities.deduction_percent", fieldKind: "text", physicalFieldName: "Text73.0", valueFormat: "raw" },
+  { logicalKey: "utilities.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button22", optionKey: "percentage", widgetIndex: 0 },
+  { logicalKey: "utilities.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button22", optionKey: "actual", widgetIndex: 1 },
+  { logicalKey: "other.description_label", fieldKind: "text", physicalFieldName: "Text71", valueFormat: "raw" },
+  { logicalKey: "other.gross", fieldKind: "text", physicalFieldName: "Text40.3", valueFormat: "comb" },
+  { logicalKey: "other.deduction", fieldKind: "text", physicalFieldName: "Text40.4", valueFormat: "comb" },
+  { logicalKey: "other.net", fieldKind: "text", physicalFieldName: "Text40.5", valueFormat: "comb" },
+  { logicalKey: "other.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button24", optionKey: "actual", widgetIndex: 1 },
+  { logicalKey: "annex.tax_id", fieldKind: "text", physicalFieldName: "Text68.3", valueFormat: "raw" },
+  { logicalKey: "annex.first_name", fieldKind: "text", physicalFieldName: "Text68.5", valueFormat: "raw" },
+  { logicalKey: "annex.last_name", fieldKind: "text", physicalFieldName: "Text68.7", valueFormat: "raw" },
+  { logicalKey: "annex.personal_deduction_item1", fieldKind: "text", physicalFieldName: "Text69.1", valueFormat: "comb" },
+  { logicalKey: "annex.personal_deduction_total", fieldKind: "text", physicalFieldName: "Text69.62", valueFormat: "comb" },
+  { logicalKey: "item.1", fieldKind: "text", physicalFieldName: "Text87.2", valueFormat: "comb" },
+  { logicalKey: "item.2", fieldKind: "text", physicalFieldName: "Text87.3", valueFormat: "comb" },
+  { logicalKey: "item.3", fieldKind: "text", physicalFieldName: "Text87.4", valueFormat: "comb" },
+  { logicalKey: "item.5", fieldKind: "text", physicalFieldName: "Text87.6", valueFormat: "comb" },
+  { logicalKey: "item.7", fieldKind: "text", physicalFieldName: "Text87.8", valueFormat: "comb" },
+  { logicalKey: "item.8", fieldKind: "text", physicalFieldName: "Text87.9", valueFormat: "comb" },
+  { logicalKey: "item.9_base", fieldKind: "text", physicalFieldName: "Text87.10", valueFormat: "plain_decimal" },
+  { logicalKey: "item.9", fieldKind: "text", physicalFieldName: "Text87.33", valueFormat: "comb" },
+  { logicalKey: "item.10", fieldKind: "text", physicalFieldName: "Text87.34", valueFormat: "comb" },
+  { logicalKey: "item.12", fieldKind: "text", physicalFieldName: "Text87.12", valueFormat: "comb" },
+  { logicalKey: "item.14", fieldKind: "text", physicalFieldName: "Text87.15", valueFormat: "comb" },
+  { logicalKey: "item.16", fieldKind: "text", physicalFieldName: "Text87.20", valueFormat: "comb" },
+  { logicalKey: "item.16_sign", fieldKind: "radio", physicalFieldName: "Radio Button89", optionKey: "due", widgetIndex: 0 },
+  { logicalKey: "item.16_sign", fieldKind: "radio", physicalFieldName: "Radio Button89", optionKey: "overpaid", widgetIndex: 1 },
+  { logicalKey: "item.18", fieldKind: "text", physicalFieldName: "Text87.23", valueFormat: "comb" },
+  { logicalKey: "item.18_sign", fieldKind: "radio", physicalFieldName: "Radio Button93", optionKey: "due", widgetIndex: 0 },
+  { logicalKey: "item.18_sign", fieldKind: "radio", physicalFieldName: "Radio Button93", optionKey: "overpaid", widgetIndex: 1 },
+  { logicalKey: "item.23", fieldKind: "text", physicalFieldName: "Text87.28", valueFormat: "comb" },
+  { logicalKey: "item.23_sign", fieldKind: "radio", physicalFieldName: "Radio Button106", optionKey: "due", widgetIndex: 0 },
+  { logicalKey: "item.23_sign", fieldKind: "radio", physicalFieldName: "Radio Button106", optionKey: "overpaid", widgetIndex: 1 },
+  { logicalKey: "item.25", fieldKind: "text", physicalFieldName: "Text87.30", valueFormat: "comb" },
+  { logicalKey: "item.25_sign", fieldKind: "radio", physicalFieldName: "Radio Button107", optionKey: "due", widgetIndex: 0 },
+  { logicalKey: "item.25_sign", fieldKind: "radio", physicalFieldName: "Radio Button107", optionKey: "overpaid", widgetIndex: 1 },
+  { logicalKey: "summary.due_amount", fieldKind: "text", physicalFieldName: "Text23.1.1", valueFormat: "comb" },
+  { logicalKey: "summary.overpaid_amount", fieldKind: "text", physicalFieldName: "Text30.0", valueFormat: "comb" },
+]
+
+export const DEFAULT_PND94_MAPPING: PndFieldMapping[] = [
+  { logicalKey: "personal.tax_id", fieldKind: "text", physicalFieldName: "Text1.1", valueFormat: "raw" },
+  { logicalKey: "personal.first_name", fieldKind: "text", physicalFieldName: "Text1.5", valueFormat: "raw" },
+  { logicalKey: "personal.last_name", fieldKind: "text", physicalFieldName: "Text1.7", valueFormat: "raw" },
+  { logicalKey: "address.building", fieldKind: "text", physicalFieldName: "Text1.9", valueFormat: "raw" },
+  { logicalKey: "address.room", fieldKind: "text", physicalFieldName: "Text1.10", valueFormat: "raw" },
+  { logicalKey: "address.floor", fieldKind: "text", physicalFieldName: "Text1.11", valueFormat: "raw" },
+  { logicalKey: "address.village", fieldKind: "text", physicalFieldName: "Text1.12", valueFormat: "raw" },
+  { logicalKey: "address.no", fieldKind: "text", physicalFieldName: "Text1.13", valueFormat: "raw" },
+  { logicalKey: "address.moo", fieldKind: "text", physicalFieldName: "Text1.14", valueFormat: "raw" },
+  { logicalKey: "address.soi", fieldKind: "text", physicalFieldName: "Text1.15", valueFormat: "raw" },
+  { logicalKey: "address.yaek", fieldKind: "text", physicalFieldName: "Text1.21", valueFormat: "raw" },
+  { logicalKey: "address.road", fieldKind: "text", physicalFieldName: "Text1.16", valueFormat: "raw" },
+  { logicalKey: "address.subdistrict", fieldKind: "text", physicalFieldName: "Text1.17", valueFormat: "raw" },
+  { logicalKey: "address.district", fieldKind: "text", physicalFieldName: "Text1.18", valueFormat: "raw" },
+  { logicalKey: "address.province", fieldKind: "text", physicalFieldName: "Text1.19", valueFormat: "raw" },
+  { logicalKey: "address.zipcode", fieldKind: "text", physicalFieldName: "Text1.20", valueFormat: "raw" },
+  { logicalKey: "rent.payer_tax_id", fieldKind: "text", physicalFieldName: "Text3.10", valueFormat: "raw" },
+  { logicalKey: "rent.description_label", fieldKind: "text", physicalFieldName: "Text3.11", valueFormat: "raw" },
+  { logicalKey: "rent.gross", fieldKind: "text", physicalFieldName: "Text3.12", valueFormat: "plain_decimal" },
+  { logicalKey: "rent.deduction_percent", fieldKind: "text", physicalFieldName: "Text3.15", valueFormat: "raw" },
+  { logicalKey: "rent.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button6", optionKey: "percentage", widgetIndex: 0 },
+  { logicalKey: "rent.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button6", optionKey: "actual", widgetIndex: 1 },
+  { logicalKey: "rent.deduction", fieldKind: "text", physicalFieldName: "Text3.16", valueFormat: "plain_decimal" },
+  { logicalKey: "rent.net", fieldKind: "text", physicalFieldName: "Text3.17", valueFormat: "plain_decimal" },
+  { logicalKey: "utilities.payer_tax_id", fieldKind: "text", physicalFieldName: "Text3.20", valueFormat: "raw" },
+  { logicalKey: "utilities.description_label", fieldKind: "text", physicalFieldName: "Text3.21", valueFormat: "raw" },
+  { logicalKey: "utilities.gross", fieldKind: "text", physicalFieldName: "Text3.22", valueFormat: "plain_decimal" },
+  { logicalKey: "utilities.deduction_percent", fieldKind: "text", physicalFieldName: "Text3.25", valueFormat: "raw" },
+  { logicalKey: "utilities.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button7", optionKey: "percentage", widgetIndex: 0 },
+  { logicalKey: "utilities.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button7", optionKey: "actual", widgetIndex: 1 },
+  { logicalKey: "utilities.deduction", fieldKind: "text", physicalFieldName: "Text3.26", valueFormat: "plain_decimal" },
+  { logicalKey: "utilities.net", fieldKind: "text", physicalFieldName: "Text3.27", valueFormat: "plain_decimal" },
+  { logicalKey: "other.payer_tax_id", fieldKind: "text", physicalFieldName: "Text3.30", valueFormat: "raw" },
+  { logicalKey: "other.description_label", fieldKind: "text", physicalFieldName: "Text3.31", valueFormat: "raw" },
+  { logicalKey: "other.gross", fieldKind: "text", physicalFieldName: "Text3.32", valueFormat: "plain_decimal" },
+  { logicalKey: "other.deduction_percent", fieldKind: "text", physicalFieldName: "Text3.35", valueFormat: "raw" },
+  { logicalKey: "other.deduction_method", fieldKind: "radio", physicalFieldName: "Radio Button8", optionKey: "actual", widgetIndex: 1 },
+  { logicalKey: "other.deduction", fieldKind: "text", physicalFieldName: "Text3.36", valueFormat: "plain_decimal" },
+  { logicalKey: "other.net", fieldKind: "text", physicalFieldName: "Text3.37", valueFormat: "plain_decimal" },
+  { logicalKey: "personal.personal_deduction", fieldKind: "text", physicalFieldName: "Text4.10.1", valueFormat: "plain_decimal" },
+  { logicalKey: "item.1", fieldKind: "text", physicalFieldName: "Text2.1", valueFormat: "plain_decimal" },
+  { logicalKey: "item.2", fieldKind: "text", physicalFieldName: "Text2.2", valueFormat: "plain_decimal" },
+  { logicalKey: "item.3", fieldKind: "text", physicalFieldName: "Text2.3", valueFormat: "plain_decimal" },
+  { logicalKey: "item.4", fieldKind: "text", physicalFieldName: "Text2.4", valueFormat: "plain_decimal" },
+  { logicalKey: "item.5", fieldKind: "text", physicalFieldName: "Text2.5", valueFormat: "plain_decimal" },
+  { logicalKey: "item.6", fieldKind: "text", physicalFieldName: "Text2.6", valueFormat: "plain_decimal" },
+  { logicalKey: "item.7", fieldKind: "text", physicalFieldName: "Text2.7", valueFormat: "plain_decimal" },
+  { logicalKey: "item.8", fieldKind: "text", physicalFieldName: "Text2.8", valueFormat: "plain_decimal" },
+  { logicalKey: "item.9", fieldKind: "text", physicalFieldName: "Text2.9", valueFormat: "plain_decimal" },
+  { logicalKey: "item.10", fieldKind: "text", physicalFieldName: "Text2.10", valueFormat: "plain_decimal" },
+  { logicalKey: "item.11", fieldKind: "text", physicalFieldName: "Text2.11", valueFormat: "plain_decimal" },
+  { logicalKey: "item.12", fieldKind: "text", physicalFieldName: "Text2.12", valueFormat: "plain_decimal" },
+  { logicalKey: "item.13", fieldKind: "text", physicalFieldName: "Text2.13", valueFormat: "plain_decimal" },
+  // หมายเหตุ: item.14 (ภาษีหัก ณ ที่จ่าย) ไม่มี field แยกในเทมเพลตนี้ (ของเดิมก็ไม่เคยกรอก Text2.14) จึงไม่ map ไว้ตรงนี้
+  { logicalKey: "item.15", fieldKind: "text", physicalFieldName: "Text2.15", valueFormat: "plain_decimal" },
+  { logicalKey: "item.16", fieldKind: "text", physicalFieldName: "Text2.16", valueFormat: "plain_decimal" },
+  { logicalKey: "item.17", fieldKind: "text", physicalFieldName: "Text2.17", valueFormat: "plain_decimal" },
+  { logicalKey: "item.18", fieldKind: "text", physicalFieldName: "Text2.18", valueFormat: "plain_decimal" },
+  { logicalKey: "item.19", fieldKind: "text", physicalFieldName: "Text2.19", valueFormat: "plain_decimal" },
+  // หมายเหตุ: Text2.26 (กล่อง "ภาษีที่ชำระ" ด้านขวา) มี maxLength=3 ไม่พอใส่ยอดเงินเต็มจำนวน จึงไม่ map ไว้เช่นกัน
+]
+
+export interface PndLogicalKeyCatalogEntry {
+  key: string
+  kind: "text" | "radio"
+  options?: string[] // radio เท่านั้น — ตัวเลือกเชิงความหมายที่เป็นไปได้ (เช่น "percentage"/"actual")
+}
+
+// สร้าง catalog "key ไหนเป็น text/radio และมีตัวเลือกอะไรบ้าง" — ครอบทุก key ใน PND_LOGICAL_KEYS เสมอ (แม้ key ที่ยังไม่เคย
+// map ใน DEFAULT mapping เช่นรายการเงินบริจาคที่ template ปัจจุบันไม่มีช่องให้ ก็ยังต้องเลือกได้ล่วงหน้าเผื่อ template ใหม่มีช่องนี้)
+// เติม kind/options จาก DEFAULT mapping โดยอัตโนมัติ (ไม่ maintain ซ้ำมือ) ค่า default ของ key ที่ไม่เจอคือ "text"
+function buildLogicalKeyCatalog(formType: "90" | "94", defaultMapping: PndFieldMapping[]): PndLogicalKeyCatalogEntry[] {
+  const byKey = new Map<string, PndLogicalKeyCatalogEntry>()
+  for (const key of PND_LOGICAL_KEYS[formType]) {
+    byKey.set(key, { key, kind: "text" })
+  }
+  for (const m of defaultMapping) {
+    const entry = byKey.get(m.logicalKey) || { key: m.logicalKey, kind: m.fieldKind }
+    entry.kind = m.fieldKind
+    if (m.fieldKind === "radio") {
+      entry.options = entry.options || []
+      if (m.optionKey && !entry.options.includes(m.optionKey)) entry.options.push(m.optionKey)
+    }
+    byKey.set(m.logicalKey, entry)
+  }
+  return Array.from(byKey.values())
+}
+
+export const PND_LOGICAL_KEY_CATALOG: Record<"90" | "94", PndLogicalKeyCatalogEntry[]> = {
+  "90": buildLogicalKeyCatalog("90", DEFAULT_PND90_MAPPING),
+  "94": buildLogicalKeyCatalog("94", DEFAULT_PND94_MAPPING),
+}
+
+// เครื่องหมาย due/overpaid ของ item ที่เป็นผลต่าง (>0 = ต้องชำระเพิ่ม, <0 = ชำระไว้เกิน, =0 = ไม่ต้องเลือกเลย)
+const signOf = (n: number): string | null => (n > 0 ? "due" : n < 0 ? "overpaid" : null)
+
+// สูตรคำนวณภาษี ภ.ง.ด. 90 (เต็มปี) — ล้วนเป็นตรรกะเดิมที่เคยฝังอยู่ใน generatePndPdf ไม่เปลี่ยนแปลง
+// ไม่รู้จักชื่อ field ทางกายภาพเลย คืนค่าเป็น logical key ล้วนๆ ให้ fillPdfFromMapping ไปจับคู่กับ mapping ต่อไป
+export function computePnd90Values(data: PndData, formattedTaxId: string): PndComputedValues {
+  const addressParts = data.addressParts || EMPTY_ADDRESS_PARTS
+  const other408 = data.other408 || 0
+  const deductionOther408 = data.deductionOther408 || 0
+  const otherNet = other408 - deductionOther408
+
+  const rentNet = data.rent405 - data.deductionRent405
+  const rentIsActual = data.rentDeductionMethod === "actual"
+
+  const utilitiesNet = data.utilities408 - data.deductionUtilities408
+  const utilIsActual = data.utilitiesDeductionMethod === "actual"
+  const utilDeductionPct = data.utilities408 > 0 ? Math.round((data.deductionUtilities408 / data.utilities408) * 100) : 0
+
+  // ค่าลดหย่อนส่วนตัว (ตามสถานภาพผู้เสียภาษี) ใช้ทั้งในข้อ 11 ข้อ 2. และในใบแนบแสดงรายละเอียดรายการลดหย่อนฯ หน้า 5
+  const personalDeduction = calculatePersonalDeduction("90", data.taxpayerStatus || "individual", data.partnerCount || 1)
+
+  // ข้อ 11 การคำนวณภาษี — รายการที่ระบบไม่มีข้อมูลจริง (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ยื่นเพิ่มเติม ฯลฯ) ปล่อยว่างไว้ไม่กรอกเลข 0
+  // ส่วนรายการที่คำนวณได้จริง (ถึงจะได้ 0 จากการคำนวณ) ยังกรอกตามปกติ เพื่อไม่ให้ดูเหมือนข้อมูลหาย
+  const item1 = data.netIncome
+  const item2 = personalDeduction
+  const item3 = Math.max(0, item1 - item2)
+  const item4 = 0 // หัก เงินบริจาคสนับสนุนการศึกษา/อื่นๆ — ไม่มีข้อมูล ปล่อยว่าง
+  const item5 = item3 - item4
+  const item6 = 0 // หัก เงินบริจาคทั่วไป — ไม่มีข้อมูล ปล่อยว่าง
+  const item7 = Math.max(0, item5 - item6)
+  const grossAssessableFull = data.rent405 + data.utilities408 + other408 // ไม่รวมมาตรา 40(1) (ระบบไม่มีเงินได้ประเภทนี้)
+  const item8 = calculateProgressiveTax(item7)
+  const item9 = calculateMinimumTax(grossAssessableFull)
+  const item10 = calculateFinalTaxDue(item8, item9)
+  const item11 = 0 // ภาษีจากใบแสดงเงินได้ฯ ในเขตพัฒนาพิเศษเฉพาะกิจ — ไม่มีข้อมูล ปล่อยว่าง
+  const item12 = item10 + item11
+  const item13 = 0 // หัก เครดิตภาษีเงินได้จากต่างประเทศ — ไม่มีข้อมูล ปล่อยว่าง
+  const item14 = item12 - item13
+  const item15 = 0 // หัก ภาษีเงินได้หัก ณ ที่จ่ายและเครดิตภาษี — ไม่มี field แยกในระบบ ปล่อยว่าง
+  const item16 = item14 - item15
+  const item17 = 0 // ยกมาจากข้อ 8 (ขายอสังหาริมทรัพย์แยกยื่น) — ไม่มีข้อมูล ปล่อยว่าง
+  const item18 = item16 + item17
+  const item19 = 0 // ยกมาจากข้อ 9 — ไม่มีข้อมูล ปล่อยว่าง
+  const item20 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
+  const item21 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
+  const item22 = 0 // เฉพาะกรณียื่นเพิ่มเติม (ระบบนี้ยื่นปกติ) ปล่อยว่าง
+  const item23 = item18 + item19 + item20 - item21 - item22
+  const item24 = 0 // บวก เงินเพิ่ม — ไม่มีข้อมูล ปล่อยว่าง
+  const item25 = item23 + item24 // รวมภาษีที่ชำระเพิ่มเติม/ชำระไว้เกิน สุดท้าย
+
+  const text: Record<string, PndTextValue | null> = {
+    "header.tax_year": { format: "raw", text: data.taxYear },
+    "personal.tax_id": { format: "raw", text: formattedTaxId },
+    "personal.first_name": { format: "raw", text: data.firstName },
+    "personal.last_name": { format: "raw", text: data.lastName },
+    "address.building": { format: "raw", text: addressParts.building },
+    "address.room": { format: "raw", text: addressParts.room },
+    "address.floor": { format: "raw", text: addressParts.floor },
+    "address.village": { format: "raw", text: addressParts.village },
+    "address.no": { format: "raw", text: addressParts.no },
+    "address.moo": { format: "raw", text: addressParts.moo },
+    "address.soi": { format: "raw", text: addressParts.soi },
+    "address.yaek": { format: "raw", text: addressParts.yaek },
+    "address.road": { format: "raw", text: addressParts.road },
+    "address.subdistrict": { format: "raw", text: addressParts.subdistrict },
+    "address.district": { format: "raw", text: addressParts.district },
+    "address.province": { format: "raw", text: addressParts.province },
+    "address.zipcode": { format: "raw", text: addressParts.zipcode },
+    "rent.payer_tax_id": { format: "raw", text: formattedTaxId },
+    "rent.gross": { format: "comb", amount: data.rent405 },
+    "rent.deduction": { format: "comb", amount: data.deductionRent405 },
+    "rent.net": { format: "comb", amount: rentNet },
+    "utilities.payer_tax_id": { format: "raw", text: formattedTaxId },
+    "utilities.description_label": { format: "raw", text: "ค่าน้ำไฟและบริการ" },
+    "utilities.gross": { format: "comb", amount: data.utilities408 },
+    "utilities.deduction": { format: "comb", amount: data.deductionUtilities408 },
+    "utilities.net": { format: "comb", amount: utilitiesNet },
+    "utilities.deduction_percent": { format: "raw", text: utilIsActual ? "" : utilDeductionPct.toString() },
+    "annex.tax_id": { format: "raw", text: formattedTaxId },
+    "annex.first_name": { format: "raw", text: data.firstName },
+    "annex.last_name": { format: "raw", text: data.lastName },
+    "annex.personal_deduction_item1": { format: "comb", amount: personalDeduction },
+    "annex.personal_deduction_total": { format: "comb", amount: personalDeduction },
+    "item.1": { format: "comb", amount: item1 },
+    "item.2": { format: "comb", amount: item2 },
+    "item.3": { format: "comb", amount: item3 },
+    "item.5": { format: "comb", amount: item5 },
+    "item.7": { format: "comb", amount: item7 },
+    "item.8": { format: "comb", amount: item8 },
+    "item.9_base": { format: "plain_decimal", amount: grossAssessableFull },
+    "item.9": { format: "comb", amount: item9 },
+    "item.10": { format: "comb", amount: item10 },
+    "item.12": { format: "comb", amount: item12 },
+    "item.14": { format: "comb", amount: item14 },
+    "item.16": { format: "comb", amount: item16 },
+    "item.18": { format: "comb", amount: item18 },
+    "item.23": { format: "comb", amount: item23 },
+    "item.25": { format: "comb", amount: item25 },
+  }
+
+  if (other408 > 0) {
+    text["other.description_label"] = { format: "raw", text: "รายได้อื่น (ปรับ/รับมัดจำ)" }
+    text["other.gross"] = { format: "comb", amount: other408 }
+    text["other.deduction"] = { format: "comb", amount: deductionOther408 }
+    text["other.net"] = { format: "comb", amount: otherNet }
+  }
+
+  if (item25 >= 0) {
+    text["summary.due_amount"] = { format: "comb", amount: item25 }
+  } else {
+    text["summary.overpaid_amount"] = { format: "comb", amount: -item25 }
+  }
+
+  const radio: Record<string, string | null> = {
+    "personal.taxpayer_status": data.taxpayerStatus === "partnership" ? "partnership" : "individual",
+    "personal.filing_type": "normal",
+    "rent.deduction_method": rentIsActual ? "actual" : "percentage",
+    "utilities.deduction_method": utilIsActual ? "actual" : "percentage",
+    "item.16_sign": signOf(item16),
+    "item.18_sign": signOf(item18),
+    "item.23_sign": signOf(item23),
+    "item.25_sign": signOf(item25),
+  }
+  if (other408 > 0) {
+    radio["other.deduction_method"] = "actual"
+  }
+
+  return { text, radio }
+}
+
+// สูตรคำนวณภาษี ภ.ง.ด. 94 (ครึ่งปี) — ล้วนเป็นตรรกะเดิมที่เคยฝังอยู่ใน generatePndPdf ไม่เปลี่ยนแปลง
+export function computePnd94Values(data: PndData, formattedTaxId: string): PndComputedValues {
+  const addressParts = data.addressParts || EMPTY_ADDRESS_PARTS
+  const taxpayerStatus = data.taxpayerStatus || "individual"
+  const partnerCount = data.partnerCount || 1
+
+  // ก.1 รายได้ค่าเช่าห้องพัก (มาตรา 40(5))
+  const rentGrossHalf = data.rent405 / 2
+  const rentDeductionHalf = data.deductionRent405
+  const rentNetHalf = Math.max(0, rentGrossHalf - rentDeductionHalf)
+  const rentIsActual = data.rentDeductionMethod === "actual"
+  const rentDeductionPct = rentGrossHalf > 0 ? Math.round((rentDeductionHalf / rentGrossHalf) * 100) : 0
+
+  // ก.2 ค่าน้ำไฟและบริการ (มาตรา 40(8))
+  const utilGrossHalf = data.utilities408 / 2
+  const utilDeductionHalf = data.deductionUtilities408
+  const utilNetHalf = Math.max(0, utilGrossHalf - utilDeductionHalf)
+  const utilIsActual = data.utilitiesDeductionMethod === "actual"
+  const utilDeductionPct = utilGrossHalf > 0 ? Math.round((utilDeductionHalf / utilGrossHalf) * 100) : 0
+
+  // ก.3 รายได้อื่น (ปรับ/ริบมัดจำ) — กฎหมายไม่ให้สิทธิ์หักแบบเหมา ใช้ "จริง" เสมอ (ไม่มีข้อมูลค่าใช้จ่ายจริงให้หัก จึงเป็น 0)
+  const otherGrossHalf = (data.other408 || 0) / 2
+
+  // ข.1 ค่าลดหย่อนส่วนตัว (ตามสถานภาพผู้เสียภาษี)
+  const personalDeduction = calculatePersonalDeduction("94", taxpayerStatus, partnerCount)
+
+  // กล่องคำนวณภาษีหน้า 1 (ข้อ 1-19) — คำนวณภาษีขั้นบันไดจริง ค่าที่ระบบไม่มีข้อมูล (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ฯลฯ) ตั้งเป็น 0
+  const netIncomeAfterExpense = rentNetHalf + utilNetHalf + otherGrossHalf
+  const item1 = netIncomeAfterExpense
+  const item2 = personalDeduction
+  const item3 = Math.max(0, item1 - item2)
+  const item4 = 0
+  const item5 = item3 - item4
+  const item6 = 0
+  const item7 = Math.max(0, item5 - item6)
+  const grossAssessableHalf = rentGrossHalf + utilGrossHalf + otherGrossHalf
+  const item8 = calculateProgressiveTax(item7)
+  const item9 = calculateMinimumTax(grossAssessableHalf)
+  const item10 = calculateFinalTaxDue(item8, item9)
+  const item11 = 0
+  const item12 = item10 + item11
+  const item13 = 0
+  const item14 = 0 // ภาษีหัก ณ ที่จ่าย — ไม่มี field แยกในแบบฟอร์มนี้ (ระบบไม่มีข้อมูลส่วนนี้)
+  const item15 = item12 + item13 - item14
+  const item16 = 0
+  const item17 = Math.max(0, item15 - item16)
+  const item18 = 0
+  const item19 = item17 + item18
+
+  const text: Record<string, PndTextValue | null> = {
+    "personal.tax_id": { format: "raw", text: formattedTaxId },
+    "personal.first_name": { format: "raw", text: data.firstName },
+    "personal.last_name": { format: "raw", text: data.lastName },
+    "address.building": { format: "raw", text: addressParts.building },
+    "address.room": { format: "raw", text: addressParts.room },
+    "address.floor": { format: "raw", text: addressParts.floor },
+    "address.village": { format: "raw", text: addressParts.village },
+    "address.no": { format: "raw", text: addressParts.no },
+    "address.moo": { format: "raw", text: addressParts.moo },
+    "address.soi": { format: "raw", text: addressParts.soi },
+    "address.yaek": { format: "raw", text: addressParts.yaek },
+    "address.road": { format: "raw", text: addressParts.road },
+    "address.subdistrict": { format: "raw", text: addressParts.subdistrict },
+    "address.district": { format: "raw", text: addressParts.district },
+    "address.province": { format: "raw", text: addressParts.province },
+    "address.zipcode": { format: "raw", text: addressParts.zipcode },
+    "rent.payer_tax_id": { format: "raw", text: formattedTaxId },
+    "rent.description_label": { format: "raw", text: "รายได้ค่าเช่าห้องพัก" },
+    "rent.gross": { format: "plain_decimal", amount: rentGrossHalf },
+    "rent.deduction_percent": { format: "raw", text: rentIsActual ? "" : rentDeductionPct.toString() },
+    "rent.deduction": { format: "plain_decimal", amount: rentDeductionHalf },
+    "rent.net": { format: "plain_decimal", amount: rentNetHalf },
+    "utilities.payer_tax_id": { format: "raw", text: formattedTaxId },
+    "utilities.description_label": { format: "raw", text: "ค่าน้ำไฟและบริการ" },
+    "utilities.gross": { format: "plain_decimal", amount: utilGrossHalf },
+    "utilities.deduction_percent": { format: "raw", text: utilIsActual ? "" : utilDeductionPct.toString() },
+    "utilities.deduction": { format: "plain_decimal", amount: utilDeductionHalf },
+    "utilities.net": { format: "plain_decimal", amount: utilNetHalf },
+    "other.payer_tax_id": { format: "raw", text: formattedTaxId },
+    "other.description_label": { format: "raw", text: "รายได้อื่น (ปรับ/ริบมัดจำ)" },
+    "other.gross": { format: "plain_decimal", amount: otherGrossHalf },
+    "other.deduction_percent": { format: "raw", text: "0" },
+    "other.deduction": { format: "plain_decimal", amount: 0 },
+    "other.net": { format: "plain_decimal", amount: otherGrossHalf },
+    "personal.personal_deduction": { format: "plain_decimal", amount: personalDeduction },
+    "item.1": { format: "plain_decimal", amount: item1 },
+    "item.2": { format: "plain_decimal", amount: item2 },
+    "item.3": { format: "plain_decimal", amount: item3 },
+    "item.4": { format: "plain_decimal", amount: item4 },
+    "item.5": { format: "plain_decimal", amount: item5 },
+    "item.6": { format: "plain_decimal", amount: item6 },
+    "item.7": { format: "plain_decimal", amount: item7 },
+    "item.8": { format: "plain_decimal", amount: item8 },
+    "item.9": { format: "plain_decimal", amount: item9 },
+    "item.10": { format: "plain_decimal", amount: item10 },
+    "item.11": { format: "plain_decimal", amount: item11 },
+    "item.12": { format: "plain_decimal", amount: item12 },
+    "item.13": { format: "plain_decimal", amount: item13 },
+    // item.14 ไม่มี field แยกในเทมเพลตนี้ (ดูหมายเหตุใน DEFAULT_PND94_MAPPING) จึงไม่ใส่ไว้ที่นี่
+    "item.15": { format: "plain_decimal", amount: item15 },
+    "item.16": { format: "plain_decimal", amount: item16 },
+    "item.17": { format: "plain_decimal", amount: item17 },
+    "item.18": { format: "plain_decimal", amount: item18 },
+    "item.19": { format: "plain_decimal", amount: item19 },
+  }
+
+  const radio: Record<string, string | null> = {
+    "rent.deduction_method": rentIsActual ? "actual" : "percentage",
+    "utilities.deduction_method": utilIsActual ? "actual" : "percentage",
+    "other.deduction_method": "actual",
+  }
+
+  return { text, radio }
+}
+
+// ตัวกรอกฟอร์ม generic — ไม่รู้จักฟอร์มภาษี/สูตรคำนวณเลย รับแค่ mapping (ชื่อ field จริง) + ค่าที่คำนวณแล้ว (logical key)
+// แล้ว dispatch ไปเรียก setField/selectRadioWidget/fmtComb ตัวเดิมของ generatePndPdf ผ่าน helpers ที่ส่งเข้ามา
+export function fillPdfFromMapping(
+  mappings: PndFieldMapping[],
+  computed: PndComputedValues,
+  helpers: {
+    setField: (name: string, value: string) => void
+    selectRadioWidget: (name: string, widgetIndex: number) => void
+    getMaxLength: (name: string) => number | undefined
+    fmtComb: (n: number, totalLen: number) => string
+  }
+) {
+  const { setField, selectRadioWidget, getMaxLength, fmtComb } = helpers
+  for (const fieldMapping of mappings) {
+    if (fieldMapping.fieldKind === "text") {
+      const value = computed.text[fieldMapping.logicalKey]
+      if (!value) continue // ไม่มีข้อมูลคำนวณสำหรับ key นี้ -> ปล่อยฟิลด์ว่างไว้ตามเดิม
+      let text: string
+      if (value.format === "comb") {
+        const totalLen = getMaxLength(fieldMapping.physicalFieldName) || 12
+        text = fmtComb(value.amount ?? 0, totalLen)
+      } else if (value.format === "plain_decimal") {
+        text = (value.amount ?? 0).toFixed(2)
+      } else {
+        text = value.text ?? ""
+      }
+      setField(fieldMapping.physicalFieldName, text)
+    } else {
+      const selectedOption = computed.radio[fieldMapping.logicalKey]
+      if (!selectedOption || fieldMapping.optionKey !== selectedOption) continue
+      selectRadioWidget(fieldMapping.physicalFieldName, fieldMapping.widgetIndex ?? 0)
+    }
+  }
+}
+
+export async function generatePndPdf(type: "90" | "94", data: PndData, templateUrl?: string, mapping?: PndFieldMapping[]) {
   // 1. กำหนดไฟล์ Template ตามประเภทของ ภ.ง.ด. — ใช้ template ที่ Super Admin อัปโหลดไว้ถ้ามี ไม่งั้น fallback เป็นไฟล์เริ่มต้นของระบบ
   const resolvedTemplateUrl = templateUrl || (type === "90"
     ? "/templates/PND90_Template.pdf"
@@ -237,7 +753,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
   // option export value ซ้ำกันในบาง field (ทุก widget ของปุ่มเดียวกันรายงานชื่อเดียวกันจากมุมมอง getOptions())
   // ทำให้ .select() แบบปกติเลือกผิด widget หรือโยน error จึงต้องตั้งค่า AS (appearance state) ของแต่ละ widget
   // โดยตรงตามลำดับ index แทน (index 0 = ตัวเลือก "ร้อยละ" ซ้ายมือ, index 1 = ตัวเลือก "จริง" ขวามือ ตามตำแหน่งจริงบนฟอร์ม)
-  const selectRadioWidget = (name: string, widgetIndex: 0 | 1) => {
+  const selectRadioWidget = (name: string, widgetIndex: number) => {
     try {
       const radioGroup = form.getRadioGroup(name)
       const widgets = radioGroup.acroField.getWidgets()
@@ -269,159 +785,23 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     return `${bahtDigits}-${decPart}`
   }
 
-  // 5. กรอกข้อมูลและตัวเลขลงในแบบฟอร์มผ่าน Form Fields
+  // ความยาว comb cell จริงของแต่ละ field อ่านจากไฟล์ตอนกรอก ไม่ hardcode ไว้ใน mapping (แต่ละ template อาจกว้างไม่เท่ากัน)
+  const getMaxLength = (name: string): number | undefined => {
+    try {
+      return form.getTextField(name).getMaxLength()
+    } catch {
+      return undefined
+    }
+  }
+
+  // 5. กรอกข้อมูลและตัวเลขลงในแบบฟอร์มผ่าน mapping (จาก DB ถ้ามี ไม่งั้น fallback เป็น mapping เริ่มต้นของไฟล์ที่ bundle มากับระบบ)
+  const activeMapping = mapping || (type === "90" ? DEFAULT_PND90_MAPPING : DEFAULT_PND94_MAPPING)
+  const computed = type === "90" ? computePnd90Values(data, formattedTaxId) : computePnd94Values(data, formattedTaxId)
+  fillPdfFromMapping(activeMapping, computed, { setField, selectRadioWidget, getMaxLength, fmtComb })
+
+  // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง (ไม่ใช่ form field ไม่ผ่านระบบ mapping)
   if (type === "90") {
-    // ภ.ง.ด. 90 (เต็มปี)
-    // หมายเหตุ: field mapping ของฟอร์มนี้ตรวจสอบจากตำแหน่ง x/y จริงของทุก field เทียบกับ label บนหน้าจริงแล้ว (ไม่ได้เดา)
-    // ของเดิมผิดหลายจุด — Text7.3 ที่เข้าใจว่าเป็นนามสกุลจริงๆ คือช่องชื่อคู่สมรส, Text9 รับที่อยู่ทั้งก้อนทั้งที่เป็นแค่ช่อง "อาคาร",
-    // Text34.0/34.1/34.2/33.9 ที่ใช้เป็นค่าเช่าจริงๆ คือช่องกองทุนรวม (RMF/LTF) ของข้อ 4 คนละรายการ,
-    // และไม่เคยกรอกช่อง "สถานภาพผู้มีเงินได้", ช่องภาษีชำระเพิ่มเติม/ไว้เกินหน้าแรก, และเลขผู้จ่ายเงินได้ของข้อ 7 เลย
-    setField("Text11111", data.taxYear)
-
-    // ข้อมูลส่วนตัว (Text7.3/Text7.4/Text7.5 เป็นช่องชื่อ-ชื่อกลาง-นามสกุลของ "คู่สมรส" ไม่ใช่ผู้มีเงินได้ จึงไม่กรอก)
-    setField("Text80.0", formattedTaxId)
-    setField("Text7.0", data.firstName)
-    setField("Text7.2", data.lastName)
-
-    // เลือกสถานภาพของผู้มีเงินได้ (widget 0 = บุคคลธรรมดา, widget 1 = ห้างหุ้นส่วนสามัญที่มิใช่นิติบุคคล)
-    selectRadioWidget("Radio Button48", data.taxpayerStatus === "partnership" ? 1 : 0)
-    // ยื่นปกติเสมอ (ระบบยังไม่รองรับยื่นแบบเพิ่มเติม)
-    selectRadioWidget("Radio Button999", 0)
-
-    // ที่อยู่แยกช่องตามกล่องจริงบนฟอร์ม (เดิมยัดที่อยู่ทั้งก้อนลงช่อง "อาคาร" ช่องเดียว ทำให้ล้นทับช่องอื่นๆ)
-    const addressParts = data.addressParts || {
-      building: "", room: "", floor: "", village: "", no: "", moo: "", soi: "", yaek: "",
-      road: "", subdistrict: "", district: "", province: "", zipcode: ""
-    }
-    setField("Text9", addressParts.building)
-    setField("Text100.1", addressParts.room)
-    setField("Text100.2", addressParts.floor)
-    setField("Text100.3", addressParts.village)
-    setField("Text13", addressParts.no)
-    setField("Text14", addressParts.moo)
-    setField("Text155.1", addressParts.soi)
-    setField("Text155.2", addressParts.yaek)
-    setField("Text155.3", addressParts.road)
-    setField("Text155.4", addressParts.subdistrict)
-    setField("Text155.5", addressParts.district)
-    setField("Text155.6", addressParts.province)
-    setField("Text20", addressParts.zipcode)
-    // หมายเหตุ: ฟอร์มนี้ไม่มีช่องเบอร์โทรศัพท์บนหน้าแรก (ของเดิมวาดทับตำแหน่งอื่นด้วยพิกัดที่ไม่มีฟิลด์รองรับจริง จึงตัดออก)
-
-    // มาตรา 40(5) ข้อ 4 ➊ "การให้เช่าทรัพย์สิน (1) บ้าน โรงเรือน สิ่งปลูกสร้างอย่างอื่น หรือแพ" - หน้า 2
-    // (ของเดิมกรอกลง Text34.0/34.1/34.2/33.9 ซึ่งจริงๆ เป็นช่องคนละรายการ (กองทุนรวม RMF/LTF ในข้อ 4 ➏) ทำให้ค่าเช่าไปโผล่ผิดจุด)
-    const rentNet = data.rent405 - data.deductionRent405
-    const rentIsActual = data.rentDeductionMethod === "actual"
-    setField("Text31.1.1", formattedTaxId) // ผู้จ่ายเงินได้ เลขประจำตัวผู้เสียภาษีอากร ของข้อ 4 — ไม่มีผู้หักภาษี ณ ที่จ่ายจริง ใช้เลขของผู้มีเงินได้เอง
-    setField("Text360.1", fmtComb(data.rent405, 12))
-    setField("Text360.2", fmtComb(data.deductionRent405, 12))
-    setField("Text360.3", fmtComb(rentNet, 12))
-    selectRadioWidget("Radio Button14", rentIsActual ? 1 : 0)
-
-    // มาตรา 40(8) ข้อ 7(1) ค่าน้ำไฟและบริการ - หน้า 3
-    // (ก่อนหน้านี้ค่าน้ำไฟ/บริการ กับ รายได้อื่น (ปรับ/ริบมัดจำ) ถูกยัดรวมเป็นก้อนเดียวลงช่องเดียว
-    // ทั้งที่ฟอร์มจริงมีแถว (1) และ (2) แยกกันตามประเภทเงินได้ ทำให้ยอดที่ ก. รวมมาไม่ตรงกับที่ควรจะกรอกแยก)
-    const utilitiesNet = data.utilities408 - data.deductionUtilities408
-    const utilIsActual = data.utilitiesDeductionMethod === "actual"
-    const utilDeductionPct = data.utilities408 > 0 ? Math.round((data.deductionUtilities408 / data.utilities408) * 100) : 0
-    setField("Text38.0", formattedTaxId) // ผู้จ่ายเงินได้ เลขประจำตัวผู้เสียภาษีอากร — ไม่มีผู้หักภาษี ณ ที่จ่ายจริง ใช้เลขของผู้มีเงินได้เอง
-    setField("Text70", "ค่าน้ำไฟและบริการ")
-    setField("Text40.0", fmtComb(data.utilities408, 13))
-    setField("Text40.1", fmtComb(data.deductionUtilities408, 13))
-    setField("Text40.2", fmtComb(utilitiesNet, 13))
-    setField("Text73.0", utilIsActual ? "" : utilDeductionPct.toString())
-    selectRadioWidget("Radio Button22", utilIsActual ? 1 : 0)
-
-    // มาตรา 40(8) ข้อ 7(2) รายได้อื่น (ปรับ/ริบมัดจำ) - หน้า 3 (กฎหมายไม่ให้หักค่าใช้จ่ายแบบเหมาสำหรับเงินได้ประเภทนี้ ใช้ "จริง" เสมอ)
     const other408 = data.other408 || 0
-    if (other408 > 0) {
-      const deductionOther408 = data.deductionOther408 || 0
-      const otherNet = other408 - deductionOther408
-      setField("Text71", "รายได้อื่น (ปรับ/รับมัดจำ)")
-      setField("Text40.3", fmtComb(other408, 13))
-      setField("Text40.4", fmtComb(deductionOther408, 13))
-      setField("Text40.5", fmtComb(otherNet, 13))
-      selectRadioWidget("Radio Button24", 1)
-    }
-
-    // เลือก radio "ชำระเพิ่มเติม" (ซ้าย, widget 0) เมื่อยอดเป็นบวก หรือ "ชำระไว้เกิน" (ขวา, widget 1) เมื่อติดลบ ไม่เลือกเมื่อเป็น 0
-    const selectDueOrOverpaid = (name: string, amount: number) => {
-      if (amount > 0) selectRadioWidget(name, 0)
-      else if (amount < 0) selectRadioWidget(name, 1)
-    }
-
-    // ค่าลดหย่อนส่วนตัว (ตามสถานภาพผู้เสียภาษี) ใช้ทั้งในข้อ 11 ข้อ 2. และในใบแนบแสดงรายละเอียดรายการลดหย่อนฯ หน้า 5
-    const personalDeduction = calculatePersonalDeduction("90", data.taxpayerStatus || "individual", data.partnerCount || 1)
-
-    // ใบแนบแสดงรายละเอียดรายการลดหย่อนและยกเว้นหลังจากหักค่าใช้จ่าย - หน้า 5 (ก่อนหน้านี้ไม่เคยกรอกเลย ทั้งที่ข้อ 11 ข้อ 2.
-    // ของหน้า 4 อ้างอิงยอดจากหน้านี้โดยตรง — ระบบมีข้อมูลเฉพาะค่าลดหย่อนส่วนตัว (รายการ 1.) จึงกรอกเป็นทั้งรายการ 1. และยอดรวม 24.)
-    // หัวกระดาษหน้านี้มีเลขประจำตัวผู้เสียภาษี/ชื่อ-นามสกุลผู้มีเงินได้ซ้ำอีกชุด (ไม่ใช่ของคู่สมรส) จึงกรอกด้วยข้อมูลเดียวกับหน้าแรก
-    setField("Text68.3", formattedTaxId)
-    setField("Text68.5", data.firstName)
-    setField("Text68.7", data.lastName)
-    setField("Text69.1", fmtComb(personalDeduction, 12))
-    setField("Text69.62", fmtComb(personalDeduction, 12))
-
-    // ข้อ 11 การคำนวณภาษี (กล่องสรุปภาษีหน้า 4) — คำนวณภาษีขั้นบันไดจริงแบบเดียวกับ ภ.ง.ด. 94 (thaiTax.ts)
-    // รายการที่ระบบไม่มีข้อมูลจริง (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ยื่นเพิ่มเติม ฯลฯ) ปล่อยว่างไว้ไม่กรอกเลข 0 ลงไป
-    // ส่วนรายการที่คำนวณได้จริง (ถึงจะได้ 0 จากการคำนวณ) ยังกรอกตามปกติ เพื่อไม่ให้ดูเหมือนข้อมูลหาย
-    const item1 = data.netIncome
-    const item2 = personalDeduction
-    const item3 = Math.max(0, item1 - item2)
-    const item4 = 0 // หัก เงินบริจาคสนับสนุนการศึกษา/อื่นๆ — ระบบไม่มีข้อมูลส่วนนี้ ปล่อยว่าง
-    const item5 = item3 - item4
-    const item6 = 0 // หัก เงินบริจาคทั่วไป — ระบบไม่มีข้อมูลส่วนนี้ ปล่อยว่าง
-    const item7 = Math.max(0, item5 - item6)
-    const grossAssessableFull = data.rent405 + data.utilities408 + other408 // ไม่รวมมาตรา 40(1) (ระบบไม่มีเงินได้ประเภทนี้อยู่แล้ว)
-    const item8 = calculateProgressiveTax(item7)
-    const item9 = calculateMinimumTax(grossAssessableFull)
-    const item10 = calculateFinalTaxDue(item8, item9)
-    const item11 = 0 // ภาษีจากใบแสดงเงินได้ฯ ในเขตพัฒนาพิเศษเฉพาะกิจ — ไม่มีข้อมูล ปล่อยว่าง
-    const item12 = item10 + item11
-    // หมายเหตุ: template ที่ Super Admin อัปโหลดล่าสุดเป็นแบบฟอร์มรุ่นใหม่ที่มี 25 รายการ (ของเดิมมีแค่ 23 รายการ)
-    // เพิ่มรายการ 13-14 (เครดิตภาษีเงินได้จากต่างประเทศ) แทรกเข้ามา ทำให้รายการ 13-23 เดิมเลื่อนเป็น 15-25 ทั้งหมด
-    const item13 = 0 // หัก เครดิตภาษีเงินได้จากต่างประเทศ — ไม่มีข้อมูล ปล่อยว่าง
-    const item14 = item12 - item13
-    const item15 = 0 // หัก ภาษีเงินได้หัก ณ ที่จ่ายและเครดิตภาษี — ไม่มี field แยกในระบบ (เหมือน ภ.ง.ด. 94) ปล่อยว่าง
-    const item16 = item14 - item15
-    const item17 = 0 // ยกมาจากข้อ 8 (ขายอสังหาริมทรัพย์แยกยื่น) — ไม่มีข้อมูล ปล่อยว่าง
-    const item18 = item16 + item17
-    const item19 = 0 // ยกมาจากข้อ 9 (เงินได้จากการให้/รับ เลือกเสียภาษี 5%) — ไม่มีข้อมูล ปล่อยว่าง
-    const item20 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
-    const item21 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
-    const item22 = 0 // เฉพาะกรณียื่นเพิ่มเติม (ระบบนี้ยื่นปกติ) ปล่อยว่าง
-    const item23 = item18 + item19 + item20 - item21 - item22
-    const item24 = 0 // บวก เงินเพิ่ม — ไม่มีข้อมูล ปล่อยว่าง
-    const item25 = item23 + item24 // รวมภาษีที่ชำระเพิ่มเติม/ชำระไว้เกิน สุดท้าย
-
-    setField("Text87.2", fmtComb(item1, 13))
-    setField("Text87.3", fmtComb(item2, 13))
-    setField("Text87.4", fmtComb(item3, 13))
-    setField("Text87.6", fmtComb(item5, 13))
-    setField("Text87.8", fmtComb(item7, 13))
-    setField("Text87.9", fmtComb(item8, 13))
-    setField("Text87.10", grossAssessableFull.toFixed(2)) // ฐานสำหรับสูตร "x 0.005" ของข้อ 9 (ไม่ใช่ comb field)
-    setField("Text87.33", fmtComb(item9, 13))
-    setField("Text87.34", fmtComb(item10, 13))
-    setField("Text87.12", fmtComb(item12, 12))
-    setField("Text87.15", fmtComb(item14, 12))
-    setField("Text87.20", fmtComb(item16, 12))
-    selectDueOrOverpaid("Radio Button89", item16)
-    setField("Text87.23", fmtComb(item18, 12))
-    selectDueOrOverpaid("Radio Button93", item18)
-    setField("Text87.28", fmtComb(item23, 12))
-    selectDueOrOverpaid("Radio Button106", item23)
-    setField("Text87.30", fmtComb(item25, 12))
-    selectDueOrOverpaid("Radio Button107", item25)
-
-    // กล่องสรุปย่อ "ภาษีที่ชำระเพิ่มเติม/ชำระไว้เกิน" ที่หัวหน้าแรก (มายกมาจากผลลัพธ์สุดท้ายของข้อ 11 ข้อ 25.)
-    if (item25 >= 0) {
-      setField("Text23.1.1", fmtComb(item25, 12))
-    } else {
-      setField("Text30.0", fmtComb(-item25, 12))
-    }
-
-    // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง
     drawText(
       `* คำนวณโดยระบบ HorSet: รายได้ 40(5) = ${data.rent405.toLocaleString()} บ. | รายได้ 40(8) = ${(data.utilities408 + other408).toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
       45,
@@ -429,124 +809,9 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
       8
     )
   } else {
-    // ภ.ง.ด. 94 (ครึ่งปี)
-    // หมายเหตุ field mapping ของฟอร์มนี้ตรวจสอบจากตำแหน่ง x/y จริงของทุก field แล้ว (ไม่ได้เดา) — ดูรายละเอียดใน
-    // plan การแก้ไข: Text1.28/Text1.6/Text1.31 ของเดิมผิด (เป็นช่องคู่สมรส/ชื่อกลาง/ไม่มีอยู่จริงตามลำดับ)
-    // และ Text4.10.1/4.15/4.18/4.20 ของเดิมเป็นช่องในตาราง "ข. รายการลดหย่อนฯ" ไม่ใช่รายได้ 40(5)-(8) เลย
-    const fmt = (n: number) => (Number.isFinite(n) ? n : 0).toFixed(2)
-
-    const addressParts = data.addressParts || {
-      building: "", room: "", floor: "", village: "", no: "", moo: "", soi: "", yaek: "",
-      road: "", subdistrict: "", district: "", province: "", zipcode: ""
-    }
-    const taxpayerStatus = data.taxpayerStatus || "individual"
-    const partnerCount = data.partnerCount || 1
-
-    // ข้อมูลส่วนตัวหน้าแรก
-    setField("Text1.1", formattedTaxId)
-    setField("Text1.5", data.firstName)
-    setField("Text1.7", data.lastName)
-    setField("Text1.9", addressParts.building)
-    setField("Text1.10", addressParts.room)
-    setField("Text1.11", addressParts.floor)
-    setField("Text1.12", addressParts.village)
-    setField("Text1.13", addressParts.no)
-    setField("Text1.14", addressParts.moo)
-    setField("Text1.15", addressParts.soi)
-    setField("Text1.21", addressParts.yaek)
-    setField("Text1.16", addressParts.road)
-    setField("Text1.17", addressParts.subdistrict)
-    setField("Text1.18", addressParts.district)
-    setField("Text1.19", addressParts.province)
-    setField("Text1.20", addressParts.zipcode)
-
-    // ก.1 รายได้ค่าเช่าห้องพัก (มาตรา 40(5))
     const rentGrossHalf = data.rent405 / 2
-    const rentDeductionHalf = data.deductionRent405
-    const rentNetHalf = Math.max(0, rentGrossHalf - rentDeductionHalf)
-    const rentIsActual = data.rentDeductionMethod === "actual"
-    const rentDeductionPct = rentGrossHalf > 0 ? Math.round((rentDeductionHalf / rentGrossHalf) * 100) : 0
-    setField("Text3.10", formattedTaxId)
-    setField("Text3.11", "รายได้ค่าเช่าห้องพัก")
-    setField("Text3.12", fmt(rentGrossHalf))
-    setField("Text3.15", rentIsActual ? "" : rentDeductionPct.toString())
-    selectRadioWidget("Radio Button6", rentIsActual ? 1 : 0)
-    setField("Text3.16", fmt(rentDeductionHalf))
-    setField("Text3.17", fmt(rentNetHalf))
-
-    // ก.2 ค่าน้ำไฟและบริการ (มาตรา 40(8))
     const utilGrossHalf = data.utilities408 / 2
-    const utilDeductionHalf = data.deductionUtilities408
-    const utilNetHalf = Math.max(0, utilGrossHalf - utilDeductionHalf)
-    const utilIsActual = data.utilitiesDeductionMethod === "actual"
-    const utilDeductionPct = utilGrossHalf > 0 ? Math.round((utilDeductionHalf / utilGrossHalf) * 100) : 0
-    setField("Text3.20", formattedTaxId)
-    setField("Text3.21", "ค่าน้ำไฟและบริการ")
-    setField("Text3.22", fmt(utilGrossHalf))
-    setField("Text3.25", utilIsActual ? "" : utilDeductionPct.toString())
-    selectRadioWidget("Radio Button7", utilIsActual ? 1 : 0)
-    setField("Text3.26", fmt(utilDeductionHalf))
-    setField("Text3.27", fmt(utilNetHalf))
-
-    // ก.3 รายได้อื่น (ปรับ/ริบมัดจำ) — กฎหมายไม่ให้สิทธิ์หักแบบเหมา ใช้ "จริง" เสมอ (ไม่มีข้อมูลค่าใช้จ่ายจริงให้หัก จึงเป็น 0)
     const otherGrossHalf = (data.other408 || 0) / 2
-    setField("Text3.30", formattedTaxId)
-    setField("Text3.31", "รายได้อื่น (ปรับ/ริบมัดจำ)")
-    setField("Text3.32", fmt(otherGrossHalf))
-    setField("Text3.35", "0")
-    selectRadioWidget("Radio Button8", 1)
-    setField("Text3.36", "0")
-    setField("Text3.37", fmt(otherGrossHalf))
-
-    // ข.1 ค่าลดหย่อนส่วนตัว (ตามสถานภาพผู้เสียภาษี)
-    const personalDeduction = calculatePersonalDeduction("94", taxpayerStatus, partnerCount)
-    setField("Text4.10.1", fmt(personalDeduction))
-
-    // กล่องคำนวณภาษีหน้า 1 (ข้อ 1-19) — คำนวณภาษีขั้นบันไดจริง ค่าที่ระบบไม่มีข้อมูล (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ฯลฯ) ตั้งเป็น 0
-    const netIncomeAfterExpense = rentNetHalf + utilNetHalf + otherGrossHalf
-    const item1 = netIncomeAfterExpense
-    const item2 = personalDeduction
-    const item3 = Math.max(0, item1 - item2)
-    const item4 = 0
-    const item5 = item3 - item4
-    const item6 = 0
-    const item7 = Math.max(0, item5 - item6)
-    const grossAssessableHalf = rentGrossHalf + utilGrossHalf + otherGrossHalf
-    const item8 = calculateProgressiveTax(item7)
-    const item9 = calculateMinimumTax(grossAssessableHalf)
-    const item10 = calculateFinalTaxDue(item8, item9)
-    const item11 = 0
-    const item12 = item10 + item11
-    const item13 = 0
-    const item14 = 0 // ภาษีหัก ณ ที่จ่าย — ไม่มี field แยกในแบบฟอร์มนี้ (ระบบไม่มีข้อมูลส่วนนี้)
-    const item15 = item12 + item13 - item14
-    const item16 = 0
-    const item17 = Math.max(0, item15 - item16)
-    const item18 = 0
-    const item19 = item17 + item18
-
-    setField("Text2.1", fmt(item1))
-    setField("Text2.2", fmt(item2))
-    setField("Text2.3", fmt(item3))
-    setField("Text2.4", fmt(item4))
-    setField("Text2.5", fmt(item5))
-    setField("Text2.6", fmt(item6))
-    setField("Text2.7", fmt(item7))
-    setField("Text2.8", fmt(item8))
-    setField("Text2.9", fmt(item9))
-    setField("Text2.10", fmt(item10))
-    setField("Text2.11", fmt(item11))
-    setField("Text2.12", fmt(item12))
-    setField("Text2.13", fmt(item13))
-    setField("Text2.15", fmt(item15))
-    setField("Text2.16", fmt(item16))
-    setField("Text2.17", fmt(item17))
-    setField("Text2.18", fmt(item18))
-    setField("Text2.19", fmt(item19))
-    // หมายเหตุ: Text2.26 (กล่อง "ภาษีที่ชำระ" ด้านขวา) มี maxLength=3 ในไฟล์ template จริง ไม่พอใส่ยอดเงินเต็มจำนวน
-    // จึงไม่กรอกช่องนี้ (ค่าที่ถูกต้องอยู่ใน Text2.19 อยู่แล้วซึ่งเป็นรายการที่ 19 ในตารางคำนวณภาษีตามลำดับ)
-
-    // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง
     drawText(
       `* คำนวณโดยระบบ HorSet: รายได้ 40(5) ครึ่งปี = ${rentGrossHalf.toLocaleString()} บ. | รายได้ 40(8) ครึ่งปี = ${(utilGrossHalf + otherGrossHalf).toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
       45,

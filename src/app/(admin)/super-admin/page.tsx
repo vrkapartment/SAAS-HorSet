@@ -1602,14 +1602,24 @@ export default function SuperAdminPage() {
                       />
                     </label>
                     {pnd90Template && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTaxTemplate(pnd90Template.id, "ภ.ง.ด. 90")}
-                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold rounded-xl border border-rose-500/20 transition-all cursor-pointer shadow-sm active:scale-95"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        รีเซ็ตเป็นค่าเริ่มต้น
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/super-admin/tax-templates/${pnd90Template.id}/mapping`)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+                        >
+                          <Settings className="w-4 h-4" />
+                          จัด mapping field
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTaxTemplate(pnd90Template.id, "ภ.ง.ด. 90")}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold rounded-xl border border-rose-500/20 transition-all cursor-pointer shadow-sm active:scale-95"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          รีเซ็ตเป็นค่าเริ่มต้น
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1705,14 +1715,24 @@ export default function SuperAdminPage() {
                             <td className="px-4 py-2.5 text-slate-400">{t.file_name || "template.pdf"}</td>
                             <td className="px-4 py-2.5 text-slate-500">{new Date(t.updated_at).toLocaleDateString("th-TH")}</td>
                             <td className="px-4 py-2.5 text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteTaxTemplate(t.id, `ภ.ง.ด. 94 ปีภาษี ${t.tax_year}`)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold rounded-lg border border-rose-500/20 transition-all active:scale-95"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                ลบ
-                              </button>
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/super-admin/tax-templates/${t.id}/mapping`)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-all active:scale-95"
+                                >
+                                  <Settings className="w-3.5 h-3.5" />
+                                  mapping
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteTaxTemplate(t.id, `ภ.ง.ด. 94 ปีภาษี ${t.tax_year}`)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold rounded-lg border border-rose-500/20 transition-all active:scale-95"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  ลบ
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
