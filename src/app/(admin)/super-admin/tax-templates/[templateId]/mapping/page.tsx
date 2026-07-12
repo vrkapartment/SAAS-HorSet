@@ -412,7 +412,9 @@ export default function TaxTemplateMappingPage() {
               {Object.entries(catalogBySection).map(([section, entries]) => (
                 <optgroup key={section} label={SECTION_LABELS[section] || section}>
                   {entries.map((entry) => (
-                    <option key={entry.key} value={entry.key}>{entry.key}</option>
+                    <option key={entry.key} value={entry.key}>
+                      {entry.key}{entry.label ? ` — ${entry.label}` : ""}
+                    </option>
                   ))}
                 </optgroup>
               ))}
