@@ -299,7 +299,7 @@ function RoomsContent() {
   // ฟังก์ชันดาวน์โหลด CSV Template พร้อมใส่ข้อมูลตัวอย่างจริงใน Workspace นำทาง
   const handleDownloadTemplate = () => {
     try {
-      const sampleTypeName = roomTypes[0]?.name || "แอร์"
+      const sampleTypeName = roomTypes[0]?.name || (locale === "th" ? "แอร์" : "Air Conditioner")
       const headers = "room_number,room_type_name,floor"
       const rows = [
         `101,${sampleTypeName},1`,
@@ -319,14 +319,14 @@ function RoomsContent() {
       link.click()
       document.body.removeChild(link)
       
-      showToast("✓ ดาวน์โหลดเทมเพลต CSV สำเร็จ", "success")
+      showToast(t("rooms.toasts.download_template_success"), "success")
       
       // แสดงข้อความแจ้งเตือนคำแนะนำเรื่องการกรอก room_type_name เพื่อป้องกันข้อผิดพลาด
       setTimeout(() => {
         setIsRoomTemplateGuideModalOpen(true)
       }, 500)
     } catch (err: any) {
-      showToast("เกิดข้อผิดพลาดในการดาวน์โหลดเทมเพลต", "error")
+      showToast(t("rooms.toasts.download_template_error"), "error")
     }
   }
 
@@ -336,7 +336,7 @@ function RoomsContent() {
     if (!file) return
 
     if (!file.name.endsWith(".csv")) {
-      showToast("กรุณาเลือกไฟล์ที่มีนามสกุล .csv เท่านั้น", "error")
+      showToast(t("rooms.toasts.upload_csv_only"), "error")
       e.target.value = ""
       return
     }
@@ -350,7 +350,7 @@ function RoomsContent() {
       reader.onload = async (event) => {
         const text = event.target?.result as string
         if (!text) {
-          showToast("ไม่สามารถเปิดอ่านข้อมูลในไฟล์ CSV นี้ได้", "error")
+          showToast(t("rooms.toasts.read_csv_error"), "error")
           setUploadingCsv(false)
           return
         }
@@ -365,7 +365,7 @@ function RoomsContent() {
         }
 
         if (rows.length < 2) {
-          showToast("โครงสร้างไฟล์ CSV ไม่ถูกต้อง หรือไม่มีข้อมูลในไฟล์", "error")
+          showToast(t("rooms.toasts.csv_invalid_structure"), "error")
           setUploadingCsv(false)
           return
         }
@@ -376,7 +376,7 @@ function RoomsContent() {
         const floorIdx = headers.indexOf("floor")
 
         if (roomNumIdx === -1 || typeNameIdx === -1) {
-          showToast("หัวคอลัมน์ไม่ถูกต้อง ในไฟล์ CSV ต้องมีคอลัมน์ room_number และ room_type_name", "error")
+          showToast(t("rooms.toasts.csv_invalid_headers"), "error")
           setUploadingCsv(false)
           return
         }
@@ -432,7 +432,7 @@ function RoomsContent() {
         }
 
         if (validRooms.length === 0 && invalidRooms.length === 0) {
-          showToast("ไม่พบรายการห้องพักใดๆ ในไฟล์ที่ระบุ", "error")
+          showToast(t("rooms.toasts.csv_no_rooms"), "error")
           setUploadingCsv(false)
           return
         }
@@ -451,13 +451,13 @@ function RoomsContent() {
           try {
             const res = await createRoomsBatch(roomsPayload)
             if (res.success) {
-              showToast(`✓ นำเข้าข้อมูลห้องพักสำเร็จเรียบร้อยทั้งหมด ${res.count} ห้อง!`, "success")
+              showToast(t("rooms.toasts.import_success").replace("{count}", String(res.count)), "success")
               await loadData(true)
             } else {
-              showToast(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error")
+              showToast(res.error || t("rooms.toasts.save_error"), "error")
             }
           } catch (err: any) {
-            showToast(err?.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล", "error")
+            showToast(err?.message || t("rooms.toasts.db_save_error"), "error")
           } finally {
             setUploadingCsv(false)
           }
@@ -472,7 +472,7 @@ function RoomsContent() {
       }
       reader.readAsText(file, "UTF-8")
     } catch (err: any) {
-      showToast("ระบบขัดข้องขณะอ่านไฟล์ CSV", "error")
+      showToast(t("rooms.toasts.system_csv_error"), "error")
       setUploadingCsv(false)
     } finally {
       e.target.value = ""
@@ -487,7 +487,7 @@ function RoomsContent() {
     // ตรวจสอบว่าห้องที่มีปัญหาทั้งหมดได้รับการเลือกประเภทห้องเรียบร้อยแล้วหรือยัง
     const unmappedRoom = csvRooms.find(r => !r.roomTypeId)
     if (unmappedRoom) {
-      setMappingError(`กรุณาเลือกประเภทห้องพักสำหรับห้องเลขที่ ${unmappedRoom.roomNumber} ก่อนดำเนินการต่อ`)
+      setMappingError(t("rooms.toasts.mapping_select_type").replace("{roomNumber}", unmappedRoom.roomNumber))
       setMappingSubmitting(false)
       return
     }
@@ -509,16 +509,16 @@ function RoomsContent() {
     try {
       const res = await createRoomsBatch(roomsPayload)
       if (res.success) {
-        showToast(`✓ นำเข้าข้อมูลห้องพักสำเร็จเรียบร้อยทั้งหมด ${res.count} ห้อง!`, "success")
+        showToast(t("rooms.toasts.import_success").replace("{count}", String(res.count)), "success")
         setIsCsvMappingModalOpen(false)
         setCsvRooms([])
         setAutoMappedRooms([])
         await loadData(true) // โหลดข้อมูลห้องใหม่และล้างแคช
       } else {
-        setMappingError(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล")
+        setMappingError(res.error || t("rooms.toasts.db_save_error"))
       }
     } catch (err: any) {
-      setMappingError(err?.message || "เกิดข้อผิดพลาดที่ไม่คาดคิดของระบบ")
+      setMappingError(err?.message || t("rooms.toasts.save_error"))
     } finally {
       setMappingSubmitting(false)
     }
@@ -773,7 +773,7 @@ function RoomsContent() {
   // การดำเนินการลบจริงหลังกดยืนยันใน Custom Modal
   const handleConfirmDelete = async () => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("rooms.toasts.permission_denied"), "error")
       return
     }
     if (!deleteTarget) return
@@ -783,10 +783,10 @@ function RoomsContent() {
     if (deleteTarget.type === "room") {
       const res = await deleteRoom(deleteTarget.id)
       if (res.success) {
-        showToast("✓ ลบห้องพักออกจากระบบสำเร็จแล้ว", "success")
+        showToast(t("rooms.toasts.delete_room_success"), "success")
         await loadData(true) // รีเฟรชข้อมูลและเคลียร์แคช
       } else {
-        showToast(res.error || "ลบห้องพักไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.delete_room_error"), "error")
         setLoading(false)
       }
     } else if (deleteTarget.type === "type") {
@@ -795,7 +795,7 @@ function RoomsContent() {
       if (res.success) {
         const wsId = getCookie("horset_current_workspace_id") || ""
         clearWorkspaceCache(wsId)
-        showToast("✓ ลบประเภทห้องพักสำเร็จแล้ว", "success")
+        showToast(t("rooms.toasts.delete_type_success"), "success")
         const typesRes = await getRoomTypes(wsId)
         if (typesRes.success && typesRes.data) {
           const typesData = typesRes.data as RoomTypeItem[]
@@ -803,18 +803,18 @@ function RoomsContent() {
           setCachedData(wsId, "room_types", typesData)
         }
       } else {
-        showToast(res.error || "ไม่สามารถลบประเภทห้องนี้ได้ เนื่องจากมีห้องพักอื่นอ้างอิงใช้งานประเภทนี้อยู่", "error")
+        showToast(res.error || t("rooms.toasts.delete_type_error"), "error")
       }
       setTypeSubmitting(false)
       setLoading(false)
     } else if (deleteTarget.type === "tenant") {
       const res = await deleteTenant(deleteTarget.id, deleteTarget.extraId || "")
       if (res.success) {
-        showToast(`✓ ดำเนินการย้ายออกผู้เช่า และคืนสถานะว่างให้ห้อง ${deleteTarget.extraId} สำเร็จแล้ว`, "success")
+        showToast(t("rooms.toasts.checkout_success_return_vacant").replace("{roomNumber}", deleteTarget.extraId || ""), "success")
         setTenantDetailModalOpen(false)
         await loadData(true)
       } else {
-        showToast(res.error || "ยกเลิกสัญญาผู้เช่าไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.cancel_contract_error"), "error")
         setLoading(false)
       }
     }
@@ -825,7 +825,7 @@ function RoomsContent() {
   const handleSubmitRoomForm = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("rooms.toasts.permission_denied"), "error")
       return
     }
     if (!newRoomNumber) return
@@ -845,21 +845,21 @@ function RoomsContent() {
         extraExpenses
       )
       if (res.success) {
-        showToast("✓ อัปเดตข้อมูลห้องพักสำเร็จ", "success")
+        showToast(t("rooms.toasts.update_room_success"), "success")
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
-        showToast(res.error || "แก้ไขข้อมูลห้องพักไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.update_room_error"), "error")
       }
     } else {
       // เพิ่มห้องพักใหม่
       const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent), newRoomFloor, extraExpenses)
       if (res.success) {
-        showToast("✓ เพิ่มห้องพักใหม่เข้าสู่ระบบสำเร็จ", "success")
+        showToast(t("rooms.toasts.add_room_success"), "success")
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
-        showToast(res.error || "สร้างห้องพักไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.create_room_error"), "error")
       }
     }
     setFormSubmitting(false)
@@ -869,7 +869,7 @@ function RoomsContent() {
   const handleSubmitTypeForm = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("rooms.toasts.permission_denied"), "error")
       return
     }
     if (!newTypeName) return
@@ -880,7 +880,7 @@ function RoomsContent() {
     if (editingType) {
       const res = await updateRoomType(editingType.id, newTypeName, Number(newTypeRent))
       if (res.success) {
-        showToast("✓ อัปเดตข้อมูลประเภทห้องสำเร็จ", "success")
+        showToast(t("rooms.toasts.update_type_success"), "success")
         setNewTypeName("")
         setNewTypeRent(4000)
         setEditingType(null)
@@ -893,12 +893,12 @@ function RoomsContent() {
           setCachedData(wsId, "room_types", typesData)
         }
       } else {
-        showToast(res.error || "แก้ไขประเภทห้องไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.update_type_error"), "error")
       }
     } else {
       const res = await createRoomType(newTypeName, Number(newTypeRent))
       if (res.success) {
-        showToast("✓ สร้างประเภทห้องพักใหม่สำเร็จ", "success")
+        showToast(t("rooms.toasts.create_type_success"), "success")
         setNewTypeName("")
         setNewTypeRent(4000)
         clearWorkspaceCache(wsId)
@@ -909,7 +909,7 @@ function RoomsContent() {
           setCachedData(wsId, "room_types", typesData)
         }
       } else {
-        showToast(res.error || "เพิ่มประเภทห้องไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.add_type_error"), "error")
       }
     }
     setTypeSubmitting(false)
@@ -963,7 +963,7 @@ function RoomsContent() {
   const handleSubmitContract = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("rooms.toasts.permission_denied"), "error")
       return
     }
     if (!selectedRoom || !tenantNameInput || !tenantPhoneInput) return
@@ -980,7 +980,7 @@ function RoomsContent() {
       )
       
       if (res.success) {
-        showToast(`✓ ทำสัญญาห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว!`, "success")
+        showToast(t("rooms.toasts.contract_success").replace("{roomNumber}", selectedRoom.roomNumber), "success")
         await loadData(true) // เคลียร์แคชและโหลดข้อมูลจริง
         
         // อัปเดต selectedRoom ใน state ทันทีเพื่อให้แสดงผลใน Success View ได้ครบถ้วน
@@ -994,10 +994,10 @@ function RoomsContent() {
         })
         setContractSuccess(true)
       } else {
-        showToast(res.error || "ทำสัญญาผู้เช่าไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.contract_error"), "error")
       }
     } catch (err) {
-      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "error")
+      showToast(t("rooms.toasts.server_connection_error"), "error")
     } finally {
       setContractSubmitting(false)
     }
@@ -1021,7 +1021,7 @@ function RoomsContent() {
   const handleCopyLinkToClipboard = (roomId: string, roomNum: string) => {
     const link = getLiffRegistrationLink(roomId)
     navigator.clipboard.writeText(link)
-    showToast(`✓ คัดลอกลิงก์ LINE LIFF ของห้อง ${roomNum} สำเร็จ! สามารถส่งแชทให้ผู้เช่าลงทะเบียนได้เลย`, "success")
+    showToast(t("rooms.toasts.copy_line_link_success").replace("{roomNumber}", roomNum), "success")
   }
 
   // เตรียมและเปิด Modal ยืนยันหยุดเชื่อมต่อ LINE
@@ -1033,7 +1033,7 @@ function RoomsContent() {
   // กดยืนยันหยุดเชื่อมต่อ LINE ใน Modal
   const handleConfirmDisconnectLine = async () => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("rooms.toasts.permission_denied"), "error")
       return
     }
     if (!selectedRoom || !selectedRoom.tenantId) return
@@ -1041,14 +1041,14 @@ function RoomsContent() {
     try {
       const res = await disconnectLine(selectedRoom.tenantId)
       if (res.success) {
-        showToast(`✓ หยุดเชื่อมต่อ LINE ของห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว!`, "success")
+        showToast(t("rooms.toasts.disconnect_line_success").replace("{roomNumber}", selectedRoom.roomNumber), "success")
         setLineDisconnectConfirmOpen(false)
         await loadData(true)
       } else {
-        showToast(res.error || "หยุดเชื่อมต่อ LINE ไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.disconnect_line_error"), "error")
       }
     } catch (err) {
-      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "error")
+      showToast(t("rooms.toasts.server_connection_error"), "error")
     } finally {
       setDisconnectSubmitting(false)
     }
@@ -1080,16 +1080,16 @@ function RoomsContent() {
   // บันทึกการแก้ไขข้อมูลผู้เช่า
   const handleSaveTenantEdits = async () => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("rooms.toasts.permission_denied"), "error")
       return
     }
     if (!selectedRoom || !selectedRoom.tenantId) return
     if (!editTenantName.trim()) {
-      showToast("กรุณากรอกชื่อผู้เช่า", "error")
+      showToast(t("rooms.toasts.fill_tenant_name"), "error")
       return
     }
     if (!editTenantPhone.trim()) {
-      showToast("กรุณากรอกเบอร์โทรศัพท์", "error")
+      showToast(t("rooms.toasts.fill_tenant_phone"), "error")
       return
     }
 
@@ -1106,7 +1106,7 @@ function RoomsContent() {
       )
 
       if (res.success) {
-        showToast("✓ แก้ไขข้อมูลผู้เช่าเรียบร้อยแล้ว", "success")
+        showToast(t("rooms.toasts.update_tenant_success"), "success")
         setIsEditingTenant(false)
         await loadData(true)
         
@@ -1119,10 +1119,10 @@ function RoomsContent() {
           leaseEnd: editLeaseEnd || null
         } : null)
       } else {
-        showToast(res.error || "แก้ไขข้อมูลไม่สำเร็จ", "error")
+        showToast(res.error || t("rooms.toasts.update_tenant_error"), "error")
       }
     } catch (err) {
-      showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error")
+      showToast(t("rooms.toasts.save_error"), "error")
     } finally {
       setEditTenantSubmitting(false)
     }
@@ -1176,13 +1176,13 @@ function RoomsContent() {
   const handleConfirmCheckout = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
-      setCheckoutError("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล")
+      setCheckoutError(t("rooms.toasts.permission_denied"))
       return
     }
     if (!selectedRoom || !selectedRoom.tenantId) return
     
     if (!checkoutDate) {
-      setCheckoutError("กรุณากรอกวันที่ยกเลิกสัญญา/ย้ายออก")
+      setCheckoutError(t("rooms.toasts.fill_checkout_date"))
       return
     }
 
@@ -1211,26 +1211,26 @@ function RoomsContent() {
           checkoutDate
         )
         if (updateRes.success) {
-          showToast(`✓ บันทึกการแจ้งย้ายออกล่วงหน้าของห้อง ${selectedRoom.roomNumber} เรียบร้อยแล้ว (ผู้เช่าจะยังแสดงอยู่ในห้องพักจนถึงวันที่ย้ายออกจริง)`, "success")
+          showToast(t("rooms.toasts.future_checkout_logged").replace("{roomNumber}", selectedRoom.roomNumber), "success")
           setCheckoutModalOpen(false)
           await loadData(true)
         } else {
-          setCheckoutError(updateRes.error || "เกิดข้อผิดพลาดในการอัปเดตวันหมดสัญญาของผู้เช่า")
+          setCheckoutError(updateRes.error || t("rooms.toasts.update_lease_end_error"))
         }
       } else {
         // 2. ปรับสถานะห้องเป็น Pending_Refund เพื่อรอจัดการคืนเงินประกันปลายงวด
         const { updateRoomStatus } = await import("@/features/room/actions")
         const res = await updateRoomStatus(selectedRoom.id, "Pending_Refund")
         if (res.success) {
-          showToast(`✓ ย้ายห้องพัก ${selectedRoom.roomNumber} ไปที่รายการ "รอดำเนินการคืนเงินประกัน" เรียบร้อยแล้ว`, "success")
+          showToast(t("rooms.toasts.moved_to_pending_refund").replace("{roomNumber}", selectedRoom.roomNumber), "success")
           setCheckoutModalOpen(false)
           await loadData(true)
         } else {
-          setCheckoutError(res.error || "เกิดข้อผิดพลาดในการอัปเดตสถานะห้องพัก")
+          setCheckoutError(res.error || t("rooms.toasts.update_room_status_error"))
         }
       }
     } catch (err) {
-      setCheckoutError("เกิดข้อผิดพลาดในการดำเนินการแจ้งคืนห้องพัก")
+      setCheckoutError(t("rooms.toasts.checkout_error"))
     } finally {
       setCheckoutSubmitting(false)
     }
@@ -1327,7 +1327,7 @@ function RoomsContent() {
 
   const handleAddCustomDeduction = () => {
     if (customDeductions.length >= 5) {
-      showToast("สามารถระบุรายการหักเงินอื่นๆ ได้สูงสุด 5 รายการ", "error")
+      showToast(t("rooms.toasts.max_deductions"), "error")
       return
     }
     setCustomDeductions([
@@ -1358,7 +1358,7 @@ function RoomsContent() {
     
     if (!isHistoricalEdit) {
       if (finalElec === "" || finalWater === "") {
-        setRefundError("กรุณากรอกตัวเลขมิเตอร์น้ำและไฟวันย้ายออกให้ครบถ้วน")
+        setRefundError(t("rooms.toasts.fill_meter_readings"))
         return
       }
       
@@ -1366,12 +1366,12 @@ function RoomsContent() {
       fWater = Number(finalWater)
       
       if (isNaN(fElec) || fElec < prevElec) {
-        setRefundError(`เลขมิเตอร์ไฟวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevElec})`)
+        setRefundError(t("rooms.toasts.invalid_electric_meter").replace("{value}", String(prevElec)))
         return
       }
       
       if (isNaN(fWater) || fWater < prevWater) {
-        setRefundError(`เลขมิเตอร์น้ำวันย้ายออกต้องไม่น้อยกว่าเลขมิเตอร์ครั้งล่าสุด (${prevWater})`)
+        setRefundError(t("rooms.toasts.invalid_water_meter").replace("{value}", String(prevWater)))
         return
       }
     }
@@ -1398,7 +1398,7 @@ function RoomsContent() {
         )
         
         if (!currentMeterRes.success) {
-          setRefundError(currentMeterRes.error || "เกิดข้อผิดพลาดในการจดมิเตอร์ปลายงวดรอบปัจจุบัน")
+          setRefundError(currentMeterRes.error || t("rooms.toasts.meter_save_error"))
           setRefundSubmitting(false)
           return
         }
@@ -1423,7 +1423,7 @@ function RoomsContent() {
         )
         
         if (!nextMeterRes.success) {
-          setRefundError(nextMeterRes.error || "เกิดข้อผิดพลาดในการสืบทอดค่าตั้งต้นมิเตอร์สำหรับผู้เช่าคนถัดไป")
+          setRefundError(nextMeterRes.error || t("rooms.toasts.meter_carry_over_error"))
           setRefundSubmitting(false)
           return
         }
@@ -1495,7 +1495,7 @@ function RoomsContent() {
       
       const saveRes = await saveCancelledContract(wsId, cancellationPayload)
       if (!saveRes.success) {
-        setRefundError(saveRes.error || "เกิดข้อผิดพลาดในการส่งข้อมูลบัญชีภาษีเงินได้หัก ณ ที่จ่าย")
+        setRefundError(saveRes.error || t("rooms.toasts.tax_submitting_error"))
         setRefundSubmitting(false)
         return
       }
@@ -1504,7 +1504,7 @@ function RoomsContent() {
         // 4. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
         const deleteRes = await deleteTenant(refundingRoom.tenantId, refundingRoom.roomNumber)
         if (!deleteRes.success) {
-          setRefundError(deleteRes.error || "เกิดข้อผิดพลาดในการปิดระบบสัญญาผู้เช่า")
+          setRefundError(deleteRes.error || t("rooms.toasts.close_tenant_system_error"))
           setRefundSubmitting(false)
           return
         }
@@ -1512,15 +1512,15 @@ function RoomsContent() {
       
       showToast(
         isHistoricalEdit 
-          ? `✓ ดำเนินการปรับปรุงข้อมูลประวัติและบัญชีภาษีของห้อง ${refundingRoom.roomNumber} เรียบร้อยแล้ว`
-          : `✓ ดำเนินการสรุปคืนเงินประกันและบันทึกบัญชีภาษีหอพักของห้อง ${refundingRoom.roomNumber} เรียบร้อยแล้ว`, 
+          ? t("rooms.toasts.update_history_success").replace("{roomNumber}", refundingRoom.roomNumber)
+          : t("rooms.toasts.refund_summary_success").replace("{roomNumber}", refundingRoom.roomNumber), 
         "success"
       )
       setRefundModalOpen(false)
       await loadData(true)
       
     } catch (err: any) {
-      setRefundError(err?.message || "เกิดข้อผิดพลาดของระบบระหว่างสรุปปิดบัญชีคืนห้อง")
+      setRefundError(err?.message || t("rooms.toasts.system_refund_error"))
     } finally {
       setRefundSubmitting(false)
     }
@@ -1531,19 +1531,19 @@ function RoomsContent() {
   // ลบประวัติการยกเลิกสัญญา มาตรา 40(8)
   const handleDeleteCancellation = async (id: string) => {
     if (!hasEditPermission) {
-      showToast("คุณไม่มีสิทธิ์ในการแก้ไขข้อมูล", "error")
+      showToast(t("rooms.toasts.permission_denied"), "error")
       return
     }
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการยกเลิกสัญญานี้? สำหรับยอดภาษีจะคำนวณใหม่โดยอัตโนมัติ")) return
+    if (!confirm(t("rooms.toasts.confirm_delete_history"))) return
     const wsId = getCookie("horset_current_workspace_id") || ""
     const res = await deleteCancelledContract(id)
     if (res.success || res.error === "table_not_found") {
       const updated = cancelledContracts.filter(c => c.id !== id)
       setCancelledContracts(updated)
       if (wsId) setCachedData(wsId, "cancelled_contracts", updated)
-      showToast("✓ ลบประวัติการยกเลิกสัญญาเรียบร้อยแล้ว", "success")
+      showToast(t("rooms.toasts.delete_history_success"), "success")
     } else {
-      showToast(`✗ ไม่สามารถลบข้อมูลได้: ${res.error}`, "error")
+      showToast(t("rooms.toasts.delete_history_error").replace("{error}", res.error || ""), "error")
     }
   }
 
@@ -1563,13 +1563,13 @@ function RoomsContent() {
       const action = financeSettings?.lease_expiry_action || "renew"
       if (action === "renew") {
         return {
-          label: "เกินกำหนดระยะสัญญาเดิม",
+          label: t("rooms.status_overdue_lease"),
           style: "bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 font-bold",
           dotColor: "bg-red-500"
         }
       } else {
         return {
-          label: "อยู่ครบตามอายุสัญญา",
+          label: t("rooms.status_active_lease"),
           style: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 font-bold",
           dotColor: "bg-emerald-500"
         }
@@ -1592,11 +1592,11 @@ function RoomsContent() {
       if (totalMonths <= 2 && totalMonths >= 0) {
         let label = ""
         if (diffDays <= 30) {
-          label = "เหลืออายุสัญญาอีก 1 เดือน"
+          label = t("rooms.status_remaining_months_1")
         } else if (diffDays <= 60) {
-          label = "เหลืออายุสัญญาอีก 2 เดือน"
+          label = t("rooms.status_remaining_months_2")
         } else {
-          label = `เหลืออายุสัญญาอีก ${totalMonths} เดือน`
+          label = t("rooms.status_remaining_months_n").replace("{months}", String(totalMonths))
         }
         return {
           label: label,
@@ -1608,7 +1608,7 @@ function RoomsContent() {
 
     // สัญญาเช่ายังปกติอยู่
     return {
-      label: "สัญญาปกติ",
+      label: t("rooms.status_normal_lease"),
       style: "bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 font-bold",
       dotColor: "bg-blue-500"
     }
@@ -1648,28 +1648,28 @@ function RoomsContent() {
 
     if (room.status === "Pending_Refund") {
       return {
-        label: "รอดำเนินการคืนเงินประกัน",
+        label: t("rooms.status_pending_refund"),
         badgeStyle: "bg-purple-50 text-purple-600 dark:bg-purple-950/35 dark:text-purple-400 border border-purple-200/40 dark:border-purple-800/40 font-bold",
         dotStyle: "bg-purple-500",
         code: "Pending_Refund"
       }
     } else if (!hasTenant) {
       return {
-        label: "ว่าง",
+        label: t("rooms.status_vacant"),
         badgeStyle: "bg-red-50 text-red-600 dark:bg-red-950/35 dark:text-red-400 border border-red-200/40 dark:border-red-800/40",
         dotStyle: "bg-red-500",
         code: "available"
       }
     } else if (!isRegistered) {
       return {
-        label: "มีผู้เช่าแล้ว (ยังไม่ลงทะเบียนไลน์)",
+        label: t("rooms.status_occupied_waiting_line"),
         badgeStyle: "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/40 dark:border-amber-900/40",
         dotStyle: "bg-amber-500",
         code: "waiting"
       }
     } else {
       return {
-        label: "มีผู้เช่าแล้ว (เชื่อม LINE)",
+        label: t("rooms.status_occupied_connected_line"),
         badgeStyle: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/35 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-800/40",
         dotStyle: "bg-emerald-500",
         code: "occupied"
@@ -1920,7 +1920,7 @@ function RoomsContent() {
             {!hasEditPermission ? (
               <span className="px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center gap-1.5 shadow-sm">
                 <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
-                โหมดดูข้อมูลอย่างเดียว
+                {t("rooms.read_only_mode")}
               </span>
             ) : (
               <button
@@ -2375,8 +2375,8 @@ function RoomsContent() {
                             <Home className="w-6 h-6" />
                           </div>
                           <div>
-                            <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">ไม่พบข้อมูลห้องพักหรือเงื่อนไขผู้เช่า</p>
-                            <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">ทดลองกรอกค้นหาข้อมูลอื่น สลับฟิลเตอร์สถานะ หรือกดปุ่มเพิ่มห้องพักใหม่ด้านบน</p>
+                            <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">{t("rooms.empty_search_title")}</p>
+                            <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">{t("rooms.empty_search_desc")}</p>
                           </div>
                         </div>
                       </div>
@@ -2388,11 +2388,11 @@ function RoomsContent() {
                     <table className="w-full text-left text-sm sm:text-base border-collapse">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-bold text-xs sm:text-sm border-b border-slate-200/60 dark:border-slate-900/60">
-                          <th className="p-4 w-40">ห้องและประเภท</th>
-                          <th className="p-4 w-48">สถานะและค่าเช่า</th>
-                          <th className="p-4">ผู้เช่าและสัญญา</th>
-                          <th className="p-4 w-72">การจัดการผู้เช่า</th>
-                          <th className="p-4 text-center w-28 border-l border-slate-100 dark:border-slate-900/50">ตั้งค่าห้อง</th>
+                          <th className="p-4 w-40">{t("rooms.table_header_room_type")}</th>
+                          <th className="p-4 w-48">{t("rooms.table_header_status_rent")}</th>
+                          <th className="p-4">{t("rooms.table_header_tenant_contract")}</th>
+                          <th className="p-4 w-72">{t("rooms.table_header_tenant_mgmt")}</th>
+                          <th className="p-4 text-center w-28 border-l border-slate-100 dark:border-slate-900/50">{t("rooms.table_header_room_settings")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-900/50">
@@ -2551,8 +2551,8 @@ function RoomsContent() {
                                   <Home className="w-6 h-6" />
                                 </div>
                                 <div>
-                                  <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">ไม่พบข้อมูลห้องพักหรือเงื่อนไขผู้เช่า</p>
-                                  <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">ทดลองกรอกค้นหาข้อมูลอื่น สลับฟิลเตอร์สถานะ หรือกดปุ่มเพิ่มห้องพักใหม่ด้านบน</p>
+                                  <p className="font-bold text-slate-700 dark:text-slate-300 text-xs">{t("rooms.empty_search_title")}</p>
+                                  <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-1">{t("rooms.empty_search_desc")}</p>
                                 </div>
                               </div>
                             </td>
@@ -2740,10 +2740,10 @@ function RoomsContent() {
             <div className="pb-1.5 border-b border-slate-100 dark:border-slate-800/40">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-red-500" /> 
-                ประวัติเงินประกันและสัญญายกเลิก มาตรา 40(8)
+                {t("rooms.cancellation_history_title")}
               </h3>
               <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
-                รายการยกเลิกสัญญาเช่าห้องพักและคำนวณเงินประกันริบ [ เงินประกัน - เงินคืนจริง ] เพื่อนำไปใช้คำนวณภาษีเงินได้ประเภท 40(8) โดยอ้างอิงตามปีปฏิทินที่มีการย้ายออก
+                {t("rooms.cancellation_history_desc")}
               </p>
             </div>
 
@@ -2752,12 +2752,12 @@ function RoomsContent() {
                 <table className="w-full text-left text-sm sm:text-base border-collapse min-w-[600px]">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 text-slate-500 dark:text-slate-400 font-bold text-xs sm:text-sm">
-                      <th className="py-3 px-4">ห้องพัก / ผู้เช่า</th>
-                      <th className="py-3 px-4 text-center">วันที่ย้ายออก</th>
-                      <th className="py-3 px-4 text-right">เงินประกัน (บาท)</th>
-                      <th className="py-3 px-4 text-right">โอนคืนจริง (บาท)</th>
-                      <th className="py-3 px-4 text-right">ยอดที่ริบ (บาท)</th>
-                      <th className="py-3 px-4 text-center w-28">การจัดการ</th>
+                      <th className="py-3 px-4">{t("rooms.table_header_room_tenant")}</th>
+                      <th className="py-3 px-4 text-center">{t("rooms.table_header_checkout_date")}</th>
+                      <th className="py-3 px-4 text-right">{t("rooms.table_header_deposit")}</th>
+                      <th className="py-3 px-4 text-right">{t("rooms.table_header_actual_refund")}</th>
+                      <th className="py-3 px-4 text-right">{t("rooms.table_header_forfeited")}</th>
+                      <th className="py-3 px-4 text-center w-28">{t("rooms.table_header_action")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
@@ -2815,8 +2815,8 @@ function RoomsContent() {
             ) : (
               <div className="py-10 text-center rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-dashed border-slate-250 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 text-xs">
                 <ShieldCheck className="w-8 h-8 text-slate-350 dark:text-slate-600 mx-auto mb-2.5 opacity-60" />
-                <p className="font-bold">ยังไม่มีข้อมูลการแจ้งคืนห้องพักหรือสัญญายกเลิก</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500/80 mt-1">ประวัติจะได้รับการบันทึกที่นี่โดยอัตโนมัติเมื่อท่านทำการ "แจ้งย้ายออก" ในปุ่มรายละเอียดห้องพัก</p>
+                <p className="font-bold">{t("rooms.cancellation_empty_title")}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500/80 mt-1">{t("rooms.cancellation_empty_desc")}</p>
               </div>
             )}
           </div>
@@ -2827,7 +2827,7 @@ function RoomsContent() {
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 p-3.5 flex items-center justify-between gap-3.5 z-40 pb-safe shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
           {!hasEditPermission ? (
             <div className="flex-1 h-12 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-sm">
-              <AlertCircle className="w-5 h-5 text-amber-500" /> โหมดดูข้อมูลอย่างเดียว
+              <AlertCircle className="w-5 h-5 text-amber-500" /> {t("rooms.read_only_mode")}
             </div>
           ) : (
             <>
