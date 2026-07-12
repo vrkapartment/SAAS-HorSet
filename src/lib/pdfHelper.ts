@@ -213,8 +213,9 @@ export const PND_LOGICAL_KEYS: Record<"90" | "94", string[]> = {
   ],
   "94": [
     ...PND_SHARED_LOGICAL_KEYS,
-    "personal.personal_deduction",
+    "personal.personal_deduction", "personal.personal_deduction_recap", "personal.filing_type",
     ...Array.from({ length: 19 }, (_, i) => `item.${i + 1}`),
+    "summary.tax_due_recap_1", "summary.tax_due_recap_2",
   ],
 }
 
@@ -322,6 +323,9 @@ export const DEFAULT_PND94_MAPPING: PndFieldMapping[] = [
   { logicalKey: "personal.tax_id", fieldKind: "text", physicalFieldName: "Text1.1", valueFormat: "raw" },
   { logicalKey: "personal.first_name", fieldKind: "text", physicalFieldName: "Text1.5", valueFormat: "raw" },
   { logicalKey: "personal.last_name", fieldKind: "text", physicalFieldName: "Text1.7", valueFormat: "raw" },
+  { logicalKey: "personal.taxpayer_status", fieldKind: "radio", physicalFieldName: "Radio Button4", optionKey: "individual", widgetIndex: 0 },
+  { logicalKey: "personal.taxpayer_status", fieldKind: "radio", physicalFieldName: "Radio Button4", optionKey: "partnership", widgetIndex: 1 },
+  { logicalKey: "personal.filing_type", fieldKind: "radio", physicalFieldName: "Radio Button1", optionKey: "normal", widgetIndex: 0 },
   { logicalKey: "address.building", fieldKind: "text", physicalFieldName: "Text1.9", valueFormat: "raw" },
   { logicalKey: "address.room", fieldKind: "text", physicalFieldName: "Text1.10", valueFormat: "raw" },
   { logicalKey: "address.floor", fieldKind: "text", physicalFieldName: "Text1.11", valueFormat: "raw" },
@@ -359,6 +363,7 @@ export const DEFAULT_PND94_MAPPING: PndFieldMapping[] = [
   { logicalKey: "other.deduction", fieldKind: "text", physicalFieldName: "Text3.36", valueFormat: "plain_decimal" },
   { logicalKey: "other.net", fieldKind: "text", physicalFieldName: "Text3.37", valueFormat: "plain_decimal" },
   { logicalKey: "personal.personal_deduction", fieldKind: "text", physicalFieldName: "Text4.10.1", valueFormat: "plain_decimal" },
+  { logicalKey: "personal.personal_deduction_recap", fieldKind: "text", physicalFieldName: "Text5.92", valueFormat: "plain_decimal" },
   { logicalKey: "item.1", fieldKind: "text", physicalFieldName: "Text2.1", valueFormat: "plain_decimal" },
   { logicalKey: "item.2", fieldKind: "text", physicalFieldName: "Text2.2", valueFormat: "plain_decimal" },
   { logicalKey: "item.3", fieldKind: "text", physicalFieldName: "Text2.3", valueFormat: "plain_decimal" },
@@ -378,6 +383,9 @@ export const DEFAULT_PND94_MAPPING: PndFieldMapping[] = [
   { logicalKey: "item.17", fieldKind: "text", physicalFieldName: "Text2.17", valueFormat: "plain_decimal" },
   { logicalKey: "item.18", fieldKind: "text", physicalFieldName: "Text2.18", valueFormat: "plain_decimal" },
   { logicalKey: "item.19", fieldKind: "text", physicalFieldName: "Text2.19", valueFormat: "plain_decimal" },
+  // Text2.20 และ Text2.25 คือกล่องสรุปยอดภาษีที่ต้องชำระ (ข้อ 19) ที่พิมพ์ซ้ำอีก 2 จุดในหน้าเดียวกัน ใช้ค่าเดียวกันเสมอ
+  { logicalKey: "summary.tax_due_recap_1", fieldKind: "text", physicalFieldName: "Text2.20", valueFormat: "plain_decimal" },
+  { logicalKey: "summary.tax_due_recap_2", fieldKind: "text", physicalFieldName: "Text2.25", valueFormat: "plain_decimal" },
   // หมายเหตุ: Text2.26 (กล่อง "ภาษีที่ชำระ" ด้านขวา) มี maxLength=3 ไม่พอใส่ยอดเงินเต็มจำนวน จึงไม่ map ไว้เช่นกัน
 ]
 
@@ -627,6 +635,8 @@ export function computePnd94Values(data: PndData, formattedTaxId: string): PndCo
     "other.deduction": { format: "plain_decimal", amount: 0 },
     "other.net": { format: "plain_decimal", amount: otherGrossHalf },
     "personal.personal_deduction": { format: "plain_decimal", amount: personalDeduction },
+    // Text5.92 คือกล่องที่ทวนค่าลดหย่อนส่วนตัวซ้ำอีกจุดในหน้าถัดไปของฟอร์ม (ใช้ตัวเลขเดียวกับ Text4.10.1 เสมอ)
+    "personal.personal_deduction_recap": { format: "plain_decimal", amount: personalDeduction },
     "item.1": { format: "plain_decimal", amount: item1 },
     "item.2": { format: "plain_decimal", amount: item2 },
     "item.3": { format: "plain_decimal", amount: item3 },
@@ -646,9 +656,14 @@ export function computePnd94Values(data: PndData, formattedTaxId: string): PndCo
     "item.17": { format: "plain_decimal", amount: item17 },
     "item.18": { format: "plain_decimal", amount: item18 },
     "item.19": { format: "plain_decimal", amount: item19 },
+    // Text2.20/Text2.25 คือกล่องสรุปยอดภาษีที่ต้องชำระซ้ำอีก 2 จุด ใช้ค่าเดียวกับข้อ 19 เสมอ
+    "summary.tax_due_recap_1": { format: "plain_decimal", amount: item19 },
+    "summary.tax_due_recap_2": { format: "plain_decimal", amount: item19 },
   }
 
   const radio: Record<string, string | null> = {
+    "personal.taxpayer_status": taxpayerStatus === "partnership" ? "partnership" : "individual",
+    "personal.filing_type": "normal", // ระบบยื่นแบบปกติเสมอ ไม่รองรับยื่นเพิ่มเติม/แก้ไข
     "rent.deduction_method": rentIsActual ? "actual" : "percentage",
     "utilities.deduction_method": utilIsActual ? "actual" : "percentage",
     "other.deduction_method": "actual",
