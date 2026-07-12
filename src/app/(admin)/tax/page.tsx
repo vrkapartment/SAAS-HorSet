@@ -1551,10 +1551,10 @@ export default function TaxPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-100 dark:border-slate-900/40">
             <div>
               <h3 className="text-base font-bold text-slate-850 dark:text-slate-50 flex items-center gap-2.5">
-                <Coins className="w-5 h-5 text-amber-500" /> {t("tax_page.expense_ledger_title", { year: taxYear })}
+                <Coins className="w-5 h-5 text-amber-500" /> {t("daily_bills.notebook_title", { year: taxYear })}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                {t("tax_page.expense_ledger_subtitle")}
+                {t("daily_bills.desc")}
               </p>
             </div>
             
@@ -1564,7 +1564,7 @@ export default function TaxPage() {
                 !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 active:scale-95 hover:shadow-teal-600/25 cursor-pointer"
               }`}
             >
-              <Plus className="w-4 h-4" /> {t("tax_page.add_expense_btn")}
+              <Plus className="w-4 h-4" /> {t("daily_bills.add_new_btn")}
             </button>
           </div>
 
@@ -1580,11 +1580,11 @@ export default function TaxPage() {
                   <table className="w-full text-left text-sm sm:text-base border-collapse">
                     <thead>
                       <tr className="bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 font-bold text-xs sm:text-sm uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-800/60">
-                        <th className="py-4 px-5 pl-5">{t("tax_page.col_expense_name")}</th>
-                        <th className="py-4 px-4">{t("tax_page.col_tax_type")}</th>
-                        <th className="py-4 px-4 text-right">{t("tax_page.col_amount")}</th>
-                        <th className="py-4 px-4 text-center">{t("tax_page.col_date")}</th>
-                        <th className="py-4 px-5 text-center">{t("tax_page.col_actions")}</th>
+                        <th className="py-4 px-5 pl-5">{t("daily_bills.col_desc")}</th>
+                        <th className="py-4 px-4">{t("daily_bills.col_category")}</th>
+                        <th className="py-4 px-4 text-right">{t("daily_bills.col_amount")}</th>
+                        <th className="py-4 px-4 text-center">{t("daily_bills.col_date")}</th>
+                        <th className="py-4 px-5 text-center">{t("daily_bills.col_actions")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
@@ -1594,11 +1594,11 @@ export default function TaxPage() {
                           <td className="py-4 px-4">
                             {exp.category === "40_5" ? (
                               <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold bg-blue-50/80 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-lg border border-blue-200/60 dark:border-blue-500/10 shadow-sm">
-                                <Landmark className="w-3.5 h-3.5" /> {t("tax_page.cat_405_label")}
+                                <Landmark className="w-3.5 h-3.5" /> {t("daily_bills.category_405_full")}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold bg-teal-50/80 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 px-2.5 py-1 rounded-lg border border-teal-200/60 dark:border-teal-500/10 shadow-sm">
-                                <Zap className="w-3.5 h-3.5" /> {t("tax_page.cat_408_label")}
+                                <Zap className="w-3.5 h-3.5" /> {t("daily_bills.category_408_full")}
                               </span>
                             )}
                           </td>
@@ -1619,7 +1619,7 @@ export default function TaxPage() {
                                 className={`p-2 rounded-xl text-slate-400 dark:text-slate-500 transition-all duration-200 ${
                                   !hasEditPermission ? "opacity-50 cursor-not-allowed" : "hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
                                 }`}
-                                title={t("tax_page.edit_tooltip")}
+                                title={t("daily_bills.edit_tooltip")}
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
@@ -1628,7 +1628,7 @@ export default function TaxPage() {
                                 className={`p-2 rounded-xl text-slate-400 dark:text-slate-500 transition-all duration-200 ${
                                   !hasEditPermission ? "opacity-50 cursor-not-allowed" : "hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
                                 }`}
-                                title={t("tax_page.delete_tooltip")}
+                                title={t("daily_bills.delete_tooltip")}
                               >
                                 <Trash2 className="w-4 h-4 text-red-500/80 group-hover:text-red-500" />
                               </button>
@@ -1784,7 +1784,7 @@ export default function TaxPage() {
                         key={m.num} 
                         className={`${isEven ? "bg-slate-50/[0.35] dark:bg-slate-900/[0.15]" : "bg-white dark:bg-transparent"} hover:bg-blue-500/[0.05] dark:hover:bg-blue-500/[0.09] transition-all duration-150 border-b border-slate-100 dark:border-slate-800/60`}
                       >
-                        <td className="py-3.5 px-4 pl-5 font-extrabold text-slate-900 dark:text-slate-100">{t("month_" + m.num)}</td>
+                        <td className="py-3.5 px-4 pl-5 font-extrabold text-slate-900 dark:text-slate-100">{t("dashboard.month_" + m.num)}</td>
                         <td className="py-3.5 px-4 text-center text-slate-700 dark:text-slate-300 font-semibold">
                           {dataSource === "system" && hasPaidBills ? t("tax_page.rooms_unit", { count: paidBillsInMonth.length }) : "-"}
                         </td>
