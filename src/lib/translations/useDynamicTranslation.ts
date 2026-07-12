@@ -33,18 +33,20 @@ export function useDynamicTranslation(text: string | null | undefined) {
     const fetchTranslation = async () => {
       setIsTranslating(true)
       try {
+        console.debug("Requesting translation:", { text, locale })
         const response = await fetch("/api/translate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, targetLanguage: locale }),
         })
-        
+
         if (response.ok) {
           const data = await response.json()
           if (data.translatedText) {
             memoryCache.set(cacheKey, data.translatedText)
             if (isMounted) setTranslatedText(data.translatedText)
           } else {
+            console.warn("Translation API returned 200 but no translatedText:", data)
             // Fallback to original text if no translation received
             if (isMounted) setTranslatedText(text)
           }
