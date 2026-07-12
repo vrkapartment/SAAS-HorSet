@@ -49,6 +49,8 @@ export function useDynamicTranslation(text: string | null | undefined) {
             if (isMounted) setTranslatedText(text)
           }
         } else {
+          const errorBody = await response.json().catch(() => null)
+          console.error("Translation API returned an error:", response.status, errorBody)
           // Fallback to original on API error
           if (isMounted) setTranslatedText(text)
         }
