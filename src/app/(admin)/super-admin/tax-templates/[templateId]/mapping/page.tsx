@@ -440,7 +440,11 @@ export default function TaxTemplateMappingPage() {
                   {entries.map((entry) => {
                     const existing = mappingForLogicalKey(entry.key, entry.kind === "radio")
                     return (
-                      <option key={entry.key} value={entry.key}>
+                      <option
+                        key={entry.key}
+                        value={entry.key}
+                        style={existing ? { color: "#fbbf24", fontWeight: 700 } : undefined}
+                      >
                         {entry.key}{entry.label ? ` — ${entry.label}` : ""}{existing ? ` (map แล้วที่ ${describeMapping(existing)})` : ""}
                       </option>
                     )
@@ -461,7 +465,11 @@ export default function TaxTemplateMappingPage() {
                   {selectedCatalogEntry.options.map((opt) => {
                     const existing = mappingForLogicalKey(pickerKey, true, opt)
                     return (
-                      <option key={opt} value={opt}>
+                      <option
+                        key={opt}
+                        value={opt}
+                        style={existing ? { color: "#fbbf24", fontWeight: 700 } : undefined}
+                      >
                         {opt}{existing ? ` (map แล้วที่ ${describeMapping(existing)})` : ""}
                       </option>
                     )
