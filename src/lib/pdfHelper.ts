@@ -1,6 +1,40 @@
-import { PDFDocument, PDFName, rgb } from "pdf-lib"
+import { PDFDocument, PDFName, PDFRef, PDFDict, rgb } from "pdf-lib"
 import fontkit from "@pdf-lib/fontkit"
 import { calculateProgressiveTax, calculateMinimumTax, calculateFinalTaxDue, calculatePersonalDeduction } from "./thaiTax"
+
+// บาง template ที่ Super Admin อัปโหลดผ่านเครื่องมือแก้ไข PDF บางตัว มี form field ที่ "หลุด" ออกจากต้นไม้ AcroForm จริง
+// (widget ยังมี /Parent โยงไปหา field object แต่ field root นั้นไม่ถูกอ้างอิงใน AcroForm/Fields อยู่เลย) ทำให้
+// pdf-lib หาฟิลด์เหล่านี้ด้วยชื่อไม่เจอ (form.getTextField() throws) ทั้งที่เปิดใน Adobe/Chrome แล้วเห็นและกรอกได้ปกติ
+// ฟังก์ชันนี้ไล่ดู widget annotation ทุกหน้า เดินขึ้นไปหา field object รากสุดแล้วเติมเข้า AcroForm/Fields ถ้ายังไม่มี
+export function repairOrphanedFormFields(pdfDoc: PDFDocument) {
+  const acroForm = pdfDoc.catalog.getAcroForm()
+  if (!acroForm) return
+
+  const existing = new Set(acroForm.getFields().map(([, ref]) => ref.toString()))
+
+  const rootRefs = new Map<string, PDFRef>()
+  for (const page of pdfDoc.getPages()) {
+    const annots = page.node.Annots()
+    if (!annots) continue
+    for (let i = 0; i < annots.size(); i++) {
+      const ref = annots.get(i)
+      if (!(ref instanceof PDFRef)) continue
+      let curRef: PDFRef = ref
+      let curDict = pdfDoc.context.lookup(ref, PDFDict)
+      while (curDict) {
+        const parentRef = curDict.get(PDFName.of("Parent"))
+        if (!(parentRef instanceof PDFRef)) break
+        curRef = parentRef
+        curDict = pdfDoc.context.lookup(parentRef, PDFDict)
+      }
+      rootRefs.set(curRef.toString(), curRef)
+    }
+  }
+
+  for (const [key, ref] of rootRefs) {
+    if (!existing.has(key)) acroForm.addField(ref)
+  }
+}
 
 // ฟังก์ชันช่วยเขียนข้อความภาษาไทยที่จัดสระและวรรณยุกต์ไม่ให้เยื้องหรือเว้นช่องว่าง (Thai Text Shaping Helper)
 export function drawThaiText(
@@ -123,13 +157,14 @@ export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
   "90": [
     "Text11111", "Text80.0", "Text7.0", "Text7.2",
     "Text9", "Text13", "Text155.3", "Text155.5", "Text155.6", "Text20",
-    "Text360.1", "Text360.2", "Text360.3",
+    "Text31.1.1", "Text360.1", "Text360.2", "Text360.3",
     "Text70", "Text40.0", "Text40.1", "Text40.2",
     "Text71", "Text40.3", "Text40.4", "Text40.5",
     "Text38.0",
     "Text87.2", "Text87.3", "Text87.4", "Text87.6", "Text87.8", "Text87.9", "Text87.33", "Text87.34", "Text87.12",
+    "Text87.15", "Text87.20", "Text87.23", "Text87.28", "Text87.30",
     "Text23.1.1", "Text30.0",
-    "Text69.1", "Text69.58",
+    "Text68.3", "Text68.5", "Text69.1", "Text69.62",
   ],
   "94": [
     "Text1.1", "Text1.5", "Text1.7", "Text1.13", "Text1.16", "Text1.17", "Text1.18", "Text1.19", "Text1.20",
@@ -144,7 +179,7 @@ export const REQUIRED_PND_FIELDS: Record<"90" | "94", string[]> = {
 export async function generatePndPdf(type: "90" | "94", data: PndData, templateUrl?: string) {
   // 1. กำหนดไฟล์ Template ตามประเภทของ ภ.ง.ด. — ใช้ template ที่ Super Admin อัปโหลดไว้ถ้ามี ไม่งั้น fallback เป็นไฟล์เริ่มต้นของระบบ
   const resolvedTemplateUrl = templateUrl || (type === "90"
-    ? "/templates/201267PIT90.pdf"
+    ? "/templates/PND90_Template.pdf"
     : "/templates/250668PIT94.pdf")
 
   const response = await fetch(resolvedTemplateUrl)
@@ -169,6 +204,9 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
 
   // 4. ฝังฟอนต์ไทยลงใน PDF (กำหนด subset: false เพื่อคงตารางตระกูลอักษร GSUB/GPOS ให้สมบูรณ์ ป้องกันวรรณยุกต์เพี้ยนบน iOS)
   const customFont = await pdfDoc.embedFont(fontBytes, { subset: false })
+
+  // ซ่อม field ที่หลุดออกจากต้นไม้ AcroForm ก่อนเรียก getForm() (ดูรายละเอียดที่คอมเมนต์ของฟังก์ชัน)
+  repairOrphanedFormFields(pdfDoc)
 
   // ดึงฟอร์ม PDF
   const form = pdfDoc.getForm()
@@ -274,6 +312,7 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     // (ของเดิมกรอกลง Text34.0/34.1/34.2/33.9 ซึ่งจริงๆ เป็นช่องคนละรายการ (กองทุนรวม RMF/LTF ในข้อ 4 ➏) ทำให้ค่าเช่าไปโผล่ผิดจุด)
     const rentNet = data.rent405 - data.deductionRent405
     const rentIsActual = data.rentDeductionMethod === "actual"
+    setField("Text31.1.1", formattedTaxId) // ผู้จ่ายเงินได้ เลขประจำตัวผู้เสียภาษีอากร ของข้อ 4 — ไม่มีผู้หักภาษี ณ ที่จ่ายจริง ใช้เลขของผู้มีเงินได้เอง
     setField("Text360.1", fmtComb(data.rent405, 12))
     setField("Text360.2", fmtComb(data.deductionRent405, 12))
     setField("Text360.3", fmtComb(rentNet, 12))
@@ -316,8 +355,12 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
 
     // ใบแนบแสดงรายละเอียดรายการลดหย่อนและยกเว้นหลังจากหักค่าใช้จ่าย - หน้า 5 (ก่อนหน้านี้ไม่เคยกรอกเลย ทั้งที่ข้อ 11 ข้อ 2.
     // ของหน้า 4 อ้างอิงยอดจากหน้านี้โดยตรง — ระบบมีข้อมูลเฉพาะค่าลดหย่อนส่วนตัว (รายการ 1.) จึงกรอกเป็นทั้งรายการ 1. และยอดรวม 24.)
+    // หัวกระดาษหน้านี้มีเลขประจำตัวผู้เสียภาษี/ชื่อ-นามสกุลผู้มีเงินได้ซ้ำอีกชุด (ไม่ใช่ของคู่สมรส) จึงกรอกด้วยข้อมูลเดียวกับหน้าแรก
+    setField("Text68.3", formattedTaxId)
+    setField("Text68.5", data.firstName)
+    setField("Text68.7", data.lastName)
     setField("Text69.1", fmtComb(personalDeduction, 12))
-    setField("Text69.58", fmtComb(personalDeduction, 12))
+    setField("Text69.62", fmtComb(personalDeduction, 12))
 
     // ข้อ 11 การคำนวณภาษี (กล่องสรุปภาษีหน้า 4) — คำนวณภาษีขั้นบันไดจริงแบบเดียวกับ ภ.ง.ด. 94 (thaiTax.ts)
     // รายการที่ระบบไม่มีข้อมูลจริง (เงินบริจาค/ภาษีหัก ณ ที่จ่าย/ยื่นเพิ่มเติม ฯลฯ) ปล่อยว่างไว้ไม่กรอกเลข 0 ลงไป
@@ -335,17 +378,21 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     const item10 = calculateFinalTaxDue(item8, item9)
     const item11 = 0 // ภาษีจากใบแสดงเงินได้ฯ ในเขตพัฒนาพิเศษเฉพาะกิจ — ไม่มีข้อมูล ปล่อยว่าง
     const item12 = item10 + item11
-    const item13 = 0 // หัก ภาษีเงินได้หัก ณ ที่จ่ายและเครดิตภาษี — ไม่มี field แยกในระบบ (เหมือน ภ.ง.ด. 94) ปล่อยว่าง
+    // หมายเหตุ: template ที่ Super Admin อัปโหลดล่าสุดเป็นแบบฟอร์มรุ่นใหม่ที่มี 25 รายการ (ของเดิมมีแค่ 23 รายการ)
+    // เพิ่มรายการ 13-14 (เครดิตภาษีเงินได้จากต่างประเทศ) แทรกเข้ามา ทำให้รายการ 13-23 เดิมเลื่อนเป็น 15-25 ทั้งหมด
+    const item13 = 0 // หัก เครดิตภาษีเงินได้จากต่างประเทศ — ไม่มีข้อมูล ปล่อยว่าง
     const item14 = item12 - item13
-    const item15 = 0 // ยกมาจากข้อ 8 (ขายอสังหาริมทรัพย์แยกยื่น) — ไม่มีข้อมูล ปล่อยว่าง
-    const item16 = item14 + item15
-    const item17 = 0 // ยกมาจากข้อ 9 (เงินได้จากการให้/รับ เลือกเสียภาษี 5%) — ไม่มีข้อมูล ปล่อยว่าง
-    const item18 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
-    const item19 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
-    const item20 = 0 // เฉพาะกรณียื่นเพิ่มเติม (ระบบนี้ยื่นปกติ) ปล่อยว่าง
-    const item21 = item16 + item17 + item18 - item19 - item20
-    const item22 = 0 // เงินเพิ่ม — ไม่มีข้อมูล ปล่อยว่าง
-    const item23 = item21 + item22
+    const item15 = 0 // หัก ภาษีเงินได้หัก ณ ที่จ่ายและเครดิตภาษี — ไม่มี field แยกในระบบ (เหมือน ภ.ง.ด. 94) ปล่อยว่าง
+    const item16 = item14 - item15
+    const item17 = 0 // ยกมาจากข้อ 8 (ขายอสังหาริมทรัพย์แยกยื่น) — ไม่มีข้อมูล ปล่อยว่าง
+    const item18 = item16 + item17
+    const item19 = 0 // ยกมาจากข้อ 9 (เงินได้จากการให้/รับ เลือกเสียภาษี 5%) — ไม่มีข้อมูล ปล่อยว่าง
+    const item20 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
+    const item21 = 0 // ยกมาจากใบแนบ — ไม่มีข้อมูล ปล่อยว่าง
+    const item22 = 0 // เฉพาะกรณียื่นเพิ่มเติม (ระบบนี้ยื่นปกติ) ปล่อยว่าง
+    const item23 = item18 + item19 + item20 - item21 - item22
+    const item24 = 0 // บวก เงินเพิ่ม — ไม่มีข้อมูล ปล่อยว่าง
+    const item25 = item23 + item24 // รวมภาษีที่ชำระเพิ่มเติม/ชำระไว้เกิน สุดท้าย
 
     setField("Text87.2", fmtComb(item1, 13))
     setField("Text87.3", fmtComb(item2, 13))
@@ -357,20 +404,21 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     setField("Text87.33", fmtComb(item9, 13))
     setField("Text87.34", fmtComb(item10, 13))
     setField("Text87.12", fmtComb(item12, 12))
-    setField("Text87.181", fmtComb(item14, 12))
-    selectDueOrOverpaid("Radio Button89", item14)
+    setField("Text87.15", fmtComb(item14, 12))
     setField("Text87.20", fmtComb(item16, 12))
-    selectDueOrOverpaid("Radio Button93", item16)
-    setField("Text87.26", fmtComb(item21, 12))
-    selectDueOrOverpaid("Radio Button106", item21)
+    selectDueOrOverpaid("Radio Button89", item16)
+    setField("Text87.23", fmtComb(item18, 12))
+    selectDueOrOverpaid("Radio Button93", item18)
     setField("Text87.28", fmtComb(item23, 12))
-    selectDueOrOverpaid("Radio Button107", item23)
+    selectDueOrOverpaid("Radio Button106", item23)
+    setField("Text87.30", fmtComb(item25, 12))
+    selectDueOrOverpaid("Radio Button107", item25)
 
-    // กล่องสรุปย่อ "ภาษีที่ชำระเพิ่มเติม/ชำระไว้เกิน" ที่หัวหน้าแรก (มายกมาจากผลลัพธ์สุดท้ายของข้อ 11 ข้อ 23.)
-    if (item23 >= 0) {
-      setField("Text23.1.1", fmtComb(item23, 12))
+    // กล่องสรุปย่อ "ภาษีที่ชำระเพิ่มเติม/ชำระไว้เกิน" ที่หัวหน้าแรก (มายกมาจากผลลัพธ์สุดท้ายของข้อ 11 ข้อ 25.)
+    if (item25 >= 0) {
+      setField("Text23.1.1", fmtComb(item25, 12))
     } else {
-      setField("Text30.0", fmtComb(-item23, 12))
+      setField("Text30.0", fmtComb(-item25, 12))
     }
 
     // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง

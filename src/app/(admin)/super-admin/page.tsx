@@ -240,8 +240,10 @@ export default function SuperAdminPage() {
     try {
       const bytes = await file.arrayBuffer()
       const { PDFDocument } = await import("pdf-lib")
-      const { REQUIRED_PND_FIELDS } = await import("@/lib/pdfHelper")
+      const { REQUIRED_PND_FIELDS, repairOrphanedFormFields } = await import("@/lib/pdfHelper")
       const pdfDoc = await PDFDocument.load(bytes)
+      // ซ่อม field ที่หลุดออกจากต้นไม้ AcroForm ก่อนตรวจสอบ (บาง template มีฟิลด์ใช้งานได้จริงแต่หาไม่เจอด้วยชื่อถ้าไม่ซ่อมก่อน)
+      repairOrphanedFormFields(pdfDoc)
       const existingNames = new Set(pdfDoc.getForm().getFields().map((f) => f.getName()))
       const missingFields = REQUIRED_PND_FIELDS[formType].filter((name) => !existingNames.has(name))
 
