@@ -14,7 +14,7 @@ const translations = {
 interface LanguageContextType {
   locale: Locale
   setLocale: (locale: Locale) => void
-  t: (key: string) => string
+  t: (key: string, params?: Record<string, string | number>) => string
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
@@ -52,15 +52,23 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Safe nested key lookup (e.g. t("common.login"))
-  const t = (key: string): string => {
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    let result = ""
     if (!mounted) {
       // Fallback to Thai during SSR to maintain HTML structure match
       const dict = translations["th"] as any
-      return getNestedValue(dict, key) || key
+      result = getNestedValue(dict, key) || key
+    } else {
+      const dict = translations[locale] as any
+      result = getNestedValue(dict, key) || key
     }
 
-    const dict = translations[locale] as any
-    return getNestedValue(dict, key) || key
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        result = result.replace(new RegExp(`{${k}}`, "g"), String(v))
+      })
+    }
+    return result
   }
 
   return (
