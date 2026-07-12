@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle2, AlertTriangle, Loader2, FileDown } from "lucide-react"
+import { ArrowLeft, CheckCircle2, AlertTriangle, Loader2, FileDown, BookOpen } from "lucide-react"
 import { PDFDocument } from "pdf-lib"
 import { loadPdfDocument } from "@/lib/pdfjsClient"
 import { inspectPdfFields, type FieldInspectionResult, type InspectedField } from "@/lib/pdfFieldInspector"
@@ -281,6 +281,15 @@ export default function TaxTemplateMappingPage() {
               map แล้ว {coverage.mappedKeyCount}/{coverage.totalRequiredKeys}
             </div>
           )}
+          <a
+            href="https://claude.ai/code/artifact/56ea7c6e-04f4-4f65-a0db-c61dd73bf0f7"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 border border-slate-700 hover:bg-slate-900 hover:text-slate-100 transition-colors"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            วิธีใช้งาน
+          </a>
         </div>
       </div>
 
