@@ -199,6 +199,26 @@ async function getDecryptedCredentials(workspaceId: string) {
   }
 }
 
+// เช็คว่าหอพักนี้ตั้งค่า SlipOK ไว้พร้อมใช้งานหรือยัง (ใช้ Service Role Client เหมือน getDecryptedCredentials)
+// สำหรับเรียกใช้จาก flow ฝั่งผู้เช่า (อัปโหลดสลิปผ่าน portal) ซึ่งไม่มี session ของแอดมินให้ RLS มองเห็นแถวการตั้งค่านี้ได้
+// ห้ามใช้ getSlipOkSettings() (session-based) ตรงนี้ เพราะ RLS จะบล็อกไม่ให้ผู้เช่าอ่านตาราง config ของแอดมิน
+// ทำให้ระบบเข้าใจผิดว่ายังไม่ได้ตั้งค่า แล้วข้ามการตรวจสอบอัตโนมัติไปเงียบๆ ทุกครั้ง
+export async function isSlipOkReadyForAutoVerify(workspaceId: string): Promise<boolean> {
+  try {
+    const supabase = await getServiceRoleOrSessionClient()
+    const { data, error } = await supabase
+      .from("workspace_slipok_settings")
+      .select("branch_id, api_key_encrypted, enabled")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (error || !data) return false
+    return !!data.branch_id && !!data.api_key_encrypted && data.enabled !== false
+  } catch {
+    return false
+  }
+}
+
 export interface SlipOkQuota {
   quota: number
   overQuota: number

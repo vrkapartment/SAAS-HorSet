@@ -5,9 +5,17 @@ import { SLIPOK_RETRYABLE_ERROR_CODES } from "@/features/slipok/constants"
 import { sendLineSlipNotificationAction } from "@/features/notification/actions"
 
 export const dynamic = "force-dynamic"
+// เพดานสูงสุดของ Vercel Hobby plan (Pro ตั้งได้ถึง 300s) — ต้องอัป plan ก่อนถึงจะเพิ่มได้
+export const maxDuration = 60
 
 // จำนวนแถวสูงสุดที่ประมวลผลต่อรอบ ป้องกัน cron รันนานเกินไปหากมีคิวค้างจำนวนมาก
 const BATCH_LIMIT = 50
+
+// จำนวนแถวที่ประมวลผลพร้อมกันในแต่ละชุด (แทนที่จะทำทีละแถว) เพื่อให้เวลารวมขึ้นกับแถวที่ช้าที่สุด
+// ของแต่ละชุด ไม่ใช่ผลรวมของทุกแถว แต่ละแถวมีจุดเรียก external API ที่ timeout ได้สูงสุด 8s ถึง 3 จุด
+// (เช็คโควต้า + ตรวจสลิป + แจ้งเตือนไลน์) คูณ CONCURRENCY แล้วยังต้องพอดีกับ maxDuration 60s ของ Hobby
+// (ถ้าโดนตัดจริงๆ ก็ไม่เสียหาย เพราะแถวที่ยังไม่ทันทำจะรอรอบถัดไปเก็บให้เอง)
+const CONCURRENCY = 10
 
 export async function GET(request: Request) {
   try {
@@ -64,9 +72,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, message: "ไม่มีรายการที่ครบเวลาตรวจสลิปซ้ำ", processed: 0, details: [] })
     }
 
-    const details: Array<{ queue_id: string; bill_id: string; outcome: string }> = []
+    type QueueItem = typeof dueItems[number]
 
-    for (const item of dueItems) {
+    // ประมวลผล 1 แถว คืนค่าผลลัพธ์กลับไปแทนการ push เข้า array ตรงๆ เพื่อให้เรียกพร้อมกันหลายแถวได้ปลอดภัย
+    async function processQueueItem(item: QueueItem): Promise<{ queue_id: string; bill_id: string; outcome: string }> {
       try {
         // ตรวจสถานะบิลปัจจุบันก่อนทุกครั้ง เผื่อ staff เข้ามาตรวจ/ยืนยันเองแล้วระหว่างรอคิว หรือสลิปถูกเปลี่ยนไปแล้ว
         const { data: bill } = await supabaseAdmin
@@ -80,8 +89,7 @@ export async function GET(request: Request) {
             .from("slipok_retry_queue")
             .update({ status: "cancelled", updated_at: new Date().toISOString() })
             .eq("id", item.id)
-          details.push({ queue_id: item.id, bill_id: item.bill_id, outcome: "cancelled_bill_changed" })
-          continue
+          return { queue_id: item.id, bill_id: item.bill_id, outcome: "cancelled_bill_changed" }
         }
 
         const verifyRes = await verifySlipWithSlipOk(item.workspace_id, item.slip_url, item.amount ?? undefined)
@@ -97,8 +105,7 @@ export async function GET(request: Request) {
             .update({ status: "paid", updated_at: new Date().toISOString() })
             .eq("id", item.bill_id)
           await sendLineSlipNotificationAction(item.bill_id, item.workspace_id, "success")
-          details.push({ queue_id: item.id, bill_id: item.bill_id, outcome: "succeeded" })
-          continue
+          return { queue_id: item.id, bill_id: item.bill_id, outcome: "succeeded" }
         }
 
         const nextAttemptCount = item.attempt_count + 1
@@ -115,8 +122,7 @@ export async function GET(request: Request) {
               updated_at: new Date().toISOString()
             })
             .eq("id", item.id)
-          details.push({ queue_id: item.id, bill_id: item.bill_id, outcome: `retry_scheduled_attempt_${nextAttemptCount}` })
-          continue
+          return { queue_id: item.id, bill_id: item.bill_id, outcome: `retry_scheduled_attempt_${nextAttemptCount}` }
         }
 
         // ครบจำนวนครั้งที่ retry ได้แล้วแต่ยังไม่ผ่าน หรือเจอ error ที่ retry ต่อไปก็ไม่มีประโยชน์ -> แจ้งเตือนแอดมินให้ตรวจเอง
@@ -136,11 +142,19 @@ export async function GET(request: Request) {
           "warning",
           verifyRes.error || "ตรวจสอบสลิปอัตโนมัติไม่ผ่าน กรุณาตรวจสอบด้วยตนเอง"
         )
-        details.push({ queue_id: item.id, bill_id: item.bill_id, outcome: "failed_notified" })
+        return { queue_id: item.id, bill_id: item.bill_id, outcome: "failed_notified" }
       } catch (itemErr: unknown) {
         console.error(`Error processing SlipOK retry queue item ${item.id}:`, itemErr)
-        details.push({ queue_id: item.id, bill_id: item.bill_id, outcome: "error" })
+        return { queue_id: item.id, bill_id: item.bill_id, outcome: "error" }
       }
+    }
+
+    // ประมวลผลเป็นชุดๆ ละ CONCURRENCY แถวพร้อมกัน (แทนทีละแถว) เรียงชุดถัดไปหลังชุดก่อนหน้าเสร็จ
+    const details: Array<{ queue_id: string; bill_id: string; outcome: string }> = []
+    for (let i = 0; i < dueItems.length; i += CONCURRENCY) {
+      const chunk = dueItems.slice(i, i + CONCURRENCY)
+      const chunkResults = await Promise.all(chunk.map((item) => processQueueItem(item)))
+      details.push(...chunkResults)
     }
 
     return NextResponse.json({
