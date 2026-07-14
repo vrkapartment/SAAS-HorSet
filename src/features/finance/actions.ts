@@ -630,7 +630,7 @@ export async function savePropertyLogoUrl(workspaceId: string, logoUrl: string) 
       if (updateError.code === "42703" || updateError.message.includes("logo_url")) {
         return {
           success: false,
-          error: "ตารางฐานข้อมูลไม่มีคอลัมน์ logo_url กรุณาติดต่อผู้พัฒนา หรือติดตั้ง SQL Patch (database_patch_workspace_logo.sql) ในระบบหลังบ้าน"
+          error: "ตารางฐานข้อมูลไม่มีคอลัมน์ logo_url กรุณาติดต่อผู้พัฒนา หรือติดตั้ง SQL Patch (schema_multi_workspace.sql) ในระบบหลังบ้าน"
         }
       }
       throw updateError

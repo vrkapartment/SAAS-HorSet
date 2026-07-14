@@ -1107,7 +1107,7 @@ export default function TenantsPage() {
               <li>{t("tenants.setup_step1_prefix")} <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-bold inline-flex items-center gap-0.5">Supabase.com</a></li>
               <li>{t("tenants.setup_step2_prefix")} <strong>SQL Editor</strong></li>
               <li>{t("tenants.setup_step3_prefix")} <strong>New query</strong> {t("tenants.setup_step3_suffix")}</li>
-              <li>{t("tenants.setup_step4_prefix")} <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono font-bold text-slate-800 dark:text-slate-300 text-[11px]">database_patch_tenants_old.sql</code> {t("tenants.setup_step4_suffix")}</li>
+              <li>{t("tenants.setup_step4_prefix")} <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono font-bold text-slate-800 dark:text-slate-300 text-[11px]">schema_multi_workspace.sql</code> {t("tenants.setup_step4_suffix")}</li>
               <li>{t("tenants.setup_step5_prefix")} <strong>Run</strong> {t("tenants.setup_step5_suffix")}</li>
             </ol>
           </div>

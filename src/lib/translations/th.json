@@ -1377,7 +1377,7 @@
     "success_clear_group_demo": "ยกเลิกการเชื่อมต่อกลุ่ม LINE จำลองสำเร็จ!",
     "success_clear_group": "ยกเลิกการเชื่อมต่อกลุ่ม LINE สำเร็จ!",
     "success_auto_pairing": "🎉 ผูกบัญชี LINE Admin อัตโนมัติสำเร็จเรียบร้อยแล้ว!",
-    "err_db_patch_warning": "⚠️ ระบบหลังบ้านตรวจพบว่าตาราง 'workspace_line_settings' ยังไม่ได้เพิ่มฟิลด์ใหม่สำหรับแจ้งเตือนแอดมิน\n\nกรุณาแจ้งให้ผู้ดูแลระบบ (Admin) รันไฟล์ SQL Patch 'database_patch_toggle_admin_notifications.sql' ในหน้า Supabase Dashboard SQL Editor เพื่อเตรียมพร้อมตารางก่อน!",
+    "err_db_patch_warning": "⚠️ ระบบหลังบ้านตรวจพบว่าตาราง 'workspace_line_settings' ยังไม่ได้เพิ่มฟิลด์ใหม่สำหรับแจ้งเตือนแอดมิน\n\nกรุณาแจ้งให้ผู้ดูแลระบบ (Admin) รันไฟล์ SQL Patch 'schema_multi_workspace.sql' ในหน้า Supabase Dashboard SQL Editor เพื่อเตรียมพร้อมตารางก่อน!",
     "err_db_patch_warning_toggle": "⚠️ ไม่สามารถบันทึกสถานะได้เนื่องจากฐานข้อมูลตาราง 'workspace_line_settings' ยังไม่ได้รันสคริปต์ SQL Patch!",
     "guide_title_1": "คู่มือเชื่อมต่อระบบ LINE OA ส่วนตัว",
     "guide_subtitle_1": "ขั้นตอนรับสิทธิ์ส่งบิลและลงทะเบียนผู้เช่าแบบแยกหอพักอิสระ",

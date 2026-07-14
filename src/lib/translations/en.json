@@ -1377,7 +1377,7 @@
     "success_clear_group_demo": "Mock LINE Group disconnected successfully!",
     "success_clear_group": "LINE Group disconnected successfully!",
     "success_auto_pairing": "🎉 Automatic admin pairing successful!",
-    "err_db_patch_warning": "⚠️ The backend detected that 'workspace_line_settings' is missing new fields for admin notifications. Please ask your system administrator to run SQL patch file 'database_patch_toggle_admin_notifications.sql' in Supabase SQL Editor first!",
+    "err_db_patch_warning": "⚠️ The backend detected that 'workspace_line_settings' is missing new fields for admin notifications. Please ask your system administrator to run SQL patch file 'schema_multi_workspace.sql' in Supabase SQL Editor first!",
     "err_db_patch_warning_toggle": "⚠️ Cannot save status because the 'workspace_line_settings' table has not run the SQL patch script!",
     "guide_title_1": "Personal LINE OA Connection Guide",
     "guide_subtitle_1": "Steps to authorize bill delivery and tenant registration per independent property",

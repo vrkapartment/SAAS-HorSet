@@ -18,7 +18,7 @@ async function getServiceRoleOrSessionClient() {
   return await createClient()
 }
 
-// รหัส Postgres error เมื่อยังไม่มีตาราง (เช่น ยังไม่ได้รัน database_patch_saas_subscription.sql)
+// รหัส Postgres error เมื่อยังไม่มีตาราง (เช่น ยังไม่ได้รัน schema_multi_workspace.sql)
 const RELATION_MISSING_CODE = "42P01"
 
 export interface SaasPlan {
@@ -92,7 +92,7 @@ async function getWorkspaceUsage(workspaceId: string) {
 /**
  * ดึงสถานะ/แผนปัจจุบันของ workspace หนึ่งๆ
  * หมายเหตุ: ถ้ายังไม่มี migration หรือยังไม่มีแถว subscription เลย ให้ถือว่าใช้งานได้ปกติ (fail-open)
- * เพื่อไม่ให้ระบบเดิมพังก่อนที่แอดมินจะรัน database_patch_saas_subscription.sql
+ * เพื่อไม่ให้ระบบเดิมพังก่อนที่แอดมินจะรัน schema_multi_workspace.sql
  */
 export async function getWorkspaceSubscription(workspaceId: string): Promise<{ success: boolean; data?: WorkspaceSubscriptionView; error?: string }> {
   try {

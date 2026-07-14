@@ -481,7 +481,7 @@ export default function SuperAdminPlansPage() {
                     {subscriptions.length === 0 && (
                       <tr>
                         <td colSpan={5} className="text-center p-8 text-slate-500 text-sm md:text-xs">
-                          {loadingSubscriptions ? "กำลังโหลดข้อมูล..." : "ยังไม่มีข้อมูล subscription ในระบบ (อาจยังไม่ได้รัน database_patch_saas_subscription.sql)"}
+                          {loadingSubscriptions ? "กำลังโหลดข้อมูล..." : "ยังไม่มีข้อมูล subscription ในระบบ (อาจยังไม่ได้รัน schema_multi_workspace.sql)"}
                         </td>
                       </tr>
                     )}

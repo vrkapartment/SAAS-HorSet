@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 
-// รหัส Postgres error เมื่อยังไม่มีตาราง (เช่น ยังไม่ได้รัน database_patch_saas_subscription.sql)
+// รหัส Postgres error เมื่อยังไม่มีตาราง (เช่น ยังไม่ได้รัน schema_multi_workspace.sql)
 const RELATION_MISSING_CODE = "42P01"
 
 export interface Building {
