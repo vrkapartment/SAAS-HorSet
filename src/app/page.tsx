@@ -91,43 +91,109 @@ const PRICING_PLANS: PricingPlan[] = [
 
 const FAQ_KEYS = ["q1", "q2", "q3", "q4", "q5", "q6"]
 
-// กรอบอุปกรณ์จำลอง (Desktop/Tablet/Mobile) ใช้แสดงว่า UI จริงปรับ layout ตามอุปกรณ์ได้ ไม่ใช่แค่การ์ดเฉย ๆ
-function DesktopFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto w-full">
-      <div className="rounded-t-xl border-[6px] border-b-0 border-slate-800 dark:border-slate-700 bg-slate-800 dark:bg-slate-700 overflow-hidden shadow-xl">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-850">
-          <span className="w-2 h-2 rounded-full bg-rose-400" />
-          <span className="w-2 h-2 rounded-full bg-amber-400" />
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-        </div>
-        <div className="bg-white dark:bg-slate-900">{children}</div>
-      </div>
-      <div className="mx-auto h-3 w-10 bg-slate-800 dark:bg-slate-700" />
-      <div className="mx-auto h-1.5 w-28 bg-slate-700 dark:bg-slate-600 rounded-full" />
-    </div>
-  )
-}
-
-function TabletFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto w-full rounded-[1.5rem] border-[10px] border-slate-800 dark:border-slate-700 bg-slate-800 dark:bg-slate-700 shadow-xl relative">
-      <span className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-slate-500" />
-      <div className="rounded-[0.5rem] bg-white dark:bg-slate-900 overflow-hidden">{children}</div>
-    </div>
-  )
-}
-
+// กรอบมือถือ (ใช้กับส่วน LINE payment highlight) — bezel เข้มเสมอ แต่หน้าจอด้านในปรับตาม theme ของหน้าเว็บ
 function PhoneFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[220px] rounded-[2.25rem] border-[8px] border-slate-800 dark:border-slate-700 bg-slate-800 dark:bg-slate-700 shadow-xl relative overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-4 bg-slate-800 dark:bg-slate-700 rounded-b-lg z-10" />
+    <div className="mx-auto w-full max-w-[220px] rounded-[2.25rem] border-[8px] border-slate-800 bg-slate-800 shadow-xl relative overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-4 bg-slate-800 rounded-b-lg z-10" />
       <div className="rounded-[1.6rem] bg-white dark:bg-slate-900 overflow-hidden">
         {children}
         <div className="flex justify-center py-2">
           <span className="w-14 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
         </div>
       </div>
+    </div>
+  )
+}
+
+// กรอบอุปกรณ์สำหรับ "โชว์เคส" ใช้งานได้ทุกอุปกรณ์ — หน้าจอด้านในล็อกเป็นธีมมืดเสมอ (เหมือนภาพสกรีนช็อตจริงของแอป)
+// ไม่ผูกกับ light/dark ของหน้าเว็บ เพื่อให้ดูเป็น "รูปถ่ายฮาร์ดแวร์" ที่สม่ำเสมอ
+function ShowcasePhoneFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-[170px] rounded-[1.85rem] border-[6px] border-slate-800 bg-slate-800 shadow-2xl relative overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-3 bg-slate-800 rounded-b-md z-10" />
+      <div className="rounded-[1.4rem] bg-slate-950 overflow-hidden">
+        {children}
+        <div className="flex justify-center py-1.5">
+          <span className="w-9 h-1 rounded-full bg-slate-700" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ShowcaseTabletFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-[230px] rounded-[1.15rem] border-[7px] border-slate-800 bg-slate-800 shadow-2xl relative">
+      <span className="absolute top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-slate-600" />
+      <div className="rounded-[0.55rem] bg-slate-950 overflow-hidden">{children}</div>
+    </div>
+  )
+}
+
+function ShowcaseLaptopFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-md">
+      <div className="rounded-t-lg border-[5px] border-b-0 border-slate-800 bg-slate-800 overflow-hidden shadow-2xl relative">
+        <span className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-slate-600 z-10" />
+        <div className="bg-slate-950">{children}</div>
+      </div>
+      <div className="relative h-2.5 bg-gradient-to-b from-slate-700 to-slate-800 rounded-b-sm">
+        <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-14 h-2 bg-slate-700 rounded-b" />
+      </div>
+      <div className="mx-auto h-1 w-[72%] bg-slate-900/40 rounded-b-2xl blur-[1px]" />
+    </div>
+  )
+}
+
+type ShowcaseScale = "sm" | "md" | "lg"
+
+// เนื้อหาการ์ดสถิติแดชบอร์ดแบบมืดล็อกตายตัว ใช้ตัวเลขชุดเดียวกับ demo dataset ของหน้า /dashboard จริง
+function ShowcaseStatsBody({ scale }: { scale: ShowcaseScale }) {
+  const tileText = scale === "sm" ? "text-[7px]" : scale === "md" ? "text-[8px]" : "text-[9px]"
+  const valueText = scale === "sm" ? "text-[10px]" : scale === "md" ? "text-xs" : "text-sm"
+  const bigText = scale === "sm" ? "text-sm" : scale === "md" ? "text-base" : "text-xl"
+  const pad = scale === "lg" ? "px-4" : "px-3"
+
+  return (
+    <div className={`pb-3 ${pad}`}>
+      <div className="grid grid-cols-4 gap-1.5 pt-3">
+        {[
+          { label: "ห้องทั้งหมด", value: "24" },
+          { label: "ห้องว่าง", value: "2" },
+          { label: "มีผู้เช่า", value: "22" },
+          { label: "ค้างชำระ", value: "3" }
+        ].map((s) => (
+          <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-lg p-1.5">
+            <span className={`${tileText} text-slate-500 font-bold uppercase block leading-tight truncate`}>{s.label}</span>
+            <span className={`${valueText} font-black text-slate-100 font-mono`}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2">
+          <span className={`${tileText} text-emerald-400/80 font-bold uppercase block`}>รายรับเดือนนี้</span>
+          <span className={`${bigText} font-black text-emerald-400 font-mono`}>118,250 ฿</span>
+        </div>
+        <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2">
+          <span className={`${tileText} text-rose-400/80 font-bold uppercase block`}>ค้างชำระ</span>
+          <span className={`${bigText} font-black text-rose-400 font-mono`}>16,800 ฿</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ShowcaseAppHeader({ big = false }: { big?: boolean }) {
+  return (
+    <div className={`flex items-center justify-between ${big ? "px-4 py-3" : "px-3 py-2.5"}`}>
+      <div className="flex items-center gap-1.5">
+        <div className={`${big ? "w-5 h-5" : "w-4 h-4"} rounded-md bg-blue-500/20 flex items-center justify-center shrink-0`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+        </div>
+        <span className={`${big ? "text-[11px]" : "text-[9px]"} font-bold text-slate-100`}>หอพัก เดโม</span>
+      </div>
+      <span className={`${big ? "text-[8px] px-2 py-0.5" : "text-[7px] px-1.5 py-0.5"} rounded-full bg-slate-800 text-slate-400 font-bold`}>DEMO</span>
     </div>
   )
 }
@@ -489,79 +555,96 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6 items-end">
-          {/* Desktop: Data Table View */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-1.5 text-slate-500 dark:text-slate-400">
-              <Monitor className="w-3.5 h-3.5" />
-              <span className="text-[11px] font-bold uppercase tracking-wide">{t("landing.devices_desktop_label")}</span>
-            </div>
-            <DesktopFrame>
-              <div className="p-3">
-                <div className="grid grid-cols-4 gap-2 text-[8px] font-bold text-slate-400 dark:text-slate-500 px-1.5 pb-1.5 mb-1 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wide">
-                  <span>ห้อง</span>
-                  <span>ผู้เช่า</span>
-                  <span className="text-right">ยอดบิล</span>
-                  <span className="text-right">สถานะ</span>
-                </div>
-                {[
-                  { room: "101", tenant: "คุณวิภาวี", amount: "5,400", status: "ชำระแล้ว", color: "text-emerald-600 dark:text-emerald-400" },
-                  { room: "105", tenant: "คุณณัฐพล", amount: "5,800", status: "รอตรวจสอบ", color: "text-amber-600 dark:text-amber-400" },
-                  { room: "302", tenant: "คุณรภัสสร", amount: "5,600", status: "ค้างชำระ", color: "text-rose-600 dark:text-rose-400" }
-                ].map((row) => (
-                  <div key={row.room} className="grid grid-cols-4 gap-2 text-[9px] px-1.5 py-1.5 items-center odd:bg-slate-50/70 dark:odd:bg-slate-850/60 rounded-md">
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{row.room}</span>
-                    <span className="text-slate-500 dark:text-slate-400 truncate">{row.tenant}</span>
-                    <span className="text-right font-mono text-slate-600 dark:text-slate-300">{row.amount}</span>
-                    <span className={`text-right font-bold ${row.color}`}>{row.status}</span>
-                  </div>
-                ))}
-              </div>
-            </DesktopFrame>
+        <div className="relative">
+          {/* ambient glow ด้านหลังกลุ่มอุปกรณ์ */}
+          <div className="absolute inset-x-0 top-1/4 flex justify-center pointer-events-none">
+            <div className="w-[80%] h-52 bg-blue-500/10 dark:bg-blue-500/15 blur-3xl rounded-full" />
           </div>
 
-          {/* Staff: on-site metering, landscape tablet */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-1.5 text-slate-500 dark:text-slate-400">
-              <Gauge className="w-3.5 h-3.5" />
-              <span className="text-[11px] font-bold uppercase tracking-wide">{t("landing.devices_staff_label")}</span>
-            </div>
-            <TabletFrame>
-              <div className="p-4">
-                <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200 mb-2.5">ห้อง 203 · มิเตอร์ไฟฟ้า</div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="rounded-lg bg-slate-50 dark:bg-slate-850 px-3 py-2">
-                    <span className="text-[8px] text-slate-400 block">เลขก่อนหน้า</span>
-                    <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-200">1,204</span>
-                  </div>
-                  <div className="rounded-lg bg-teal-50 dark:bg-teal-950/40 px-3 py-2 border border-teal-200/60 dark:border-teal-900/40">
-                    <span className="text-[8px] text-teal-500 block">เลขปัจจุบัน</span>
-                    <span className="text-sm font-mono font-bold text-teal-700 dark:text-teal-400">1,257</span>
-                  </div>
-                </div>
-                <div className="mt-2.5 text-center bg-teal-600 text-white text-[11px] font-bold py-1.5 rounded-lg">บันทึกมิเตอร์</div>
+          <div className="relative grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-4 items-end">
+            {/* มือถือ */}
+            <div className="md:col-span-3 md:col-start-1 flex flex-col items-center gap-4">
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <Smartphone className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold">{t("landing.devices_type_mobile")}</span>
               </div>
-            </TabletFrame>
-          </div>
+              <div className="-rotate-3 hover:rotate-0 motion-reduce:rotate-0 transition-transform duration-500 ease-out">
+                <ShowcasePhoneFrame>
+                  <ShowcaseAppHeader />
+                  <ShowcaseStatsBody scale="sm" />
+                </ShowcasePhoneFrame>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 text-center max-w-[180px] leading-relaxed">
+                {t("landing.devices_mobile_label")}
+              </p>
+            </div>
 
-          {/* Tenant: mobile portal */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-1.5 text-slate-500 dark:text-slate-400">
-              <Smartphone className="w-3.5 h-3.5" />
-              <span className="text-[11px] font-bold uppercase tracking-wide">{t("landing.devices_mobile_label")}</span>
-            </div>
-            <PhoneFrame>
-              <div className="p-4 pt-6 space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-700 dark:text-slate-200">บิลเดือน มิ.ย. 69</span>
-                  <span className="font-mono font-black text-indigo-600 dark:text-indigo-400">5,800 ฿</span>
-                </div>
-                <div className="mx-auto w-20 h-20 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center">
-                  <QrCode className="w-12 h-12 text-white dark:text-slate-900" />
-                </div>
-                <div className="w-full text-center bg-indigo-600 text-white text-xs font-bold py-2 rounded-lg">แนบสลิปโอนเงิน</div>
+            {/* คอมพิวเตอร์ */}
+            <div className="md:col-span-6 md:col-start-4 flex flex-col items-center gap-4 relative z-10">
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <Monitor className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold">{t("landing.devices_type_desktop")}</span>
               </div>
-            </PhoneFrame>
+              <ShowcaseLaptopFrame>
+                <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-800">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="ml-2 text-[9px] font-mono text-slate-500">app.horset.co/dashboard</span>
+                </div>
+                <ShowcaseAppHeader big />
+                <ShowcaseStatsBody scale="lg" />
+                <div className="grid grid-cols-4 gap-2 px-4 pb-4">
+                  {[
+                    { label: t("dashboard.action_meter"), icon: Receipt, color: "text-blue-400 bg-blue-500/10" },
+                    { label: t("dashboard.action_bill"), icon: Plus, color: "text-teal-400 bg-teal-500/10" },
+                    { label: t("dashboard.action_tenants"), icon: Users, color: "text-indigo-400 bg-indigo-500/10" },
+                    { label: t("dashboard.action_expense"), icon: Coins, color: "text-amber-400 bg-amber-500/10" }
+                  ].map((act) => {
+                    const Icon = act.icon
+                    return (
+                      <div key={act.label} className={`rounded-lg p-2 flex flex-col items-center gap-1 text-center ${act.color}`}>
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="text-[7px] font-bold leading-tight text-slate-300">{act.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </ShowcaseLaptopFrame>
+              <p className="text-xs text-slate-500 dark:text-slate-400 text-center max-w-[220px] leading-relaxed">
+                {t("landing.devices_desktop_label")}
+              </p>
+            </div>
+
+            {/* แท็บเล็ต */}
+            <div className="md:col-span-3 md:col-start-10 flex flex-col items-center gap-4">
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <Gauge className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold">{t("landing.devices_type_tablet")}</span>
+              </div>
+              <div className="rotate-3 hover:rotate-0 motion-reduce:rotate-0 transition-transform duration-500 ease-out">
+                <ShowcaseTabletFrame>
+                  <ShowcaseAppHeader />
+                  <div className="px-3 pb-3">
+                    <div className="text-[9px] font-bold text-slate-300 mb-2 pt-1">ห้อง 203 · มิเตอร์ไฟฟ้า</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-slate-900 border border-slate-800 px-2.5 py-1.5">
+                        <span className="text-[7px] text-slate-500 block">เลขก่อนหน้า</span>
+                        <span className="text-xs font-mono font-bold text-slate-200">1,204</span>
+                      </div>
+                      <div className="rounded-lg bg-teal-500/10 border border-teal-500/20 px-2.5 py-1.5">
+                        <span className="text-[7px] text-teal-400/80 block">เลขปัจจุบัน</span>
+                        <span className="text-xs font-mono font-bold text-teal-400">1,257</span>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-center bg-teal-600 text-white text-[9px] font-bold py-1.5 rounded-lg">บันทึกมิเตอร์</div>
+                  </div>
+                </ShowcaseTabletFrame>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 text-center max-w-[180px] leading-relaxed">
+                {t("landing.devices_staff_label")}
+              </p>
+            </div>
           </div>
         </div>
 
