@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Gauge,
@@ -90,6 +90,47 @@ const PRICING_PLANS: PricingPlan[] = [
 ]
 
 const FAQ_KEYS = ["q1", "q2", "q3", "q4", "q5", "q6"]
+
+// กรอบอุปกรณ์จำลอง (Desktop/Tablet/Mobile) ใช้แสดงว่า UI จริงปรับ layout ตามอุปกรณ์ได้ ไม่ใช่แค่การ์ดเฉย ๆ
+function DesktopFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full">
+      <div className="rounded-t-xl border-[6px] border-b-0 border-slate-800 dark:border-slate-700 bg-slate-800 dark:bg-slate-700 overflow-hidden shadow-xl">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-850">
+          <span className="w-2 h-2 rounded-full bg-rose-400" />
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+        </div>
+        <div className="bg-white dark:bg-slate-900">{children}</div>
+      </div>
+      <div className="mx-auto h-3 w-10 bg-slate-800 dark:bg-slate-700" />
+      <div className="mx-auto h-1.5 w-28 bg-slate-700 dark:bg-slate-600 rounded-full" />
+    </div>
+  )
+}
+
+function TabletFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full rounded-[1.5rem] border-[10px] border-slate-800 dark:border-slate-700 bg-slate-800 dark:bg-slate-700 shadow-xl relative">
+      <span className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-slate-500" />
+      <div className="rounded-[0.5rem] bg-white dark:bg-slate-900 overflow-hidden">{children}</div>
+    </div>
+  )
+}
+
+function PhoneFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-[220px] rounded-[2.25rem] border-[8px] border-slate-800 dark:border-slate-700 bg-slate-800 dark:bg-slate-700 shadow-xl relative overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-4 bg-slate-800 dark:bg-slate-700 rounded-b-lg z-10" />
+      <div className="rounded-[1.6rem] bg-white dark:bg-slate-900 overflow-hidden">
+        {children}
+        <div className="flex justify-center py-2">
+          <span className="w-14 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function LandingPage() {
   const router = useRouter()
@@ -448,71 +489,84 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6 items-end">
           {/* Desktop: Data Table View */}
-          <div className="rounded-2xl border border-slate-200/60 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-              <Monitor className="w-4 h-4 text-blue-500" />
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{t("landing.devices_desktop_label")}</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <Monitor className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold uppercase tracking-wide">{t("landing.devices_desktop_label")}</span>
             </div>
-            <div className="p-4 space-y-1.5">
-              {[
-                { room: "101", tenant: "คุณวิภาวี", status: "ชำระแล้ว", color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40" },
-                { room: "105", tenant: "คุณณัฐพล", status: "รอตรวจสอบ", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40" },
-                { room: "302", tenant: "คุณรภัสสร", status: "ค้างชำระ", color: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40" }
-              ].map((row) => (
-                <div key={row.room} className="flex items-center justify-between text-xs px-2.5 py-2 rounded-lg bg-slate-50/70 dark:bg-slate-850/60">
-                  <span className="font-bold text-slate-700 dark:text-slate-200">ห้อง {row.room}</span>
-                  <span className="text-slate-500 dark:text-slate-400">{row.tenant}</span>
-                  <span className={`font-bold px-2 py-0.5 rounded-full ${row.color}`}>{row.status}</span>
+            <DesktopFrame>
+              <div className="p-3">
+                <div className="grid grid-cols-4 gap-2 text-[8px] font-bold text-slate-400 dark:text-slate-500 px-1.5 pb-1.5 mb-1 border-b border-slate-100 dark:border-slate-800 uppercase tracking-wide">
+                  <span>ห้อง</span>
+                  <span>ผู้เช่า</span>
+                  <span className="text-right">ยอดบิล</span>
+                  <span className="text-right">สถานะ</span>
                 </div>
-              ))}
-            </div>
+                {[
+                  { room: "101", tenant: "คุณวิภาวี", amount: "5,400", status: "ชำระแล้ว", color: "text-emerald-600 dark:text-emerald-400" },
+                  { room: "105", tenant: "คุณณัฐพล", amount: "5,800", status: "รอตรวจสอบ", color: "text-amber-600 dark:text-amber-400" },
+                  { room: "302", tenant: "คุณรภัสสร", amount: "5,600", status: "ค้างชำระ", color: "text-rose-600 dark:text-rose-400" }
+                ].map((row) => (
+                  <div key={row.room} className="grid grid-cols-4 gap-2 text-[9px] px-1.5 py-1.5 items-center odd:bg-slate-50/70 dark:odd:bg-slate-850/60 rounded-md">
+                    <span className="font-bold text-slate-700 dark:text-slate-200">{row.room}</span>
+                    <span className="text-slate-500 dark:text-slate-400 truncate">{row.tenant}</span>
+                    <span className="text-right font-mono text-slate-600 dark:text-slate-300">{row.amount}</span>
+                    <span className={`text-right font-bold ${row.color}`}>{row.status}</span>
+                  </div>
+                ))}
+              </div>
+            </DesktopFrame>
           </div>
 
-          {/* Staff: on-site metering */}
-          <div className="rounded-2xl border border-slate-200/60 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-              <Gauge className="w-4 h-4 text-teal-500" />
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{t("landing.devices_staff_label")}</span>
+          {/* Staff: on-site metering, landscape tablet */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <Gauge className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold uppercase tracking-wide">{t("landing.devices_staff_label")}</span>
             </div>
-            <div className="p-4 space-y-3">
-              <div className="text-xs font-bold text-slate-700 dark:text-slate-200">ห้อง 203 · มิเตอร์ไฟฟ้า</div>
-              <div className="flex gap-2">
-                <div className="flex-1 rounded-lg bg-slate-50 dark:bg-slate-850 px-3 py-2">
-                  <span className="text-[9px] text-slate-400 block">เลขก่อนหน้า</span>
-                  <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-200">1,204</span>
+            <TabletFrame>
+              <div className="p-4">
+                <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200 mb-2.5">ห้อง 203 · มิเตอร์ไฟฟ้า</div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-lg bg-slate-50 dark:bg-slate-850 px-3 py-2">
+                    <span className="text-[8px] text-slate-400 block">เลขก่อนหน้า</span>
+                    <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-200">1,204</span>
+                  </div>
+                  <div className="rounded-lg bg-teal-50 dark:bg-teal-950/40 px-3 py-2 border border-teal-200/60 dark:border-teal-900/40">
+                    <span className="text-[8px] text-teal-500 block">เลขปัจจุบัน</span>
+                    <span className="text-sm font-mono font-bold text-teal-700 dark:text-teal-400">1,257</span>
+                  </div>
                 </div>
-                <div className="flex-1 rounded-lg bg-teal-50 dark:bg-teal-950/40 px-3 py-2 border border-teal-200/60 dark:border-teal-900/40">
-                  <span className="text-[9px] text-teal-500 block">เลขปัจจุบัน</span>
-                  <span className="text-sm font-mono font-bold text-teal-700 dark:text-teal-400">1,257</span>
-                </div>
+                <div className="mt-2.5 text-center bg-teal-600 text-white text-[11px] font-bold py-1.5 rounded-lg">บันทึกมิเตอร์</div>
               </div>
-              <div className="w-full text-center bg-teal-600 text-white text-xs font-bold py-2 rounded-lg">บันทึกมิเตอร์</div>
-            </div>
+            </TabletFrame>
           </div>
 
           {/* Tenant: mobile portal */}
-          <div className="rounded-2xl border border-slate-200/60 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-              <Smartphone className="w-4 h-4 text-indigo-500" />
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{t("landing.devices_mobile_label")}</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <Smartphone className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold uppercase tracking-wide">{t("landing.devices_mobile_label")}</span>
             </div>
-            <div className="p-4 space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-700 dark:text-slate-200">บิลเดือน มิ.ย. 69</span>
-                <span className="font-mono font-black text-indigo-600 dark:text-indigo-400">5,800 ฿</span>
+            <PhoneFrame>
+              <div className="p-4 pt-6 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700 dark:text-slate-200">บิลเดือน มิ.ย. 69</span>
+                  <span className="font-mono font-black text-indigo-600 dark:text-indigo-400">5,800 ฿</span>
+                </div>
+                <div className="mx-auto w-20 h-20 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center">
+                  <QrCode className="w-12 h-12 text-white dark:text-slate-900" />
+                </div>
+                <div className="w-full text-center bg-indigo-600 text-white text-xs font-bold py-2 rounded-lg">แนบสลิปโอนเงิน</div>
               </div>
-              <div className="mx-auto w-20 h-20 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center">
-                <QrCode className="w-12 h-12 text-white dark:text-slate-900" />
-              </div>
-              <div className="w-full text-center bg-indigo-600 text-white text-xs font-bold py-2 rounded-lg">แนบสลิปโอนเงิน</div>
-            </div>
+            </PhoneFrame>
           </div>
         </div>
 
         {/* Highlight: LINE payment flow */}
-        <div className="mt-8 glass-card rounded-3xl border border-slate-200/60 dark:border-slate-850 p-6 sm:p-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="mt-14 glass-card rounded-3xl border border-slate-200/60 dark:border-slate-850 p-6 sm:p-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
               {t("landing.devices_highlight_title")}
@@ -530,8 +584,8 @@ export default function LandingPage() {
             </ul>
           </div>
 
-          <div className="mx-auto w-full max-w-[260px] rounded-[2rem] border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 shadow-xl">
-            <div className="rounded-[1.5rem] bg-white dark:bg-slate-900 p-4 space-y-3">
+          <PhoneFrame>
+            <div className="p-4 pt-6 space-y-3">
               <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">
                 <MessageCircleMore className="w-4 h-4 text-emerald-500" /> HorSet LINE OA
               </div>
@@ -543,7 +597,7 @@ export default function LandingPage() {
               </div>
               <div className="w-full text-center bg-emerald-600 text-white text-xs font-bold py-2 rounded-lg">แนบสลิปการโอนเงิน</div>
             </div>
-          </div>
+          </PhoneFrame>
         </div>
       </section>
 
