@@ -29,7 +29,8 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
-  Building
+  Building,
+  Menu
 } from "lucide-react"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { LanguageToggle } from "@/components/LanguageToggle"
@@ -161,54 +162,21 @@ function ShowcaseLaptopFrame({ children }: { children: React.ReactNode }) {
   )
 }
 
-type ShowcaseScale = "sm" | "md" | "lg"
-
-// เนื้อหาการ์ดสถิติแดชบอร์ดแบบมืดล็อกตายตัว ใช้ตัวเลขชุดเดียวกับ demo dataset ของหน้า /dashboard จริง
-function ShowcaseStatsBody({ scale }: { scale: ShowcaseScale }) {
-  const tileText = scale === "sm" ? "text-[7px]" : scale === "md" ? "text-[8px]" : "text-[9px]"
-  const valueText = scale === "sm" ? "text-[10px]" : scale === "md" ? "text-xs" : "text-sm"
-  const bigText = scale === "sm" ? "text-sm" : scale === "md" ? "text-base" : "text-xl"
-  const pad = scale === "lg" ? "px-4" : "px-3"
-
+// แถบหัวจริงของแอป (จำลองจาก DashboardLayout.tsx): ปุ่มแฮมเบอร์เกอร์ + ชื่อหน้าปัจจุบัน + ไอคอนภาษา/ธีม/แจ้งเตือน
+function ShowcaseAppHeader({ title, big = false }: { title: string; big?: boolean }) {
   return (
-    <div className={`pb-3 ${pad}`}>
-      <div className="grid grid-cols-4 gap-1.5 pt-3">
-        {[
-          { label: "ห้องทั้งหมด", value: "24" },
-          { label: "ห้องว่าง", value: "2" },
-          { label: "มีผู้เช่า", value: "22" },
-          { label: "ค้างชำระ", value: "3" }
-        ].map((s) => (
-          <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-lg p-1.5">
-            <span className={`${tileText} text-slate-500 font-bold uppercase block leading-tight truncate`}>{s.label}</span>
-            <span className={`${valueText} font-black text-slate-100 font-mono`}>{s.value}</span>
-          </div>
-        ))}
+    <div className={`flex items-center justify-between border-b border-slate-800 ${big ? "px-4 py-2.5" : "px-3 py-2"}`}>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <Menu className={`${big ? "w-4 h-4" : "w-3 h-3"} text-slate-400 shrink-0`} />
+        <span className={`${big ? "text-[11px]" : "text-[9px]"} font-bold text-slate-100 truncate`}>{title}</span>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 mt-1.5">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2">
-          <span className={`${tileText} text-emerald-400/80 font-bold uppercase block`}>รายรับเดือนนี้</span>
-          <span className={`${bigText} font-black text-emerald-400 font-mono`}>118,250 ฿</span>
-        </div>
-        <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2">
-          <span className={`${tileText} text-rose-400/80 font-bold uppercase block`}>ค้างชำระ</span>
-          <span className={`${bigText} font-black text-rose-400 font-mono`}>16,800 ฿</span>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className={`${big ? "text-[8px]" : "text-[7px]"} font-bold text-slate-500`}>TH</span>
+        <div className="relative">
+          <BellRing className={`${big ? "w-3.5 h-3.5" : "w-3 h-3"} text-slate-500`} />
+          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
         </div>
       </div>
-    </div>
-  )
-}
-
-function ShowcaseAppHeader({ big = false }: { big?: boolean }) {
-  return (
-    <div className={`flex items-center justify-between ${big ? "px-4 py-3" : "px-3 py-2.5"}`}>
-      <div className="flex items-center gap-1.5">
-        <div className={`${big ? "w-5 h-5" : "w-4 h-4"} rounded-md bg-blue-500/20 flex items-center justify-center shrink-0`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-        </div>
-        <span className={`${big ? "text-[11px]" : "text-[9px]"} font-bold text-slate-100`}>หอพัก เดโม</span>
-      </div>
-      <span className={`${big ? "text-[8px] px-2 py-0.5" : "text-[7px] px-1.5 py-0.5"} rounded-full bg-slate-800 text-slate-400 font-bold`}>DEMO</span>
     </div>
   )
 }
@@ -254,18 +222,20 @@ export default function LandingPage() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <LanguageToggle />
-          <ThemeToggle />
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
           <button
             onClick={() => router.push("/login")}
-            className="hidden sm:inline-flex glow-btn bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 hover:border-blue-500 dark:hover:border-blue-400 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-white text-xs font-semibold py-2.5 px-5 rounded-full shadow-sm transition-all"
+            className="glow-btn inline-flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 hover:border-blue-500 dark:hover:border-blue-400 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-white text-[11px] sm:text-xs font-semibold py-2 sm:py-2.5 px-3.5 sm:px-5 rounded-full shadow-sm transition-all whitespace-nowrap"
           >
             {t("common.login")}
           </button>
           <button
             onClick={goToRegister}
-            className="glow-btn bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white text-xs font-semibold py-2.5 px-5 rounded-full shadow-md transition-all"
+            className="glow-btn bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white text-[11px] sm:text-xs font-semibold py-2 sm:py-2.5 px-3.5 sm:px-5 rounded-full shadow-md transition-all whitespace-nowrap"
           >
             {t("landing.get_started")}
           </button>
@@ -585,18 +555,74 @@ export default function LandingPage() {
               </div>
               <div className="-rotate-3 hover:rotate-0 motion-reduce:rotate-0 transition-transform duration-500 ease-out">
                 <ShowcasePhoneFrame>
-                  <ShowcaseAppHeader />
-                  <ShowcaseStatsBody scale="sm" />
-                  <div className="mt-auto flex items-center justify-around px-2 py-2 border-t border-slate-800 shrink-0">
+                  <ShowcaseAppHeader title="Dashboard" />
+
+                  {/* ยินดีต้อนรับกลับ */}
+                  <div className="px-3 pt-2.5 pb-2">
+                    <p className="text-[10px] font-black text-slate-100 truncate">ยินดีต้อนรับกลับ แอดมิน!</p>
+                  </div>
+
+                  {/* การ์ดสถิติ 2x2 — label บน, ตัวเลขใหญ่, ไอคอนมุมขวาบน เหมือนหน้า /dashboard จริง */}
+                  <div className="grid grid-cols-2 gap-1.5 px-3">
                     {[
-                      { icon: Home, active: true },
-                      { icon: Receipt, active: false },
-                      { icon: Gauge, active: false },
-                      { icon: Users, active: false }
-                    ].map((item, idx) => {
-                      const Icon = item.icon
-                      return <Icon key={idx} className={`w-3.5 h-3.5 ${item.active ? "text-blue-400" : "text-slate-600"}`} />
+                      { label: "ห้องทั้งหมด", value: "24", icon: Home, color: "text-blue-400 bg-blue-500/10" },
+                      { label: "ห้องว่าง", value: "2", icon: Home, color: "text-emerald-400 bg-emerald-500/10" },
+                      { label: "มีผู้เช่า", value: "22", icon: Users, color: "text-teal-400 bg-teal-500/10" },
+                      { label: "ค้างชำระ", value: "3", icon: Clock, color: "text-rose-400 bg-rose-500/10" }
+                    ].map((s) => {
+                      const Icon = s.icon
+                      return (
+                        <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-lg p-1.5 flex items-start justify-between gap-1">
+                          <div className="min-w-0">
+                            <span className="text-[6px] text-slate-500 font-bold uppercase block truncate">{s.label}</span>
+                            <span className="text-[11px] font-black text-slate-100 font-mono">{s.value}</span>
+                          </div>
+                          <div className={`p-0.5 rounded-md shrink-0 ${s.color}`}>
+                            <Icon className="w-2.5 h-2.5" />
+                          </div>
+                        </div>
+                      )
                     })}
+                  </div>
+
+                  {/* รายรับ / ค้างชำระ เต็มความกว้าง เรียงต่อกัน */}
+                  <div className="flex flex-col gap-1.5 px-3 pt-1.5">
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5">
+                      <span className="text-[6px] text-emerald-400/80 font-bold uppercase block">รายรับเดือนนี้</span>
+                      <span className="text-xs font-black text-emerald-400 font-mono">118,250 ฿</span>
+                    </div>
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-1.5">
+                      <span className="text-[6px] text-rose-400/80 font-bold uppercase block">ค้างชำระ</span>
+                      <span className="text-xs font-black text-rose-400 font-mono">16,800 ฿</span>
+                    </div>
+                  </div>
+
+                  {/* เมนูลัด 2x2 — ไอคอนกล่องขาวมุมซ้ายบน ป้ายชื่อล่าง เหมือนการ์ด quick action บนมือถือจริง */}
+                  <div className="grid grid-cols-2 gap-1.5 px-3 pt-1.5">
+                    {[
+                      { label: "จดมิเตอร์", color: "bg-blue-500/10", icon: Gauge },
+                      { label: "ออกบิล", color: "bg-teal-500/10", icon: Plus },
+                      { label: "ผู้เช่า", color: "bg-indigo-500/10", icon: Users },
+                      { label: "รายจ่าย", color: "bg-amber-500/10", icon: Coins }
+                    ].map((act) => {
+                      const Icon = act.icon
+                      return (
+                        <div key={act.label} className={`rounded-lg p-1.5 ${act.color}`}>
+                          <div className="w-4 h-4 bg-slate-950 rounded-md flex items-center justify-center mb-1">
+                            <Icon className="w-2.5 h-2.5 text-slate-200" />
+                          </div>
+                          <span className="text-[7px] font-extrabold text-slate-200">{act.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Tab สลับมุมมองเฉพาะมือถือจริง: บิลล่าสุด / กิจกรรมล่าสุด */}
+                  <div className="mt-auto px-3 pt-2 pb-2.5 shrink-0">
+                    <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                      <span className="flex-1 text-center text-[7px] font-extrabold py-1 rounded-md bg-slate-800 text-teal-400">บิลล่าสุด (4)</span>
+                      <span className="flex-1 text-center text-[7px] font-extrabold py-1 rounded-md text-slate-500">กิจกรรม (3)</span>
+                    </div>
                   </div>
                 </ShowcasePhoneFrame>
               </div>
@@ -618,7 +644,7 @@ export default function LandingPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span className="ml-2 text-[9px] font-mono text-slate-500">app.horset.co/manage-bills</span>
                 </div>
-                <ShowcaseAppHeader big />
+                <ShowcaseAppHeader title="จัดการใบแจ้งหนี้" big />
 
                 {/* หัวข้อหน้า: จัดการใบแจ้งหนี้ */}
                 <div className="flex items-center justify-between px-4 pt-1 pb-2.5">
@@ -688,7 +714,7 @@ export default function LandingPage() {
               </div>
               <div className="rotate-3 hover:rotate-0 motion-reduce:rotate-0 transition-transform duration-500 ease-out">
                 <ShowcaseTabletFrame>
-                  <ShowcaseAppHeader />
+                  <ShowcaseAppHeader title="จัดการห้องพักและผู้เช่า" />
 
                   {/* หัวข้อหน้า: จัดการห้องพักและผู้เช่า */}
                   <div className="flex items-center justify-between px-3 pt-1 pb-2">
