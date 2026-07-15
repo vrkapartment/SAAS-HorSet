@@ -26,7 +26,10 @@ import {
   Plus,
   Star,
   Check,
-  X
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Building
 } from "lucide-react"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { LanguageToggle } from "@/components/LanguageToggle"
@@ -134,9 +137,9 @@ function ShowcasePhoneFrame({ children }: { children: React.ReactNode }) {
 // ทรง iPad: ขอบบางสม่ำเสมอ, จอสัดส่วน 4:3 แนวนอน, กล้องหน้าจุดเดียวกลางขอบบน
 function ShowcaseTabletFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[260px] rounded-[1.1rem] border-[7px] border-slate-800 bg-slate-800 shadow-2xl relative">
+    <div className="mx-auto w-full max-w-[340px] rounded-[1.1rem] border-[8px] border-slate-800 bg-slate-800 shadow-2xl relative">
       <span className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-slate-600 z-10" />
-      <div className="aspect-[4/3] bg-slate-950 rounded-[0.4rem] overflow-hidden flex flex-col justify-center">
+      <div className="aspect-[4/3] bg-slate-950 rounded-[0.4rem] overflow-hidden flex flex-col">
         {children}
       </div>
     </div>
@@ -575,7 +578,7 @@ export default function LandingPage() {
 
           <div className="relative grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-4 items-end">
             {/* มือถือ */}
-            <div className="md:col-span-3 md:col-start-1 flex flex-col items-center gap-4">
+            <div className="md:col-span-2 md:col-start-1 flex flex-col items-center gap-4">
               <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                 <Smartphone className="w-3.5 h-3.5" />
                 <span className="text-xs font-bold">{t("landing.devices_type_mobile")}</span>
@@ -603,7 +606,7 @@ export default function LandingPage() {
             </div>
 
             {/* คอมพิวเตอร์ */}
-            <div className="md:col-span-6 md:col-start-4 flex flex-col items-center gap-4 relative z-10">
+            <div className="md:col-span-6 md:col-start-3 flex flex-col items-center gap-4 relative z-10">
               <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                 <Monitor className="w-3.5 h-3.5" />
                 <span className="text-xs font-bold">{t("landing.devices_type_desktop")}</span>
@@ -613,25 +616,63 @@ export default function LandingPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="ml-2 text-[9px] font-mono text-slate-500">app.horset.co/dashboard</span>
+                  <span className="ml-2 text-[9px] font-mono text-slate-500">app.horset.co/manage-bills</span>
                 </div>
                 <ShowcaseAppHeader big />
-                <ShowcaseStatsBody scale="lg" />
-                <div className="grid grid-cols-4 gap-2 px-4 pb-4">
+
+                {/* หัวข้อหน้า: จัดการใบแจ้งหนี้ */}
+                <div className="flex items-center justify-between px-4 pt-1 pb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <Receipt className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[11px] font-bold text-slate-100">จัดการใบแจ้งหนี้</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[8px] font-bold px-2 py-1 rounded-lg bg-slate-800 text-slate-300">ก.ค. 2569</span>
+                    <span className="flex items-center gap-1 text-[8px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white">
+                      <Plus className="w-2.5 h-2.5" /> สร้างบิล
+                    </span>
+                  </div>
+                </div>
+
+                {/* สถิติบิลประจำรอบ */}
+                <div className="grid grid-cols-4 gap-2 px-4 pb-3">
                   {[
-                    { label: t("dashboard.action_meter"), icon: Receipt, color: "text-blue-400 bg-blue-500/10" },
-                    { label: t("dashboard.action_bill"), icon: Plus, color: "text-teal-400 bg-teal-500/10" },
-                    { label: t("dashboard.action_tenants"), icon: Users, color: "text-indigo-400 bg-indigo-500/10" },
-                    { label: t("dashboard.action_expense"), icon: Coins, color: "text-amber-400 bg-amber-500/10" }
-                  ].map((act) => {
-                    const Icon = act.icon
+                    { label: "บันทึกมิเตอร์แล้ว", value: "8/12", icon: Gauge, color: "text-blue-400" },
+                    { label: "ชำระเงินแล้ว", value: "5", icon: CheckCircle2, color: "text-emerald-400" },
+                    { label: "รอตรวจสอบสลิป", value: "2", icon: Clock, color: "text-amber-400" },
+                    { label: "ค้างชำระ", value: "3", icon: AlertCircle, color: "text-rose-400" }
+                  ].map((s) => {
+                    const Icon = s.icon
                     return (
-                      <div key={act.label} className={`rounded-lg p-2 flex flex-col items-center gap-1 text-center ${act.color}`}>
-                        <Icon className="w-3.5 h-3.5" />
-                        <span className="text-[7px] font-bold leading-tight text-slate-300">{act.label}</span>
+                      <div key={s.label} className="rounded-lg p-2 border border-slate-800 bg-slate-900">
+                        <Icon className={`w-3 h-3 mb-1 ${s.color}`} />
+                        <span className="text-[7px] text-slate-500 font-bold uppercase block truncate">{s.label}</span>
+                        <span className="text-xs font-black text-slate-100 font-mono">{s.value}</span>
                       </div>
                     )
                   })}
+                </div>
+
+                {/* ตารางบิลรายห้อง */}
+                <div className="px-4 pb-4">
+                  <div className="grid grid-cols-4 gap-2 text-[7px] font-bold text-slate-500 px-2 pb-1.5 mb-1 border-b border-slate-800 uppercase tracking-wide">
+                    <span>ห้อง</span>
+                    <span>ผู้เช่า</span>
+                    <span className="text-right">ยอดบิล</span>
+                    <span className="text-right">สถานะ</span>
+                  </div>
+                  {[
+                    { room: "101", tenant: "สมชาย ใจดี", amount: "4,850", status: "ชำระแล้ว", color: "text-emerald-400" },
+                    { room: "102", tenant: "วรรณา พงษ์สุข", amount: "4,600", status: "รอตรวจสลิป", color: "text-amber-400" },
+                    { room: "103", tenant: "อนุชา ทองดี", amount: "5,120", status: "ค้างชำระ", color: "text-rose-400" }
+                  ].map((row) => (
+                    <div key={row.room} className="grid grid-cols-4 gap-2 text-[9px] px-2 py-1.5 items-center odd:bg-slate-900/60 rounded-md">
+                      <span className="font-bold text-slate-200">{row.room}</span>
+                      <span className="text-slate-500 truncate">{row.tenant}</span>
+                      <span className="text-right font-mono text-slate-300">{row.amount}</span>
+                      <span className={`text-right font-bold ${row.color}`}>{row.status}</span>
+                    </div>
+                  ))}
                 </div>
               </ShowcaseLaptopFrame>
               <p className="text-xs text-slate-500 dark:text-slate-400 text-center max-w-[220px] leading-relaxed">
@@ -640,7 +681,7 @@ export default function LandingPage() {
             </div>
 
             {/* แท็บเล็ต */}
-            <div className="md:col-span-3 md:col-start-10 flex flex-col items-center gap-4">
+            <div className="md:col-span-4 md:col-start-9 flex flex-col items-center gap-4">
               <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                 <Gauge className="w-3.5 h-3.5" />
                 <span className="text-xs font-bold">{t("landing.devices_type_tablet")}</span>
@@ -648,19 +689,55 @@ export default function LandingPage() {
               <div className="rotate-3 hover:rotate-0 motion-reduce:rotate-0 transition-transform duration-500 ease-out">
                 <ShowcaseTabletFrame>
                   <ShowcaseAppHeader />
-                  <div className="px-3 pb-3">
-                    <div className="text-[9px] font-bold text-slate-300 mb-2 pt-1">ห้อง 203 · มิเตอร์ไฟฟ้า</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-lg bg-slate-900 border border-slate-800 px-2.5 py-1.5">
-                        <span className="text-[7px] text-slate-500 block">เลขก่อนหน้า</span>
-                        <span className="text-xs font-mono font-bold text-slate-200">1,204</span>
-                      </div>
-                      <div className="rounded-lg bg-teal-500/10 border border-teal-500/20 px-2.5 py-1.5">
-                        <span className="text-[7px] text-teal-400/80 block">เลขปัจจุบัน</span>
-                        <span className="text-xs font-mono font-bold text-teal-400">1,257</span>
-                      </div>
+
+                  {/* หัวข้อหน้า: จัดการห้องพักและผู้เช่า */}
+                  <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Home className="w-3.5 h-3.5 text-blue-400" />
+                      <span className="text-[10px] font-bold text-slate-100">จัดการห้องพักและผู้เช่า</span>
                     </div>
-                    <div className="mt-2 text-center bg-teal-600 text-white text-[9px] font-bold py-1.5 rounded-lg">บันทึกมิเตอร์</div>
+                    <span className="flex items-center gap-1 text-[7px] font-bold px-1.5 py-1 rounded-lg bg-blue-600 text-white shrink-0">
+                      <Plus className="w-2.5 h-2.5" /> เพิ่มห้อง
+                    </span>
+                  </div>
+
+                  {/* สถิติห้องพัก */}
+                  <div className="grid grid-cols-4 gap-1.5 px-3 pb-2">
+                    {[
+                      { label: "ห้องทั้งหมด", value: "24", icon: Building, color: "text-slate-300" },
+                      { label: "ห้องว่าง", value: "6", icon: Home, color: "text-red-400" },
+                      { label: "รอ LINE", value: "3", icon: Users, color: "text-amber-400" },
+                      { label: "เชื่อม LINE", value: "15", icon: CheckCircle2, color: "text-emerald-400" }
+                    ].map((s) => {
+                      const Icon = s.icon
+                      return (
+                        <div key={s.label} className="rounded-lg p-1.5 border border-slate-800 bg-slate-900">
+                          <Icon className={`w-2.5 h-2.5 mb-0.5 ${s.color}`} />
+                          <span className="text-[6px] text-slate-500 font-bold uppercase block truncate leading-tight">{s.label}</span>
+                          <span className="text-[10px] font-black text-slate-100 font-mono">{s.value}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* การ์ดห้องพัก */}
+                  <div className="grid grid-cols-2 gap-1.5 px-3 pb-3">
+                    {[
+                      { room: "101", detail: "฿4,500 / เดือน", status: "ว่าง", color: "bg-red-500/10 text-red-400 border-red-500/20", dot: "bg-red-500" },
+                      { room: "102", detail: "คุณสมหญิง ใจงาม", status: "เชื่อม LINE แล้ว", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", dot: "bg-emerald-500" },
+                      { room: "103", detail: "คุณอนุชา ทองดี", status: "รอลงทะเบียน LINE", color: "bg-amber-500/10 text-amber-400 border-amber-500/20", dot: "bg-amber-500" },
+                      { room: "104", detail: "คุณวรรณา พงษ์สุข", status: "เชื่อม LINE แล้ว", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", dot: "bg-emerald-500" }
+                    ].map((r) => (
+                      <div key={r.room} className="rounded-lg border border-slate-800 bg-slate-900 p-1.5">
+                        <div className="flex items-center justify-between gap-1 mb-0.5">
+                          <span className="text-[9px] font-bold text-slate-100 shrink-0">ห้อง {r.room}</span>
+                          <span className={`flex items-center gap-1 text-[6px] font-bold px-1 py-0.5 rounded-full border truncate ${r.color}`}>
+                            <span className={`w-1 h-1 rounded-full shrink-0 ${r.dot}`} /> {r.status}
+                          </span>
+                        </div>
+                        <span className="text-[7px] text-slate-500 block truncate">{r.detail}</span>
+                      </div>
+                    ))}
                   </div>
                 </ShowcaseTabletFrame>
               </div>
