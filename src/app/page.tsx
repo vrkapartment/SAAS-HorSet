@@ -108,25 +108,37 @@ function PhoneFrame({ children }: { children: React.ReactNode }) {
 
 // กรอบอุปกรณ์สำหรับ "โชว์เคส" ใช้งานได้ทุกอุปกรณ์ — หน้าจอด้านในล็อกเป็นธีมมืดเสมอ (เหมือนภาพสกรีนช็อตจริงของแอป)
 // ไม่ผูกกับ light/dark ของหน้าเว็บ เพื่อให้ดูเป็น "รูปถ่ายฮาร์ดแวร์" ที่สม่ำเสมอ
+
+// ทรง iPhone 17 Pro: ขอบไทเทเนียมบาง, จอสัดส่วน ~19.5:9, Dynamic Island (ไม่ใช่รอยบากกว้างแบบเดิม), ปุ่มด้านข้าง
 function ShowcasePhoneFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[170px] rounded-[1.85rem] border-[6px] border-slate-800 bg-slate-800 shadow-2xl relative overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-3 bg-slate-800 rounded-b-md z-10" />
-      <div className="rounded-[1.4rem] bg-slate-950 overflow-hidden">
-        {children}
-        <div className="flex justify-center py-1.5">
-          <span className="w-9 h-1 rounded-full bg-slate-700" />
+    <div className="relative mx-auto w-full max-w-[150px]">
+      <span className="absolute -right-[3px] top-14 w-[3px] h-9 bg-slate-700 rounded-r-sm" />
+      <span className="absolute -left-[3px] top-11 w-[3px] h-5 bg-slate-700 rounded-l-sm" />
+      <span className="absolute -left-[3px] top-[4.6rem] w-[3px] h-8 bg-slate-700 rounded-l-sm" />
+      <div className="rounded-[2.3rem] border-[5px] border-slate-800 bg-slate-800 shadow-2xl overflow-hidden">
+        <div className="relative aspect-[9/19.5] bg-slate-950 flex flex-col">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-9 h-2.5 bg-black rounded-full z-20" />
+          <div className="pt-5 flex-1 flex flex-col overflow-hidden">
+            {children}
+          </div>
+          <div className="flex justify-center pb-1.5 pt-1 shrink-0">
+            <span className="w-9 h-1 rounded-full bg-slate-700" />
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
+// ทรง iPad: ขอบบางสม่ำเสมอ, จอสัดส่วน 4:3 แนวนอน, กล้องหน้าจุดเดียวกลางขอบบน
 function ShowcaseTabletFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[230px] rounded-[1.15rem] border-[7px] border-slate-800 bg-slate-800 shadow-2xl relative">
-      <span className="absolute top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-slate-600" />
-      <div className="rounded-[0.55rem] bg-slate-950 overflow-hidden">{children}</div>
+    <div className="mx-auto w-full max-w-[260px] rounded-[1.1rem] border-[7px] border-slate-800 bg-slate-800 shadow-2xl relative">
+      <span className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-slate-600 z-10" />
+      <div className="aspect-[4/3] bg-slate-950 rounded-[0.4rem] overflow-hidden flex flex-col justify-center">
+        {children}
+      </div>
     </div>
   )
 }
@@ -572,6 +584,17 @@ export default function LandingPage() {
                 <ShowcasePhoneFrame>
                   <ShowcaseAppHeader />
                   <ShowcaseStatsBody scale="sm" />
+                  <div className="mt-auto flex items-center justify-around px-2 py-2 border-t border-slate-800 shrink-0">
+                    {[
+                      { icon: Home, active: true },
+                      { icon: Receipt, active: false },
+                      { icon: Gauge, active: false },
+                      { icon: Users, active: false }
+                    ].map((item, idx) => {
+                      const Icon = item.icon
+                      return <Icon key={idx} className={`w-3.5 h-3.5 ${item.active ? "text-blue-400" : "text-slate-600"}`} />
+                    })}
+                  </div>
                 </ShowcasePhoneFrame>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 text-center max-w-[180px] leading-relaxed">
