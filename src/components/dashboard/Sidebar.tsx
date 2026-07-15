@@ -87,7 +87,7 @@ export default function Sidebar({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-xl md:text-2xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
-              {t("common.app_name") || "HorSet หอเสร็จ"}
+              {t("common.app_name") || "HorSet"}
             </h2>
           </div>
         </div>
@@ -299,7 +299,7 @@ export default function Sidebar({
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg md:text-xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
-                    {t("common.app_name") || "HorSet หอเสร็จ"}
+                    {t("common.app_name") || "HorSet"}
                   </h2>
                 </div>
               </div>

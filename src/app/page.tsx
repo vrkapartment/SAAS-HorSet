@@ -210,7 +210,7 @@ export default function LandingPage() {
             <img src="/icon-512x512.png" className="w-7 h-7 object-contain" alt="HorSet Logo" />
           </div>
           <span className="text-xl font-bold tracking-wide text-slate-900 dark:text-white">
-            HorSet <span className="text-blue-600 dark:text-blue-500">หอเสร็จ</span>
+            HorSet
           </span>
         </div>
 
@@ -254,7 +254,7 @@ export default function LandingPage() {
           {t("landing.hero_subtitle") === "with HorSet Platform" ? (
             <>with <span className="text-blue-600 dark:text-blue-500">HorSet Platform</span></>
           ) : (
-            <>ด้วยระบบ <span className="text-blue-600 dark:text-blue-500">HorSet (หอเสร็จ)</span></>
+            <>ด้วยระบบ <span className="text-blue-600 dark:text-blue-500">HorSet</span></>
           )}
         </h1>
 
