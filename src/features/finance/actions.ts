@@ -345,42 +345,51 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
       ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
       : supabase
 
+    // ฟิลด์หลักที่ทั้งสองหน้า (ตั้งค่าหอพัก / ตั้งค่าการเงินฯ) ส่งมาครบทุกครั้งเสมอ (บังคับ required ใน FinanceSettings)
+    const corePayload: Record<string, any> = {
+      tax_firstname: settings.tax_firstname.trim(),
+      tax_lastname: settings.tax_lastname.trim(),
+      tax_id: settings.tax_id.trim(),
+      tax_address: settings.tax_address.trim(),
+      tax_phone: settings.tax_phone.trim(),
+      promptpay_type: settings.promptpay_type,
+      promptpay_id: settings.promptpay_id.trim(),
+      promptpay_name: settings.promptpay_name.trim(),
+      common_fee: Number(settings.common_fee),
+      water_rate: Number(settings.water_rate),
+      electric_rate: Number(settings.electric_rate),
+      water_min_checked: Boolean(settings.water_min_checked),
+      water_min_unit: Number(settings.water_min_unit),
+      electric_min_checked: Boolean(settings.electric_min_checked),
+      electric_min_unit: Number(settings.electric_min_unit),
+      late_penalty_rate: Number(settings.late_penalty_rate || 0),
+    }
+
+    // ฟิลด์ optional ที่หน้า "ตั้งค่าหอพัก" กับ "ตั้งค่าการเงินและบัญชีรับเงิน" แบ่งกันเป็นเจ้าของคนละส่วน
+    // (เช่น lease_expiry_action เป็นของหน้าตั้งค่าหอพัก, tax_address_building เป็นของหน้าตั้งค่าการเงินฯ)
+    // ใส่ลง payload เฉพาะตอนที่ผู้เรียกส่งค่ามาจริง (!== undefined) เท่านั้น ไม่งั้นหน้าที่ไม่มีฟิลด์นี้ในฟอร์ม
+    // ของตัวเองจะเขียนทับด้วยค่า default แทนค่าจริงที่อีกหน้าหนึ่งเคยบันทึกไว้ (สาเหตุของบั๊กข้อมูลรีเซ็ตข้ามหน้า)
+    const optionalPayload: Record<string, any> = {}
+    if (settings.deposit_amount !== undefined) optionalPayload.deposit_amount = Number(settings.deposit_amount)
+    if (settings.advance_rent !== undefined) optionalPayload.advance_rent = Number(settings.advance_rent)
+    if (settings.deposit_type !== undefined) optionalPayload.deposit_type = settings.deposit_type
+    if (settings.lease_duration !== undefined) optionalPayload.lease_duration = Number(settings.lease_duration)
+    if (settings.lease_expiry_action !== undefined) optionalPayload.lease_expiry_action = settings.lease_expiry_action
+    if (settings.slip_retention_months !== undefined) optionalPayload.slip_retention_months = Number(settings.slip_retention_months)
+    if (settings.checkout_policy !== undefined) optionalPayload.checkout_policy = settings.checkout_policy
+    if (settings.taxpayer_status !== undefined) optionalPayload.taxpayer_status = settings.taxpayer_status
+    if (settings.partner_count !== undefined) optionalPayload.partner_count = Number(settings.partner_count)
+    if (settings.tax_address_building !== undefined) optionalPayload.tax_address_building = settings.tax_address_building.trim()
+    if (settings.tax_address_room !== undefined) optionalPayload.tax_address_room = settings.tax_address_room.trim()
+    if (settings.tax_address_floor !== undefined) optionalPayload.tax_address_floor = settings.tax_address_floor.trim()
+    if (settings.tax_address_village !== undefined) optionalPayload.tax_address_village = settings.tax_address_village.trim()
+    if (settings.tax_address_moo !== undefined) optionalPayload.tax_address_moo = settings.tax_address_moo.trim()
+    if (settings.tax_address_soi !== undefined) optionalPayload.tax_address_soi = settings.tax_address_soi.trim()
+    if (settings.tax_address_yaek !== undefined) optionalPayload.tax_address_yaek = settings.tax_address_yaek.trim()
+
     const { data: updatedRows, error: updateError } = await dbClient
       .from("workspaces")
-      .update({
-        tax_firstname: settings.tax_firstname.trim(),
-        tax_lastname: settings.tax_lastname.trim(),
-        tax_id: settings.tax_id.trim(),
-        tax_address: settings.tax_address.trim(),
-        tax_phone: settings.tax_phone.trim(),
-        promptpay_type: settings.promptpay_type,
-        promptpay_id: settings.promptpay_id.trim(),
-        promptpay_name: settings.promptpay_name.trim(),
-        common_fee: Number(settings.common_fee),
-        water_rate: Number(settings.water_rate),
-        electric_rate: Number(settings.electric_rate),
-        water_min_checked: Boolean(settings.water_min_checked),
-        water_min_unit: Number(settings.water_min_unit),
-        electric_min_checked: Boolean(settings.electric_min_checked),
-        electric_min_unit: Number(settings.electric_min_unit),
-        late_penalty_rate: Number(settings.late_penalty_rate || 0),
-        deposit_amount: Number(settings.deposit_amount || 0),
-        advance_rent: Number(settings.advance_rent || 0),
-        deposit_type: settings.deposit_type || "months",
-        lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
-        lease_expiry_action: settings.lease_expiry_action || "renew",
-        slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0),
-        checkout_policy: settings.checkout_policy || "DAILY_PRORATE",
-        taxpayer_status: settings.taxpayer_status || "individual",
-        partner_count: Number(settings.partner_count || 1),
-        tax_address_building: (settings.tax_address_building || "").trim(),
-        tax_address_room: (settings.tax_address_room || "").trim(),
-        tax_address_floor: (settings.tax_address_floor || "").trim(),
-        tax_address_village: (settings.tax_address_village || "").trim(),
-        tax_address_moo: (settings.tax_address_moo || "").trim(),
-        tax_address_soi: (settings.tax_address_soi || "").trim(),
-        tax_address_yaek: (settings.tax_address_yaek || "").trim()
-      })
+      .update({ ...corePayload, ...optionalPayload })
       .eq("id", workspaceId)
       .select("id")
 
