@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Script from "next/script"
-import { Key, Mail, CheckCircle2, Lock, ArrowRight } from "lucide-react"
-import { loginAction } from "@/features/auth/actions"
+import { Key, Mail, CheckCircle2, Lock, ArrowRight, RefreshCw, AlertCircle } from "lucide-react"
+import { loginAction, resendConfirmationEmailAction } from "@/features/auth/actions"
 import { createClient } from "@/lib/supabase/client"
 import { clearCachedUserProfile } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
@@ -29,6 +29,10 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState<string | null>(null)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
+  const [confirmBanner, setConfirmBanner] = useState<"confirmed" | "confirm_error" | null>(null)
   const [selectedRole, setSelectedRole] = useState<"admin" | "staff" | "tenant" | "super_admin" | null>(null)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
@@ -89,6 +93,7 @@ export default function LoginPage() {
   }, [turnstileSiteKey])
 
   // ดึงค่า email จาก URL Parameter ในกรณีที่มาจากการสมัครสมาชิกหน้า Register และทำความสะอาด Cache ทั้งหมด
+  // รวมถึงตรวจสอบสถานะการยืนยันอีเมลที่ redirect กลับมาจาก /auth/callback
   useEffect(() => {
     clearAllCache()
     if (typeof window !== "undefined") {
@@ -96,6 +101,11 @@ export default function LoginPage() {
       const emailParam = params.get("email")
       if (emailParam) {
         setEmail(emailParam)
+      }
+      if (params.get("confirmed") === "1") {
+        setConfirmBanner("confirmed")
+      } else if (params.get("confirm_error") === "1") {
+        setConfirmBanner("confirm_error")
       }
     }
   }, [clearAllCache])
@@ -119,6 +129,8 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setErrorCode(null)
+    setResendMessage(null)
     clearCachedUserProfile()
 
     // ตรวจสอบความปลอดภัย Turnstile
@@ -197,6 +209,7 @@ export default function LoginPage() {
           }
         } else {
           setError(res.error || "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
+          setErrorCode("code" in res && res.code ? res.code : null)
           // รีเซ็ตวิดเจ็ตเพื่อความปลอดภัยกรณีเกิดข้อผิดพลาด
           if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
             window.turnstile.reset(widgetIdRef.current)
@@ -213,6 +226,14 @@ export default function LoginPage() {
         }
       }
     }
+  }
+
+  const handleResendConfirmation = async () => {
+    setResendLoading(true)
+    setResendMessage(null)
+    const res = await resendConfirmationEmailAction(email.trim())
+    setResendLoading(false)
+    setResendMessage(res.success ? (res.message || "ส่งอีเมลอีกครั้งแล้ว") : (res.error || "ส่งอีเมลไม่สำเร็จ"))
   }
 
   const handleVerify2FA = (e: React.FormEvent) => {
@@ -310,10 +331,38 @@ export default function LoginPage() {
               <Lock className="w-5 h-5 text-blue-400" /> เข้าสู่ระบบผู้ใช้
             </h2>
 
+            {/* แจ้งผลลัพธ์การยืนยันอีเมลที่ redirect กลับมาจาก /auth/callback */}
+            {confirmBanner === "confirmed" && (
+              <div className="p-3 bg-teal-500/10 border border-teal-500/25 text-teal-400 rounded-xl text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>ยืนยันอีเมลสำเร็จแล้ว! สามารถเข้าสู่ระบบได้เลย</span>
+              </div>
+            )}
+            {confirmBanner === "confirm_error" && (
+              <div className="p-3 bg-red-500/10 border border-red-500/25 text-red-400 rounded-xl text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>ลิงก์ยืนยันอีเมลไม่ถูกต้องหรือหมดอายุ กรุณาขอส่งอีเมลยืนยันใหม่</span>
+              </div>
+            )}
+
             {/* แสดง Error */}
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/25 text-red-400 rounded-xl text-xs">
-                {error}
+              <div className="p-3 bg-red-500/10 border border-red-500/25 text-red-400 rounded-xl text-xs space-y-2">
+                <p>{error}</p>
+                {errorCode === "email_not_confirmed" && (
+                  <div className="pt-1 border-t border-red-500/20 space-y-1">
+                    <button
+                      type="button"
+                      onClick={handleResendConfirmation}
+                      disabled={resendLoading}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${resendLoading ? "animate-spin" : ""}`} />
+                      ส่งอีเมลยืนยันอีกครั้ง
+                    </button>
+                    {resendMessage && <p className="text-[11px] text-slate-400">{resendMessage}</p>}
+                  </div>
+                )}
               </div>
             )}
 
@@ -386,10 +435,10 @@ export default function LoginPage() {
                 ยังไม่มีบัญชีผู้ใช้งานใช่หรือไม่?{" "}
                 <button
                   type="button"
-                  onClick={() => router.push("/register")}
+                  onClick={() => router.push("/register?tab=new")}
                   className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline"
                 >
-                  สมัครสมาชิกใหม่ด้วยรหัสคำเชิญ (Secret Code)
+                  สมัครหอพักใหม่ฟรี 30 วัน
                 </button>
               </p>
             </div>

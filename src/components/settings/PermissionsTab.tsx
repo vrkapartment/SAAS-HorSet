@@ -153,6 +153,10 @@ WHERE role IN ('admin', 'super_admin');`
       setError(t("permissions_tab.err_email_name_required"))
       return
     }
+    if (!addPassword || addPassword.length < 6) {
+      setError(t("permissions_tab.err_password_required"))
+      return
+    }
 
     setFormLoading(true)
     setError(null)
@@ -160,7 +164,7 @@ WHERE role IN ('admin', 'super_admin');`
 
     const result = await createWorkspaceStaffAction({
       email: addEmail.trim(),
-      password: addPassword || undefined,
+      password: addPassword,
       fullName: addFullName.trim(),
       phone: addPhone.trim(),
       permissions: addPermissions
@@ -898,6 +902,8 @@ WHERE role IN ('admin', 'super_admin');`
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type={showAddPassword ? "text" : "password"}
+                    required
+                    minLength={6}
                     placeholder={t("permissions_tab.password_placeholder")}
                     className="w-full pl-9 pr-10 py-2 border rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border-slate-250 dark:border-slate-850 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-mono font-bold"
                     value={addPassword}

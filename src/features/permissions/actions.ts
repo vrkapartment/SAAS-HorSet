@@ -159,7 +159,7 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
  */
 export async function createWorkspaceStaffAction(data: {
   email: string
-  password?: string
+  password: string
   fullName: string
   phone: string
   permissions: StaffPermissions
@@ -167,7 +167,7 @@ export async function createWorkspaceStaffAction(data: {
 }) {
   try {
     const isDemo = isDemoMode()
-    
+
     const profileRes = await getCurrentUserProfileAction()
     if (!profileRes.success || !profileRes.data) {
       return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
@@ -179,6 +179,10 @@ export async function createWorkspaceStaffAction(data: {
 
     if (!isAdmin && !isSuperAdmin) {
       return { success: false, error: "คุณไม่มีสิทธิ์สร้าง Staff" }
+    }
+
+    if (!data.password || data.password.length < 6) {
+      return { success: false, error: "กรุณากรอกรหัสผ่านอย่างน้อย 6 ตัวอักษร" }
     }
 
     const targetWorkspaceId = data.workspaceId || currentUser.workspace_id
@@ -198,7 +202,7 @@ export async function createWorkspaceStaffAction(data: {
     // 1. สร้างบัญชีผู้ใช้งานใหม่ลงในระบบ Supabase Auth
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
-      password: data.password || "123456", // รหัสดีฟอลต์ถ้าไม่ได้ใส่
+      password: data.password,
       email_confirm: true,
       user_metadata: {
         role: "staff",

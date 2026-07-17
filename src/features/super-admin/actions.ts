@@ -3,6 +3,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { encryptText, decryptText } from "@/lib/encryption"
+import { generateSecurePassword } from "@/lib/password"
 
 interface CreateUserParams {
   email: string
@@ -63,9 +64,11 @@ export async function createWorkspaceUserAction(data: CreateUserParams) {
     }
 
     // 1. สร้างผู้ใช้งานลงในระบบ Supabase Auth
+    // ถ้าไม่ได้กรอกรหัสผ่านมา ให้สุ่มรหัสผ่านที่ปลอดภัยแทนการใช้ค่าดีฟอลต์ตายตัว แล้วส่งกลับให้ Super Admin คัดลอกไปให้ผู้ใช้
+    const finalPassword = data.password || generateSecurePassword()
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
-      password: data.password || "123456", // รหัสผ่านดีฟอลต์หากไม่ได้กรอก
+      password: finalPassword,
       email_confirm: true, // ทำการ Auto-confirm อีเมลเพื่อล็อกอินได้ทันทีโดยไม่ต้องคลิกลิงก์กดยืนยัน
       user_metadata: {
         role: data.role,
@@ -82,13 +85,14 @@ export async function createWorkspaceUserAction(data: CreateUserParams) {
     // หมายเหตุ: ตาราง public.profiles จะได้รับการสร้างและอัปเดตข้อมูลโดยอัตโนมัติ
     // ผ่าน PostgreSQL Trigger "on_auth_user_created" บนระบบ Supabase Database
     
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         id: authUser.user.id,
         email: authUser.user.email,
-        role: data.role
-      } 
+        role: data.role,
+        password: finalPassword
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างบัญชีผู้ใช้งานจริง"

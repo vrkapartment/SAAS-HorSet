@@ -91,7 +91,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const pathname = usePathname()
   const safeNavigate = (path: string) => {
     if (typeof window !== "undefined" && (window as any).__hasUnsavedChanges) {
-      const confirmLeave = window.confirm("คุณยังมีข้อมูลที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?")
+      const confirmLeave = window.confirm(t("dashboard.unsaved_changes_confirm"))
       if (!confirmLeave) return
       ;(window as any).__hasUnsavedChanges = false
     }
@@ -478,7 +478,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             const res = await getCurrentUserProfileClient()
             if (res.success && res.data) {
               const profileData = res.data
-              setFullName(profileData.full_name || profileData.email || "ผู้ดูแลระบบ")
+              setFullName(profileData.full_name || profileData.email || t("dashboard.default_admin_name"))
               setProfileName(profileData.full_name || "")
               setProfilePhone(profileData.phone || "")
               
@@ -774,12 +774,12 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     setProfileSuccess(null)
 
     if (profilePassword && profilePassword.length < 6) {
-      setProfileError("รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร")
+      setProfileError(t("dashboard.profile_password_too_short"))
       return
     }
 
     if (profilePassword !== profileConfirmPassword) {
-      setProfileError("รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน")
+      setProfileError(t("dashboard.profile_password_mismatch"))
       return
     }
 
@@ -800,7 +800,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           } else {
             await getCurrentUserProfileClient(true)
           }
-          setProfileSuccess("✓ บันทึกข้อมูลโปรไฟล์และเปลี่ยนรหัสผ่านสำเร็จ!")
+          setProfileSuccess(t("dashboard.profile_update_success"))
           setProfilePassword("")
           setProfileConfirmPassword("")
           setTimeout(() => {
@@ -808,10 +808,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             setProfileSuccess(null)
           }, 1500)
         } else {
-          setProfileError(res.error || "เกิดข้อผิดพลาดในการอัปเดตข้อมูล")
+          setProfileError(res.error || t("dashboard.profile_update_error_generic"))
         }
       } catch (err) {
-        setProfileError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์")
+        setProfileError(t("dashboard.profile_update_error_connection"))
       } finally {
         setProfileLoading(false)
       }
@@ -821,7 +821,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         setCookie(`horset_demo_profile_name_${userRole}`, profileName)
         setCookie(`horset_demo_profile_phone_${userRole}`, profilePhone)
         setFullName(profileName)
-        setProfileSuccess("✓ [Demo Mode] อัปเดตข้อมูลและรหัสผ่านจำลองสำเร็จแล้ว!")
+        setProfileSuccess(t("dashboard.profile_update_demo_success"))
         setProfilePassword("")
         setProfileConfirmPassword("")
         setProfileLoading(false)
@@ -1031,6 +1031,32 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     router.push("/login")
   }
 
+  // บัญชีนี้ไม่ได้ผูกกับ workspace ใดเลย (workspace_id เป็น NULL ในฐานข้อมูล จริง ๆ ไม่ควรเกิดขึ้น แต่ต้องแจ้งให้เห็น
+  // แทนแดชบอร์ดเปล่า ๆ ที่เข้าใจผิดได้ว่าหอพักยังไม่มีข้อมูล — ดู schema_multi_workspace.sql handle_new_user())
+  if (!isDemo && !workspaceLoading && userRole !== "super_admin" && !currentWorkspace.id) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
+        <div className="max-w-sm text-center space-y-4">
+          <div className="inline-flex p-4 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-10 h-10" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+            {t("dashboard.no_workspace_title")}
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+            {t("dashboard.no_workspace_desc")}
+          </p>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-sm font-semibold hover:bg-slate-700 dark:hover:bg-white transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" /> {t("dashboard.no_workspace_logout")}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div 
       className="h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans overflow-hidden"
@@ -1118,7 +1144,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   <button
                     onClick={() => handleDecideSupport(false)}
                     className="text-[10px] bg-teal-500/10 border border-teal-500/20 hover:bg-red-500/10 hover:border-red-500/20 text-teal-600 dark:text-teal-400 hover:text-red-600 dark:hover:text-red-400 font-bold px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1"
-                    title="คลิกเพื่อสั่งระงับสิทธิ์ชั่วคราว"
+                    title={t("dashboard.support_revoke_tooltip")}
                   >
                     <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse" />
                     {t("dashboard.authorized_revoke")}
@@ -1139,7 +1165,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 className="relative p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50 transition-all duration-200 active:scale-95 cursor-pointer"
-                aria-label="การแจ้งเตือน"
+                aria-label={t("dashboard.notifications_label")}
               >
                 <BellRing className={`w-4 h-4 ${mounted && unreadCount > 0 ? "animate-bounce" : ""}`} />
                 {mounted && unreadCount > 0 && (
@@ -1154,10 +1180,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-900/80 bg-slate-50/50 dark:bg-slate-900/30">
                     <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-xs text-slate-800 dark:text-slate-200">การแจ้งเตือน</h2>
+                      <h2 className="font-bold text-xs text-slate-800 dark:text-slate-200">{t("dashboard.notifications_label")}</h2>
                       {unreadCount > 0 && (
                         <span className="bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                          ใหม่ {unreadCount}
+                          {t("dashboard.notifications_new_count").replace("{count}", String(unreadCount))}
                         </span>
                       )}
                     </div>
@@ -1166,10 +1192,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                         <button
                           onClick={markAllAsRead}
                           className="p-1 px-2 text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg flex items-center gap-1 transition-all font-semibold cursor-pointer"
-                          title="อ่านทั้งหมด"
+                          title={t("dashboard.notifications_mark_all_read")}
                         >
                           <CheckCheck className="w-3 h-3" />
-                          <span>อ่านทั้งหมด</span>
+                          <span>{t("dashboard.notifications_mark_all_read")}</span>
                         </button>
                       )}
                       <button
@@ -1184,9 +1210,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   {/* Tabs */}
                   <div className="flex gap-1 p-2 bg-slate-50/30 dark:bg-slate-900/10 border-b border-slate-100 dark:border-slate-900/60">
                     {[
-                      { id: "all", label: "ทั้งหมด" },
-                      { id: "billing", label: "บิล/เงินโอน" },
-                      { id: "system", label: "ผู้เช่า/ระบบ" }
+                      { id: "all", label: t("dashboard.notifications_tab_all") },
+                      { id: "billing", label: t("dashboard.notifications_tab_billing") },
+                      { id: "system", label: t("dashboard.notifications_tab_system") }
                     ].map(tab => {
                       const isActive = activeTab === tab.id
                       return (
@@ -1210,15 +1236,15 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     {notificationsLoading ? (
                       <div className="flex flex-col items-center justify-center py-10 gap-2">
                         <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
-                        <span className="text-xs text-slate-500">กำลังโหลดการแจ้งเตือน...</span>
+                        <span className="text-xs text-slate-500">{t("dashboard.notifications_loading")}</span>
                       </div>
                     ) : filteredNotifications.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                         <div className="w-10 h-12 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-center mb-2.5">
                           <BellRing className="w-4 h-4 text-slate-400" />
                         </div>
-                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">ไม่มีการแจ้งเตือนใหม่</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">เมื่อมีความเคลื่อนไหวของหอพัก ระบบจะแจ้งคุณที่นี่</p>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{t("dashboard.notifications_empty_title")}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{t("dashboard.notifications_empty_desc")}</p>
                       </div>
                     ) : (
                       filteredNotifications.map(notification => {
@@ -1290,7 +1316,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                             <button
                               onClick={(e) => dismissNotification(notification.id, e)}
                               className="absolute bottom-1 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 rounded transition-all duration-200 cursor-pointer"
-                              title="ละเว้นแจ้งเตือน"
+                              title={t("dashboard.notifications_dismiss_tooltip")}
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -1302,13 +1328,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   
                   {/* Footer */}
                   <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-900/60 bg-slate-50/30 dark:bg-slate-900/10 flex justify-between items-center text-[9px] text-slate-400">
-                    <span>อัปเดตเรียลไทม์</span>
+                    <span>{t("dashboard.notifications_realtime_label")}</span>
                     <button
                       onClick={() => fetchNotifications(false, currentWorkspace?.id || undefined)}
                       className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer"
                     >
                       <RefreshCw className={`w-2.5 h-2.5 ${notificationsLoading ? "animate-spin" : ""}`} />
-                      โหลดใหม่
+                      {t("dashboard.notifications_reload")}
                     </button>
                   </div>
                 </div>
@@ -1321,11 +1347,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               {workspaceLoading && !isDemo ? (
                 <div className="flex items-center gap-1.5 justify-end h-5">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                  <span className="text-xs text-slate-500 animate-pulse font-medium">กำลังโหลดหอพัก...</span>
+                  <span className="text-xs text-slate-500 animate-pulse font-medium">{t("dashboard.workspace_loading_label")}</span>
                 </div>
               ) : (
                 <p className="text-xs font-bold text-slate-800 dark:text-slate-300">
-                  {t("dashboard.building")} <DynamicText>{currentWorkspace.name || "กำลังโหลด..."}</DynamicText>
+                  {t("dashboard.building")} <DynamicText>{currentWorkspace.name || t("dashboard.workspace_name_loading")}</DynamicText>
                 </p>
               )}
               <p className="text-[10px] text-slate-500">{t("dashboard.current_cycle")}</p>
@@ -1369,11 +1395,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                     </div>
                     
                     <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 mb-3">
-                      คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+                      {t("dashboard.access_denied_title")}
                     </h2>
-                    
+
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                      สิทธิ์การใช้งานของพนักงาน (Staff) ของคุณถูกกำหนดไม่ให้เข้าถึงเมนูนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การเข้าใช้งาน
+                      {t("dashboard.access_denied_desc")}
                     </p>
 
                     <div className="space-y-3">
@@ -1382,7 +1408,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                           onClick={() => safeNavigate("/billing")}
                           className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
                         >
-                          ไปยังหน้าจดมิเตอร์ & จัดการบิล
+                          {t("dashboard.access_denied_go_billing")}
                         </button>
                       )}
                       {userPermissions?.manage_rooms_tenants && (
@@ -1390,14 +1416,14 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                           onClick={() => safeNavigate("/rooms")}
                           className="w-full py-3 px-4 bg-gradient-to-r from-slate-600 to-slate-800 hover:from-slate-500 hover:to-slate-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-slate-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
                         >
-                          ไปยังหน้าจัดการห้องพักและผู้เช่า
+                          {t("dashboard.access_denied_go_rooms")}
                         </button>
                       )}
                       <button
                         onClick={handleLogout}
                         className="w-full py-2.5 px-4 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors text-xs font-bold"
                       >
-                        ออกจากระบบ (Logout)
+                        {t("dashboard.access_denied_logout")}
                       </button>
                     </div>
                   </div>

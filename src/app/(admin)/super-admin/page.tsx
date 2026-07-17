@@ -23,7 +23,9 @@ import {
   X,
   Key,
   Settings,
-  Languages
+  Languages,
+  Copy,
+  Check
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -90,6 +92,9 @@ export default function SuperAdminPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setResultSuccess] = useState<string | null>(null)
+  // เก็บรหัสผ่านที่ระบบสุ่มให้ตอนสร้างบัญชีผู้ใช้ (เมื่อ Super Admin เว้นช่องรหัสผ่านว่างไว้) เพื่อโชว์ให้คัดลอกได้ครั้งเดียว
+  const [createdCredential, setCreatedCredential] = useState<{ email: string; password: string } | null>(null)
+  const [credentialCopied, setCredentialCopied] = useState(false)
 
 
   // ข้อมูลจากฐานข้อมูล
@@ -382,6 +387,8 @@ export default function SuperAdminPage() {
     setAddingUser(true)
     setError(null)
     setResultSuccess(null)
+    setCreatedCredential(null)
+    setCredentialCopied(false)
 
     const newId = crypto.randomUUID()
     const newProfile: ProfileItem = {
@@ -405,16 +412,17 @@ export default function SuperAdminPage() {
           workspaceId: selectedWorkspaceId
         })
 
-        if (!result.success) {
-          throw new Error(result.error)
+        if (!result.success || !result.data) {
+          throw new Error(result.error || "สร้างบัญชีไม่สำเร็จ")
         }
 
+        setCreatedCredential({ email: result.data.email || newUserEmail.trim(), password: result.data.password })
         setNewUserEmail("")
         setNewUserPassword("")
         setNewUserFullName("")
         setNewUserPhone("")
         setResultSuccess(`✓ สร้างบัญชีสำเร็จและมอบสิทธิ์ "${newUserRole.toUpperCase()}" ให้บัญชี ${newUserEmail.trim()} เรียบร้อยแล้ว สามารถเข้าใช้งานได้ทันที`)
-        
+
         // โหลดข้อมูลรายชื่อใหม่เพื่อให้โปรไฟล์ที่ถูกสร้างผ่าน Trigger แสดงผลบนหน้าจอด้วย ID จริงจาก Auth
         await loadData()
       } catch (err: any) {
@@ -959,7 +967,10 @@ export default function SuperAdminPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-900/60 bg-slate-950/20">
                   {filteredProfiles.map((p) => {
-                    const wsName = workspaces.find((w) => w.id === p.workspace_id)?.name || "ไม่มีสังกัด (Global / Super Admin)"
+                    const workspaceEntry = workspaces.find((w) => w.id === p.workspace_id)
+                    // แยกกรณี super_admin (ไม่มี workspace ปกติอยู่แล้ว) ออกจากกรณีอื่นที่ไม่มี workspace (ผิดปกติ ต้องรีบแก้)
+                    const isOrphanedWorkspace = !workspaceEntry && p.role !== "super_admin"
+                    const wsName = workspaceEntry?.name || (p.role === "super_admin" ? "Global / Super Admin" : "⚠️ ไม่มี Workspace (ผิดปกติ)")
                     return (
                       <tr key={p.id} className="hover:bg-slate-900/25 transition-colors">
                         <td className="p-4 font-semibold text-slate-200">
@@ -993,7 +1004,7 @@ export default function SuperAdminPage() {
                             {p.role.toUpperCase()}
                           </span>
                         </td>
-                        <td className="p-4 text-slate-300 font-medium">
+                        <td className={`p-4 font-medium ${isOrphanedWorkspace ? "text-amber-400 font-bold" : "text-slate-300"}`}>
                           {wsName}
                         </td>
                         <td className="p-4 text-center">
@@ -1095,9 +1106,8 @@ export default function SuperAdminPage() {
                         </span>
                         <input
                           type="password"
-                          required
                           minLength={6}
-                          placeholder="รหัสผ่านอย่างน้อย 6 ตัว"
+                          placeholder="เว้นว่างเพื่อให้ระบบสุ่มรหัสผ่านให้อัตโนมัติ"
                           className="w-full pl-11 pr-4 py-3.5 md:pl-9 md:pr-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-sm md:text-xs transition-colors"
                           value={newUserPassword}
                           onChange={(e) => setNewUserPassword(e.target.value)}
@@ -1168,6 +1178,33 @@ export default function SuperAdminPage() {
                     )}
                   </button>
                 </form>
+
+                {/* กล่องแสดงรหัสผ่านที่ระบบสุ่มให้ (ตอนเว้นช่องรหัสผ่านว่างไว้) พร้อมปุ่มคัดลอก แสดงครั้งเดียวหลังสร้างบัญชีสำเร็จ */}
+                {createdCredential && (
+                  <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl space-y-2.5">
+                    <p className="text-[11px] text-amber-400 font-semibold">
+                      บันทึกรหัสผ่านนี้ไว้ให้ผู้ใช้ทันที ระบบจะไม่แสดงซ้ำอีก
+                    </p>
+                    <div className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-500 truncate">{createdCredential.email}</p>
+                        <p className="text-sm font-mono font-bold text-slate-200 tracking-wide">{createdCredential.password}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(createdCredential.password)
+                          setCredentialCopied(true)
+                          setTimeout(() => setCredentialCopied(false), 2000)
+                        }}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                      >
+                        {credentialCopied ? <Check className="w-3.5 h-3.5 text-teal-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {credentialCopied ? "คัดลอกแล้ว" : "คัดลอก"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

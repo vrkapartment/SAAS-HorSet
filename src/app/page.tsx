@@ -183,11 +183,11 @@ function ShowcaseAppHeader({ title, big = false }: { title: string; big?: boolea
 
 export default function LandingPage() {
   const router = useRouter()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
-  const goToRegister = () => router.push("/register")
+  const goToRegister = () => router.push("/register?tab=new")
 
   const navLinks = [
     { key: "nav_features", href: "#features" },
@@ -251,7 +251,7 @@ export default function LandingPage() {
 
         <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight text-slate-900 dark:text-white">
           {t("landing.hero_title")}<br />
-          {t("landing.hero_subtitle") === "with HorSet Platform" ? (
+          {locale === "en" ? (
             <>with <span className="text-blue-600 dark:text-blue-500">HorSet Platform</span></>
           ) : (
             <>ด้วยระบบ <span className="text-blue-600 dark:text-blue-500">HorSet</span></>
@@ -392,13 +392,13 @@ export default function LandingPage() {
           <div className="lg:col-span-5 space-y-6">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-bold tracking-wider uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
-              Daily Property Operations
+              {t("landing.features_group1_badge")}
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-              จัดการงานหอพักรายวันอย่างเป็นระบบ
+              {t("landing.features_group1_title")}
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              สลายงานซับซ้อนให้จบได้ในไม่กี่วินาที ตั้งแต่พนักงานจดมิเตอร์ไปจนถึงการส่งบิลตรงเข้าสมาร์ทโฟนของผู้เช่าโดยตรง รวดเร็ว ถูกต้อง แม่นยำ
+              {t("landing.features_group1_desc")}
             </p>
 
             <div className="space-y-4 pt-2">
@@ -440,13 +440,13 @@ export default function LandingPage() {
           <div className="lg:col-span-7 space-y-6">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-lg text-xs font-bold tracking-wider uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-pulse" />
-              Financial & Tax Compliance
+              {t("landing.features_group2_badge")}
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-              ระบบการเงินและภาษีครบถ้วนตามกฎหมาย
+              {t("landing.features_group2_title")}
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              เหนือกว่าระบบทั่วไปด้วยโมดูลการเงินที่รองรับ QR พร้อมเพย์มาตรฐานสากล พร้อมเครื่องมือสรุปข้อมูลภาษีสรรพากร ภ.ง.ด. 90/94 มั่นใจ ตรวจสอบได้ โปร่งใส 100%
+              {t("landing.features_group2_desc")}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
@@ -465,7 +465,7 @@ export default function LandingPage() {
                   </p>
                 </div>
                 <div className="mt-8 pt-4 border-t border-slate-200/50 dark:border-slate-800/40 flex items-center justify-between text-indigo-600 dark:text-indigo-400 text-xs font-semibold group-hover:text-indigo-700 dark:group-hover:text-indigo-300">
-                  <span>ระบบพร้อมเพย์อัจฉริยะ</span>
+                  <span>{t("landing.features_qr_caption")}</span>
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                 </div>
               </div>
@@ -478,14 +478,14 @@ export default function LandingPage() {
                   </div>
                   <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-1.5">
                     {t("landing.features_tax_title")}
-                    <span className="text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded font-medium">ภ.ง.ด. 90/94</span>
+                    <span className="text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded font-medium">{t("landing.features_tax_badge")}</span>
                   </h4>
                   <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                     {t("landing.features_tax_desc")}
                   </p>
                 </div>
                 <div className="mt-8 pt-4 border-t border-slate-200/50 dark:border-slate-800/40 flex items-center justify-between text-violet-600 dark:text-violet-400 text-xs font-semibold group-hover:text-violet-700 dark:group-hover:text-violet-300">
-                  <span>ระบบสรุปแบบยื่นภาษี</span>
+                  <span>{t("landing.features_tax_caption")}</span>
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                 </div>
               </div>
@@ -559,16 +559,18 @@ export default function LandingPage() {
 
                   {/* ยินดีต้อนรับกลับ */}
                   <div className="px-3 pt-2.5 pb-2">
-                    <p className="text-[10px] font-black text-slate-100 truncate">ยินดีต้อนรับกลับ แอดมิน!</p>
+                    <p className="text-[10px] font-black text-slate-100 truncate">
+                      {t("dashboard.welcome_back").replace("{name}", t("dashboard.default_admin_name"))}
+                    </p>
                   </div>
 
-                  {/* การ์ดสถิติ 2x2 — label บน, ตัวเลขใหญ่, ไอคอนมุมขวาบน เหมือนหน้า /dashboard จริง */}
+                  {/* การ์ดสถิติ 2x2 — label บน, ตัวเลขใหญ่, ไอคอนมุมขวาบน เหมือนหน้า /dashboard จริง (ใช้ key เดียวกับ hero mockup) */}
                   <div className="grid grid-cols-2 gap-1.5 px-3">
                     {[
-                      { label: "ห้องทั้งหมด", value: "24", icon: Home, color: "text-blue-400 bg-blue-500/10" },
-                      { label: "ห้องว่าง", value: "2", icon: Home, color: "text-emerald-400 bg-emerald-500/10" },
-                      { label: "มีผู้เช่า", value: "22", icon: Users, color: "text-teal-400 bg-teal-500/10" },
-                      { label: "ค้างชำระ", value: "3", icon: Clock, color: "text-rose-400 bg-rose-500/10" }
+                      { label: t("dashboard.stat_all_rooms_title"), value: "24", icon: Home, color: "text-blue-400 bg-blue-500/10" },
+                      { label: t("dashboard.stat_vacant_title"), value: "2", icon: Home, color: "text-emerald-400 bg-emerald-500/10" },
+                      { label: t("dashboard.stat_occupied_title"), value: "22", icon: Users, color: "text-teal-400 bg-teal-500/10" },
+                      { label: t("dashboard.stat_unpaid_title"), value: "3", icon: Clock, color: "text-rose-400 bg-rose-500/10" }
                     ].map((s) => {
                       const Icon = s.icon
                       return (
@@ -588,11 +590,11 @@ export default function LandingPage() {
                   {/* รายรับ / ค้างชำระ เต็มความกว้าง เรียงต่อกัน */}
                   <div className="flex flex-col gap-1.5 px-3 pt-1.5">
                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5">
-                      <span className="text-[6px] text-emerald-400/80 font-bold uppercase block">รายรับเดือนนี้</span>
+                      <span className="text-[6px] text-emerald-400/80 font-bold uppercase block">{t("dashboard.revenue_title")}</span>
                       <span className="text-xs font-black text-emerald-400 font-mono">118,250 ฿</span>
                     </div>
                     <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-1.5">
-                      <span className="text-[6px] text-rose-400/80 font-bold uppercase block">ค้างชำระ</span>
+                      <span className="text-[6px] text-rose-400/80 font-bold uppercase block">{t("dashboard.unpaid_title")}</span>
                       <span className="text-xs font-black text-rose-400 font-mono">16,800 ฿</span>
                     </div>
                   </div>
@@ -600,10 +602,10 @@ export default function LandingPage() {
                   {/* เมนูลัด 2x2 — ไอคอนกล่องขาวมุมซ้ายบน ป้ายชื่อล่าง เหมือนการ์ด quick action บนมือถือจริง */}
                   <div className="grid grid-cols-2 gap-1.5 px-3 pt-1.5">
                     {[
-                      { label: "จดมิเตอร์", color: "bg-blue-500/10", icon: Gauge },
-                      { label: "ออกบิล", color: "bg-teal-500/10", icon: Plus },
-                      { label: "ผู้เช่า", color: "bg-indigo-500/10", icon: Users },
-                      { label: "รายจ่าย", color: "bg-amber-500/10", icon: Coins }
+                      { label: t("landing.mockup_action_meter"), color: "bg-blue-500/10", icon: Gauge },
+                      { label: t("landing.mockup_action_bill"), color: "bg-teal-500/10", icon: Plus },
+                      { label: t("landing.mockup_action_tenants"), color: "bg-indigo-500/10", icon: Users },
+                      { label: t("landing.mockup_action_expense"), color: "bg-amber-500/10", icon: Coins }
                     ].map((act) => {
                       const Icon = act.icon
                       return (
@@ -620,8 +622,12 @@ export default function LandingPage() {
                   {/* Tab สลับมุมมองเฉพาะมือถือจริง: บิลล่าสุด / กิจกรรมล่าสุด */}
                   <div className="mt-auto px-3 pt-2 pb-2.5 shrink-0">
                     <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-800">
-                      <span className="flex-1 text-center text-[7px] font-extrabold py-1 rounded-md bg-slate-800 text-teal-400">บิลล่าสุด (4)</span>
-                      <span className="flex-1 text-center text-[7px] font-extrabold py-1 rounded-md text-slate-500">กิจกรรม (3)</span>
+                      <span className="flex-1 text-center text-[7px] font-extrabold py-1 rounded-md bg-slate-800 text-teal-400">
+                        {t("dashboard.recent_bills_title").replace("{count}", "4")}
+                      </span>
+                      <span className="flex-1 text-center text-[7px] font-extrabold py-1 rounded-md text-slate-500">
+                        {t("dashboard.recent_activities_title").replace("{count}", "3")}
+                      </span>
                     </div>
                   </div>
                 </ShowcasePhoneFrame>

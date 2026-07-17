@@ -571,13 +571,12 @@ create trigger set_workspace_subscriptions_updated_at
 
 
 -- Trigger for profiles: sync workspace_id during new user sign up
+-- หมายเหตุ: ห้ามเดา workspace อื่นมาใช้แทนเด็ดขาดถ้า metadata ไม่ได้ส่ง workspace_id มา (เคยมี fallback ไปผูกกับ
+-- workspace แรกสุดของระบบซึ่งเป็นช่องโหว่ข้อมูลข้ามหอพัก) ให้เป็น NULL แทน — คอลัมน์นี้ nullable อยู่แล้วและ RLS
+-- จะกันไม่ให้เห็นข้อมูลของหอพักไหนเลยถ้าเป็น NULL (fail-safe)
 create or replace function public.handle_new_user()
 returns trigger as $$
-declare
-  default_ws_id uuid;
 begin
-  select id into default_ws_id from public.workspaces order by created_at limit 1;
-  
   insert into public.profiles (id, email, role, full_name, phone, workspace_id)
   values (
     new.id,
@@ -585,7 +584,7 @@ begin
     coalesce(new.raw_user_meta_data->>'role', 'tenant'),
     new.raw_user_meta_data->>'full_name',
     new.raw_user_meta_data->>'phone',
-    coalesce((new.raw_user_meta_data->>'workspace_id')::uuid, default_ws_id)
+    (new.raw_user_meta_data->>'workspace_id')::uuid
   );
   return new;
 end;

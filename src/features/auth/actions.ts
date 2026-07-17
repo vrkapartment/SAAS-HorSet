@@ -21,6 +21,16 @@ function getSupabaseAdmin() {
   })
 }
 
+// ปลายทาง redirect หลังกดลิงก์ยืนยันอีเมล (ตัด / ท้าย NEXT_PUBLIC_APP_URL ออกก่อนเสมอ ป้องกัน URL ซ้อนกัน // )
+function getEmailCallbackUrl() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  let safeAppUrl = appUrl.trim()
+  while (safeAppUrl.endsWith("/")) {
+    safeAppUrl = safeAppUrl.slice(0, -1)
+  }
+  return `${safeAppUrl}/auth/callback`
+}
+
 
 /**
  * ฟังก์ชันสำหรับการทำ Login ผ่าน Supabase
@@ -39,6 +49,14 @@ export async function loginAction(email: string, password: string, captchaToken?
     })
 
     if (authError) {
+      // แยกกรณี "ยังไม่ยืนยันอีเมล" ออกมาต่างหาก เพื่อให้หน้า UI เสนอปุ่มส่งอีเมลยืนยันซ้ำแทน error ทั่วไป
+      if (authError.code === "email_not_confirmed") {
+        return {
+          success: false,
+          error: "กรุณายืนยันอีเมลของคุณก่อนเข้าสู่ระบบ ตรวจสอบกล่องจดหมาย (รวมถึงโฟลเดอร์สแปม) สำหรับลิงก์ยืนยัน",
+          code: "email_not_confirmed" as const
+        }
+      }
       return { success: false, error: authError.message }
     }
 
@@ -282,7 +300,7 @@ export async function registerWithSecretCodeAction(data: {
       email: data.email.trim(),
       password: data.password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`,
+        emailRedirectTo: getEmailCallbackUrl(),
         captchaToken: data.captchaToken || undefined,
         data: {
           role: codeData.role,
@@ -316,9 +334,9 @@ export async function registerWithSecretCodeAction(data: {
       console.error("Warning: Failed to mark code as used:", updateErr)
     }
 
-    return { 
-      success: true, 
-      message: "สมัครสมาชิกและลงทะเบียนสิทธิ์ของคุณเรียบร้อยแล้ว! สามารถเข้าสู่ระบบได้ทันที" 
+    return {
+      success: true,
+      message: "สมัครสมาชิกและลงทะเบียนสิทธิ์ของคุณเรียบร้อยแล้ว! กรุณาตรวจสอบอีเมลของคุณเพื่อยืนยันตัวตนก่อนเข้าสู่ระบบ"
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลงทะเบียน"
@@ -326,5 +344,127 @@ export async function registerWithSecretCodeAction(data: {
   }
 }
 
+/**
+ * ส่งอีเมลยืนยันตัวตนซ้ำอีกครั้ง (ใช้ตอนผู้ใช้ยังไม่ได้กดลิงก์ยืนยันจากอีเมลแรก)
+ */
+export async function resendConfirmationEmailAction(email: string) {
+  try {
+    const supabase = await createClient()
 
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim(),
+      options: {
+        emailRedirectTo: getEmailCallbackUrl()
+      }
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, message: "ส่งอีเมลยืนยันตัวตนอีกครั้งเรียบร้อยแล้ว กรุณาตรวจสอบกล่องจดหมายของคุณ" }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการส่งอีเมลยืนยัน" }
+  }
+}
+
+/**
+ * ฟังก์ชันสำหรับการสมัครสมาชิกใหม่แบบ Self-Serve สำหรับเจ้าของหอพักรายใหม่ (ไม่ต้องใช้รหัสเชิญชวน)
+ * สร้าง workspace ของตัวเองให้อัตโนมัติ (trial 30 วันผ่าน trigger handle_new_workspace_subscription)
+ * แล้วจึงสมัครบัญชีผู้ใช้บทบาท admin ผูกกับ workspace นั้นทันที
+ */
+export async function registerNewWorkspaceAction(data: {
+  email: string
+  password: string
+  fullName: string
+  phone: string
+  propertyName: string
+  captchaToken?: string
+}) {
+  const email = data.email.trim()
+  const propertyName = data.propertyName.trim()
+
+  if (!propertyName) {
+    return { success: false, error: "กรุณากรอกชื่อหอพัก/อพาร์ทเมนต์ของคุณ" }
+  }
+  if (data.password.length < 6) {
+    return { success: false, error: "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร" }
+  }
+
+  const supabaseAdmin = getSupabaseAdmin()
+  let newWorkspaceId: string | null = null
+
+  try {
+    // 1. เช็คอีเมลซ้ำก่อนสร้างอะไรทั้งนั้น เพื่อไม่ให้เกิด workspace กำพร้าเวลามีคนลองสมัครซ้ำ
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle()
+
+    if (existingProfile) {
+      return { success: false, error: "อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาเข้าสู่ระบบ หรือใช้อีเมลอื่นในการสมัคร" }
+    }
+
+    // 2. สร้าง Workspace ใหม่ก่อน (trigger จะสร้าง trial subscription + อาคารหลักให้อัตโนมัติ)
+    const { data: newWorkspace, error: workspaceError } = await supabaseAdmin
+      .from("workspaces")
+      .insert({ name: propertyName })
+      .select("id")
+      .single()
+
+    if (workspaceError || !newWorkspace) {
+      return { success: false, error: `สร้างหอพักใหม่ไม่สำเร็จ: ${workspaceError?.message || "ไม่ทราบสาเหตุ"}` }
+    }
+
+    newWorkspaceId = newWorkspace.id
+
+    // 3. สมัครสมาชิกผ่าน Supabase Auth พร้อมส่ง workspace_id ที่เพิ่งสร้างเข้าไปใน metadata ทันที
+    //    (ห้ามลืมขั้นตอนนี้ — ถ้าไม่ส่ง workspace_id มา trigger handle_new_user() จะไปผูกกับ workspace แรกสุดในระบบแทนโดยอัตโนมัติ)
+    const supabase = await createClient()
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password: data.password,
+      options: {
+        emailRedirectTo: getEmailCallbackUrl(),
+        captchaToken: data.captchaToken || undefined,
+        data: {
+          role: "admin",
+          full_name: data.fullName.trim(),
+          phone: data.phone.trim(),
+          workspace_id: newWorkspaceId
+        }
+      }
+    })
+
+    // 4. ถ้าสมัครไม่สำเร็จ หรือเป็นอีเมลที่ยืนยันแล้วในระบบอยู่ก่อน (Supabase จะคืน identities ว่างเปล่าแทนการแจ้ง error ตรง ๆ
+    //    เพื่อป้องกันการสุ่มเช็คอีเมลในระบบ) ให้ rollback ลบ workspace ที่เพิ่งสร้างทิ้งทันที (cascade ลบ subscription/building ให้เอง)
+    const isDuplicateEmail = !authError && authData.user && authData.user.identities?.length === 0
+
+    if (authError || isDuplicateEmail) {
+      await supabaseAdmin.from("workspaces").delete().eq("id", newWorkspaceId)
+
+      if (isDuplicateEmail) {
+        return { success: false, error: "อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาเข้าสู่ระบบ หรือใช้อีเมลอื่นในการสมัคร" }
+      }
+      return { success: false, error: `สมัครสมาชิกไม่สำเร็จ: ${authError?.message}` }
+    }
+
+    return {
+      success: true,
+      message: "สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลของคุณเพื่อยืนยันตัวตนก่อนเข้าสู่ระบบ"
+    }
+  } catch (error) {
+    // หากเกิดข้อผิดพลาดไม่คาดคิดหลังสร้าง workspace ไปแล้ว ให้พยายาม rollback ทิ้งเพื่อไม่ให้ค้างเป็น workspace กำพร้า
+    if (newWorkspaceId) {
+      const { error: rollbackError } = await supabaseAdmin.from("workspaces").delete().eq("id", newWorkspaceId)
+      if (rollbackError) {
+        console.error("Warning: Failed to rollback orphaned workspace:", rollbackError)
+      }
+    }
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสมัครสมาชิก"
+    return { success: false, error: errorMessage }
+  }
+}
 
