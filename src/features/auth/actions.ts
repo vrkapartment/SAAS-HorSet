@@ -22,13 +22,16 @@ function getSupabaseAdmin() {
 }
 
 // ปลายทาง redirect หลังกดลิงก์ยืนยันอีเมล (ตัด / ท้าย NEXT_PUBLIC_APP_URL ออกก่อนเสมอ ป้องกัน URL ซ้อนกัน // )
+// ชี้ไปหน้า /confirm-email (ต้องกดปุ่มยืนยันเองก่อนถึงจะแลก code จริง) แทนที่จะแลกอัตโนมัติทันทีที่เปิดลิงก์
+// เพราะ code ใช้ได้แค่ครั้งเดียว และอีเมล client บางเจ้า (Outlook Safe Links ฯลฯ) แอบยิง GET ไปสแกนลิงก์
+// ล่วงหน้าก่อนผู้ใช้กดจริง ทำให้ code ถูกใช้ไปก่อนโดยไม่ได้ตั้งใจ ผู้ใช้กดจริงทีหลังเลยเจอ error หลอกๆ
 function getEmailCallbackUrl() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   let safeAppUrl = appUrl.trim()
   while (safeAppUrl.endsWith("/")) {
     safeAppUrl = safeAppUrl.slice(0, -1)
   }
-  return `${safeAppUrl}/auth/callback`
+  return `${safeAppUrl}/confirm-email`
 }
 
 
@@ -366,6 +369,29 @@ export async function resendConfirmationEmailAction(email: string) {
     return { success: true, message: "ส่งอีเมลยืนยันตัวตนอีกครั้งเรียบร้อยแล้ว กรุณาตรวจสอบกล่องจดหมายของคุณ" }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการส่งอีเมลยืนยัน" }
+  }
+}
+
+/**
+ * แลก code ยืนยันอีเมลเป็น session จริง — เรียกเฉพาะตอนผู้ใช้กดปุ่มยืนยันเองที่หน้า /confirm-email เท่านั้น
+ * (ไม่ทำอัตโนมัติทันทีที่เปิดลิงก์ กัน email scanner แอบใช้ code ไปก่อนผู้ใช้จริง)
+ */
+export async function confirmEmailAction(code: string) {
+  try {
+    if (!code || !code.trim()) {
+      return { success: false, error: "ลิงก์ยืนยันอีเมลไม่ถูกต้องหรือหมดอายุ กรุณาขอส่งอีเมลยืนยันใหม่" }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase.auth.exchangeCodeForSession(code.trim())
+
+    if (error) {
+      return { success: false, error: "ลิงก์ยืนยันอีเมลไม่ถูกต้องหรือหมดอายุ กรุณาขอส่งอีเมลยืนยันใหม่" }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการยืนยันอีเมล" }
   }
 }
 
