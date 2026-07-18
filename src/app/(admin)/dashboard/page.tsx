@@ -109,7 +109,9 @@ function AdminDashboardContent() {
     let needsReplace = false
     const params = new URLSearchParams(window.location.search)
 
-    // 1. Handle Month Context
+    // 1. Handle Month Context — ใช้ค่าที่จำไว้ร่วมกับหน้า Billing/Manage Bills (sessionStorage คีย์ร่วม)
+    // เพื่อให้สลับหน้าไปมาแล้วยังดูเดือนเดิมต่อเนื่องกัน ค่านี้จะถูกรีเซ็ตเป็นเดือนปัจจุบันอัตโนมัติตอนเข้าสู่ระบบ
+    // ใหม่/reload จริงๆ ที่ (admin)/layout.tsx (ดูคอมเมนต์ที่นั่น) ไม่ใช่ค้างเดือนเก่าไว้ตลอดไปแบบเมื่อก่อน
     if (monthParam) {
       setSelectedMonth(monthParam)
       sessionStorage.setItem("dashboard_month", monthParam)
