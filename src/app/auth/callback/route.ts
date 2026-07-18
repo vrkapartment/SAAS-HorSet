@@ -35,11 +35,14 @@ export async function GET(request: Request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("workspace_id")
+    .select("role, workspace_id")
     .eq("id", userData.user.id)
     .maybeSingle()
 
-  if (!profile || !profile.workspace_id) {
+  // เช็คว่าเป็นบัญชี Google ใหม่ล้วนที่ trigger ยังไม่ได้ผูก workspace ให้จริงๆ (role default เป็น "tenant" เสมอ
+  // ตาม handle_new_user() ถ้าไม่มี custom metadata) ไม่ใช่แค่เช็ค workspace_id อย่างเดียว เพราะ super_admin
+  // ก็มี workspace_id เป็น NULL โดยดีไซน์เช่นกัน (ไม่ได้ผูกกับหอพักใดหอพักหนึ่ง) ต้องไม่โดนเด้งไปกรอกชื่อหอพักผิดๆ
+  if (!profile || (profile.role === "tenant" && !profile.workspace_id)) {
     // ยังไม่มี workspace ผูกอยู่ (บัญชี Google ใหม่ล้วน) — ให้ไปกรอกชื่อหอพักก่อนถึงจะใช้งานได้
     return NextResponse.redirect(`${origin}/register/complete-workspace`)
   }

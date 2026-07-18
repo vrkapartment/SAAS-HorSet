@@ -594,8 +594,10 @@ export async function completeGoogleWorkspaceRegistrationAction(propertyName: st
       return { success: false, error: "ไม่พบข้อมูล Profile ของผู้ใช้นี้" }
     }
 
-    if (existingProfile.workspace_id) {
-      // มี workspace อยู่แล้ว (เคยทำขั้นตอนนี้ผ่านมาก่อน หรือเป็นบัญชีเดิม) ถือว่าสำเร็จแล้ว ไม่ต้องสร้างซ้ำ
+    // บัญชีที่มี workspace_id อยู่แล้ว หรือมี role อื่นที่ไม่ใช่ "tenant" (เช่น super_admin ที่ไม่ผูก workspace ใดเป็นการเฉพาะ
+    // โดยดีไซน์) ถือว่าเป็นบัญชีที่สมบูรณ์อยู่แล้ว ไม่ใช่บัญชี Google ใหม่ล้วนที่ต้องมาตั้งชื่อหอพัก ห้ามสร้าง workspace
+    // ใหม่ให้/เปลี่ยน role ทับของเดิมโดยเด็ดขาด
+    if (existingProfile.workspace_id || existingProfile.role !== "tenant") {
       await setLoginSessionCookies(existingProfile.role, existingProfile.workspace_id)
       return { success: true, data: { workspaceId: existingProfile.workspace_id } }
     }
