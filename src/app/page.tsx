@@ -1062,9 +1062,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p>{t("landing.footer_text")}</p>
           <div className="flex gap-4 text-slate-400 dark:text-slate-500">
-            <a href="#" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_privacy")}</a>
+            <a href="/privacy-policy" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_privacy")}</a>
             <span>•</span>
-            <a href="#" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_terms")}</a>
+            <a href="/terms-of-service" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_terms")}</a>
             <span>•</span>
             <a href="#" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_contact")}</a>
           </div>
