@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Script from "next/script"
 import { Key, Mail, CheckCircle2, Lock, ArrowRight, RefreshCw, AlertCircle } from "lucide-react"
-import { loginAction, resendConfirmationEmailAction } from "@/features/auth/actions"
+import { loginAction, resendConfirmationEmailAction, establishGoogleLoginSessionAction } from "@/features/auth/actions"
 import { createClient } from "@/lib/supabase/client"
-import { clearCachedUserProfile } from "@/features/auth/client"
+import { clearCachedUserProfile, signInWithGoogle } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 
 // Declare types for Cloudflare Turnstile on the window object
@@ -36,6 +36,7 @@ export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState<"admin" | "staff" | "tenant" | "super_admin" | null>(null)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const turnstileContainerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | null>(null)
 
@@ -236,6 +237,21 @@ export default function LoginPage() {
     setResendMessage(res.success ? (res.message || "ส่งอีเมลอีกครั้งแล้ว") : (res.error || "ส่งอีเมลไม่สำเร็จ"))
   }
 
+  const handleGoogleSignIn = async () => {
+    if (isDemo) {
+      setError("โหมด Demo ยังไม่รองรับการเข้าสู่ระบบด้วย Google")
+      return
+    }
+    setGoogleLoading(true)
+    setError(null)
+    const { error: oauthError } = await signInWithGoogle("login")
+    if (oauthError) {
+      setGoogleLoading(false)
+      setError(oauthError.message)
+    }
+    // สำเร็จแล้วเบราว์เซอร์จะถูก redirect ไป Google เอง ไม่ต้องทำอะไรต่อที่นี่
+  }
+
   const handleVerify2FA = (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -292,6 +308,37 @@ export default function LoginPage() {
       }
     }
   }
+
+  // เข้าสู่ระบบด้วย Google สำเร็จแล้ว กลับมาจาก /auth/callback?oauth_ready=1 — โหลด role/สิทธิ์แล้วเข้า path เดียวกับ login ปกติ
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("oauth_ready") !== "1") return
+
+    setLoading(true)
+    establishGoogleLoginSessionAction().then((res) => {
+      setLoading(false)
+      if (res.success && res.data) {
+        const role = res.data.role as "admin" | "staff" | "tenant" | "super_admin"
+        setSelectedRole(role)
+        if (res.data.workspaceId) {
+          setWorkspaceId(res.data.workspaceId)
+        }
+
+        if (role === "admin" && res.data.tfaEnabled) {
+          setShow2FA(true)
+        } else {
+          if (res.data.workspaceId) {
+            document.cookie = `horset_current_workspace_id=${res.data.workspaceId}; path=/; max-age=86400`
+          }
+          navigateToDashboardWithRole(role, res.data.landingPage)
+        }
+      } else {
+        setError(res.error || "เข้าสู่ระบบด้วย Google ไม่สำเร็จ")
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const navigateToDashboard = () => {
     navigateToDashboardWithRole(selectedRole)
@@ -429,6 +476,37 @@ export default function LoginPage() {
                 </>
               )}
             </button>
+
+            {!isDemo && (
+              <>
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex-1 h-px bg-slate-800" />
+                  <span className="text-[11px] text-slate-500">หรือ</span>
+                  <div className="flex-1 h-px bg-slate-800" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading || loading}
+                  className="w-full bg-white hover:bg-slate-100 disabled:opacity-60 disabled:cursor-not-allowed text-slate-700 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-sm transition-colors cursor-pointer"
+                >
+                  {googleLoading ? (
+                    <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" viewBox="0 0 48 48" aria-hidden="true">
+                        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.5 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.4 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z"/>
+                        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.4 15.5 18.8 12 24 12c3.1 0 5.8 1.1 8 3l6-6C34.4 5.1 29.5 3 24 3 16.3 3 9.7 7.3 6.3 14.7z"/>
+                        <path fill="#4CAF50" d="M24 45c5.3 0 10.1-2 13.7-5.3l-6.3-5.3C29.4 36 26.9 37 24 37c-5.3 0-9.8-3.4-11.4-8.1l-6.5 5C9.5 40.6 16.2 45 24 45z"/>
+                        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.7l6.3 5.3C40.9 36 44 30.4 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                      </svg>
+                      เข้าสู่ระบบด้วย Google
+                    </>
+                  )}
+                </button>
+              </>
+            )}
 
             <div className="text-center pt-2">
               <p className="text-xs text-slate-500">

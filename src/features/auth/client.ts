@@ -1,6 +1,7 @@
 "use client"
 
 import { getCurrentUserProfileAction } from "./actions"
+import { createClient } from "@/lib/supabase/client"
 
 // In-memory global profile cache in the browser's JavaScript runtime.
 // This persists across client-side page transitions in Next.js (SPA mode).
@@ -52,4 +53,18 @@ export function setCachedUserProfile(profile: any) {
  */
 export function clearCachedUserProfile() {
   cachedProfile = null
+}
+
+/**
+ * เริ่ม flow เข้าสู่ระบบ/สมัครสมาชิกผ่าน Google (redirect ไป Google แล้วกลับมาที่ /auth/callback)
+ * intent="login" = เข้าสู่ระบบด้วยบัญชีที่มีอยู่แล้ว, intent="register_workspace" = สมัครหอพักใหม่แบบ self-serve
+ * ต้องเรียกจาก client component เท่านั้น (ต้องมี window เพื่อ redirect)
+ */
+export async function signInWithGoogle(intent: "login" | "register_workspace") {
+  const supabase = createClient()
+  const redirectTo = `${window.location.origin}/auth/callback?intent=${intent}`
+  return supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo }
+  })
 }

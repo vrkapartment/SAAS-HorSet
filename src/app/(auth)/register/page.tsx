@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Script from "next/script"
 import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight, User, Phone, Sparkles, AlertCircle, Building2, Rocket, RefreshCw } from "lucide-react"
 import { registerWithSecretCodeAction, registerNewWorkspaceAction, resendConfirmationEmailAction } from "@/features/auth/actions"
+import { signInWithGoogle } from "@/features/auth/client"
 
 // Declare types for Cloudflare Turnstile on the window object
 declare global {
@@ -61,6 +62,7 @@ function RegisterPageContent() {
   const [success, setSuccess] = useState<string | null>(null)
 
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const turnstileContainerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | null>(null)
 
@@ -239,6 +241,21 @@ function RegisterPageContent() {
 
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState<string | null>(null)
+
+  const handleGoogleSignIn = async () => {
+    if (isDemo) {
+      setError("โหมด Demo ยังไม่รองรับการสมัครสมาชิกด้วย Google")
+      return
+    }
+    setGoogleLoading(true)
+    setError(null)
+    const { error: oauthError } = await signInWithGoogle("register_workspace")
+    if (oauthError) {
+      setGoogleLoading(false)
+      setError(oauthError.message)
+    }
+    // สำเร็จแล้วเบราว์เซอร์จะถูก redirect ไป Google เอง ไม่ต้องทำอะไรต่อที่นี่
+  }
 
   const handleResend = async () => {
     setResendLoading(true)
@@ -633,6 +650,37 @@ function RegisterPageContent() {
                     </>
                   )}
                 </button>
+
+                {!isDemo && (
+                  <>
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="flex-1 h-px bg-slate-800" />
+                      <span className="text-[11px] text-slate-500">หรือ</span>
+                      <div className="flex-1 h-px bg-slate-800" />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignIn}
+                      disabled={googleLoading || loading}
+                      className="w-full bg-white hover:bg-slate-100 disabled:opacity-60 disabled:cursor-not-allowed text-slate-700 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-sm transition-colors cursor-pointer"
+                    >
+                      {googleLoading ? (
+                        <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" viewBox="0 0 48 48" aria-hidden="true">
+                            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.5 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.4 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z"/>
+                            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.4 15.5 18.8 12 24 12c3.1 0 5.8 1.1 8 3l6-6C34.4 5.1 29.5 3 24 3 16.3 3 9.7 7.3 6.3 14.7z"/>
+                            <path fill="#4CAF50" d="M24 45c5.3 0 10.1-2 13.7-5.3l-6.3-5.3C29.4 36 26.9 37 24 37c-5.3 0-9.8-3.4-11.4-8.1l-6.5 5C9.5 40.6 16.2 45 24 45z"/>
+                            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.7l6.3 5.3C40.9 36 44 30.4 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                          </svg>
+                          สมัครหอพักใหม่ด้วย Google
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </form>
             )}
           </>

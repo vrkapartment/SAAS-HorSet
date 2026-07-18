@@ -494,3 +494,148 @@ export async function registerNewWorkspaceAction(data: {
   }
 }
 
+// ตั้งคุกกี้สิทธิ์ผู้ใช้ (แบบเดียวกับที่ loginAction ทำ) — ใช้ทั้งฝั่ง login ด้วย Google และหลังสมัครหอพักใหม่ผ่าน Google
+async function setLoginSessionCookies(role: string, workspaceId: string | null, landingPage?: string) {
+  const cookieStore = await cookies()
+  cookieStore.set("horset_user_role", role, {
+    path: "/",
+    maxAge: 86400,
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: false,
+  })
+  if (workspaceId) {
+    cookieStore.set("horset_current_workspace_id", workspaceId, {
+      path: "/",
+      maxAge: 86400,
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: false,
+    })
+  }
+  if (role === "staff" && landingPage) {
+    cookieStore.set("horset_staff_landing_page", landingPage, {
+      path: "/",
+      maxAge: 86400,
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: false,
+    })
+  }
+}
+
+/**
+ * เรียกจาก /auth/callback หลัง Google OAuth สำเร็จ และพบว่าเป็นบัญชีที่มี workspace_id อยู่แล้ว (login ปกติ)
+ * ตั้งคุกกี้สิทธิ์ให้เหมือนกับที่ loginAction ทำหลัง signInWithPassword สำเร็จ
+ */
+export async function establishGoogleLoginSessionAction() {
+  try {
+    const supabase = await createClient()
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    if (userError || !userData.user) {
+      return { success: false, error: "ไม่พบข้อมูลผู้ใช้หลังเข้าสู่ระบบด้วย Google" }
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, full_name, tfa_enabled, workspace_id, permissions")
+      .eq("id", userData.user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return { success: false, error: "เข้าสู่ระบบแล้ว แต่ไม่พบข้อมูล Profile และสิทธิ์การใช้งานในตาราง profiles" }
+    }
+
+    const landingPage = profile.permissions?.landing_page || "/billing"
+    await setLoginSessionCookies(profile.role, profile.workspace_id, landingPage)
+
+    return {
+      success: true,
+      data: {
+        userId: userData.user.id,
+        email: userData.user.email,
+        role: profile.role,
+        fullName: profile.full_name,
+        tfaEnabled: profile.tfa_enabled,
+        workspaceId: profile.workspace_id,
+        landingPage
+      }
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google" }
+  }
+}
+
+/**
+ * เรียกจากหน้า /register/complete-workspace หลังผู้ใช้ที่สมัครผ่าน Google (profile ยังไม่มี workspace_id)
+ * กรอกชื่อหอพัก — สร้าง workspace ใหม่ให้ แล้วยกระดับ profile ของตัวเองเป็น admin ผูกกับ workspace นั้น
+ */
+export async function completeGoogleWorkspaceRegistrationAction(propertyName: string) {
+  const trimmedName = propertyName.trim()
+  if (!trimmedName) {
+    return { success: false, error: "กรุณากรอกชื่อหอพัก/อพาร์ทเมนต์ของคุณ" }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    if (userError || !userData.user) {
+      return { success: false, error: "กรุณาเข้าสู่ระบบด้วย Google ก่อนทำรายการนี้" }
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+
+    // Guard: ต้องเป็น profile ที่ยังไม่มี workspace_id เท่านั้น กัน user ที่มีบัญชี/workspace อยู่แล้วมาเรียกซ้ำ
+    // เพื่อยกระดับสิทธิ์ตัวเองหรือสร้าง workspace เพิ่มโดยไม่ได้ตั้งใจ (idempotent guard)
+    const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
+      .from("profiles")
+      .select("role, workspace_id")
+      .eq("id", userData.user.id)
+      .single()
+
+    if (existingProfileError || !existingProfile) {
+      return { success: false, error: "ไม่พบข้อมูล Profile ของผู้ใช้นี้" }
+    }
+
+    if (existingProfile.workspace_id) {
+      // มี workspace อยู่แล้ว (เคยทำขั้นตอนนี้ผ่านมาก่อน หรือเป็นบัญชีเดิม) ถือว่าสำเร็จแล้ว ไม่ต้องสร้างซ้ำ
+      await setLoginSessionCookies(existingProfile.role, existingProfile.workspace_id)
+      return { success: true, data: { workspaceId: existingProfile.workspace_id } }
+    }
+
+    let newWorkspaceId: string | null = null
+    try {
+      // 1. สร้าง Workspace ใหม่ก่อน (trigger จะสร้าง trial subscription + อาคารหลักให้อัตโนมัติ)
+      const { data: newWorkspace, error: workspaceError } = await supabaseAdmin
+        .from("workspaces")
+        .insert({ name: trimmedName })
+        .select("id")
+        .single()
+
+      if (workspaceError || !newWorkspace) {
+        return { success: false, error: `สร้างหอพักใหม่ไม่สำเร็จ: ${workspaceError?.message || "ไม่ทราบสาเหตุ"}` }
+      }
+      newWorkspaceId = newWorkspace.id
+
+      // 2. ยกระดับ profile ของผู้ใช้นี้ให้เป็น admin ผูกกับ workspace ที่เพิ่งสร้าง
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ role: "admin", workspace_id: newWorkspaceId, updated_at: new Date().toISOString() })
+        .eq("id", userData.user.id)
+
+      if (updateError) {
+        throw updateError
+      }
+
+      await setLoginSessionCookies("admin", newWorkspaceId)
+      return { success: true, data: { workspaceId: newWorkspaceId } }
+    } catch (innerError) {
+      // Rollback: ลบ workspace กำพร้าทิ้งถ้าอัปเดต profile ไม่สำเร็จ
+      if (newWorkspaceId) {
+        await supabaseAdmin.from("workspaces").delete().eq("id", newWorkspaceId)
+      }
+      const errorMessage = innerError instanceof Error ? innerError.message : "เกิดข้อผิดพลาดในการสร้างหอพักใหม่"
+      return { success: false, error: errorMessage }
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสมัครหอพักใหม่ผ่าน Google" }
+  }
+}
+
