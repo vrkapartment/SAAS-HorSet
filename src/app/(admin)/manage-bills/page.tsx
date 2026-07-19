@@ -235,14 +235,10 @@ function ManageBillsContent() {
       if (cachedMonth && cachedYear) {
         const cachedCycle = `${cachedYear}-${cachedMonth}`
         if (!registrationCycle || cachedCycle >= registrationCycle) {
+          // ห้าม sync ค่านี้กลับลง URL (ห้าม router.replace ใส่ ?cycle=) เพราะถ้าใส่ไว้ การกด reload ครั้งถัดไป
+          // จะโหลด URL เดิมที่มี ?cycle= ค้างอยู่ ทำให้ targetCycle ด้านบนเป็นจริงเสมอ ข้าม sessionStorage/
+          // เดือนปัจจุบันไปตลอดกาล กลายเป็นค้างเดือนเก่าไม่มีวันรีเซ็ต
           setBillingCycle(cachedCycle)
-
-          // ซิงค์ลง URL เผื่อกรณีสลับแท็บเมนูเข้ามา
-          const params = new URLSearchParams(window.location.search)
-          params.set("cycle", cachedCycle)
-          params.set("year", cachedYear)
-          params.set("month", cachedMonth)
-          router.replace(`?${params.toString()}`, { scroll: false })
           return
         }
       }

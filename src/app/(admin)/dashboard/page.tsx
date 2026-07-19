@@ -106,12 +106,12 @@ function AdminDashboardContent() {
     const yearParam = searchParams.get("year")
     const tabParam = searchParams.get("tab")
 
-    let needsReplace = false
-    const params = new URLSearchParams(window.location.search)
-
     // 1. Handle Month Context — ใช้ค่าที่จำไว้ร่วมกับหน้า Billing/Manage Bills (sessionStorage คีย์ร่วม)
     // เพื่อให้สลับหน้าไปมาแล้วยังดูเดือนเดิมต่อเนื่องกัน ค่านี้จะถูกรีเซ็ตเป็นเดือนปัจจุบันอัตโนมัติตอนเข้าสู่ระบบ
-    // ใหม่/reload จริงๆ ที่ (admin)/layout.tsx (ดูคอมเมนต์ที่นั่น) ไม่ใช่ค้างเดือนเก่าไว้ตลอดไปแบบเมื่อก่อน
+    // ใหม่/reload จริงๆ ที่ (admin)/layout.tsx (ดูคอมเมนต์ที่นั่น)
+    // สำคัญ: ห้าม sync ค่า fallback นี้กลับลง URL (ห้าม router.replace ใส่ ?month=) เพราะถ้าใส่ไว้ การกด reload
+    // ครั้งถัดไปจะโหลด URL เดิมที่มี ?month= ค้างอยู่ ทำให้เข้า branch "if (monthParam)" ด้านบนเสมอ
+    // (อ่านจาก URL ตรงๆ ข้าม sessionStorage/วันที่ปัจจุบันไปเลย) กลายเป็นค้างเดือนเก่าถาวรไม่มีวันรีเซ็ต
     if (monthParam) {
       setSelectedMonth(monthParam)
       sessionStorage.setItem("dashboard_month", monthParam)
@@ -120,8 +120,6 @@ function AdminDashboardContent() {
       const finalMonth = cachedMonth || String(new Date().getMonth() + 1).padStart(2, "0")
       setSelectedMonth(finalMonth)
       sessionStorage.setItem("dashboard_month", finalMonth)
-      params.set("month", finalMonth)
-      needsReplace = true
     }
 
     // 2. Handle Year Context
@@ -133,8 +131,6 @@ function AdminDashboardContent() {
       const finalYear = cachedYear || String(new Date().getFullYear())
       setSelectedYear(finalYear)
       sessionStorage.setItem("dashboard_year", finalYear)
-      params.set("year", finalYear)
-      needsReplace = true
     }
 
     // 3. Handle Active Tab Context
@@ -146,10 +142,6 @@ function AdminDashboardContent() {
       const finalTab = (cachedTab === "transactions" || cachedTab === "activities") ? cachedTab : "transactions"
       setActiveTab(finalTab as "transactions" | "activities")
       sessionStorage.setItem("dashboard_tab", finalTab)
-    }
-
-    if (needsReplace) {
-      router.replace(`?${params.toString()}`, { scroll: false })
     }
   }, [searchParams, router])
 
