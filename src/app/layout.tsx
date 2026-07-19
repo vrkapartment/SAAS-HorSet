@@ -50,6 +50,9 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "HorSet",
   },
+  verification: {
+    google: "A6xbVNIgCvYrEjat61mnsVitoQ2h6aX1vNNturgGYJg",
+  },
 };
 
 export const viewport: Viewport = {

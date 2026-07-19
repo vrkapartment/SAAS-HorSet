@@ -95,6 +95,64 @@ const PRICING_PLANS: PricingPlan[] = [
 
 const FAQ_KEYS = ["q1", "q2", "q3", "q4", "q5", "q6"]
 
+// ชุดสีของการ์ดฟีเจอร์หลัก (Core Features) — เขียน class เต็มเป็น literal เสมอ เพื่อให้ Tailwind JIT ตรวจจับได้
+const FEATURE_ACCENTS = {
+  blue: {
+    hoverBorder: "hover:border-blue-400/50 dark:hover:border-blue-500/50",
+    borderRest: "border-blue-500/15 dark:border-blue-500/20",
+    borderHover: "hover:border-blue-500",
+    blur: "bg-blue-500/5 dark:bg-blue-500/10",
+    iconBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white",
+    badgeBg: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
+    captionText: "text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300"
+  },
+  teal: {
+    hoverBorder: "hover:border-teal-400/50 dark:hover:border-teal-500/50",
+    borderRest: "border-teal-500/15 dark:border-teal-500/20",
+    borderHover: "hover:border-teal-500",
+    blur: "bg-teal-500/5 dark:bg-teal-500/10",
+    iconBg: "bg-teal-500/10 text-teal-600 dark:text-teal-400 group-hover:bg-teal-600 group-hover:text-white",
+    badgeBg: "bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300",
+    captionText: "text-teal-600 dark:text-teal-400 group-hover:text-teal-700 dark:group-hover:text-teal-300"
+  },
+  indigo: {
+    hoverBorder: "hover:border-indigo-400/50 dark:hover:border-indigo-500/50",
+    borderRest: "border-indigo-500/15 dark:border-indigo-500/20",
+    borderHover: "hover:border-indigo-500",
+    blur: "bg-indigo-500/5 dark:bg-indigo-500/10",
+    iconBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white",
+    badgeBg: "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300",
+    captionText: "text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-300"
+  },
+  violet: {
+    hoverBorder: "hover:border-violet-400/50 dark:hover:border-violet-500/50",
+    borderRest: "border-violet-500/15 dark:border-violet-500/20",
+    borderHover: "hover:border-violet-500",
+    blur: "bg-violet-500/5 dark:bg-violet-500/10",
+    iconBg: "bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-600 group-hover:text-white",
+    badgeBg: "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300",
+    captionText: "text-violet-600 dark:text-violet-400 group-hover:text-violet-700 dark:group-hover:text-violet-300"
+  },
+  emerald: {
+    hoverBorder: "hover:border-emerald-400/50 dark:hover:border-emerald-500/50",
+    borderRest: "border-emerald-500/15 dark:border-emerald-500/20",
+    borderHover: "hover:border-emerald-500",
+    blur: "bg-emerald-500/5 dark:bg-emerald-500/10",
+    iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white",
+    badgeBg: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
+    captionText: "text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-300"
+  },
+  amber: {
+    hoverBorder: "hover:border-amber-400/50 dark:hover:border-amber-500/50",
+    borderRest: "border-amber-500/15 dark:border-amber-500/20",
+    borderHover: "hover:border-amber-500",
+    blur: "bg-amber-500/5 dark:bg-amber-500/10",
+    iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white",
+    badgeBg: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
+    captionText: "text-amber-600 dark:text-amber-400 group-hover:text-amber-700 dark:group-hover:text-amber-300"
+  }
+} as const
+
 // กรอบมือถือ (ใช้กับส่วน LINE payment highlight) — bezel เข้มเสมอ แต่หน้าจอด้านในปรับตาม theme ของหน้าเว็บ
 function PhoneFrame({ children }: { children: React.ReactNode }) {
   return (
@@ -185,7 +243,7 @@ export default function LandingPage() {
   const router = useRouter()
   const { t, locale } = useLanguage()
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
 
   const goToRegister = () => router.push("/register?tab=new")
 
@@ -379,151 +437,105 @@ export default function LandingPage() {
       {/* Section ฟีเจอร์หลัก (Features Showcase Grouped Layout) */}
       <section id="features" className="max-w-6xl mx-auto px-6 pb-24 relative z-10 scroll-mt-24">
         <div className="text-center max-w-2xl mx-auto mb-16 relative z-10">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-white mb-4 text-balance">
             {t("landing.features_title")}
           </h2>
-          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 text-pretty">
             {t("landing.features_subtitle")}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           {/* ส่วนปฏิบัติการหอพักรายวัน (Daily Property Operations Column - 5 Cols) */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-bold tracking-wider uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
+          <div className="lg:col-span-5 flex flex-col">
+            <div className="inline-flex items-center gap-2 self-start px-3 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
               {t("landing.features_group1_badge")}
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-4">
               {t("landing.features_group1_title")}
             </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-3">
               {t("landing.features_group1_desc")}
             </p>
 
-            <div className="space-y-4 pt-2">
-              <div className="glass-card p-6 rounded-2xl border border-slate-200/60 dark:border-slate-850 hover:border-blue-400/50 dark:hover:border-blue-500/50 transition-all group hover:scale-[1.01] shadow-sm hover:shadow-md">
-                <div className="flex gap-4 items-start">
-                  <div className="w-12 h-12 shrink-0 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <Gauge className="w-6 h-6" />
+            <div className="flex-1 flex flex-col gap-5 mt-8">
+              {[
+                { icon: Gauge, title: t("landing.features_meter_title"), desc: t("landing.features_meter_desc"), accent: "blue" as const },
+                { icon: BellRing, title: t("landing.features_line_title"), desc: t("landing.features_line_desc"), accent: "teal" as const }
+              ].map((f) => {
+                const Icon = f.icon
+                const style = FEATURE_ACCENTS[f.accent]
+                return (
+                  <div
+                    key={f.title}
+                    className={`group relative flex-1 glass-card p-6 sm:p-7 rounded-2xl border border-slate-200/60 dark:border-slate-850 ${style.hoverBorder} transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-lg overflow-hidden flex flex-col justify-center`}
+                  >
+                    <div className={`absolute -top-8 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-opacity duration-300 opacity-60 group-hover:opacity-100 ${style.blur}`} />
+                    <div className="relative z-10 flex gap-4 items-start">
+                      <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors duration-300 ${style.iconBg}`}>
+                        <Icon className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2">{f.title}</h4>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{f.desc}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2">
-                      {t("landing.features_meter_title")}
-                    </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                      {t("landing.features_meter_desc")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card p-6 rounded-2xl border border-slate-200/60 dark:border-slate-850 hover:border-teal-400/50 dark:hover:border-teal-500/50 transition-all group hover:scale-[1.01] shadow-sm hover:shadow-md">
-                <div className="flex gap-4 items-start">
-                  <div className="w-12 h-12 shrink-0 bg-teal-500/10 rounded-xl flex items-center justify-center text-teal-600 dark:text-teal-400 group-hover:bg-teal-600 group-hover:text-white transition-colors">
-                    <BellRing className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2">
-                      {t("landing.features_line_title")}
-                    </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                      {t("landing.features_line_desc")}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                )
+              })}
             </div>
           </div>
 
           {/* ส่วนการเงินและภาษีระดับพรีเมียม (Financial & Tax Compliance - 7 Cols) */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-lg text-xs font-bold tracking-wider uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-pulse" />
+          <div className="lg:col-span-7 flex flex-col">
+            <div className="inline-flex items-center gap-2 self-start px-3 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 rounded-full text-xs font-bold tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400" />
               {t("landing.features_group2_badge")}
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-4">
               {t("landing.features_group2_title")}
             </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-3">
               {t("landing.features_group2_desc")}
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-              <div className="glass-card p-6 rounded-2xl border-2 border-indigo-500/15 dark:border-indigo-500/20 hover:border-indigo-500 transition-all group hover:scale-[1.02] shadow-[0_4px_20px_-3px_rgba(99,102,241,0.04)] hover:shadow-[0_8px_25px_-5px_rgba(99,102,241,0.12)] flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-bl-full pointer-events-none" />
-                <div>
-                  <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors mb-5 shadow-sm">
-                    <Receipt className="w-6 h-6" />
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-5 auto-rows-fr mt-8">
+              {[
+                { icon: Receipt, title: t("landing.features_qr_title"), desc: t("landing.features_qr_desc"), badge: "EMVCo", caption: t("landing.features_qr_caption"), accent: "indigo" as const },
+                { icon: FileText, title: t("landing.features_tax_title"), desc: t("landing.features_tax_desc"), badge: t("landing.features_tax_badge"), caption: t("landing.features_tax_caption"), accent: "violet" as const },
+                { icon: ShieldCheck, title: t("landing.features_security_title"), desc: t("landing.features_security_desc"), accent: "emerald" as const },
+                { icon: Smartphone, title: t("landing.features_portal_title"), desc: t("landing.features_portal_desc"), accent: "amber" as const }
+              ].map((f) => {
+                const Icon = f.icon
+                const style = FEATURE_ACCENTS[f.accent]
+                return (
+                  <div
+                    key={f.title}
+                    className={`group relative glass-card p-6 sm:p-7 rounded-2xl border-2 ${style.borderRest} ${style.borderHover} transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-lg flex flex-col overflow-hidden`}
+                  >
+                    <div className={`absolute -top-8 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-opacity duration-300 opacity-60 group-hover:opacity-100 ${style.blur}`} />
+                    <div className="relative z-10 flex-1">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors duration-300 mb-5 shadow-sm ${style.iconBg}`}>
+                        <Icon className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-1.5 flex-wrap">
+                        {f.title}
+                        {f.badge && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${style.badgeBg}`}>{f.badge}</span>
+                        )}
+                      </h4>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{f.desc}</p>
+                    </div>
+                    {f.caption && (
+                      <div className={`relative z-10 mt-6 pt-4 border-t border-slate-200/50 dark:border-slate-800/40 flex items-center justify-between text-xs font-semibold ${style.captionText}`}>
+                        <span>{f.caption}</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    )}
                   </div>
-                  <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-1.5">
-                    {t("landing.features_qr_title")}
-                    <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded font-medium">EMVCo</span>
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {t("landing.features_qr_desc")}
-                  </p>
-                </div>
-                <div className="mt-8 pt-4 border-t border-slate-200/50 dark:border-slate-800/40 flex items-center justify-between text-indigo-600 dark:text-indigo-400 text-xs font-semibold group-hover:text-indigo-700 dark:group-hover:text-indigo-300">
-                  <span>{t("landing.features_qr_caption")}</span>
-                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-                </div>
-              </div>
-
-              <div className="glass-card p-6 rounded-2xl border-2 border-violet-500/15 dark:border-violet-500/20 hover:border-violet-500 transition-all group hover:scale-[1.02] shadow-[0_4px_20px_-3px_rgba(139,92,246,0.04)] hover:shadow-[0_8px_25px_-5px_rgba(139,92,246,0.12)] flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/5 dark:bg-violet-500/10 rounded-bl-full pointer-events-none" />
-                <div>
-                  <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center text-violet-600 dark:text-violet-400 group-hover:bg-violet-600 group-hover:text-white transition-colors mb-5 shadow-sm">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-1.5">
-                    {t("landing.features_tax_title")}
-                    <span className="text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded font-medium">{t("landing.features_tax_badge")}</span>
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {t("landing.features_tax_desc")}
-                  </p>
-                </div>
-                <div className="mt-8 pt-4 border-t border-slate-200/50 dark:border-slate-800/40 flex items-center justify-between text-violet-600 dark:text-violet-400 text-xs font-semibold group-hover:text-violet-700 dark:group-hover:text-violet-300">
-                  <span>{t("landing.features_tax_caption")}</span>
-                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-                </div>
-              </div>
-            </div>
-
-            {/* แถวเสริม: RBAC/2FA + พอร์ทัลผู้เช่า */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-              <div className="glass-card p-6 rounded-2xl border border-slate-200/60 dark:border-slate-850 hover:border-emerald-400/50 dark:hover:border-emerald-500/50 transition-all group hover:scale-[1.01] shadow-sm hover:shadow-md">
-                <div className="flex gap-4 items-start">
-                  <div className="w-12 h-12 shrink-0 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                    <ShieldCheck className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2">
-                      {t("landing.features_security_title")}
-                    </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                      {t("landing.features_security_desc")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card p-6 rounded-2xl border border-slate-200/60 dark:border-slate-850 hover:border-amber-400/50 dark:hover:border-amber-500/50 transition-all group hover:scale-[1.01] shadow-sm hover:shadow-md">
-                <div className="flex gap-4 items-start">
-                  <div className="w-12 h-12 shrink-0 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                    <Smartphone className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2">
-                      {t("landing.features_portal_title")}
-                    </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                      {t("landing.features_portal_desc")}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                )
+              })}
             </div>
           </div>
         </div>
