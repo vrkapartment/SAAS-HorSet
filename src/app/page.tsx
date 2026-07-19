@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Gauge,
@@ -241,9 +241,19 @@ function ShowcaseAppHeader({ title, big = false }: { title: string; big?: boolea
 
 export default function LandingPage() {
   const router = useRouter()
-  const { t, locale } = useLanguage()
+  const { t, locale, setLocale } = useLanguage()
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+
+  // รองรับลิงก์ตรง ?lang=en เพื่อให้เปิดหน้าแรกเป็นภาษาอังกฤษได้ทันที (เช่น ส่งให้ทีมตรวจสอบของ Google อ่าน
+  // โดยไม่ต้องกดปุ่มสลับภาษาเอง) — ค่านี้ยังคง fallback เป็นภาษาไทยตอน SSR เหมือนเดิม แค่สลับให้ทันทีหลัง mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const langParam = new URLSearchParams(window.location.search).get("lang")
+    if (langParam === "en" || langParam === "th") {
+      setLocale(langParam)
+    }
+  }, [setLocale])
 
   const goToRegister = () => router.push("/register?tab=new")
 
