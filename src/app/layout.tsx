@@ -37,7 +37,7 @@ const promptFont = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "HorSet (หอเสร็จ) - ระบบบริหารจัดการหอพักครบวงจร | All-in-one dormitory management SaaS",
+  title: "HorSet (หอเสร็จ) - ระบบบริหารจัดการหอพักครบวงจร",
   description: "HorSet (หอเสร็จ) is an all-in-one SaaS platform for managing dormitories and apartments in Thailand: record electricity/water meter readings, generate PDF bills, create PromptPay QR codes for rent payments, send LINE notifications to tenants, and export tax reference reports. / ระบบ SaaS บริหารจัดการหอพัก อพาร์ทเมนท์ครบวงจร จดมิเตอร์ ออกบิล แจ้งเตือนผ่าน LINE และคำนวณภาษี ภ.ง.ด. 90/94",
   manifest: "/manifest.json",
   icons: {
