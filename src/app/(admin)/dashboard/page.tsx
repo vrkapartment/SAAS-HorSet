@@ -175,13 +175,6 @@ function AdminDashboardContent() {
   // Dynamic Workspace Name
   const [workspaceName, setWorkspaceName] = useState<string>("แสนสุข แมนชั่น")
 
-  // Cache raw data client-side for dynamic billing cycle filtering without database refetches
-  const [rawRooms, setRawRooms] = useState<any[]>([])
-  const [rawTenants, setRawTenants] = useState<any[]>([])
-  const [rawBills, setRawBills] = useState<any[]>([])
-  const [rawExpenses, setRawExpenses] = useState<any[]>([])
-  const [rawOldTenants, setRawOldTenants] = useState<any[]>([])
-
   // Sync Cycle state whenever Month or Year changes
   useEffect(() => {
     setSelectedCycle(`${selectedYear}-${selectedMonth}`)
@@ -559,12 +552,6 @@ function AdminDashboardContent() {
 
       if (isRealSupabase) {
         setIsDemo(false)
-        setRawRooms(rooms)
-        setRawTenants(tenants)
-        setRawBills(bills)
-        setRawExpenses(expenses)
-        setRawOldTenants(oldTenants || [])
-        
         calculateStats(rooms, tenants, bills, expenses, `${selectedYear}-${selectedMonth}`, oldTenants || [])
       } else {
         setIsDemo(true)
@@ -579,11 +566,6 @@ function AdminDashboardContent() {
       if (isRealSupabase) {
         setIsDemo(false)
         setDbError(e instanceof Error ? e.message : t("dashboard.error_db_generic"))
-        setRawRooms([])
-        setRawTenants([])
-        setRawBills([])
-        setRawExpenses([])
-        setRawOldTenants([])
         calculateStats([], [], [], [], `${selectedYear}-${selectedMonth}`, [])
       } else {
         setIsDemo(true)
@@ -722,21 +704,14 @@ function AdminDashboardContent() {
     ])
   }
 
-  // Fetch when selected year changes
+  // Fetch when selected year OR month changes — ต้องผูก selectedMonth ไว้ด้วย ไม่ใช่แค่ selectedYear
+  // เพราะ loadDashboardData() ข้างในอ่าน selectedMonth จาก closure ของ render ที่ effect นี้ถูก schedule ไว้
+  // ถ้า selectedMonth เพิ่งถูกอัปเดต (เช่น จาก effect sync sessionStorage ตอนโหลดหน้าครั้งแรก) แต่ effect นี้ไม่ได้
+  // re-run ตาม จะเห็นค่าเก่าค้างอยู่ ทำให้คำนวณสถิติผิดเดือนไปเงียบๆ (dropdown ถูกแต่ข้อมูลผิด) — getDashboardData/
+  // getCachedData แคชเป็นรายปีอยู่แล้ว จึงไม่เสีย network call ซ้ำเวลาเปลี่ยนแค่เดือนภายในปีเดียวกัน
   useEffect(() => {
     loadDashboardData()
-  }, [selectedYear])
-
-  // Sync calculations when selected month changes (without reloading db if rawBills already has the selected year's data)
-  useEffect(() => {
-    if (!loading) {
-      if (isDemo) {
-        setupDemoFallback(`${selectedYear}-${selectedMonth}`)
-      } else {
-        calculateStats(rawRooms, rawTenants, rawBills, rawExpenses, `${selectedYear}-${selectedMonth}`, rawOldTenants)
-      }
-    }
-  }, [selectedMonth])
+  }, [selectedYear, selectedMonth])
 
 
 
