@@ -329,9 +329,9 @@ export default function LandingPage() {
         <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-lg max-w-2xl mx-auto mt-6 leading-relaxed">
           {t("landing.hero_desc")}
         </p>
-        {/* คำอธิบายภาษาอังกฤษเสมอ ไม่ผูกกับ locale toggle — ให้ผู้เข้าชมที่อ่านไทยไม่ออก (เช่น ทีมตรวจสอบ OAuth
-            ของ Google) เห็นทันทีว่าแอปนี้ทำอะไร โดยไม่ต้องรู้จักปุ่มสลับภาษาหรือใช้ ?lang=en ก่อน */}
-        <p className="text-slate-500 dark:text-slate-500 text-xs sm:text-sm max-w-2xl mx-auto mt-2 leading-relaxed">
+        {/* คำอธิบายภาษาอังกฤษเสมอ ไม่ผูกกับ locale toggle — ยังอยู่ใน DOM ให้ทีมตรวจสอบ OAuth ของ Google
+            หรือ screen reader อ่านเจอได้ แต่ซ่อนไม่ให้แสดงผลกับผู้เข้าชมทั่วไป (sr-only) ตามที่ผู้ใช้ขอ */}
+        <p className="sr-only">
           HorSet — all-in-one dormitory &amp; apartment management platform for Thailand: meter readings, PDF bills, PromptPay QR payments, LINE notifications, and tax reference reports.
         </p>
 
