@@ -4,6 +4,9 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider } from "@/lib/translations/LanguageProvider";
 import { WorkspaceDataProvider } from "@/context/WorkspaceDataContext";
+import { CookieConsentProvider } from "@/lib/analytics/CookieConsentContext";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 
 const promptFont = localFont({
   src: [
@@ -82,9 +85,13 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans antialiased">
         <ThemeProvider>
           <LanguageProvider>
-            <WorkspaceDataProvider>
-              {children}
-            </WorkspaceDataProvider>
+            <CookieConsentProvider>
+              <WorkspaceDataProvider>
+                {children}
+              </WorkspaceDataProvider>
+              <CookieConsentBanner />
+              <GoogleAnalytics />
+            </CookieConsentProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

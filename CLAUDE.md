@@ -164,6 +164,16 @@ expenses          # รายจ่าย
 
 ---
 
+## 📊 Analytics & Cookie Consent (PDPA)
+
+- ใช้ **Google Analytics 4 (GA4)** — โหลดผ่าน `src/components/GoogleAnalytics.tsx`
+- GA script จะถูกโหลด **เฉพาะเมื่อผู้ใช้กด "ยอมรับ" ใน Cookie Consent Banner เท่านั้น** — ไม่โหลดล่วงหน้า (PDPA compliance)
+- Consent state เก็บใน cookie `horset_cookie_consent` (`granted` / `denied`) ผ่าน `src/lib/analytics/CookieConsentContext.tsx`
+- ถ้าไม่ตั้งค่า `NEXT_PUBLIC_GA_MEASUREMENT_ID` ระบบจะไม่โหลด GA เลยไม่ว่าจะกดยอมรับหรือไม่
+- ห้ามเพิ่ม tracking script อื่น (Facebook Pixel, Hotjar ฯลฯ) โดยไม่ผ่าน consent gate เดียวกันนี้
+
+---
+
 ## 💰 PromptPay QR (EMVCo)
 
 - ใช้ **EMVCo QR Code template** — ไม่ผ่าน Payment Gateway ใด ๆ
@@ -196,6 +206,9 @@ LINE_CHANNEL_SECRET=
 
 # App
 NEXT_PUBLIC_APP_URL=
+
+# Analytics (ไม่บังคับ)
+NEXT_PUBLIC_GA_MEASUREMENT_ID=       # Google Analytics 4 Measurement ID — ถ้าไม่ตั้งค่า ระบบจะไม่โหลด GA เลย
 ```
 
 > ❌ ห้าม commit `.env` หรือ `.env.local` ขึ้น git เด็ดขาด

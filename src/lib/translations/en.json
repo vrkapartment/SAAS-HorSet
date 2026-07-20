@@ -14,6 +14,12 @@
     "english": "English",
     "profile_settings": "Profile & Password Settings"
   },
+  "cookie_consent": {
+    "message": "This website uses cookies to remember your preferences and analyze site usage, to improve your experience.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "policy_link": "Cookie Policy"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "rooms": "Manage Rooms & Tenants",
