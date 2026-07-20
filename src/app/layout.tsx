@@ -37,6 +37,7 @@ const promptFont = localFont({
     },
   ],
   variable: "--font-prompt",
+  preload: false,
 });
 
 export const metadata: Metadata = {

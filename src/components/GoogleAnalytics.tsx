@@ -34,7 +34,7 @@ export function GoogleAnalytics() {
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', '${GA_MEASUREMENT_ID}', { anonymize_ip: true });
+          gtag('config', '${GA_MEASUREMENT_ID}', { anonymize_ip: true, cookie_domain: 'none' });
           window.gtag = gtag;
         `}
       </Script>
