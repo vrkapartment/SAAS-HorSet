@@ -4,6 +4,15 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { encryptText, decryptText } from "@/lib/encryption"
 import { generateSecurePassword } from "@/lib/password"
+import { updateGoogleDriveFolderNameAction as updateGoogleDriveFolderNameImpl } from "@/lib/googleDrive"
+
+// Wrapper บาง ๆ เพื่อให้ Client Component (หน้า Super Admin) import ผ่าน server action file นี้แทน
+// ไม่ import "@/lib/googleDrive" ตรงๆ จาก client component เด็ดขาด เพราะไฟล์นั้นดึง google-auth-library/gaxios
+// (Node-only, มี node:net) เข้ามาด้วย ถ้า client component import ตรงจะทำให้ build พยายาม bundle
+// dependency เหล่านี้ลง browser bundle แล้ว error ทันที — ต้องผ่าน "use server" boundary ของไฟล์นี้เท่านั้น
+export async function updateGoogleDriveFolderNameAction(name: string) {
+  return updateGoogleDriveFolderNameImpl(name)
+}
 
 interface CreateUserParams {
   email: string
@@ -391,7 +400,7 @@ export async function getSystemSettingsAction() {
     // Decrypt values safely
     const decryptedData = data.map(item => {
       let val = item.value
-      if (item.key.includes("KEY") || item.key.includes("SECRET")) {
+      if (item.key.includes("KEY") || item.key.includes("SECRET") || item.key.includes("TOKEN")) {
         val = decryptText(item.value)
         if (item.key === "GOOGLE_SERVICE_ACCOUNT_KEY") {
           try {
@@ -431,7 +440,7 @@ export async function updateSystemSettingAction(key: string, value: string) {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 
-    const valueToStore = key.includes("KEY") || key.includes("SECRET") ? encryptText(value) : value
+    const valueToStore = key.includes("KEY") || key.includes("SECRET") || key.includes("TOKEN") ? encryptText(value) : value
 
     const { error } = await supabaseAdmin.from("system_settings").upsert({ key, value: valueToStore }, { onConflict: "key" })
     if (error) throw error

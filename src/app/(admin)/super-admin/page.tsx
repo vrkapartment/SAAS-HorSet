@@ -36,7 +36,8 @@ import {
   deleteWorkspaceAdminAction,
   getSuperAdminDataAction,
   getSystemSettingsAction,
-  updateSystemSettingAction
+  updateSystemSettingAction,
+  updateGoogleDriveFolderNameAction
 } from "@/features/super-admin/actions"
 
 interface Workspace {
@@ -110,8 +111,16 @@ export default function SuperAdminPage() {
   // การตั้งค่าระบบ
   const [googleProjectId, setGoogleProjectId] = useState("")
   const [googleServiceKey, setGoogleServiceKey] = useState("")
-  const [googleDriveFolderId, setGoogleDriveFolderId] = useState("")
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+
+  // Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2) — คนละกลไกกับ Google Translate ด้านบน (service account)
+  const [googleDriveOAuthClientId, setGoogleDriveOAuthClientId] = useState("")
+  const [googleDriveOAuthClientSecret, setGoogleDriveOAuthClientSecret] = useState("")
+  const [googleDriveFolderName, setGoogleDriveFolderName] = useState("")
+  const [googleDriveFolderId, setGoogleDriveFolderId] = useState("")
+  const [googleDriveConnected, setGoogleDriveConnected] = useState(false)
+  const [isSavingDriveOAuthSettings, setIsSavingDriveOAuthSettings] = useState(false)
+  const [isSavingDriveFolderName, setIsSavingDriveFolderName] = useState(false)
   const [googleKeyInfo, setGoogleKeyInfo] = useState<{ projectId: string, clientEmail: string } | null>(null)
 
   // ฟอร์มเพิ่ม Workspace
@@ -156,10 +165,6 @@ export default function SuperAdminPage() {
           setGoogleKeyInfo(res2.googleKeyInfo)
         }
       }
-      if (googleDriveFolderId) {
-        const res3 = await updateSystemSettingAction("GOOGLE_DRIVE_FOLDER_ID", googleDriveFolderId)
-        if (!res3.success) throw new Error(res3.error)
-      }
 
       setResultSuccess("บันทึกการตั้งค่าระบบเรียบร้อยแล้ว")
       // Set masked back
@@ -170,6 +175,48 @@ export default function SuperAdminPage() {
       setError(err.message || "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า")
     } finally {
       setIsUpdatingSettings(false)
+    }
+  }
+
+  const handleSaveDriveOAuthSettings = async () => {
+    setIsSavingDriveOAuthSettings(true)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      if (googleDriveOAuthClientId) {
+        const res1 = await updateSystemSettingAction("GOOGLE_DRIVE_OAUTH_CLIENT_ID", googleDriveOAuthClientId)
+        if (!res1.success) throw new Error(res1.error)
+      }
+      if (googleDriveOAuthClientSecret && googleDriveOAuthClientSecret !== "••••••••••••••••••••••••••••••••••••") {
+        const res2 = await updateSystemSettingAction("GOOGLE_DRIVE_OAUTH_CLIENT_SECRET", googleDriveOAuthClientSecret)
+        if (!res2.success) throw new Error(res2.error)
+      }
+
+      setResultSuccess("บันทึก Client ID/Secret ของ Google Drive เรียบร้อยแล้ว — กด \"เชื่อมต่อ Google Drive\" เพื่อดำเนินการต่อได้เลย")
+      if (googleDriveOAuthClientSecret && googleDriveOAuthClientSecret !== "••••••••••••••••••••••••••••••••••••") {
+        setGoogleDriveOAuthClientSecret("••••••••••••••••••••••••••••••••••••")
+      }
+    } catch (err: any) {
+      setError(err.message || "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า Google Drive")
+    } finally {
+      setIsSavingDriveOAuthSettings(false)
+    }
+  }
+
+  const handleSaveDriveFolderName = async () => {
+    setIsSavingDriveFolderName(true)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      const res = await updateGoogleDriveFolderNameAction(googleDriveFolderName)
+      if (!res.success) throw new Error(res.error)
+      setResultSuccess(
+        "warning" in res && res.warning ? res.warning : "บันทึกชื่อโฟลเดอร์ Google Drive เรียบร้อยแล้ว"
+      )
+    } catch (err: any) {
+      setError(err.message || "เกิดข้อผิดพลาดในการบันทึกชื่อโฟลเดอร์")
+    } finally {
+      setIsSavingDriveFolderName(false)
     }
   }
 
@@ -212,9 +259,7 @@ export default function SuperAdminPage() {
         if (settingsRes.success && settingsRes.data) {
           const projectIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_PROJECT_ID")
           const serviceKeySetting = settingsRes.data.find(s => s.key === "GOOGLE_SERVICE_ACCOUNT_KEY")
-          const driveFolderIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_DRIVE_FOLDER_ID")
           if (projectIdSetting) setGoogleProjectId(projectIdSetting.value)
-          if (driveFolderIdSetting) setGoogleDriveFolderId(driveFolderIdSetting.value)
           // Hide actual JSON in UI by showing a masked text if it exists
           if (serviceKeySetting && serviceKeySetting.value) {
             setGoogleServiceKey("••••••••••••••••••••••••••••••••••••")
@@ -223,6 +268,21 @@ export default function SuperAdminPage() {
           if (googleKeyInfo) {
             setGoogleKeyInfo(googleKeyInfo)
           }
+
+          // Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2)
+          const driveClientIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_DRIVE_OAUTH_CLIENT_ID")
+          const driveClientSecretSetting = settingsRes.data.find(s => s.key === "GOOGLE_DRIVE_OAUTH_CLIENT_SECRET")
+          const driveRefreshTokenSetting = settingsRes.data.find(s => s.key === "GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN")
+          const driveFolderIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_DRIVE_FOLDER_ID")
+          const driveFolderNameSetting = settingsRes.data.find(s => s.key === "GOOGLE_DRIVE_FOLDER_NAME")
+
+          if (driveClientIdSetting) setGoogleDriveOAuthClientId(driveClientIdSetting.value)
+          if (driveClientSecretSetting && driveClientSecretSetting.value) {
+            setGoogleDriveOAuthClientSecret("••••••••••••••••••••••••••••••••••••")
+          }
+          if (driveFolderIdSetting) setGoogleDriveFolderId(driveFolderIdSetting.value)
+          setGoogleDriveFolderName(driveFolderNameSetting?.value || "HorSet Subscription Slips Archive")
+          setGoogleDriveConnected(!!driveRefreshTokenSetting?.value)
         }
 
         const grantMap: { [key: string]: string } = {}
@@ -336,6 +396,25 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     loadData()
+  }, [])
+
+  // อ่านผลลัพธ์การเชื่อมต่อ Google Drive ที่ redirect กลับมาจาก /api/google-drive/oauth-callback
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get("google_drive_connected")
+    const errorCode = params.get("google_drive_error")
+
+    if (connected) {
+      setActiveTab("settings")
+      setResultSuccess("เชื่อมต่อ Google Drive สำเร็จแล้ว")
+      window.history.replaceState({}, "", window.location.pathname)
+    } else if (errorCode) {
+      setActiveTab("settings")
+      setError("เชื่อมต่อ Google Drive ไม่สำเร็จ: " + errorCode)
+      window.history.replaceState({}, "", window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ฟังก์ชันเพิ่ม Workspace ใหม่
@@ -1413,20 +1492,6 @@ export default function SuperAdminPage() {
                     </p>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300">Google Drive Folder ID (สำหรับ archive สลิป subscription)</label>
-                    <input
-                      type="text"
-                      value={googleDriveFolderId}
-                      onChange={(e) => setGoogleDriveFolderId(e.target.value)}
-                      placeholder="เช่น 1A2b3C4d5E6f7G8h9I0jKlmNoPQRstuv"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm"
-                    />
-                    <p className="text-xs text-slate-500">
-                      * สร้าง Shared Drive ใน Google Drive แล้วแชร์ให้กับอีเมลบริการ (Client Email) ด้านบน ก่อนคัดลอก Folder ID จาก URL มาใส่ที่นี่ — ระบบจะอัปโหลดสลิปค่า subscription ที่เก่ากว่า 3 เดือนเข้าโฟลเดอร์นี้อัตโนมัติก่อนลบออกจาก storage
-                    </p>
-                  </div>
-
                   <div className="pt-4 border-t border-slate-800/50 flex justify-end">
                     <button
                       onClick={handleSaveSettings}
@@ -1449,6 +1514,141 @@ export default function SuperAdminPage() {
                         </>
                       )}
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* กล่องตั้งค่า Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2) — คนละกลไก auth กับ Google Translate ด้านบน */}
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-transparent pointer-events-none" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
+                    <Key className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-extrabold text-slate-100">Google Drive (บัญชีสำรองส่วนตัว)</h3>
+                    <p className="text-sm text-slate-400 mt-1">เชื่อมต่อบัญชี Gmail ส่วนตัวเพื่อ archive สลิป subscription ที่หมดอายุ — ไม่ต้องใช้ Shared Drive/Google Workspace</p>
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300">OAuth Client ID</label>
+                    <input
+                      type="text"
+                      value={googleDriveOAuthClientId}
+                      onChange={(e) => setGoogleDriveOAuthClientId(e.target.value)}
+                      placeholder="เช่น 123456-abc.apps.googleusercontent.com"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                      <span>OAuth Client Secret</span>
+                      <span className="text-xs text-teal-400">ถูกเข้ารหัส (AES-256) ก่อนบันทึกลงฐานข้อมูล</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={googleDriveOAuthClientSecret}
+                      onChange={(e) => setGoogleDriveOAuthClientSecret(e.target.value)}
+                      placeholder="GOCSPX-..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all font-mono text-sm"
+                    />
+                    <p className="text-xs text-slate-500">
+                      * สร้างได้ที่ GCP Console → APIs &amp; Services → Credentials → OAuth client ID (ประเภท Web application) — Redirect URI ต้องเป็น <span className="font-mono">{process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app"}/api/google-drive/oauth-callback</span>
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={handleSaveDriveOAuthSettings}
+                      disabled={isSavingDriveOAuthSettings}
+                      className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all ${
+                        isSavingDriveOAuthSettings
+                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-teal-600 hover:bg-teal-500 text-white shadow-teal-500/20"
+                      }`}
+                    >
+                      {isSavingDriveOAuthSettings ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          กำลังบันทึก...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          บันทึก Client ID/Secret
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 pt-4 border-t border-slate-800/50">
+                    <label className="text-sm font-bold text-slate-300">ชื่อโฟลเดอร์ Archive ใน Google Drive</label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={googleDriveFolderName}
+                        onChange={(e) => setGoogleDriveFolderName(e.target.value)}
+                        placeholder="HorSet Subscription Slips Archive"
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all text-sm"
+                      />
+                      <button
+                        onClick={handleSaveDriveFolderName}
+                        disabled={isSavingDriveFolderName}
+                        className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all shrink-0 ${
+                          isSavingDriveFolderName
+                            ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                            : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                        }`}
+                      >
+                        {isSavingDriveFolderName ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "บันทึกชื่อ"
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      * ระบบจะสร้างโฟลเดอร์นี้ในบัญชี Drive ที่เชื่อมต่ออัตโนมัติเองตอนอัปโหลดครั้งแรก — ถ้าสร้างไปแล้ว การแก้ชื่อที่นี่จะเปลี่ยนชื่อโฟลเดอร์จริงใน Drive ให้ตรงกันทันที
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    {googleDriveConnected ? (
+                      <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-sm text-teal-400 font-bold flex items-center gap-2 flex-1">
+                        <CheckCircle2 className="w-4 h-4 animate-pulse" />
+                        เชื่อมต่อ Google Drive แล้ว
+                        {googleDriveFolderId && (
+                          <a
+                            href={`https://drive.google.com/drive/folders/${googleDriveFolderId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-auto text-xs text-slate-300 hover:text-white underline font-normal"
+                          >
+                            เปิดโฟลเดอร์ archive
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 flex-1">ยังไม่ได้เชื่อมต่อบัญชี Google Drive — บันทึก Client ID/Secret ด้านบนก่อน แล้วกดปุ่มเชื่อมต่อ</p>
+                    )}
+                    <a
+                      href={
+                        googleDriveOAuthClientId
+                          ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(googleDriveOAuthClientId)}&redirect_uri=${encodeURIComponent((process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app") + "/api/google-drive/oauth-callback")}&response_type=code&scope=${encodeURIComponent("https://www.googleapis.com/auth/drive.file")}&access_type=offline&prompt=consent`
+                          : undefined
+                      }
+                      className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all shrink-0 text-center ${
+                        googleDriveOAuthClientId
+                          ? "bg-teal-600 hover:bg-teal-500 text-white shadow-teal-500/20"
+                          : "bg-slate-800 text-slate-500 cursor-not-allowed pointer-events-none"
+                      }`}
+                    >
+                      {googleDriveConnected ? "เชื่อมต่อใหม่อีกครั้ง" : "เชื่อมต่อ Google Drive"}
+                    </a>
                   </div>
                 </div>
               </div>

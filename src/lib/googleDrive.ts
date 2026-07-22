@@ -1,14 +1,100 @@
-import { JWT } from "google-auth-library"
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { OAuth2Client } from "google-auth-library"
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
 import { decryptText } from "@/lib/encryption"
+import { getCurrentUserProfileAction } from "@/features/auth/actions"
+
+const DEFAULT_FOLDER_NAME = "HorSet Subscription Slips Archive"
 
 type UploadResult =
   | { success: true; fileId: string; webViewLink: string }
   | { success: false; error: string }
 
+function getSupabaseAdmin(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey || serviceKey.includes("placeholder")) return null
+  return createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+}
+
+/**
+ * สร้าง OAuth2Client ที่พร้อมขอ access token จาก refresh_token ที่เชื่อมต่อไว้แล้ว (บัญชี Gmail ส่วนตัว)
+ * คนละกลไกกับ Service Account (JWT) ที่ใช้กับ Google Translate — ไม่ต้องพึ่ง Shared Drive/Workspace
+ */
+async function getDriveOAuthClient(
+  supabaseAdmin: SupabaseClient
+): Promise<{ client: OAuth2Client } | { error: string }> {
+  const { data: settings, error } = await supabaseAdmin
+    .from("system_settings")
+    .select("key, value")
+    .in("key", ["GOOGLE_DRIVE_OAUTH_CLIENT_ID", "GOOGLE_DRIVE_OAUTH_CLIENT_SECRET", "GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN"])
+
+  if (error) throw error
+
+  const clientId = settings?.find((s) => s.key === "GOOGLE_DRIVE_OAUTH_CLIENT_ID")?.value
+  const clientSecretEnc = settings?.find((s) => s.key === "GOOGLE_DRIVE_OAUTH_CLIENT_SECRET")?.value
+  const refreshTokenEnc = settings?.find((s) => s.key === "GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN")?.value
+
+  if (!clientId || !clientSecretEnc) {
+    return { error: "ยังไม่ได้ตั้งค่า Google Drive OAuth Client ID/Secret" }
+  }
+  if (!refreshTokenEnc) {
+    return { error: "ยังไม่ได้เชื่อมต่อ Google Drive (บัญชีส่วนตัว) — กรุณากดปุ่มเชื่อมต่อในหน้า Super Admin ก่อน" }
+  }
+
+  const clientSecret = decryptText(clientSecretEnc)
+  const refreshToken = decryptText(refreshTokenEnc)
+
+  const client = new OAuth2Client({ clientId, clientSecret })
+  client.setCredentials({ refresh_token: refreshToken })
+
+  return { client }
+}
+
+/**
+ * หาโฟลเดอร์หลักที่เคยสร้างไว้ (GOOGLE_DRIVE_FOLDER_ID) หรือสร้างใหม่ครั้งแรกถ้ายังไม่มี
+ * ใช้ชื่อจาก GOOGLE_DRIVE_FOLDER_NAME (กำหนดเองได้ผ่านหน้า Super Admin) หรือชื่อ default ถ้ายังไม่ได้ตั้งไว้
+ * ต้องให้แอปเป็นคนสร้างโฟลเดอร์นี้เอง (ไม่ใช่ user สร้างเองใน Drive UI) เพราะใช้ scope แคบ drive.file
+ * ซึ่งเข้าถึงได้แค่ไฟล์/โฟลเดอร์ที่แอปสร้างขึ้นเองเท่านั้น
+ */
+async function getOrCreateRootFolder(
+  supabaseAdmin: SupabaseClient,
+  accessToken: string
+): Promise<{ folderId: string } | { error: string }> {
+  const { data: settings } = await supabaseAdmin
+    .from("system_settings")
+    .select("key, value")
+    .in("key", ["GOOGLE_DRIVE_FOLDER_ID", "GOOGLE_DRIVE_FOLDER_NAME"])
+
+  const existingFolderId = settings?.find((s) => s.key === "GOOGLE_DRIVE_FOLDER_ID")?.value
+  if (existingFolderId) return { folderId: existingFolderId }
+
+  const folderName = settings?.find((s) => s.key === "GOOGLE_DRIVE_FOLDER_NAME")?.value || DEFAULT_FOLDER_NAME
+
+  const createRes = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ name: folderName, mimeType: "application/vnd.google-apps.folder" })
+  })
+
+  if (!createRes.ok) {
+    const errJson = await createRes.json().catch(() => ({}))
+    return { error: errJson?.error?.message || "สร้างโฟลเดอร์หลักใน Google Drive ไม่สำเร็จ" }
+  }
+
+  const createData = await createRes.json()
+  const folderId = createData.id as string
+
+  await supabaseAdmin.from("system_settings").upsert({ key: "GOOGLE_DRIVE_FOLDER_ID", value: folderId }, { onConflict: "key" })
+
+  return { folderId }
+}
+
 /**
  * หาโฟลเดอร์ย่อยชื่อ subfolderName ที่อยู่ใต้ parentFolderId ถ้ายังไม่มีให้สร้างใหม่ แล้วคืนค่า folder id
- * ใช้จัดเก็บสลิปแยกตามเดือน-ปี (เช่น "2026-07") ภายใน Shared Drive เดียวกัน
+ * ใช้จัดเก็บสลิปแยกตามเดือน-ปี (เช่น "2026-07") ภายใต้โฟลเดอร์หลักเดียวกัน
  */
 async function getOrCreateDriveSubfolder(
   accessToken: string,
@@ -19,7 +105,7 @@ async function getOrCreateDriveSubfolder(
   const query = `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`
 
   const listRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives&fields=files(id,name)`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
 
@@ -30,8 +116,7 @@ async function getOrCreateDriveSubfolder(
     }
   }
 
-  // ยังไม่มีโฟลเดอร์ย่อยนี้ -> สร้างใหม่ใต้โฟลเดอร์หลัก
-  const createRes = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id", {
+  const createRes = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -54,11 +139,10 @@ async function getOrCreateDriveSubfolder(
 }
 
 /**
- * อัปโหลดไฟล์ขึ้น Google Drive โดยใช้ Google Service Account ตัวเดียวกับที่ใช้กับ Google Translate
- * (system_settings.GOOGLE_SERVICE_ACCOUNT_KEY) — ต้องเปิด Drive API บน GCP project เดียวกัน และแชร์
- * Shared Drive ปลายทางให้กับอีเมลของ service account ไว้ก่อน (ดูวิธีตั้งค่าในหน้า Super Admin)
+ * อัปโหลดไฟล์ขึ้น Google Drive ของบัญชี Gmail ส่วนตัวที่เชื่อมต่อไว้ (OAuth2 refresh token)
+ * ต่างจาก Google Translate ที่ใช้ Service Account (JWT) — คนละกลไก auth กันคนละไฟล์
  *
- * ถ้าระบุ subfolderName (เช่น "2026-07") ไฟล์จะถูกจัดเก็บในโฟลเดอร์ย่อยชื่อนั้นใต้ Folder ID หลัก
+ * ถ้าระบุ subfolderName (เช่น "2026-07") ไฟล์จะถูกจัดเก็บในโฟลเดอร์ย่อยชื่อนั้นใต้โฟลเดอร์หลัก
  * (สร้างโฟลเดอร์ย่อยให้อัตโนมัติถ้ายังไม่มี) แทนที่จะวางไว้ที่โฟลเดอร์หลักตรงๆ
  */
 export async function uploadFileToGoogleDriveAction(
@@ -68,58 +152,26 @@ export async function uploadFileToGoogleDriveAction(
   subfolderName?: string
 ): Promise<UploadResult> {
   try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!url || !serviceKey || serviceKey.includes("placeholder")) {
+    const supabaseAdmin = getSupabaseAdmin()
+    if (!supabaseAdmin) {
       return { success: false, error: "ระบบฐานข้อมูลหรือคีย์เชื่อมต่อเซิร์ฟเวอร์ไม่พร้อมใช้งาน" }
     }
 
-    const supabaseAdmin = createSupabaseClient(url, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    })
+    const clientResult = await getDriveOAuthClient(supabaseAdmin)
+    if ("error" in clientResult) return { success: false, error: clientResult.error }
 
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from("system_settings")
-      .select("key, value")
-      .in("key", ["GOOGLE_SERVICE_ACCOUNT_KEY", "GOOGLE_DRIVE_FOLDER_ID"])
-
-    if (settingsError) throw settingsError
-
-    const serviceKeySetting = settings?.find((s) => s.key === "GOOGLE_SERVICE_ACCOUNT_KEY")
-    const folderIdSetting = settings?.find((s) => s.key === "GOOGLE_DRIVE_FOLDER_ID")
-
-    if (!serviceKeySetting?.value) {
-      return { success: false, error: "ยังไม่ได้ตั้งค่า Google Service Account Key" }
-    }
-    if (!folderIdSetting?.value) {
-      return { success: false, error: "ยังไม่ได้ตั้งค่า Google Drive Folder ID" }
-    }
-
-    let credentials: { client_email: string; private_key: string }
-    try {
-      const decryptedKeyString = decryptText(serviceKeySetting.value)
-      credentials = JSON.parse(decryptedKeyString)
-    } catch (err) {
-      console.error("Failed to parse Google Service Account Key JSON", err)
-      return { success: false, error: "รูปแบบ Google Service Account Key ไม่ถูกต้อง" }
-    }
-
-    const jwtClient = new JWT({
-      email: credentials.client_email,
-      key: credentials.private_key,
-      scopes: ["https://www.googleapis.com/auth/drive.file"]
-    })
-
-    const { token: accessToken } = await jwtClient.getAccessToken()
+    const { token: accessToken } = await clientResult.client.getAccessToken()
     if (!accessToken) {
       return { success: false, error: "ไม่สามารถขอ Access Token จาก Google ได้" }
     }
 
-    let targetFolderId = folderIdSetting.value
+    const rootFolderResult = await getOrCreateRootFolder(supabaseAdmin, accessToken)
+    if ("error" in rootFolderResult) return { success: false, error: rootFolderResult.error }
+
+    let targetFolderId = rootFolderResult.folderId
     if (subfolderName) {
       try {
-        targetFolderId = await getOrCreateDriveSubfolder(accessToken, folderIdSetting.value, subfolderName)
+        targetFolderId = await getOrCreateDriveSubfolder(accessToken, rootFolderResult.folderId, subfolderName)
       } catch (err) {
         console.error("Failed to get/create Google Drive subfolder:", err)
         return { success: false, error: err instanceof Error ? err.message : "สร้างโฟลเดอร์ย่อยใน Google Drive ไม่สำเร็จ" }
@@ -145,18 +197,14 @@ export async function uploadFileToGoogleDriveAction(
       Buffer.from(closingPart, "utf-8")
     ])
 
-    // supportsAllDrives=true จำเป็นเพราะปลายทางเป็น Shared Drive (service account ไม่มี "My Drive" ส่วนตัว)
-    const uploadRes = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": `multipart/related; boundary=${boundary}`
-        },
-        body
-      }
-    )
+    const uploadRes = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`
+      },
+      body
+    })
 
     if (!uploadRes.ok) {
       const errJson = await uploadRes.json().catch(() => ({}))
@@ -176,5 +224,75 @@ export async function uploadFileToGoogleDriveAction(
       success: false,
       error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปโหลดไฟล์ขึ้น Google Drive"
     }
+  }
+}
+
+/**
+ * Super Admin ตั้ง/แก้ไขชื่อโฟลเดอร์ archive ใน Google Drive เอง — ถ้าโฟลเดอร์ถูกสร้างไปแล้ว
+ * (มี GOOGLE_DRIVE_FOLDER_ID อยู่แล้ว) จะเปลี่ยนชื่อจริงใน Drive ให้ตรงกันทันที ไม่ปล่อยให้ชื่อไม่ตรงกัน
+ */
+export async function updateGoogleDriveFolderNameAction(name: string) {
+  try {
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+    if (!name || !name.trim()) {
+      return { success: false, error: "กรุณากรอกชื่อโฟลเดอร์" }
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+    if (!supabaseAdmin) {
+      return { success: false, error: "ระบบฐานข้อมูลหรือคีย์เชื่อมต่อเซิร์ฟเวอร์ไม่พร้อมใช้งาน" }
+    }
+
+    const trimmedName = name.trim()
+
+    const { error: upsertError } = await supabaseAdmin
+      .from("system_settings")
+      .upsert({ key: "GOOGLE_DRIVE_FOLDER_NAME", value: trimmedName }, { onConflict: "key" })
+    if (upsertError) throw upsertError
+
+    const { data: folderIdSetting } = await supabaseAdmin
+      .from("system_settings")
+      .select("value")
+      .eq("key", "GOOGLE_DRIVE_FOLDER_ID")
+      .maybeSingle()
+
+    if (!folderIdSetting?.value) {
+      // ยังไม่เคยสร้างโฟลเดอร์จริง -> แค่บันทึกชื่อไว้ใช้ตอนสร้างครั้งแรก
+      return { success: true }
+    }
+
+    const clientResult = await getDriveOAuthClient(supabaseAdmin)
+    if ("error" in clientResult) {
+      return { success: true, warning: "บันทึกชื่อในระบบแล้ว แต่ยังไม่ได้เปลี่ยนชื่อโฟลเดอร์จริงใน Drive เพราะยังไม่ได้เชื่อมต่อบัญชี" }
+    }
+
+    const { token: accessToken } = await clientResult.client.getAccessToken()
+    if (!accessToken) {
+      return { success: true, warning: "บันทึกชื่อในระบบแล้ว แต่ขอ Access Token เพื่อเปลี่ยนชื่อโฟลเดอร์จริงใน Drive ไม่สำเร็จ" }
+    }
+
+    const renameRes = await fetch(`https://www.googleapis.com/drive/v3/files/${folderIdSetting.value}?fields=id`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: trimmedName })
+    })
+
+    if (!renameRes.ok) {
+      const errJson = await renameRes.json().catch(() => ({}))
+      return {
+        success: true,
+        warning: errJson?.error?.message || "บันทึกชื่อในระบบแล้ว แต่เปลี่ยนชื่อโฟลเดอร์จริงใน Drive ไม่สำเร็จ"
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกชื่อโฟลเดอร์" }
   }
 }
