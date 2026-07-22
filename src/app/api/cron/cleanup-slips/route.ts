@@ -197,7 +197,7 @@ export async function GET(request: Request) {
 
     const { data: expiredPayments, error: paymentsError } = await supabaseAdmin
       .from("saas_payments")
-      .select("id, workspace_id, slip_image_url")
+      .select("id, workspace_id, slip_image_url, created_at")
       .not("slip_image_url", "is", null)
       .lt("created_at", subscriptionCutoffDate.toISOString())
 
@@ -227,7 +227,11 @@ export async function GET(request: Request) {
           const ext = extMatch ? extMatch[0] : (contentType.includes("png") ? ".png" : ".jpg")
           const filename = `saas-subscription-slip-${payment.id}${ext}`
 
-          const uploadResult = await uploadFileToGoogleDriveAction(fileBuffer, filename, contentType)
+          // จัดเก็บแยกโฟลเดอร์ตามเดือน-ปีที่ "เกิดรายการชำระเงิน" (ไม่ใช่วันที่ archive) เช่น "2026-07"
+          const paymentDate = new Date(payment.created_at)
+          const monthFolderName = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, "0")}`
+
+          const uploadResult = await uploadFileToGoogleDriveAction(fileBuffer, filename, contentType, monthFolderName)
 
           if (!uploadResult.success) {
             // ไม่ลบไฟล์เดิมเมื่อ archive ไม่สำเร็จ (เช่นยังไม่ได้ตั้งค่า Drive Folder ID) รอ cron รอบถัดไป retry ให้เอง

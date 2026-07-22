@@ -7,14 +7,65 @@ type UploadResult =
   | { success: false; error: string }
 
 /**
+ * หาโฟลเดอร์ย่อยชื่อ subfolderName ที่อยู่ใต้ parentFolderId ถ้ายังไม่มีให้สร้างใหม่ แล้วคืนค่า folder id
+ * ใช้จัดเก็บสลิปแยกตามเดือน-ปี (เช่น "2026-07") ภายใน Shared Drive เดียวกัน
+ */
+async function getOrCreateDriveSubfolder(
+  accessToken: string,
+  parentFolderId: string,
+  subfolderName: string
+): Promise<string> {
+  const escapedName = subfolderName.replace(/'/g, "\\'")
+  const query = `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`
+
+  const listRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives&fields=files(id,name)`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+
+  if (listRes.ok) {
+    const listData = await listRes.json()
+    if (listData?.files?.length > 0) {
+      return listData.files[0].id
+    }
+  }
+
+  // ยังไม่มีโฟลเดอร์ย่อยนี้ -> สร้างใหม่ใต้โฟลเดอร์หลัก
+  const createRes = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: subfolderName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [parentFolderId]
+    })
+  })
+
+  if (!createRes.ok) {
+    const errJson = await createRes.json().catch(() => ({}))
+    throw new Error(errJson?.error?.message || `สร้างโฟลเดอร์ย่อย "${subfolderName}" ใน Google Drive ไม่สำเร็จ`)
+  }
+
+  const createData = await createRes.json()
+  return createData.id
+}
+
+/**
  * อัปโหลดไฟล์ขึ้น Google Drive โดยใช้ Google Service Account ตัวเดียวกับที่ใช้กับ Google Translate
  * (system_settings.GOOGLE_SERVICE_ACCOUNT_KEY) — ต้องเปิด Drive API บน GCP project เดียวกัน และแชร์
  * Shared Drive ปลายทางให้กับอีเมลของ service account ไว้ก่อน (ดูวิธีตั้งค่าในหน้า Super Admin)
+ *
+ * ถ้าระบุ subfolderName (เช่น "2026-07") ไฟล์จะถูกจัดเก็บในโฟลเดอร์ย่อยชื่อนั้นใต้ Folder ID หลัก
+ * (สร้างโฟลเดอร์ย่อยให้อัตโนมัติถ้ายังไม่มี) แทนที่จะวางไว้ที่โฟลเดอร์หลักตรงๆ
  */
 export async function uploadFileToGoogleDriveAction(
   fileBuffer: Buffer,
   filename: string,
-  mimeType: string
+  mimeType: string,
+  subfolderName?: string
 ): Promise<UploadResult> {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -65,9 +116,19 @@ export async function uploadFileToGoogleDriveAction(
       return { success: false, error: "ไม่สามารถขอ Access Token จาก Google ได้" }
     }
 
+    let targetFolderId = folderIdSetting.value
+    if (subfolderName) {
+      try {
+        targetFolderId = await getOrCreateDriveSubfolder(accessToken, folderIdSetting.value, subfolderName)
+      } catch (err) {
+        console.error("Failed to get/create Google Drive subfolder:", err)
+        return { success: false, error: err instanceof Error ? err.message : "สร้างโฟลเดอร์ย่อยใน Google Drive ไม่สำเร็จ" }
+      }
+    }
+
     // อัปโหลดแบบ multipart/related ตรงผ่าน Drive v3 REST API (ไม่ใช้ package googleapis เต็มตัว)
     const boundary = `horset-drive-upload-${Date.now()}`
-    const metadata = { name: filename, parents: [folderIdSetting.value] }
+    const metadata = { name: filename, parents: [targetFolderId] }
 
     const metadataPart =
       `--${boundary}\r\n` +
