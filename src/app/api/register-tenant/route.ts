@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { assertSubscriptionActive } from "@/features/subscription/actions"
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +28,16 @@ export async function POST(request: Request) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(workspaceId)) {
       return NextResponse.json({ success: false, error: "รหัสอพาร์ทเมนท์ไม่ถูกต้องตามโครงสร้างระบบ" }, { status: 400 })
+    }
+
+    // ป้องกัน workspace ที่ subscription ถูกจำกัดสิทธิ์ (read_only) ไม่ให้รับผู้เช่าลงทะเบียนใหม่ผ่านลิงก์สาธารณะนี้
+    try {
+      await assertSubscriptionActive(workspaceId)
+    } catch {
+      return NextResponse.json({
+        success: false,
+        error: "หอพักนี้ถูกจำกัดสิทธิ์การใช้งานชั่วคราว กรุณาติดต่อเจ้าของหอพักโดยตรง"
+      }, { status: 403 })
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL

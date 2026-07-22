@@ -110,6 +110,7 @@ export default function SuperAdminPage() {
   // การตั้งค่าระบบ
   const [googleProjectId, setGoogleProjectId] = useState("")
   const [googleServiceKey, setGoogleServiceKey] = useState("")
+  const [googleDriveFolderId, setGoogleDriveFolderId] = useState("")
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
   const [googleKeyInfo, setGoogleKeyInfo] = useState<{ projectId: string, clientEmail: string } | null>(null)
 
@@ -154,6 +155,10 @@ export default function SuperAdminPage() {
         if (res2.googleKeyInfo) {
           setGoogleKeyInfo(res2.googleKeyInfo)
         }
+      }
+      if (googleDriveFolderId) {
+        const res3 = await updateSystemSettingAction("GOOGLE_DRIVE_FOLDER_ID", googleDriveFolderId)
+        if (!res3.success) throw new Error(res3.error)
       }
 
       setResultSuccess("บันทึกการตั้งค่าระบบเรียบร้อยแล้ว")
@@ -207,7 +212,9 @@ export default function SuperAdminPage() {
         if (settingsRes.success && settingsRes.data) {
           const projectIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_PROJECT_ID")
           const serviceKeySetting = settingsRes.data.find(s => s.key === "GOOGLE_SERVICE_ACCOUNT_KEY")
+          const driveFolderIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_DRIVE_FOLDER_ID")
           if (projectIdSetting) setGoogleProjectId(projectIdSetting.value)
+          if (driveFolderIdSetting) setGoogleDriveFolderId(driveFolderIdSetting.value)
           // Hide actual JSON in UI by showing a masked text if it exists
           if (serviceKeySetting && serviceKeySetting.value) {
             setGoogleServiceKey("••••••••••••••••••••••••••••••••••••")
@@ -1403,6 +1410,20 @@ export default function SuperAdminPage() {
                       </div>
                     )}
                     <p className="hidden">
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300">Google Drive Folder ID (สำหรับ archive สลิป subscription)</label>
+                    <input
+                      type="text"
+                      value={googleDriveFolderId}
+                      onChange={(e) => setGoogleDriveFolderId(e.target.value)}
+                      placeholder="เช่น 1A2b3C4d5E6f7G8h9I0jKlmNoPQRstuv"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm"
+                    />
+                    <p className="text-xs text-slate-500">
+                      * สร้าง Shared Drive ใน Google Drive แล้วแชร์ให้กับอีเมลบริการ (Client Email) ด้านบน ก่อนคัดลอก Folder ID จาก URL มาใส่ที่นี่ — ระบบจะอัปโหลดสลิปค่า subscription ที่เก่ากว่า 3 เดือนเข้าโฟลเดอร์นี้อัตโนมัติก่อนลบออกจาก storage
                     </p>
                   </div>
 

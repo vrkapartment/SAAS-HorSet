@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { uploadFileToGoogleDriveAction } from "@/lib/googleDrive"
 
 export const dynamic = "force-dynamic"
+
+// ระยะเวลาเก็บสลิปค่า subscription (saas_payments) ก่อน archive ขึ้น Google Drive แล้วลบออกจาก storage
+// (คนละค่ากับ retention ของสลิปค่าเช่าที่ตั้งได้ต่อ workspace ผ่าน slip_retention_months)
+const SUBSCRIPTION_SLIP_RETENTION_MONTHS = 3
 
 export async function GET(request: Request) {
   try {
@@ -179,12 +184,106 @@ export async function GET(request: Request) {
       }
     }
 
+    // =====================================================================
+    // ส่วนที่ 2: Archive สลิปค่า subscription (saas_payments) ขึ้น Google Drive ก่อนลบออกจาก storage
+    // เก็บใน storage ไว้ 3 เดือน (SUBSCRIPTION_SLIP_RETENTION_MONTHS) แยกจาก loop สลิปค่าเช่าด้านบนทั้งหมด
+    // ถ้าอัปโหลด Drive ไม่สำเร็จ (เช่นยังไม่ได้ตั้งค่า Folder ID) จะ "ไม่ลบไฟล์เดิม" ไว้ก่อน (fail-safe กันข้อมูลหาย)
+    // =====================================================================
+    let totalSubscriptionSlipsArchived = 0
+    const subscriptionSlipDetails: Array<{ payment_id: string; success: boolean; message?: string; error?: string }> = []
+
+    const subscriptionCutoffDate = new Date()
+    subscriptionCutoffDate.setMonth(subscriptionCutoffDate.getMonth() - SUBSCRIPTION_SLIP_RETENTION_MONTHS)
+
+    const { data: expiredPayments, error: paymentsError } = await supabaseAdmin
+      .from("saas_payments")
+      .select("id, workspace_id, slip_image_url")
+      .not("slip_image_url", "is", null)
+      .lt("created_at", subscriptionCutoffDate.toISOString())
+
+    if (paymentsError) {
+      console.error("Error fetching saas_payments for Drive archival:", paymentsError)
+    } else if (expiredPayments && expiredPayments.length > 0) {
+      for (const payment of expiredPayments) {
+        try {
+          if (!payment.slip_image_url) continue
+
+          const fileRes = await fetch(payment.slip_image_url)
+          if (!fileRes.ok) {
+            subscriptionSlipDetails.push({
+              payment_id: payment.id,
+              success: false,
+              error: `ดาวน์โหลดไฟล์สลิปเดิมไม่สำเร็จ (HTTP ${fileRes.status})`
+            })
+            continue
+          }
+
+          const arrayBuffer = await fileRes.arrayBuffer()
+          const fileBuffer = Buffer.from(arrayBuffer)
+          const contentType = fileRes.headers.get("content-type") || "image/jpeg"
+
+          const urlPath = new URL(payment.slip_image_url).pathname
+          const extMatch = urlPath.match(/\.[a-zA-Z0-9]+$/)
+          const ext = extMatch ? extMatch[0] : (contentType.includes("png") ? ".png" : ".jpg")
+          const filename = `saas-subscription-slip-${payment.id}${ext}`
+
+          const uploadResult = await uploadFileToGoogleDriveAction(fileBuffer, filename, contentType)
+
+          if (!uploadResult.success) {
+            // ไม่ลบไฟล์เดิมเมื่อ archive ไม่สำเร็จ (เช่นยังไม่ได้ตั้งค่า Drive Folder ID) รอ cron รอบถัดไป retry ให้เอง
+            subscriptionSlipDetails.push({ payment_id: payment.id, success: false, error: uploadResult.error })
+            continue
+          }
+
+          const { error: updateError } = await supabaseAdmin
+            .from("saas_payments")
+            .update({ archived_drive_url: uploadResult.webViewLink, slip_image_url: null })
+            .eq("id", payment.id)
+
+          if (updateError) {
+            console.error(`Error updating saas_payments after Drive archive for ${payment.id}:`, updateError)
+            subscriptionSlipDetails.push({
+              payment_id: payment.id,
+              success: false,
+              error: "อัปโหลดขึ้น Google Drive สำเร็จ แต่บันทึกฐานข้อมูลไม่สำเร็จ (ไม่ลบไฟล์เดิม)"
+            })
+            continue
+          }
+
+          // ลบไฟล์จริงออกจาก Supabase Storage หลัง archive + บันทึก DB สำเร็จแล้วเท่านั้น
+          const marker = "/payment-slips/"
+          const idx = payment.slip_image_url.indexOf(marker)
+          if (idx !== -1) {
+            const storagePath = payment.slip_image_url.substring(idx + marker.length)
+            if (storagePath) {
+              const { error: deleteStorageError } = await supabaseAdmin.storage.from("payment-slips").remove([storagePath])
+              if (deleteStorageError) {
+                console.error(`Error deleting archived subscription slip from storage for ${payment.id}:`, deleteStorageError)
+              }
+            }
+          }
+
+          totalSubscriptionSlipsArchived++
+          subscriptionSlipDetails.push({ payment_id: payment.id, success: true, message: "archive ขึ้น Google Drive และลบไฟล์เดิมสำเร็จ" })
+        } catch (paymentErr: unknown) {
+          console.error(`Unexpected error archiving saas_payment ${payment.id}:`, paymentErr)
+          subscriptionSlipDetails.push({
+            payment_id: payment.id,
+            success: false,
+            error: paymentErr instanceof Error ? paymentErr.message : "เกิดข้อผิดพลาดที่ไม่รู้จัก"
+          })
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "ระบบดำเนินการตรวจเช็กและล้างไฟล์สลิปหมดอายุประจำงวดเรียบร้อยแล้ว!",
       processed_workspaces: totalWorkspacesProcessed,
       total_files_deleted: totalFilesDeleted,
-      details
+      details,
+      subscription_slips_archived: totalSubscriptionSlipsArchived,
+      subscription_slip_details: subscriptionSlipDetails
     })
 
   } catch (err: unknown) {

@@ -31,6 +31,7 @@ export interface SaasPlan {
   maxStaff: number | null
   maxBuildings: number | null
   features: { line_notify?: boolean; tax_export?: boolean; slipok_auto_verify?: boolean }
+  isActive: boolean
 }
 
 function mapPlanRow(row: Record<string, unknown>): SaasPlan {
@@ -43,7 +44,8 @@ function mapPlanRow(row: Record<string, unknown>): SaasPlan {
     maxRooms: row.max_rooms === null ? null : Number(row.max_rooms),
     maxStaff: row.max_staff === null ? null : Number(row.max_staff),
     maxBuildings: row.max_buildings === null ? null : Number(row.max_buildings),
-    features: (row.features as SaasPlan["features"]) || {}
+    features: (row.features as SaasPlan["features"]) || {},
+    isActive: row.is_active !== false
   }
 }
 
@@ -162,7 +164,10 @@ export async function getCurrentWorkspaceId(): Promise<string | null> {
 export async function assertSubscriptionActive(workspaceId: string): Promise<void> {
   if (!workspaceId) return
 
-  const supabase = await createClient()
+  // ใช้ getServiceRoleOrSessionClient (ไม่ใช่ createClient ตรงๆ) เพราะฟังก์ชันนี้ถูกเรียกจาก
+  // route สาธารณะที่ไม่มี session คุกกี้ด้วย (เช่น api/register-tenant) ถ้าใช้ session client เฉยๆ
+  // RLS จะกรองไม่เจอแถวเลยเมื่อไม่มีผู้ใช้ login ทำให้ fail-open และข้าม guard ไปโดยไม่ได้ตั้งใจ
+  const supabase = await getServiceRoleOrSessionClient()
   const { data, error } = await supabase
     .from("workspace_subscriptions")
     .select("status")
@@ -340,6 +345,38 @@ export async function verifySlipWithHorSetSlipOk(imageUrl: string, amount: numbe
 const RETRYABLE_CODES = [1009, 1010]
 
 /**
+ * คำนวณ current_period_start/end ของรอบบิลใหม่ พร้อม logic "trial-carryover": ถ้า workspace ยังอยู่ใน
+ * trial และยังไม่หมดอายุ ให้เริ่มนับรอบบิลใหม่หลังวันที่ trial หมดอายุจริง แทนที่จะเริ่มนับทันที
+ * เพื่อไม่ให้เสียวันทดลองใช้ที่เหลืออยู่ไปฟรีๆ — ใช้ร่วมกันทั้งเส้นทาง verify สำเร็จทันที (uploadSubscriptionSlip)
+ * และเส้นทาง retry คิวสำเร็จภายหลัง (cron subscription-check) เพื่อไม่ให้ผลลัพธ์ต่างกันตามแต่ว่า SlipOK
+ * ผ่านตั้งแต่ครั้งแรกหรือผ่านตอน retry
+ */
+export async function computeSubscriptionPeriodWithTrialCarryover(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  workspaceId: string,
+  billingCycle: "monthly" | "yearly"
+): Promise<{ periodStart: Date; currentPeriodEnd: Date; carriedOverDays: number }> {
+  const periodMs = billingCycle === "yearly" ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000
+  const now = new Date()
+
+  const { data: existingSub } = await supabase
+    .from("workspace_subscriptions")
+    .select("status, trial_ends_at")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()
+
+  const trialEndsAt = existingSub?.status === "trial" && existingSub.trial_ends_at ? new Date(existingSub.trial_ends_at) : null
+  const periodStart = trialEndsAt && trialEndsAt.getTime() > now.getTime() ? trialEndsAt : now
+  const currentPeriodEnd = new Date(periodStart.getTime() + periodMs)
+  const carriedOverDays = trialEndsAt && trialEndsAt.getTime() > now.getTime()
+    ? Math.ceil((trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    : 0
+
+  return { periodStart, currentPeriodEnd, carriedOverDays }
+}
+
+/**
  * อัปโหลดสลิปจ่ายค่า subscription รายเดือน/รายปี ให้ HorSet -> ตรวจสอบผ่าน SlipOK -> ปรับแผนอัตโนมัติเมื่อสำเร็จ
  */
 export async function uploadSubscriptionSlip(workspaceId: string, planId: string, billingCycle: "monthly" | "yearly", slipImageUrl: string) {
@@ -369,22 +406,14 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
     const verifyRes = await verifySlipWithHorSetSlipOk(slipImageUrl, amount)
 
     if (verifyRes.success) {
-      const periodMs = billingCycle === "yearly" ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000
       const now = new Date()
-
       const serviceClient = await getServiceRoleOrSessionClient()
 
-      // ถ้ายังอยู่ในช่วงทดลองใช้ฟรีและยังไม่หมดอายุ ให้เริ่มนับรอบบิลใหม่หลังวันที่ trial หมดอายุ
-      // แทนที่จะเริ่มนับทันที เพื่อไม่ให้เสียวันทดลองใช้ที่เหลืออยู่ไปฟรีๆ
-      const { data: existingSub } = await serviceClient
-        .from("workspace_subscriptions")
-        .select("status, trial_ends_at")
-        .eq("workspace_id", workspaceId)
-        .maybeSingle()
-
-      const trialEndsAt = existingSub?.status === "trial" && existingSub.trial_ends_at ? new Date(existingSub.trial_ends_at) : null
-      const periodStart = trialEndsAt && trialEndsAt.getTime() > now.getTime() ? trialEndsAt : now
-      const currentPeriodEnd = new Date(periodStart.getTime() + periodMs)
+      const { periodStart, currentPeriodEnd, carriedOverDays } = await computeSubscriptionPeriodWithTrialCarryover(
+        serviceClient,
+        workspaceId,
+        billingCycle
+      )
 
       await serviceClient
         .from("saas_payments")
@@ -406,9 +435,6 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
         )
       if (subUpdateError) throw subUpdateError
 
-      const carriedOverDays = trialEndsAt && trialEndsAt.getTime() > now.getTime()
-        ? Math.ceil((trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
-        : 0
       if (carriedOverDays > 0) {
         return {
           success: true,
@@ -441,6 +467,170 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
     return { success: false, error: verifyRes.error }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบสลิปการชำระเงิน" }
+  }
+}
+
+/**
+ * ดึงแผนการใช้งานทั้งหมด (รวมที่ปิดขายแล้ว/is_active=false) สำหรับหน้าจัดการแผนของ Super Admin เท่านั้น
+ * ต่างจาก listSaasPlans() ที่กรองเฉพาะแผนที่เปิดขายอยู่ สำหรับหน้า Pricing ของลูกค้าทั่วไป
+ */
+export async function listAllSaasPlansForAdmin() {
+  try {
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    const serviceClient = await getServiceRoleOrSessionClient()
+    const { data, error } = await serviceClient
+      .from("saas_plans")
+      .select("*")
+      .order("price_monthly", { ascending: true })
+
+    if (error) {
+      if (error.code === RELATION_MISSING_CODE) return { success: true, data: [] as SaasPlan[] }
+      throw error
+    }
+
+    return { success: true, data: (data || []).map(mapPlanRow) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลแผนการใช้งานทั้งหมด" }
+  }
+}
+
+export interface SaasPlanInput {
+  code: "trial" | "starter" | "pro" | "business"
+  name: string
+  priceMonthly: number
+  priceYearly: number | null
+  maxRooms: number | null
+  maxStaff: number | null
+  maxBuildings: number | null
+  features: { line_notify?: boolean; tax_export?: boolean; slipok_auto_verify?: boolean }
+}
+
+function validateSaasPlanInput(input: SaasPlanInput): string | null {
+  if (!input.code || !["trial", "starter", "pro", "business"].includes(input.code)) {
+    return "รหัสแผน (code) ไม่ถูกต้อง ต้องเป็น trial, starter, pro หรือ business เท่านั้น"
+  }
+  if (!input.name || !input.name.trim()) {
+    return "กรุณากรอกชื่อแผน"
+  }
+  if (input.priceMonthly === null || input.priceMonthly === undefined || input.priceMonthly < 0) {
+    return "กรุณากรอกราคารายเดือนให้ถูกต้อง (ต้องไม่ติดลบ)"
+  }
+  return null
+}
+
+/**
+ * Super Admin สร้างแผนการใช้งานใหม่ — ในทางปฏิบัติแทบไม่ได้ใช้เพราะ code ถูกจำกัดแค่ 4 ค่าตาม
+ * check constraint ของตาราง (trial/starter/pro/business) และแต่ละ code unique อยู่แล้ว ฟังก์ชันนี้
+ * มีไว้เพื่อความครบถ้วนกรณีมี code ใดยังไม่เคย seed ไว้ (เช่น ตั้งฐานข้อมูลใหม่)
+ */
+export async function createSaasPlan(input: SaasPlanInput) {
+  try {
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    const validationError = validateSaasPlanInput(input)
+    if (validationError) return { success: false, error: validationError }
+
+    const serviceClient = await getServiceRoleOrSessionClient()
+    const { error } = await serviceClient.from("saas_plans").insert({
+      code: input.code,
+      name: input.name.trim(),
+      price_monthly: input.priceMonthly,
+      price_yearly: input.priceYearly,
+      max_rooms: input.maxRooms,
+      max_staff: input.maxStaff,
+      max_buildings: input.maxBuildings,
+      features: input.features,
+      is_active: true
+    })
+
+    if (error) {
+      if (error.code === "23505") {
+        return { success: false, error: `มีแผนรหัส "${input.code}" อยู่แล้วในระบบ กรุณาแก้ไขแผนเดิมแทนการสร้างใหม่` }
+      }
+      throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างแผนการใช้งาน" }
+  }
+}
+
+/**
+ * Super Admin แก้ไขรายละเอียดแผน (ราคา, โควตา, ฟีเจอร์) — การใช้งานหลักของหน้าจัดการแผนราคา
+ */
+export async function updateSaasPlan(planId: string, input: SaasPlanInput) {
+  try {
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+    if (!planId) {
+      return { success: false, error: "ไม่พบรหัสแผนการใช้งานที่จะแก้ไข" }
+    }
+
+    const validationError = validateSaasPlanInput(input)
+    if (validationError) return { success: false, error: validationError }
+
+    const serviceClient = await getServiceRoleOrSessionClient()
+    const { error } = await serviceClient
+      .from("saas_plans")
+      .update({
+        code: input.code,
+        name: input.name.trim(),
+        price_monthly: input.priceMonthly,
+        price_yearly: input.priceYearly,
+        max_rooms: input.maxRooms,
+        max_staff: input.maxStaff,
+        max_buildings: input.maxBuildings,
+        features: input.features
+      })
+      .eq("id", planId)
+
+    if (error) {
+      if (error.code === "23505") {
+        return { success: false, error: `มีแผนรหัส "${input.code}" อยู่แล้วในระบบ ไม่สามารถเปลี่ยนไปใช้รหัสซ้ำได้` }
+      }
+      throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการแก้ไขแผนการใช้งาน" }
+  }
+}
+
+/**
+ * Super Admin เปิด/ปิดการขายแผน (soft toggle ผ่าน is_active) — ไม่ลบแผนออกจากฐานข้อมูลจริง
+ * เพื่อไม่ให้กระทบ workspace_subscriptions/saas_payments เดิมที่ยังอ้างอิง plan_id นี้อยู่ (ตามธรรมเนียม soft delete ของโปรเจค)
+ */
+export async function toggleSaasPlanActive(planId: string, isActive: boolean) {
+  try {
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+    if (!planId) {
+      return { success: false, error: "ไม่พบรหัสแผนการใช้งาน" }
+    }
+
+    const serviceClient = await getServiceRoleOrSessionClient()
+    const { error } = await serviceClient
+      .from("saas_plans")
+      .update({ is_active: isActive })
+      .eq("id", planId)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเปลี่ยนสถานะแผนการใช้งาน" }
   }
 }
 

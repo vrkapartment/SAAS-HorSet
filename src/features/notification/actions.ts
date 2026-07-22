@@ -1035,6 +1035,260 @@ export async function sendLineSlipNotificationAction(
 }
 
 /**
+ * ส่งข้อความแจ้งเตือน LINE ไปยัง Admin ของหอพัก เมื่อสถานะ subscription เปลี่ยน (ใกล้/ถูกจำกัดสิทธิ์)
+ * เรียกใช้จาก src/app/api/cron/subscription-check/route.ts ทุกครั้งที่ workspace ถูกเปลี่ยนสถานะจริงในรอบนั้น
+ */
+export type SubscriptionNotificationVariant =
+  | "trial_locked"
+  | "past_due"
+  | "payment_failed_locked"
+  | "cancelled_locked"
+
+const SUBSCRIPTION_NOTIFICATION_VARIANTS: Record<
+  SubscriptionNotificationVariant,
+  { headerColor: string; headerTitle: string; altPrefix: string; bodyMessage: string; buttonColor: string; buttonLabel: string }
+> = {
+  trial_locked: {
+    headerColor: "#DC2626",
+    headerTitle: "🔒 ระยะทดลองใช้งานสิ้นสุดแล้ว",
+    altPrefix: "🔒 ทดลองใช้งานหมดอายุ",
+    bodyMessage: "ระยะทดลองใช้งานฟรีของหอพักคุณสิ้นสุดแล้ว ระบบถูกจำกัดสิทธิ์เป็นโหมดดูข้อมูลอย่างเดียว กรุณาอัปเกรดแผนเพื่อใช้งานต่อ",
+    buttonColor: "#DC2626",
+    buttonLabel: "💳 อัปเกรดแผนตอนนี้"
+  },
+  past_due: {
+    headerColor: "#D97706",
+    headerTitle: "⚠️ ยังไม่ได้รับการชำระเงิน",
+    altPrefix: "⚠️ ค้างชำระค่าบริการ",
+    bodyMessage: "รอบบิลของหอพักคุณครบกำหนดแล้วแต่ยังไม่ได้รับการชำระเงิน กรุณาชำระก่อนถูกจำกัดสิทธิ์การใช้งาน",
+    buttonColor: "#D97706",
+    buttonLabel: "💳 ชำระเงินตอนนี้"
+  },
+  payment_failed_locked: {
+    headerColor: "#DC2626",
+    headerTitle: "🔒 บัญชีถูกจำกัดสิทธิ์ (ค้างชำระเกินกำหนด)",
+    altPrefix: "🔒 บัญชีถูกจำกัดสิทธิ์",
+    bodyMessage: "หอพักคุณค้างชำระค่าบริการเกินระยะเวลาผ่อนผันแล้ว ระบบถูกจำกัดสิทธิ์เป็นโหมดดูข้อมูลอย่างเดียว กรุณาชำระเงินเพื่อกลับมาใช้งานตามปกติ",
+    buttonColor: "#DC2626",
+    buttonLabel: "💳 ชำระเงินตอนนี้"
+  },
+  cancelled_locked: {
+    headerColor: "#6B7280",
+    headerTitle: "🔒 บัญชีถูกจำกัดสิทธิ์ (ยกเลิกการใช้งาน)",
+    altPrefix: "🔒 บัญชีถูกจำกัดสิทธิ์",
+    bodyMessage: "หอพักคุณได้ยกเลิกการใช้งานไปก่อนหน้านี้ และครบกำหนดวันหมดอายุแล้ว ระบบถูกจำกัดสิทธิ์เป็นโหมดดูข้อมูลอย่างเดียว หากต้องการใช้งานต่อ กรุณาเลือกแผนและชำระเงินอีกครั้ง",
+    buttonColor: "#4F46E5",
+    buttonLabel: "💳 เลือกแผนอีกครั้ง"
+  }
+}
+
+export async function sendLineSubscriptionNotificationAction(
+  workspaceId: string,
+  variant: SubscriptionNotificationVariant
+) {
+  const variantConfig = SUBSCRIPTION_NOTIFICATION_VARIANTS[variant]
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    let supabase = await createClient()
+
+    // ใช้ Service Role Client เพราะฟังก์ชันนี้ถูกเรียกจาก cron job ที่ไม่มี session คุกกี้ของผู้ใช้เลย
+    if (url && serviceKey && !serviceKey.includes("placeholder")) {
+      const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+      supabase = createSupabaseClient(url, serviceKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      }) as any
+    }
+
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("name")
+      .eq("id", workspaceId)
+      .maybeSingle()
+
+    const workspaceName = ws?.name || "หอพัก"
+
+    const { data: settings } = await supabase
+      .from("workspace_line_settings")
+      .select("channel_access_token, admin_line_user_id, admin_line_group_id, admin_notification_active, disabled_admin_line_user_ids")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    const adminNotificationActive = settings?.admin_notification_active !== false
+
+    if (!adminNotificationActive) {
+      return { success: true, message: "ระบบแจ้งเตือนแอดมินปิดใช้งานอยู่ ข้ามกระบวนการ" }
+    }
+
+    let channelAccessToken = settings?.channel_access_token
+    const adminLineUserId = settings?.admin_line_user_id
+    const adminLineGroupId = settings?.admin_line_group_id
+    const disabledAdminLineUserIds = settings?.disabled_admin_line_user_ids || ""
+
+    if (!channelAccessToken) {
+      channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
+    }
+
+    if (!channelAccessToken || channelAccessToken === "placeholder" || !channelAccessToken.trim()) {
+      return { success: false, error: "ไม่มี Channel Access Token ของ LINE" }
+    }
+
+    const disabledList = disabledAdminLineUserIds
+      ? disabledAdminLineUserIds.split(/[\s,\n]+/).map((id: string) => id.trim()).filter((id: string) => id.length > 0)
+      : []
+
+    const userIds = adminLineUserId
+      ? (adminLineUserId as string)
+          .split(/[\s,\n]+/)
+          .map((id: string) => id.trim())
+          .filter((id: string) => id.length > 0 && !disabledList.includes(id))
+          .slice(0, 5)
+      : []
+
+    const hasUserId = userIds.length > 0
+    const hasGroupId = adminLineGroupId && adminLineGroupId.trim()
+
+    if (!hasUserId && !hasGroupId) {
+      return { success: true, message: "ไม่มีการตั้งค่าแจ้งเตือนฝั่งแอดมิน ข้ามกระบวนการ" }
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    let safeAppUrl = appUrl.trim()
+    while (safeAppUrl.endsWith("/")) {
+      safeAppUrl = safeAppUrl.slice(0, -1)
+    }
+
+    const packageLink = `${safeAppUrl}/settings?tab=package`
+    const altText = `${variantConfig.altPrefix}: ${workspaceName}`
+
+    const flexMessageContent: any = {
+      type: "bubble",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: variantConfig.headerColor,
+        paddingTop: "xl",
+        paddingBottom: "xl",
+        paddingStart: "xl",
+        paddingEnd: "xl",
+        contents: [
+          {
+            type: "text",
+            text: variantConfig.headerTitle,
+            color: "#FFFFFF",
+            size: "sm",
+            weight: "bold",
+            wrap: true
+          },
+          {
+            type: "text",
+            text: workspaceName,
+            color: "#E0E7FF",
+            size: "md",
+            margin: "xs",
+            weight: "bold"
+          }
+        ]
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingTop: "xl",
+        paddingBottom: "xl",
+        paddingStart: "xl",
+        paddingEnd: "xl",
+        contents: [
+          {
+            type: "text",
+            text: variantConfig.bodyMessage,
+            color: "#374151",
+            size: "sm",
+            wrap: true
+          }
+        ]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingTop: "md",
+        paddingBottom: "md",
+        paddingStart: "xl",
+        paddingEnd: "xl",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            color: variantConfig.buttonColor,
+            height: "sm",
+            action: {
+              type: "uri",
+              label: variantConfig.buttonLabel,
+              uri: packageLink
+            }
+          }
+        ]
+      }
+    }
+
+    const sendPush = async (toTarget: string) => {
+      return fetch("https://api.line.me/v2/bot/message/push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${channelAccessToken}`
+        },
+        signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({
+          to: toTarget.trim(),
+          messages: [
+            {
+              type: "flex",
+              altText,
+              contents: flexMessageContent
+            }
+          ]
+        })
+      })
+    }
+
+    const promises = []
+
+    if (hasUserId) {
+      for (const userId of userIds) {
+        promises.push(sendPush(userId))
+      }
+    }
+
+    if (hasGroupId) {
+      promises.push(sendPush(adminLineGroupId))
+    }
+
+    const results = await Promise.all(promises)
+    let anySuccess = false
+    for (const res of results) {
+      if (res.ok) {
+        anySuccess = true
+      } else {
+        const errJson = await res.json().catch(() => ({}))
+        console.error("Error sending subscription push notification via LINE Messaging API:", errJson)
+      }
+    }
+
+    if (anySuccess) {
+      return { success: true, data: "แจ้งเตือนสถานะ subscription สำเร็จ" }
+    } else {
+      return { success: false, error: "ไม่สามารถส่งข้อความแจ้งเตือนเข้าไลน์แอดมินหรือไลน์กลุ่มได้" }
+    }
+  } catch (error: any) {
+    console.error("sendLineSubscriptionNotificationAction Exception:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
  * ดึงโปรไฟล์ LINE จาก User ID ที่กำหนด (รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่)
  * จำกัดสูงสุด 5 คน เพื่อแสดงผลในระบบการตั้งค่าแอดมิน
  */

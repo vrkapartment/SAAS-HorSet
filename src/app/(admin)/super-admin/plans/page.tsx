@@ -16,7 +16,11 @@ import {
   ShieldCheck,
   Wallet,
   Gauge,
-  CalendarClock
+  CalendarClock,
+  Package,
+  Plus,
+  ToggleLeft,
+  ToggleRight
 } from "lucide-react"
 import {
   getSystemSettingsAction,
@@ -27,13 +31,18 @@ import {
   listAllWorkspaceSubscriptions,
   listSaasPayments,
   listSaasPlans,
+  listAllSaasPlansForAdmin,
+  createSaasPlan,
+  updateSaasPlan,
+  toggleSaasPlanActive,
   superAdminOverrideSubscription,
-  type SaasPlan
+  type SaasPlan,
+  type SaasPlanInput
 } from "@/features/subscription/actions"
 import { getSuperAdminDataAction } from "@/features/super-admin/actions"
 
 type SubscriptionStatus = "trial" | "active" | "past_due" | "read_only" | "cancelled"
-type PlansTab = "subscription" | "slipok" | "finance"
+type PlansTab = "subscription" | "catalog" | "slipok" | "finance"
 
 interface Workspace {
   id: string
@@ -156,6 +165,24 @@ export default function SuperAdminPlansPage() {
   const [editingSubPeriodEnd, setEditingSubPeriodEnd] = useState("")
   const [updatingSubscription, setUpdatingSubscription] = useState(false)
 
+  // แผนราคา (saas_plans) — หน้าจัดการแผนของ Super Admin
+  const [catalogPlans, setCatalogPlans] = useState<SaasPlan[]>([])
+  const [loadingCatalogPlans, setLoadingCatalogPlans] = useState(false)
+  const [planFormMode, setPlanFormMode] = useState<"closed" | "create" | "edit">("closed")
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null)
+  const [planFormCode, setPlanFormCode] = useState<SaasPlan["code"]>("starter")
+  const [planFormName, setPlanFormName] = useState("")
+  const [planFormPriceMonthly, setPlanFormPriceMonthly] = useState("")
+  const [planFormPriceYearly, setPlanFormPriceYearly] = useState("")
+  const [planFormMaxRooms, setPlanFormMaxRooms] = useState("")
+  const [planFormMaxStaff, setPlanFormMaxStaff] = useState("")
+  const [planFormMaxBuildings, setPlanFormMaxBuildings] = useState("")
+  const [planFormLineNotify, setPlanFormLineNotify] = useState(false)
+  const [planFormTaxExport, setPlanFormTaxExport] = useState(false)
+  const [planFormSlipokAutoVerify, setPlanFormSlipokAutoVerify] = useState(false)
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [togglingPlanId, setTogglingPlanId] = useState<string | null>(null)
+
   const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
   const loadHorsetQuota = async () => {
@@ -197,6 +224,18 @@ export default function SuperAdminPlansPage() {
       }
     } finally {
       setLoadingSubscriptions(false)
+    }
+  }
+
+  const loadCatalogPlans = async () => {
+    setLoadingCatalogPlans(true)
+    try {
+      const res = await listAllSaasPlansForAdmin()
+      if (res.success && res.data) {
+        setCatalogPlans(res.data as SaasPlan[])
+      }
+    } finally {
+      setLoadingCatalogPlans(false)
     }
   }
 
@@ -246,7 +285,7 @@ export default function SuperAdminPlansPage() {
         loadHorsetQuota()
       }
 
-      await loadSubscriptionsData()
+      await Promise.all([loadSubscriptionsData(), loadCatalogPlans()])
     } catch (err) {
       console.error(err)
       setError("ไม่สามารถโหลดข้อมูลจาก Supabase ได้: " + (err instanceof Error ? err.message : ""))
@@ -331,8 +370,92 @@ export default function SuperAdminPlansPage() {
     }
   }
 
+  const openCreatePlanForm = () => {
+    setPlanFormMode("create")
+    setEditingPlanId(null)
+    setPlanFormCode("starter")
+    setPlanFormName("")
+    setPlanFormPriceMonthly("")
+    setPlanFormPriceYearly("")
+    setPlanFormMaxRooms("")
+    setPlanFormMaxStaff("")
+    setPlanFormMaxBuildings("")
+    setPlanFormLineNotify(false)
+    setPlanFormTaxExport(false)
+    setPlanFormSlipokAutoVerify(false)
+  }
+
+  const openEditPlanForm = (plan: SaasPlan) => {
+    setPlanFormMode("edit")
+    setEditingPlanId(plan.id)
+    setPlanFormCode(plan.code)
+    setPlanFormName(plan.name)
+    setPlanFormPriceMonthly(String(plan.priceMonthly))
+    setPlanFormPriceYearly(plan.priceYearly === null ? "" : String(plan.priceYearly))
+    setPlanFormMaxRooms(plan.maxRooms === null ? "" : String(plan.maxRooms))
+    setPlanFormMaxStaff(plan.maxStaff === null ? "" : String(plan.maxStaff))
+    setPlanFormMaxBuildings(plan.maxBuildings === null ? "" : String(plan.maxBuildings))
+    setPlanFormLineNotify(!!plan.features?.line_notify)
+    setPlanFormTaxExport(!!plan.features?.tax_export)
+    setPlanFormSlipokAutoVerify(!!plan.features?.slipok_auto_verify)
+  }
+
+  const handleSubmitPlanForm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingPlan(true)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      const input: SaasPlanInput = {
+        code: planFormCode,
+        name: planFormName,
+        priceMonthly: Number(planFormPriceMonthly) || 0,
+        priceYearly: planFormPriceYearly.trim() === "" ? null : Number(planFormPriceYearly),
+        maxRooms: planFormMaxRooms.trim() === "" ? null : Number(planFormMaxRooms),
+        maxStaff: planFormMaxStaff.trim() === "" ? null : Number(planFormMaxStaff),
+        maxBuildings: planFormMaxBuildings.trim() === "" ? null : Number(planFormMaxBuildings),
+        features: {
+          line_notify: planFormLineNotify,
+          tax_export: planFormTaxExport,
+          slipok_auto_verify: planFormSlipokAutoVerify
+        }
+      }
+
+      const res = planFormMode === "create"
+        ? await createSaasPlan(input)
+        : await updateSaasPlan(editingPlanId as string, input)
+
+      if (!res.success) throw new Error(res.error)
+
+      setResultSuccess(planFormMode === "create" ? "✓ สร้างแผนการใช้งานใหม่สำเร็จ" : "✓ แก้ไขแผนการใช้งานสำเร็จ")
+      setPlanFormMode("closed")
+      await loadCatalogPlans()
+    } catch (err) {
+      setError("ไม่สามารถบันทึกแผนการใช้งานได้: " + (err instanceof Error ? err.message : ""))
+    } finally {
+      setSavingPlan(false)
+    }
+  }
+
+  const handleTogglePlanActive = async (plan: SaasPlan) => {
+    setTogglingPlanId(plan.id)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      const res = await toggleSaasPlanActive(plan.id, !plan.isActive)
+      if (!res.success) throw new Error(res.error)
+      setResultSuccess(plan.isActive ? "✓ ปิดการขายแผนแล้ว" : "✓ เปิดการขายแผนแล้ว")
+      await loadCatalogPlans()
+    } catch (err) {
+      setError("ไม่สามารถเปลี่ยนสถานะแผนได้: " + (err instanceof Error ? err.message : ""))
+    } finally {
+      setTogglingPlanId(null)
+    }
+  }
+
   const PLANS_TABS: Array<{ id: PlansTab; label: string; icon: typeof CreditCard }> = [
     { id: "subscription", label: "Subscription Detail", icon: CreditCard },
+    { id: "catalog", label: "แผนราคา", icon: Package },
     { id: "slipok", label: "เชื่อมต่อ SlipOK", icon: ShieldCheck },
     { id: "finance", label: "ตั้งค่าการเงินและบัญชีรับเงิน", icon: Wallet }
   ]
@@ -555,6 +678,110 @@ export default function SuperAdminPlansPage() {
                       <tr>
                         <td colSpan={6} className="text-center p-8 text-slate-500 text-sm md:text-xs">
                           ยังไม่มีประวัติการชำระเงินในระบบ
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab: แผนราคา (saas_plans catalog) */}
+        {activeTab === "catalog" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-emerald-600/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-200">แผนราคา (saas_plans)</h2>
+                    <p className="text-[11px] text-slate-500">จัดการราคา โควตา และฟีเจอร์ของแต่ละแผน — รหัสแผน (code) ถูกจำกัดไว้แค่ 4 ค่าตามโครงสร้างฐานข้อมูล</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
+                  <button
+                    onClick={loadCatalogPlans}
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingCatalogPlans ? "animate-spin text-emerald-400" : ""}`} />
+                    รีเฟรชข้อมูล
+                  </button>
+                  <button
+                    onClick={openCreatePlanForm}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/10"
+                  >
+                    <Plus className="w-4 h-4" />
+                    เพิ่มแผนใหม่
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-900">
+                <table className="w-full text-left text-sm md:text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-900">
+                      <th className="p-4">รหัสแผน</th>
+                      <th className="p-4">ชื่อแผน</th>
+                      <th className="p-4">ราคา/เดือน</th>
+                      <th className="p-4">ราคา/ปี</th>
+                      <th className="p-4">โควตา (ห้อง/staff/อาคาร)</th>
+                      <th className="p-4">สถานะขาย</th>
+                      <th className="p-4 text-center">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-900/60 bg-slate-950/20">
+                    {catalogPlans.map((plan) => (
+                      <tr key={plan.id} className="hover:bg-slate-900/25 transition-colors">
+                        <td className="p-4 font-mono text-slate-400">{plan.code}</td>
+                        <td className="p-4 font-semibold text-slate-200">{plan.name}</td>
+                        <td className="p-4 text-slate-300 font-mono">{plan.priceMonthly.toLocaleString("th-TH")} บาท</td>
+                        <td className="p-4 text-slate-300 font-mono">
+                          {plan.priceYearly === null ? "-" : `${plan.priceYearly.toLocaleString("th-TH")} บาท`}
+                        </td>
+                        <td className="p-4 text-slate-400 font-mono">
+                          {plan.maxRooms ?? "∞"} / {plan.maxStaff ?? "∞"} / {plan.maxBuildings ?? "∞"}
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              plan.isActive
+                                ? "bg-teal-500/20 text-teal-400 border border-teal-500/10"
+                                : "bg-slate-700/30 text-slate-400 border border-slate-600/20"
+                            }`}
+                          >
+                            {plan.isActive ? "เปิดขาย" : "ปิดขาย"}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => openEditPlanForm(plan)}
+                              className="p-3 md:p-1.5 text-emerald-400 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/15 rounded-xl md:rounded-lg border border-emerald-500/10 transition-colors inline-flex items-center gap-1.5"
+                              title="แก้ไขแผน"
+                            >
+                              <Edit className="w-4 h-4" /> แก้ไข
+                            </button>
+                            <button
+                              onClick={() => handleTogglePlanActive(plan)}
+                              disabled={togglingPlanId === plan.id}
+                              className="p-3 md:p-1.5 text-slate-300 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-xl md:rounded-lg border border-slate-700/50 transition-colors inline-flex items-center gap-1.5"
+                              title={plan.isActive ? "ปิดการขายแผนนี้" : "เปิดการขายแผนนี้"}
+                            >
+                              {plan.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {catalogPlans.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="text-center p-8 text-slate-500 text-sm md:text-xs">
+                          {loadingCatalogPlans ? "กำลังโหลดข้อมูล..." : "ยังไม่มีแผนการใช้งานในระบบ (อาจยังไม่ได้รัน schema_multi_workspace.sql)"}
                         </td>
                       </tr>
                     )}
@@ -880,6 +1107,170 @@ export default function SuperAdminPlansPage() {
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     "บันทึกการเปลี่ยนแปลง"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {planFormMode !== "closed" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
+          <div className="w-full max-w-lg glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden overflow-y-auto max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-emerald-600/10 rounded-full blur-[50px] pointer-events-none" />
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-600/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+                  <Package className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-slate-200">
+                  {planFormMode === "create" ? "เพิ่มแผนการใช้งานใหม่" : "แก้ไขแผนการใช้งาน"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlanFormMode("closed")}
+                className="p-2 md:p-1.5 hover:bg-slate-900 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800/80 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitPlanForm} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">รหัสแผน (code)</label>
+                  <select
+                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 text-sm md:text-xs transition-colors"
+                    value={planFormCode}
+                    onChange={(e) => setPlanFormCode(e.target.value as SaasPlan["code"])}
+                  >
+                    <option value="trial">trial</option>
+                    <option value="starter">starter</option>
+                    <option value="pro">pro</option>
+                    <option value="business">business</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">ชื่อแผนที่แสดงผล</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 text-sm md:text-xs transition-colors"
+                    value={planFormName}
+                    onChange={(e) => setPlanFormName(e.target.value)}
+                    placeholder="เช่น Starter"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">ราคา/เดือน (บาท)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    required
+                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 text-sm md:text-xs transition-colors"
+                    value={planFormPriceMonthly}
+                    onChange={(e) => setPlanFormPriceMonthly(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">ราคา/ปี (บาท, เว้นว่าง = ไม่ขายรายปี)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 text-sm md:text-xs transition-colors"
+                    value={planFormPriceYearly}
+                    onChange={(e) => setPlanFormPriceYearly(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">โควตาห้อง (เว้นว่าง = ∞)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full px-3 py-3.5 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 text-sm md:text-xs transition-colors"
+                    value={planFormMaxRooms}
+                    onChange={(e) => setPlanFormMaxRooms(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">โควตา Staff (เว้นว่าง = ∞)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full px-3 py-3.5 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 text-sm md:text-xs transition-colors"
+                    value={planFormMaxStaff}
+                    onChange={(e) => setPlanFormMaxStaff(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400 font-medium block">โควตาอาคาร (เว้นว่าง = ∞)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full px-3 py-3.5 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500 text-sm md:text-xs transition-colors"
+                    value={planFormMaxBuildings}
+                    onChange={(e) => setPlanFormMaxBuildings(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-800/50">
+                <label className="text-[11px] text-slate-400 font-medium block">ฟีเจอร์ที่เปิดให้แผนนี้</label>
+                <label className="flex items-center gap-2.5 text-sm md:text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={planFormLineNotify}
+                    onChange={(e) => setPlanFormLineNotify(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 accent-emerald-500"
+                  />
+                  แจ้งเตือนผ่าน LINE (line_notify)
+                </label>
+                <label className="flex items-center gap-2.5 text-sm md:text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={planFormTaxExport}
+                    onChange={(e) => setPlanFormTaxExport(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 accent-emerald-500"
+                  />
+                  Export รายงานภาษี (tax_export)
+                </label>
+                <label className="flex items-center gap-2.5 text-sm md:text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={planFormSlipokAutoVerify}
+                    onChange={(e) => setPlanFormSlipokAutoVerify(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 accent-emerald-500"
+                  />
+                  ตรวจสอบสลิปอัตโนมัติ (slipok_auto_verify)
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPlanFormMode("closed")}
+                  className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPlan}
+                  className="flex-1 py-3 md:py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm md:text-xs font-bold md:font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-600/10"
+                >
+                  {savingPlan ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "บันทึกแผนการใช้งาน"
                   )}
                 </button>
               </div>

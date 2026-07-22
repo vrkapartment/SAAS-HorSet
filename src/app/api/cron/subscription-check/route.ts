@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { verifySlipWithHorSetSlipOk } from "@/features/subscription/actions"
+import { verifySlipWithHorSetSlipOk, computeSubscriptionPeriodWithTrialCarryover } from "@/features/subscription/actions"
 import { SLIPOK_RETRYABLE_ERROR_CODES } from "@/features/slipok/constants"
+import { sendLineSubscriptionNotificationAction } from "@/features/notification/actions"
 
 export const dynamic = "force-dynamic"
 
@@ -115,6 +116,34 @@ export async function GET(request: Request) {
     }
 
     // =====================================================================
+    // ส่วนที่ 1.5: แจ้งเตือน LINE ไปยัง Admin ของแต่ละหอที่เพิ่งถูกเปลี่ยนสถานะจริงในรอบนี้
+    // (ยิงแบบ fire-and-forget ต่อ workspace ไม่ให้ error ของหอใดหอหนึ่งไปบล็อก response ของ cron รอบนี้)
+    // =====================================================================
+    const notificationJobs: Array<Promise<unknown>> = []
+
+    for (const row of trialToReadOnly || []) {
+      notificationJobs.push(sendLineSubscriptionNotificationAction(row.workspace_id, "trial_locked"))
+    }
+    for (const row of activeToPastDue || []) {
+      notificationJobs.push(sendLineSubscriptionNotificationAction(row.workspace_id, "past_due"))
+    }
+    for (const row of pastDueToReadOnly || []) {
+      notificationJobs.push(sendLineSubscriptionNotificationAction(row.workspace_id, "payment_failed_locked"))
+    }
+    for (const row of cancelledToReadOnly || []) {
+      notificationJobs.push(sendLineSubscriptionNotificationAction(row.workspace_id, "cancelled_locked"))
+    }
+
+    if (notificationJobs.length > 0) {
+      const notificationResults = await Promise.allSettled(notificationJobs)
+      notificationResults.forEach((result) => {
+        if (result.status === "rejected") {
+          console.error("Error sending subscription status LINE notification:", result.reason)
+        }
+      })
+    }
+
+    // =====================================================================
     // ส่วนที่ 2: retry คิว SlipOK ของการจ่ายค่า subscription (saas_payment_retry_queue)
     // =====================================================================
 
@@ -162,8 +191,13 @@ export async function GET(request: Request) {
 
           if (verifyRes.success) {
             const now = new Date()
-            const periodMs = payment.billing_cycle === "yearly" ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000
-            const currentPeriodEnd = new Date(now.getTime() + periodMs)
+            // ใช้ helper เดียวกับ uploadSubscriptionSlip (verify สำเร็จทันที) เพื่อให้ trial-carryover
+            // ทำงานเหมือนกันไม่ว่า SlipOK จะผ่านตั้งแต่ครั้งแรกหรือผ่านตอน retry ผ่านคิวนี้
+            const { periodStart, currentPeriodEnd } = await computeSubscriptionPeriodWithTrialCarryover(
+              supabaseAdmin,
+              item.workspace_id,
+              payment.billing_cycle
+            )
 
             await supabaseAdmin
               .from("saas_payment_retry_queue")
@@ -183,7 +217,7 @@ export async function GET(request: Request) {
                   plan_id: payment.plan_id,
                   status: "active",
                   billing_cycle: payment.billing_cycle,
-                  current_period_start: now.toISOString(),
+                  current_period_start: periodStart.toISOString(),
                   current_period_end: currentPeriodEnd.toISOString()
                 },
                 { onConflict: "workspace_id" }
@@ -244,6 +278,7 @@ export async function GET(request: Request) {
       success: true,
       message: "ตรวจสอบสถานะ subscription และประมวลผลคิวชำระเงินเรียบร้อยแล้ว",
       subscriptionStatusChanges,
+      subscriptionNotificationsSent: notificationJobs.length,
       paymentRetryProcessed: paymentRetryDetails.length,
       paymentRetryDetails,
       ...(warnings.length > 0 ? { warnings } : {})
