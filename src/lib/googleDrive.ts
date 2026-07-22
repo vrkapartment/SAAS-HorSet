@@ -66,9 +66,24 @@ async function getOrCreateRootFolder(
     .in("key", ["GOOGLE_DRIVE_FOLDER_ID", "GOOGLE_DRIVE_FOLDER_NAME"])
 
   const existingFolderId = settings?.find((s) => s.key === "GOOGLE_DRIVE_FOLDER_ID")?.value
-  if (existingFolderId) return { folderId: existingFolderId }
-
   const folderName = settings?.find((s) => s.key === "GOOGLE_DRIVE_FOLDER_NAME")?.value || DEFAULT_FOLDER_NAME
+
+  if (existingFolderId) {
+    // ตรวจสอบว่าโฟลเดอร์นี้ยังเข้าถึงได้จริงด้วยบัญชี OAuth ปัจจุบันก่อนเชื่อค่าที่บันทึกไว้ทันที
+    // กันกรณี id ค้างจากการตั้งค่าครั้งก่อน (เช่น Shared Drive ID เดิมตอนใช้ Service Account
+    // ซึ่งบัญชี Gmail ส่วนตัวที่เพิ่งเชื่อมต่อใหม่ไม่มีสิทธิ์เข้าถึงเลย จะเจอ "File not found")
+    const checkRes = await fetch(`https://www.googleapis.com/drive/v3/files/${existingFolderId}?fields=id,trashed`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+    if (checkRes.ok) {
+      const checkData = await checkRes.json()
+      if (!checkData.trashed) {
+        return { folderId: existingFolderId }
+      }
+    }
+    // เข้าถึงไม่ได้หรือถูกลบไปแล้ว -> ล้างค่าเดิมทิ้งแล้วสร้างโฟลเดอร์ใหม่ด้านล่างแทน
+    console.warn(`Configured GOOGLE_DRIVE_FOLDER_ID (${existingFolderId}) is no longer accessible, creating a new folder.`)
+  }
 
   const createRes = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
     method: "POST",
