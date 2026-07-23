@@ -56,13 +56,23 @@ export default function SaasPaymentReviewModal({
   const [isZoomed, setIsZoomed] = useState(false)
   const [note, setNote] = useState("")
   const [submitting, setSubmitting] = useState<"approve" | "reject" | null>(null)
+  const [pendingDecision, setPendingDecision] = useState<"approve" | "reject" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [resultMessage, setResultMessage] = useState<string | null>(null)
 
   const slipOkReason = extractSlipOkReason(payment)
   const retryStatus = payment.retry_queue_status
 
-  const handleDecision = async (decision: "approve" | "reject") => {
+  // สลิปเกี่ยวกับเงิน/สิทธิ์การใช้งานของลูกค้าจริง — บังคับให้ยืนยันอีกขั้นก่อนกดจริง ป้องกันการกดพลาด
+  const requestDecision = (decision: "approve" | "reject") => {
+    setError(null)
+    setPendingDecision(decision)
+  }
+
+  const confirmPendingDecision = async () => {
+    if (!pendingDecision) return
+    const decision = pendingDecision
+    setPendingDecision(null)
     setSubmitting(decision)
     setError(null)
     try {
@@ -80,10 +90,20 @@ export default function SaasPaymentReviewModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-        <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-6 relative shadow-2xl grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 animate-in fade-in zoom-in-95 duration-200">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose()
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`ตรวจสอบสลิปจ่ายเงินของ ${workspaceName}`}
+          className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-6 relative shadow-2xl grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 animate-in fade-in zoom-in-95 duration-200">
           <button
             onClick={onClose}
+            aria-label="ปิดหน้าต่างตรวจสอบสลิป"
             className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all z-10"
           >
             <X className="w-4 h-4" />
@@ -119,7 +139,7 @@ export default function SaasPaymentReviewModal({
                   href={payment.archived_drive_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1.5 px-4 text-center"
+                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 px-4 text-center"
                 >
                   สลิปถูก archive ไป Google Drive แล้ว — เปิดดูที่นี่ <ExternalLink className="w-3.5 h-3.5" />
                 </a>
@@ -225,22 +245,60 @@ export default function SaasPaymentReviewModal({
 
             {payment.status === "pending" && (
               <div className="space-y-2 pt-4">
-                <button
-                  onClick={() => handleDecision("approve")}
-                  disabled={submitting !== null}
-                  className="w-full h-11 bg-teal-600 hover:bg-teal-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-all"
-                >
-                  {submitting === "approve" ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                  อนุมัติด้วยตนเอง (เปิดสิทธิ์ใช้งาน)
-                </button>
-                <button
-                  onClick={() => handleDecision("reject")}
-                  disabled={submitting !== null}
-                  className="w-full h-11 rounded-xl text-xs font-bold border border-rose-900/40 bg-rose-950/20 hover:bg-rose-600 text-rose-400 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
-                >
-                  {submitting === "reject" ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                  ปฏิเสธ (ปิดเป็นล้มเหลว)
-                </button>
+                {pendingDecision ? (
+                  <div
+                    role="alertdialog"
+                    aria-label="ยืนยันการตัดสินใจ"
+                    className={`p-4 rounded-xl border space-y-3 ${
+                      pendingDecision === "approve" ? "bg-teal-500/10 border-teal-500/20" : "bg-rose-500/10 border-rose-500/20"
+                    }`}
+                  >
+                    <p className={`text-xs font-bold leading-relaxed ${pendingDecision === "approve" ? "text-teal-400" : "text-rose-400"}`}>
+                      {pendingDecision === "approve"
+                        ? `ยืนยันอนุมัติสลิปนี้และเปิดสิทธิ์ใช้งานให้ "${workspaceName}" ทันที ใช่หรือไม่?`
+                        : `ยืนยันปฏิเสธสลิปนี้และปิดรายการเป็นล้มเหลว ใช่หรือไม่?`}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPendingDecision(null)}
+                        disabled={submitting !== null}
+                        className="flex-1 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold disabled:opacity-60"
+                      >
+                        ยกเลิก
+                      </button>
+                      <button
+                        type="button"
+                        onClick={confirmPendingDecision}
+                        disabled={submitting !== null}
+                        className={`flex-1 h-10 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-60 ${
+                          pendingDecision === "approve" ? "bg-teal-600 hover:bg-teal-500" : "bg-rose-600 hover:bg-rose-500"
+                        }`}
+                      >
+                        {submitting !== null ? <Loader2 className="w-4 h-4 animate-spin" /> : "ยืนยัน"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => requestDecision("approve")}
+                      disabled={submitting !== null}
+                      className="w-full h-11 bg-teal-600 hover:bg-teal-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-all"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      อนุมัติด้วยตนเอง (เปิดสิทธิ์ใช้งาน)
+                    </button>
+                    <button
+                      onClick={() => requestDecision("reject")}
+                      disabled={submitting !== null}
+                      className="w-full h-11 rounded-xl text-xs font-bold border border-rose-900/40 bg-rose-950/20 hover:bg-rose-600 text-rose-400 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      ปฏิเสธ (ปิดเป็นล้มเหลว)
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

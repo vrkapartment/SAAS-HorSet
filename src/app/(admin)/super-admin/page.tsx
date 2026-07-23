@@ -31,6 +31,7 @@ import {
   Gauge
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import Skeleton from "@/components/ui/Skeleton"
 import {
   createWorkspaceUserAction,
   updateUserProfileAdminAction,
@@ -48,7 +49,8 @@ import {
   checkSuperAdminConnectionCodeStatusAction,
   cancelSuperAdminConnectionCodeAction,
   getSuperAdminLineQuotaAction,
-  getSuperAdminLineProfilesAction
+  getSuperAdminLineProfilesAction,
+  getSuperAdminLineBootstrapAction
 } from "@/features/super-admin/actions"
 
 interface Workspace {
@@ -183,6 +185,14 @@ export default function SuperAdminPage() {
   const [newUserRole, setNewUserRole] = useState<"admin" | "staff" | "tenant">("admin")
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("")
   const [addingUser, setAddingUser] = useState(false)
+
+  // กล่องยืนยันก่อนดำเนินการที่ทำลายข้อมูล (แทนที่ browser confirm() ที่หลุดออกจาก UI ที่จัดสไตล์ไว้)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
 
   // แก้ไข Workspace
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null)
@@ -442,7 +452,14 @@ export default function SuperAdminPage() {
 
     if (!isDemo) {
       try {
-        const res = await getSuperAdminDataAction()
+        // ยิง 3 คำขอพร้อมกันแทนการ await ทีละตัวตามลำดับ — ลด wall-clock ของการโหลดหน้าแรกลงเหลือเท่าคำขอที่ช้าที่สุด
+        // แทนที่จะเป็นผลรวมของทั้งสามคำขอ (แต่ละคำขอยังเช็ค role ของตัวเองอยู่ เพราะเป็น server action คนละตัว)
+        const [res, settingsRes, lineBootstrapRes] = await Promise.all([
+          getSuperAdminDataAction(),
+          getSystemSettingsAction(),
+          getSuperAdminLineBootstrapAction()
+        ])
+
         if (!res.success) throw new Error(res.error)
 
         if (res.isDemo) {
@@ -459,8 +476,6 @@ export default function SuperAdminPage() {
         setProfiles(profData)
         setRegistrationCodes(codeData)
 
-        // Load System Settings
-        const settingsRes = await getSystemSettingsAction()
         if (settingsRes.success && settingsRes.data) {
           const projectIdSetting = settingsRes.data.find(s => s.key === "GOOGLE_PROJECT_ID")
           const serviceKeySetting = settingsRes.data.find(s => s.key === "GOOGLE_SERVICE_ACCOUNT_KEY")
@@ -490,26 +505,30 @@ export default function SuperAdminPage() {
           setGoogleDriveConnected(!!driveRefreshTokenSetting?.value)
         }
 
-        // Load LINE settings ของ Super Admin เอง (คนละตารางกับ workspace_line_settings)
-        const lineSettingsRes = await getSuperAdminLineSettingsAction()
-        if (lineSettingsRes.success && lineSettingsRes.data) {
-          if (lineSettingsRes.data.channel_access_token) {
+        // การตั้งค่า LINE ของ Super Admin เอง (คนละตารางกับ workspace_line_settings) — ดึงมาพร้อมโควต้าและ
+        // โปรไฟล์คนที่เชื่อมต่อไว้แล้วในคำขอเดียว (getSuperAdminLineBootstrapAction) ไม่แยกยิง 3 รอบเหมือนเดิม
+        if (lineBootstrapRes.success && lineBootstrapRes.data?.settings) {
+          const lineSettings = lineBootstrapRes.data.settings
+          if (lineSettings.channel_access_token) {
             setLineChannelAccessToken("••••••••••••••••••••••••••••••••••••")
           }
-          if (lineSettingsRes.data.channel_secret) {
+          if (lineSettings.channel_secret) {
             setLineChannelSecret("••••••••••••••••••••••••••••••••••••")
           }
-          setLineAdminUserId(lineSettingsRes.data.admin_line_user_id || "")
-          setLineAdminGroupId(lineSettingsRes.data.admin_line_group_id || "")
-          setLineNotificationActive(lineSettingsRes.data.notification_active !== false)
-          setLineQuotaExceededBehavior(lineSettingsRes.data.quota_exceeded_behavior === "send_anyway" ? "send_anyway" : "skip")
+          setLineAdminUserId(lineSettings.admin_line_user_id || "")
+          setLineAdminGroupId(lineSettings.admin_line_group_id || "")
+          const quotaExceededBehavior = lineSettings.quota_exceeded_behavior === "send_anyway" ? "send_anyway" : "skip"
+          setLineQuotaExceededBehavior(quotaExceededBehavior)
 
-          if (lineSettingsRes.data.channel_access_token) {
-            loadLineQuota()
+          const quota = lineBootstrapRes.data.quota
+          if (quota) {
+            setLineQuota(quota)
           }
-          if (lineSettingsRes.data.admin_line_user_id) {
-            loadLineProfiles(lineSettingsRes.data.admin_line_user_id)
-          }
+          setLineNotificationActive(
+            lineSettings.notification_active !== false &&
+              !(quota && quota.remaining !== null && quota.remaining <= 0 && quotaExceededBehavior === "skip")
+          )
+          setLineProfiles(lineBootstrapRes.data.profiles || [])
         }
 
         const grantMap: { [key: string]: string } = {}
@@ -771,57 +790,69 @@ export default function SuperAdminPage() {
   }
 
   // ฟังก์ชันลบสิทธิ์ผู้ใช้งาน (ในหน้าควบคุม)
-  const handleDeleteProfile = async (id: string, email: string) => {
-    if (!confirm(`คุณต้องการถอนสิทธิ์การใช้งานบัญชี ${email} ใช่หรือไม่?`)) return
+  const handleDeleteProfile = (id: string, email: string) => {
+    setConfirmDialog({
+      title: "ถอนสิทธิ์การใช้งาน",
+      message: `คุณต้องการถอนสิทธิ์การใช้งานบัญชี ${email} ใช่หรือไม่?`,
+      confirmLabel: "ถอนสิทธิ์",
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        if (!isDemo) {
+          try {
+            const res = await deleteUserProfileAdminAction(id)
+            if (!res.success) throw new Error(res.error)
 
-    if (!isDemo) {
-      try {
-        const res = await deleteUserProfileAdminAction(id)
-        if (!res.success) throw new Error(res.error)
-
-        setProfiles(profiles.filter((p) => p.id !== id))
-        setResultSuccess(`✓ ถอนสิทธิ์บัญชี ${email} เรียบร้อยแล้ว`)
-      } catch (err: any) {
-        setError("เกิดข้อผิดพลาดในการลบสิทธิ์: " + err.message)
+            setProfiles(profiles.filter((p) => p.id !== id))
+            setResultSuccess(`✓ ถอนสิทธิ์บัญชี ${email} เรียบร้อยแล้ว`)
+          } catch (err: any) {
+            setError("เกิดข้อผิดพลาดในการลบสิทธิ์: " + err.message)
+          }
+        } else {
+          const updated = profiles.filter((p) => p.id !== id)
+          setProfiles(updated)
+          setResultSuccess(`✓ [Demo] ถอนสิทธิ์บัญชี ${email} สำเร็จ`)
+        }
       }
-    } else {
-      const updated = profiles.filter((p) => p.id !== id)
-      setProfiles(updated)
-      setResultSuccess(`✓ [Demo] ถอนสิทธิ์บัญชี ${email} สำเร็จ`)
-    }
+    })
   }
 
   // ฟังก์ชันลบ Workspace
-  const handleDeleteWorkspace = async (id: string, name: string) => {
-    if (!confirm(`⚠️ คำเตือน: หากคุณลบพื้นที่ทำงาน "${name}" ข้อมูลและการตั้งค่าที่เกี่ยวข้องทั้งหมดจะได้รับผลกระทบ\nคุณต้องการลบพื้นที่ทำงานนี้ใช่หรือไม่?`)) return
+  const handleDeleteWorkspace = (id: string, name: string) => {
+    setConfirmDialog({
+      title: "ลบพื้นที่ทำงาน",
+      message: `⚠️ หากคุณลบพื้นที่ทำงาน "${name}" ข้อมูลและการตั้งค่าที่เกี่ยวข้องทั้งหมด (ห้องพัก บิล ผู้ใช้งานที่สังกัด) จะได้รับผลกระทบ คุณต้องการลบพื้นที่ทำงานนี้ใช่หรือไม่?`,
+      confirmLabel: "ลบพื้นที่ทำงาน",
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setError(null)
+        setResultSuccess(null)
 
-    setError(null)
-    setResultSuccess(null)
+        if (!isDemo) {
+          try {
+            const res = await deleteWorkspaceAdminAction(id)
+            if (!res.success) throw new Error(res.error)
 
-    if (!isDemo) {
-      try {
-        const res = await deleteWorkspaceAdminAction(id)
-        if (!res.success) throw new Error(res.error)
+            setWorkspaces(workspaces.filter((w) => w.id !== id))
+            setResultSuccess(`✓ ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
+          } catch (err: any) {
+            setError("ไม่สามารถลบ Workspace ใน Supabase (กรุณาตรวจสอบว่ามีข้อมูลห้องพัก บิล หรือผู้ใช้งานสังกัดอยู่หรือไม่): " + err.message)
+          }
+        } else {
+          // โหมด Demo
+          const updatedWs = workspaces.filter((w) => w.id !== id)
+          setWorkspaces(updatedWs)
 
-        setWorkspaces(workspaces.filter((w) => w.id !== id))
-        setResultSuccess(`✓ ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
-      } catch (err: any) {
-        setError("ไม่สามารถลบ Workspace ใน Supabase (กรุณาตรวจสอบว่ามีข้อมูลห้องพัก บิล หรือผู้ใช้งานสังกัดอยู่หรือไม่): " + err.message)
+          // ลบสิทธิ์ช่วยเหลือด้วยถ้ามี
+          removeCookie(`horset_support_status_${id}`)
+
+          // ปรับโปรไฟล์ที่เกี่ยวข้องให้ไม่มีสังกัด
+          const updatedProfs = profiles.map((p) => p.workspace_id === id ? { ...p, workspace_id: null } : p)
+          setProfiles(updatedProfs)
+
+          setResultSuccess(`✓ [Demo] ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
+        }
       }
-    } else {
-      // โหมด Demo
-      const updatedWs = workspaces.filter((w) => w.id !== id)
-      setWorkspaces(updatedWs)
-
-      // ลบสิทธิ์ช่วยเหลือด้วยถ้ามี
-      removeCookie(`horset_support_status_${id}`)
-
-      // ปรับโปรไฟล์ที่เกี่ยวข้องให้ไม่มีสังกัด
-      const updatedProfs = profiles.map((p) => p.workspace_id === id ? { ...p, workspace_id: null } : p)
-      setProfiles(updatedProfs)
-
-      setResultSuccess(`✓ [Demo] ลบพื้นที่ทำงาน "${name}" เรียบร้อยแล้ว`)
-    }
+    })
   }
 
   // ฟังก์ชันอัปเดต Workspace (เช่น เปลี่ยนชื่อ)
@@ -1017,27 +1048,27 @@ export default function SuperAdminPage() {
       <div className="space-y-8 pb-12">
         
         {/* หัวข้อ แนะนำผู้ดูแลระบบ */}
-        <div className="relative p-8 rounded-3xl overflow-hidden glass-panel border border-purple-500/10 shadow-2xl">
-          <div className="absolute top-0 right-0 w-[400px] h-[200px] bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="relative p-8 rounded-3xl overflow-hidden glass-panel border border-blue-500/10 shadow-2xl">
+          <div className="absolute top-0 right-0 w-[400px] h-[200px] bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold rounded-full text-xs uppercase tracking-wider animate-pulse">
-                <ShieldCheck className="w-3.5 h-3.5" /> แผงควบคุมควบคุมระบบสูงสุด
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold rounded-full text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5" /> แผงควบคุมระบบสูงสุด
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-purple-400">
+              <h1 className="text-3xl font-extrabold tracking-tight text-white">
                 Super Admin Console
               </h1>
               <p className="text-slate-400 text-sm max-w-xl">
                 ระบบจัดการผู้ใช้แบบรวมศูนย์กลาง มอบหมายพื้นที่ทำงาน (Workspace) ตั้งค่าบทบาท และสลับสิทธิ์การเข้าตรวจสอบข้อมูลเพื่อบริการช่วยเหลือลูกค้า
               </p>
             </div>
-            
+
             <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
               <button
                 onClick={loadData}
                 className="px-5 py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-purple-400" : ""}`} />
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-400" : ""}`} />
                 รีเฟรชข้อมูลระบบ
               </button>
             </div>
@@ -1061,7 +1092,7 @@ export default function SuperAdminPage() {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex-1 flex items-center justify-center gap-2 py-3.5 md:py-2.5 rounded-xl text-sm md:text-xs font-bold transition-all duration-300 relative cursor-pointer ${
                   isTabActive
-                    ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20 scale-100"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-100"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -1114,15 +1145,22 @@ export default function SuperAdminPage() {
                   <input
                     type="text"
                     placeholder="ค้นหาชื่อหอพัก/Workspace..."
-                    className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
+                    className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
                     value={searchWorkspace}
                     onChange={(e) => setSearchWorkspace(e.target.value)}
                   />
                 </div>
 
                 {/* รายการพื้นที่ทำงาน */}
+                {loading && workspaces.length === 0 && (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-20 rounded-2xl" />
+                    ))}
+                  </div>
+                )}
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                  {filteredWorkspaces.map((ws) => {
+                  {!(loading && workspaces.length === 0) && filteredWorkspaces.map((ws) => {
                     const status = supportGrants[ws.id] || "none"
                     return (
                       <div
@@ -1162,7 +1200,7 @@ export default function SuperAdminPage() {
                               setEditingWorkspaceName(ws.name)
                             }}
                             className="p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-blue-400 hover:text-blue-300 rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all flex-1 md:flex-none"
-                            title="แก้ไขชื่อ Workspace"
+                            aria-label="แก้ไขชื่อ Workspace" title="แก้ไขชื่อ Workspace"
                           >
                             <Edit className="w-3.5 h-3.5" /> <span className="md:inline">แก้ไข</span>
                           </button>
@@ -1170,7 +1208,7 @@ export default function SuperAdminPage() {
                           <button
                             onClick={() => handleDeleteWorkspace(ws.id, ws.name)}
                             className="p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-red-400 hover:text-red-300 rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all flex-1 md:flex-none"
-                            title="ลบ Workspace"
+                            aria-label="ลบ Workspace" title="ลบ Workspace"
                           >
                             <Trash2 className="w-3.5 h-3.5" /> <span className="md:inline">ลบ</span>
                           </button>
@@ -1213,7 +1251,7 @@ export default function SuperAdminPage() {
                       type="text"
                       required
                       placeholder="เช่น ตึก บานเย็น คอร์ท, แสนสบาย เพลส..."
-                      className="w-full px-4 py-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
                       value={newWorkspaceName}
                       onChange={(e) => setNewWorkspaceName(e.target.value)}
                     />
@@ -1259,15 +1297,99 @@ export default function SuperAdminPage() {
                 <input
                   type="text"
                   placeholder="ค้นหาด้วย อีเมล, ชื่อ-นามสกุล, หรือสิทธิ์..."
-                  className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                  className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
                   value={searchProfile}
                   onChange={(e) => setSearchProfile(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* ตารางโปรไฟล์ */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-900">
+            {/* สถานะโหลดข้อมูล (Skeleton) — แสดงเฉพาะตอนโหลดครั้งแรกที่ยังไม่มีข้อมูลเลย */}
+            {loading && profiles.length === 0 && (
+              <div className="space-y-2.5">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 rounded-2xl md:h-14 md:rounded-xl" />
+                ))}
+              </div>
+            )}
+
+            {/* รายการโปรไฟล์แบบการ์ด (มือถือ) */}
+            {!(loading && profiles.length === 0) && (
+              <div className="md:hidden space-y-2.5">
+                {filteredProfiles.map((p) => {
+                  const workspaceEntry = workspaces.find((w) => w.id === p.workspace_id)
+                  const isOrphanedWorkspace = !workspaceEntry && p.role !== "super_admin"
+                  const wsName = workspaceEntry?.name || (p.role === "super_admin" ? "Global / Super Admin" : "⚠️ ไม่มี Workspace (ผิดปกติ)")
+                  return (
+                    <div key={p.id} className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/60 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-sm truncate">
+                            <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span className="truncate">{p.email}</span>
+                          </div>
+                          <p className="text-xs text-slate-400">{p.full_name || "-"}</p>
+                        </div>
+                        <span className={`shrink-0 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          p.role === "super_admin"
+                            ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/10"
+                            : p.role === "admin"
+                            ? "bg-red-500/20 text-red-400 border border-red-500/10"
+                            : p.role === "staff"
+                            ? "bg-teal-500/20 text-teal-400 border border-teal-500/10"
+                            : "bg-blue-500/20 text-blue-400 border border-blue-500/10"
+                        }`}>
+                          {p.role.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <div className="space-y-0.5 min-w-0">
+                          {p.phone && (
+                            <div className="flex items-center gap-1 text-slate-400">
+                              <Phone className="w-3 h-3 text-slate-500" /> {p.phone}
+                            </div>
+                          )}
+                          <p className={`truncate ${isOrphanedWorkspace ? "text-amber-400 font-bold" : "text-slate-400"}`}>{wsName}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingProfile(p)
+                              setEditingProfileRole(p.role)
+                              setEditingProfileWorkspaceId(p.workspace_id)
+                              setEditingProfileFullName(p.full_name || "")
+                              setEditingProfilePhone(p.phone || "")
+                            }}
+                            className="p-3 text-indigo-400 bg-indigo-500/5 rounded-xl border border-indigo-500/10"
+                            aria-label="แก้ไขโปรไฟล์ / สิทธิ์" title="แก้ไขโปรไฟล์ / สิทธิ์"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          {p.role !== "super_admin" && (
+                            <button
+                              onClick={() => handleDeleteProfile(p.id, p.email)}
+                              className="p-3 text-red-400 bg-red-500/5 rounded-xl border border-red-500/10"
+                              aria-label="ถอนสิทธิ์ผู้ใช้งาน" title="ถอนสิทธิ์ผู้ใช้งาน"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {filteredProfiles.length === 0 && (
+                  <div className="text-center p-8 text-slate-500 text-sm rounded-2xl border border-slate-900 bg-slate-950/20">
+                    ไม่พบข้อมูลรายชื่อบัญชีผู้ใช้ในระบบ
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ตารางโปรไฟล์ (เดสก์ท็อป) */}
+            <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-900">
               <table className="w-full text-left text-sm md:text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-900">
@@ -1308,7 +1430,7 @@ export default function SuperAdminPage() {
                         <td className="p-4">
                           <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                             p.role === "super_admin"
-                              ? "bg-purple-500/20 text-purple-400 border border-purple-500/10"
+                              ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/10"
                               : p.role === "admin"
                               ? "bg-red-500/20 text-red-400 border border-red-500/10"
                               : p.role === "staff"
@@ -1331,8 +1453,8 @@ export default function SuperAdminPage() {
                                 setEditingProfileFullName(p.full_name || "")
                                 setEditingProfilePhone(p.phone || "")
                               }}
-                              className="p-3 md:p-1.5 text-purple-400 hover:text-purple-300 bg-purple-500/5 hover:bg-purple-500/15 rounded-xl md:rounded-lg border border-purple-500/10 transition-colors"
-                              title="แก้ไขโปรไฟล์ / สิทธิ์"
+                              className="p-3 md:p-1.5 text-indigo-400 hover:text-indigo-300 bg-indigo-500/5 hover:bg-indigo-500/15 rounded-xl md:rounded-lg border border-indigo-500/10 transition-colors"
+                              aria-label="แก้ไขโปรไฟล์ / สิทธิ์" title="แก้ไขโปรไฟล์ / สิทธิ์"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
@@ -1340,7 +1462,7 @@ export default function SuperAdminPage() {
                               <button
                                 onClick={() => handleDeleteProfile(p.id, p.email)}
                                 className="p-3 md:p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-xl md:rounded-lg border border-red-500/10 transition-colors"
-                                title="ถอนสิทธิ์ผู้ใช้งาน"
+                                aria-label="ถอนสิทธิ์ผู้ใช้งาน" title="ถอนสิทธิ์ผู้ใช้งาน"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1370,7 +1492,7 @@ export default function SuperAdminPage() {
             <div className="lg:col-span-6 space-y-8">
               <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 bg-purple-600/10 text-purple-400 rounded-xl border border-purple-500/20">
+                  <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
                     <UserPlus className="w-5 h-5" />
                   </div>
                   <div>
@@ -1383,7 +1505,7 @@ export default function SuperAdminPage() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] text-slate-400 font-medium">สังกัดหอพัก (Workspace)</label>
                     <select
-                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-purple-500 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
                       value={selectedWorkspaceId}
                       onChange={(e) => {
                         const val = e.target.value
@@ -1406,7 +1528,7 @@ export default function SuperAdminPage() {
                         type="email"
                         required
                         placeholder="name@horset.com"
-                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-sm md:text-xs transition-colors"
+                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
                         value={newUserEmail}
                         onChange={(e) => setNewUserEmail(e.target.value)}
                       />
@@ -1422,7 +1544,7 @@ export default function SuperAdminPage() {
                           type="password"
                           minLength={6}
                           placeholder="เว้นว่างเพื่อให้ระบบสุ่มรหัสผ่านให้อัตโนมัติ"
-                          className="w-full pl-11 pr-4 py-3.5 md:pl-9 md:pr-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-sm md:text-xs transition-colors"
+                          className="w-full pl-11 pr-4 py-3.5 md:pl-9 md:pr-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
                           value={newUserPassword}
                           onChange={(e) => setNewUserPassword(e.target.value)}
                         />
@@ -1436,7 +1558,7 @@ export default function SuperAdminPage() {
                       <input
                         type="text"
                         placeholder="เช่น สมใจ รักษ์ดี"
-                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-sm md:text-xs transition-colors"
+                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
                         value={newUserFullName}
                         onChange={(e) => setNewUserFullName(e.target.value)}
                       />
@@ -1447,7 +1569,7 @@ export default function SuperAdminPage() {
                       <input
                         type="text"
                         placeholder="08xxxxxxxx"
-                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-sm md:text-xs transition-colors"
+                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
                         value={newUserPhone}
                         onChange={(e) => setNewUserPhone(e.target.value)}
                       />
@@ -1468,7 +1590,7 @@ export default function SuperAdminPage() {
                           onClick={() => setNewUserRole(item.role as any)}
                           className={`py-3 px-2 md:py-2 md:px-1 text-center rounded-xl text-sm md:text-[10px] font-bold md:font-semibold border transition-all ${
                             newUserRole === item.role
-                              ? "bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/10"
+                              ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10"
                               : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
                           }`}
                         >
@@ -1481,7 +1603,7 @@ export default function SuperAdminPage() {
                   <button
                     type="submit"
                     disabled={addingUser || !selectedWorkspaceId}
-                    className="w-full mt-2 glow-btn bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold md:font-semibold py-3.5 md:py-2.5 rounded-xl text-sm md:text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-purple-600/10"
+                    className="w-full mt-2 glow-btn bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold md:font-semibold py-3.5 md:py-2.5 rounded-xl text-sm md:text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-blue-600/10"
                   >
                     {addingUser ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1539,7 +1661,7 @@ export default function SuperAdminPage() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] text-slate-400 font-medium">สังกัดตึกที่กำหนด (Locked Workspace)</label>
                     <select
-                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
                       value={genWorkspaceId}
                       onChange={(e) => {
                         const val = e.target.value
@@ -1642,7 +1764,7 @@ export default function SuperAdminPage() {
                               type="button"
                               onClick={() => handleDeleteCode(item.code)}
                               className="p-3 md:p-1.5 text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/15 rounded-xl md:rounded-lg border border-red-500/10 transition-colors w-full md:w-auto flex items-center justify-center gap-1.5"
-                              title="ลบ Code"
+                              aria-label="ลบ Code" title="ลบ Code"
                             >
                               <Trash2 className="w-4 h-4 md:w-3.5 md:h-3.5" />
                               <span className="md:hidden text-xs font-bold">ลบรหัสนี้</span>
@@ -1716,8 +1838,6 @@ export default function SuperAdminPage() {
                         <p><span className="text-slate-400">อีเมลบริการ (Client Email):</span> <span className="font-mono font-bold text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-xs select-all">{googleKeyInfo.clientEmail}</span></p>
                       </div>
                     )}
-                    <p className="hidden">
-                    </p>
                   </div>
 
                   <div className="pt-4 border-t border-slate-800/50 flex justify-end">
@@ -1887,10 +2007,10 @@ export default function SuperAdminPage() {
         {activeTab === "line" && (
           <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent pointer-events-none" />
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-green-500/20 text-green-400 flex items-center justify-center border border-green-500/30">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
                     <MessageCircle className="w-6 h-6" />
                   </div>
                   <div>
@@ -1908,11 +2028,41 @@ export default function SuperAdminPage() {
                   <p>• สลิปจ่ายเงิน subscription ตรวจสอบไม่ผ่าน (ทั้งตรวจครั้งแรกและครบจำนวนครั้ง retry แล้ว)</p>
                 </div>
 
+                <div className="mb-6 space-y-2">
+                  <label className="text-sm font-bold text-slate-300">เมื่อโควต้าข้อความ LINE หมด</label>
+                  <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-xl w-full">
+                    {[
+                      { id: "skip", label: "ข้ามการส่ง (ปลอดภัย)" },
+                      { id: "send_anyway", label: "ส่งต่อแม้เกินโควต้าฟรี" }
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setLineQuotaExceededBehavior(opt.id as "skip" | "send_anyway")}
+                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                          lineQuotaExceededBehavior === opt.id
+                            ? opt.id === "skip"
+                              ? "bg-blue-600 text-white shadow-md"
+                              : "bg-amber-600 text-white shadow-md"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {lineQuotaExceededBehavior === "skip"
+                      ? "แนะนำ — ระบบจะปิดการแจ้งเตือนอัตโนมัติทันทีที่โควต้าเหลือ 0 ไม่มีความเสี่ยงค่าใช้จ่ายเพิ่ม"
+                      : "เผื่อไว้สำหรับกรณีต้องการให้แจ้งเตือนสำคัญส่งต่อไปได้แม้โควต้าฟรีหมด — อาจมีค่าใช้จ่ายเพิ่มถ้าแพ็กเกจ LINE คิดเงินส่วนเกิน"}
+                  </p>
+                </div>
+
                 {/* โควต้าข้อความ LINE คงเหลือ — ดึงสดจาก LINE Messaging API เท่านั้น ไม่มี cache table */}
                 <div className="mb-6 p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20">
+                      <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
                         <Gauge className="w-4 h-4" />
                       </div>
                       <div>
@@ -1930,7 +2080,7 @@ export default function SuperAdminPage() {
                       disabled={lineQuotaLoading}
                       className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all disabled:opacity-50 shrink-0"
                     >
-                      <RefreshCw className={`w-3.5 h-3.5 ${lineQuotaLoading ? "animate-spin text-green-400" : ""}`} />
+                      <RefreshCw className={`w-3.5 h-3.5 ${lineQuotaLoading ? "animate-spin text-blue-400" : ""}`} />
                     </button>
                   </div>
 
@@ -1962,7 +2112,7 @@ export default function SuperAdminPage() {
                         </div>
                         <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
                           <p className="text-[10px] text-slate-500 font-bold mb-1">คงเหลือ</p>
-                          <p className={`text-lg font-black ${lineQuotaExhausted ? "text-rose-400" : "text-green-400"}`}>
+                          <p className={`text-lg font-black ${lineQuotaExhausted ? "text-rose-400" : "text-emerald-400"}`}>
                             {lineQuota.remaining === null ? "ไม่จำกัด" : lineQuota.remaining.toLocaleString()}
                           </p>
                         </div>
@@ -1979,14 +2129,14 @@ export default function SuperAdminPage() {
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-300 flex justify-between">
                       <span>LINE Channel Access Token</span>
-                      <span className="text-xs text-green-400">ถูกส่งเป็น Bearer token ตอนเรียก LINE Messaging API</span>
+                      <span className="text-xs text-blue-400">ถูกส่งเป็น Bearer token ตอนเรียก LINE Messaging API</span>
                     </label>
                     <input
                       type="text"
                       value={lineChannelAccessToken}
                       onChange={(e) => setLineChannelAccessToken(e.target.value)}
                       placeholder="Channel Access Token จาก LINE Developers Console"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                     />
                     <p className="text-xs text-slate-500">
                       * ถ้ามี token เดิมบันทึกไว้อยู่แล้ว จะแสดงเป็น ••••••• เพื่อความปลอดภัย หากต้องการเปลี่ยนให้ลบแล้ววาง token ใหม่
@@ -1996,20 +2146,20 @@ export default function SuperAdminPage() {
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-300 flex justify-between">
                       <span>LINE Channel Secret (ไม่บังคับ)</span>
-                      <span className="text-xs text-green-400">ใช้ตรวจสอบ signature ของ webhook เท่านั้น</span>
+                      <span className="text-xs text-blue-400">ใช้ตรวจสอบ signature ของ webhook เท่านั้น</span>
                     </label>
                     <input
                       type="text"
                       value={lineChannelSecret}
                       onChange={(e) => setLineChannelSecret(e.target.value)}
                       placeholder="Channel Secret จาก LINE Developers Console"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1.5">
                     <p className="font-bold text-slate-300">Webhook URL (ตั้งค่าใน LINE Developers Console)</p>
-                    <p className="font-mono text-green-400 break-all select-all">
+                    <p className="font-mono text-blue-400 break-all select-all">
                       {(process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app").replace(/\/+$/, "")}/api/webhook/line?scope=super_admin
                     </p>
                   </div>
@@ -2027,7 +2177,7 @@ export default function SuperAdminPage() {
                           onClick={() => setLinePairingMode(tab.id as "auto" | "manual")}
                           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                             linePairingMode === tab.id
-                              ? "bg-green-600 text-white shadow-md"
+                              ? "bg-blue-600 text-white shadow-md"
                               : "text-slate-400 hover:text-slate-200"
                           }`}
                         >
@@ -2047,7 +2197,7 @@ export default function SuperAdminPage() {
                               type="button"
                               onClick={handleGenerateLineConnectionCode}
                               disabled={isGeneratingLineCode}
-                              className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:opacity-60 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
+                              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
                             >
                               {isGeneratingLineCode ? (
                                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -2059,11 +2209,11 @@ export default function SuperAdminPage() {
                           </div>
                         ) : (
                           <div className="space-y-3 animate-in fade-in duration-200">
-                            <div className="text-center space-y-1.5 py-3 bg-slate-950 border border-green-500/20 rounded-xl">
-                              <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider block">
+                            <div className="text-center space-y-1.5 py-3 bg-slate-950 border border-blue-500/20 rounded-xl">
+                              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">
                                 ส่งรหัสนี้หา LINE OA ของ HorSet
                               </span>
-                              <div className="text-3xl font-extrabold text-green-400 font-mono tracking-widest select-all">
+                              <div className="text-3xl font-extrabold text-blue-400 font-mono tracking-widest select-all">
                                 {lineConnectionCode.split("").join(" ")}
                               </div>
                               <span className="text-xs text-rose-400 font-bold block">
@@ -2077,8 +2227,8 @@ export default function SuperAdminPage() {
                                 <X className="w-3.5 h-3.5" /> ยกเลิกรหัสนี้
                               </button>
                             </div>
-                            <div className="p-3 bg-green-500/5 border border-green-500/10 rounded-xl flex items-start gap-2.5">
-                              <RefreshCw className="w-4 h-4 text-green-400 shrink-0 mt-0.5 animate-spin" />
+                            <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-xl flex items-start gap-2.5">
+                              <RefreshCw className="w-4 h-4 text-blue-400 shrink-0 mt-0.5 animate-spin" />
                               <p className="text-xs text-slate-400">กำลังรอรหัสถูกส่งเข้าแชท LINE... ระบบจะผูกบัญชีให้อัตโนมัติทันทีที่ได้รับ</p>
                             </div>
                             <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px] pl-1">
@@ -2095,7 +2245,7 @@ export default function SuperAdminPage() {
                         value={lineAdminUserId}
                         onChange={(e) => setLineAdminUserId(e.target.value)}
                         placeholder="รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่ (สูงสุด 5 คน) — พิมพ์ #MYID หากับบอตเพื่อขอ User ID ของตัวเอง"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                       />
                     )}
 
@@ -2111,7 +2261,7 @@ export default function SuperAdminPage() {
                                 key={p.userId}
                                 className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs ${
                                   p.success
-                                    ? "bg-green-500/5 border-green-500/10"
+                                    ? "bg-emerald-500/5 border-emerald-500/10"
                                     : "bg-amber-500/5 border-amber-500/10"
                                 }`}
                               >
@@ -2143,43 +2293,13 @@ export default function SuperAdminPage() {
                       value={lineAdminGroupId}
                       onChange={(e) => setLineAdminGroupId(e.target.value)}
                       placeholder="เช่น Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-300">เมื่อโควต้าข้อความ LINE หมด</label>
-                    <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-xl w-full">
-                      {[
-                        { id: "skip", label: "ข้ามการส่ง (ปลอดภัย)" },
-                        { id: "send_anyway", label: "ส่งต่อแม้เกินโควต้าฟรี" }
-                      ].map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setLineQuotaExceededBehavior(opt.id as "skip" | "send_anyway")}
-                          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                            lineQuotaExceededBehavior === opt.id
-                              ? opt.id === "skip"
-                                ? "bg-green-600 text-white shadow-md"
-                                : "bg-amber-600 text-white shadow-md"
-                              : "text-slate-400 hover:text-slate-200"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      {lineQuotaExceededBehavior === "skip"
-                        ? "แนะนำ — ระบบจะปิดการแจ้งเตือนอัตโนมัติทันทีที่โควต้าเหลือ 0 ไม่มีความเสี่ยงค่าใช้จ่ายเพิ่ม"
-                        : "เผื่อไว้สำหรับกรณีต้องการให้แจ้งเตือนสำคัญส่งต่อไปได้แม้โควต้าฟรีหมด — อาจมีค่าใช้จ่ายเพิ่มถ้าแพ็กเกจ LINE คิดเงินส่วนเกิน"}
-                    </p>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div>
-                      <p className="text-sm font-bold text-slate-300">เปิดใช้งานการแจ้งเตือน</p>
+                      <p id="line-notification-toggle-label" className="text-sm font-bold text-slate-300">เปิดใช้งานการแจ้งเตือน</p>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {lineQuotaExhaustedAndSkipping
                           ? "ปิดอัตโนมัติเพราะโควต้าข้อความ LINE หมดแล้ว — กดรีเฟรชโควต้าด้านบนอีกครั้งหลังโควต้าปัดรอบใหม่เพื่อเปิดกลับ"
@@ -2188,10 +2308,13 @@ export default function SuperAdminPage() {
                     </div>
                     <button
                       type="button"
+                      role="switch"
+                      aria-checked={lineNotificationActive && !lineQuotaExhaustedAndSkipping}
+                      aria-labelledby="line-notification-toggle-label"
                       onClick={() => !lineQuotaExhaustedAndSkipping && setLineNotificationActive(!lineNotificationActive)}
                       disabled={lineQuotaExhaustedAndSkipping}
-                      className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
-                        lineQuotaExhaustedAndSkipping ? "bg-slate-800 cursor-not-allowed opacity-60" : lineNotificationActive ? "bg-green-600" : "bg-slate-700"
+                      className={`relative w-12 h-7 rounded-full transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:outline-none ${
+                        lineQuotaExhaustedAndSkipping ? "bg-slate-800 cursor-not-allowed opacity-60" : lineNotificationActive ? "bg-blue-600" : "bg-slate-700"
                       }`}
                     >
                       <span
@@ -2225,7 +2348,7 @@ export default function SuperAdminPage() {
                       className={`px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${
                         isSavingLineSettings
                           ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                          : "bg-green-600 hover:bg-green-500 text-white shadow-green-500/20"
+                          : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20"
                       }`}
                     >
                       {isSavingLineSettings ? (
@@ -2249,8 +2372,13 @@ export default function SuperAdminPage() {
 
         {/* Workspace Edit Modal */}
         {editingWorkspace && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
-            <div className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditingWorkspace(null)
+            }}
+          >
+            <div role="dialog" aria-modal="true" aria-labelledby="edit-workspace-title" className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-blue-600/10 rounded-full blur-[50px] pointer-events-none" />
               
               <div className="flex items-center justify-between">
@@ -2259,7 +2387,7 @@ export default function SuperAdminPage() {
                     <Building className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-200">แก้ไขพื้นที่ทำงาน (Edit Workspace)</h3>
+                    <h3 id="edit-workspace-title" className="text-base font-bold text-slate-200">แก้ไขพื้นที่ทำงาน (Edit Workspace)</h3>
                     <p className="text-[10px] text-slate-500">เปลี่ยนชื่อหอพักหรือตึกในระบบ</p>
                   </div>
                 </div>
@@ -2279,7 +2407,7 @@ export default function SuperAdminPage() {
                     type="text"
                     required
                     placeholder="ระบุชื่อหอพัก..."
-                    className="w-full px-4 py-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
+                    className="w-full px-4 py-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
                     value={editingWorkspaceName}
                     onChange={(e) => setEditingWorkspaceName(e.target.value)}
                   />
@@ -2312,17 +2440,22 @@ export default function SuperAdminPage() {
 
         {/* Profile Edit Modal */}
         {editingProfile && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
-            <div className="w-full max-w-lg glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-purple-600/10 rounded-full blur-[50px] pointer-events-none" />
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditingProfile(null)
+            }}
+          >
+            <div role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" className="w-full max-w-lg glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-indigo-600/10 rounded-full blur-[50px] pointer-events-none" />
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 bg-purple-600/10 text-purple-400 rounded-xl border border-purple-500/20">
+                  <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-200">แก้ไขข้อมูลผู้ใช้งานและสิทธิ์ (Edit Profile)</h3>
+                    <h3 id="edit-profile-title" className="text-base font-bold text-slate-200">แก้ไขข้อมูลผู้ใช้งานและสิทธิ์ (Edit Profile)</h3>
                     <p className="text-[10px] text-slate-500">จัดการอีเมล: {editingProfile.email}</p>
                   </div>
                 </div>
@@ -2342,7 +2475,7 @@ export default function SuperAdminPage() {
                     <input
                       type="text"
                       placeholder="เช่น สมใจ รักษ์ดี"
-                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
                       value={editingProfileFullName}
                       onChange={(e) => setEditingProfileFullName(e.target.value)}
                     />
@@ -2353,7 +2486,7 @@ export default function SuperAdminPage() {
                     <input
                       type="text"
                       placeholder="08xxxxxxxx"
-                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
                       value={editingProfilePhone}
                       onChange={(e) => setEditingProfilePhone(e.target.value)}
                     />
@@ -2363,7 +2496,7 @@ export default function SuperAdminPage() {
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-slate-400 font-medium block">สังกัดหอพัก (Workspace)</label>
                   <select
-                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:outline-none focus:border-purple-500 text-sm md:text-xs transition-colors"
+                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
                     value={editingProfileWorkspaceId || ""}
                     onChange={(e) => setEditingProfileWorkspaceId(e.target.value || null)}
                   >
@@ -2391,7 +2524,7 @@ export default function SuperAdminPage() {
                         onClick={() => setEditingProfileRole(item.role as any)}
                         className={`py-3 px-2 md:py-2 md:px-1 text-center rounded-xl text-sm md:text-[10px] font-bold md:font-semibold border transition-all ${
                           editingProfileRole === item.role
-                            ? "bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/10"
+                            ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10"
                             : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
                         }`}
                       >
@@ -2412,7 +2545,7 @@ export default function SuperAdminPage() {
                   <button
                     type="submit"
                     disabled={updatingProfile}
-                    className="flex-1 py-3 md:py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm md:text-xs font-bold md:font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-purple-600/10"
+                    className="flex-1 py-3 md:py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm md:text-xs font-bold md:font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-blue-600/10"
                   >
                     {updatingProfile ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -2422,6 +2555,53 @@ export default function SuperAdminPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* กล่องยืนยันก่อนดำเนินการที่ทำลายข้อมูล — แทนที่ browser confirm() เพื่อให้ผู้ใช้ยังอยู่ใน UI ที่จัดสไตล์ไว้เสมอ */}
+        {confirmDialog && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setConfirmDialog(null)
+            }}
+          >
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="confirm-dialog-title"
+              aria-describedby="confirm-dialog-message"
+              className="w-full max-w-md glass-panel p-6 rounded-3xl border border-red-500/20 shadow-2xl relative space-y-5 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-red-600/10 text-red-400 rounded-xl border border-red-500/20 shrink-0">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <h3 id="confirm-dialog-title" className="text-base font-bold text-slate-100">
+                  {confirmDialog.title}
+                </h3>
+              </div>
+              <p id="confirm-dialog-message" className="text-sm text-slate-400 leading-relaxed">
+                {confirmDialog.message}
+              </p>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setConfirmDialog(null)}
+                  className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDialog.onConfirm}
+                  className="flex-1 py-3 md:py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm md:text-xs font-bold md:font-semibold rounded-xl transition-all shadow-lg shadow-red-600/10"
+                >
+                  {confirmDialog.confirmLabel}
+                </button>
+              </div>
             </div>
           </div>
         )}

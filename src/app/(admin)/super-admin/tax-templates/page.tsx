@@ -34,6 +34,12 @@ export default function TaxTemplatesPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setResultSuccess] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
 
   // PDF Template ของแบบฟอร์ม ภ.ง.ด. 90/94
   const [taxTemplates, setTaxTemplates] = useState<TaxFormTemplate[]>([])
@@ -132,10 +138,16 @@ export default function TaxTemplatesPage() {
       const resolvedTaxYear = formType === "94" ? taxYear!.trim() : null
 
       if (missingFields.length > 0) {
-        const proceed = confirm(
-          `ไฟล์นี้ไม่มีฟิลด์ที่ระบบต้องใช้กรอกข้อมูลอัตโนมัติจำนวน ${missingFields.length} ฟิลด์:\n${missingFields.join(", ")}\n\nถ้าอัปโหลดต่อ ข้อมูลส่วนนี้จะไม่ถูกกรอกเข้าฟอร์มให้อัตโนมัติ ต้องการอัปโหลดต่อหรือไม่?`
-        )
-        if (!proceed) return
+        setConfirmDialog({
+          title: "ฟิลด์กรอกข้อมูลอัตโนมัติไม่ครบ",
+          message: `ไฟล์นี้ไม่มีฟิลด์ที่ระบบต้องใช้กรอกข้อมูลอัตโนมัติจำนวน ${missingFields.length} ฟิลด์: ${missingFields.join(", ")} — ถ้าอัปโหลดต่อ ข้อมูลส่วนนี้จะไม่ถูกกรอกเข้าฟอร์มให้อัตโนมัติ ต้องการอัปโหลดต่อหรือไม่?`,
+          confirmLabel: "อัปโหลดต่อ",
+          onConfirm: () => {
+            setConfirmDialog(null)
+            performTaxTemplateUpload(formType, resolvedTaxYear, file)
+          }
+        })
+        return
       }
 
       await performTaxTemplateUpload(formType, resolvedTaxYear, file)
@@ -144,19 +156,26 @@ export default function TaxTemplatesPage() {
     }
   }
 
-  const handleDeleteTaxTemplate = async (id: string, label: string) => {
-    if (!confirm(`ต้องการลบ template "${label}" ใช่หรือไม่? ระบบจะกลับไปใช้ไฟล์เริ่มต้นแทนทันที`)) return
-    setError(null)
-    setResultSuccess(null)
-    try {
-      const res = await deleteTaxFormTemplateAction(id)
-      if (!res.success) throw new Error(res.error)
-      setResultSuccess("✓ ลบ template เรียบร้อยแล้ว ระบบจะใช้ไฟล์เริ่มต้นแทน")
-      const templatesRes = await getTaxFormTemplatesAction()
-      if (templatesRes.success) setTaxTemplates(templatesRes.data || [])
-    } catch (err: any) {
-      setError("ลบ template ไม่สำเร็จ: " + (err?.message || "เกิดข้อผิดพลาด"))
-    }
+  const handleDeleteTaxTemplate = (id: string, label: string) => {
+    setConfirmDialog({
+      title: "ลบ Template",
+      message: `ต้องการลบ template "${label}" ใช่หรือไม่? ระบบจะกลับไปใช้ไฟล์เริ่มต้นแทนทันที`,
+      confirmLabel: "ลบ template",
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setError(null)
+        setResultSuccess(null)
+        try {
+          const res = await deleteTaxFormTemplateAction(id)
+          if (!res.success) throw new Error(res.error)
+          setResultSuccess("✓ ลบ template เรียบร้อยแล้ว ระบบจะใช้ไฟล์เริ่มต้นแทน")
+          const templatesRes = await getTaxFormTemplatesAction()
+          if (templatesRes.success) setTaxTemplates(templatesRes.data || [])
+        } catch (err: any) {
+          setError("ลบ template ไม่สำเร็จ: " + (err?.message || "เกิดข้อผิดพลาด"))
+        }
+      }
+    })
   }
 
   // บันทึกปีภาษีที่จะพิมพ์ลงบนแบบฟอร์ม ภ.ง.ด. 90 (ใช้ข้ามทุกปีที่ Admin เลือกดูรายงาน)
@@ -191,8 +210,8 @@ export default function TaxTemplatesPage() {
     <>
       <div className="space-y-8 pb-12">
         {/* หัวข้อ */}
-        <div className="relative p-8 rounded-3xl overflow-hidden glass-panel border border-teal-500/10 shadow-2xl">
-          <div className="absolute top-0 right-0 w-[400px] h-[200px] bg-teal-600/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="relative p-8 rounded-3xl overflow-hidden glass-panel border border-blue-500/10 shadow-2xl">
+          <div className="absolute top-0 right-0 w-[400px] h-[200px] bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
             <div className="space-y-2">
               <button
@@ -202,7 +221,7 @@ export default function TaxTemplatesPage() {
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Super Admin Console
               </button>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-500/10 border border-teal-500/20 text-teal-400 font-bold rounded-full text-xs uppercase tracking-wider">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold rounded-full text-xs uppercase tracking-wider">
                 <FileText className="w-3.5 h-3.5" /> จัดการ Template ภาษี
               </div>
               <h1 className="text-3xl font-extrabold tracking-tight text-slate-100">
@@ -217,7 +236,7 @@ export default function TaxTemplatesPage() {
               onClick={loadData}
               className="px-5 py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg shrink-0 self-start md:self-center"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-teal-400" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-400" : ""}`} />
               รีเฟรชข้อมูล
             </button>
           </div>
@@ -239,10 +258,10 @@ export default function TaxTemplatesPage() {
         <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
           {/* กล่องอัปโหลด PDF Template แบบฟอร์ม ภ.ง.ด. 90 */}
           <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent pointer-events-none" />
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
                   <FileText className="w-6 h-6" />
                 </div>
                 <div>
@@ -265,7 +284,7 @@ export default function TaxTemplatesPage() {
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <label className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 ${uploadingTaxTemplate === "90" ? "opacity-50 pointer-events-none" : ""}`}>
+                  <label className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 ${uploadingTaxTemplate === "90" ? "opacity-50 pointer-events-none" : ""}`}>
                     <UploadCloud className="w-4 h-4" />
                     <span>{uploadingTaxTemplate === "90" ? "กำลังอัปโหลด..." : pnd90Template ? "แทนที่ไฟล์" : "อัปโหลดไฟล์"}</span>
                     <input
@@ -311,7 +330,7 @@ export default function TaxTemplatesPage() {
                     onChange={(e) => setPnd90TaxYearInput(e.target.value)}
                     placeholder="เช่น 2569"
                     disabled={!pnd90Template}
-                    className="w-full sm:w-40 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all font-mono text-sm disabled:opacity-50"
+                    className="w-full sm:w-40 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm disabled:opacity-50"
                   />
                 </div>
                 <button
@@ -321,7 +340,7 @@ export default function TaxTemplatesPage() {
                   className={`px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all ${
                     !pnd90Template || savingPnd90Year
                       ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                      : "bg-teal-600 hover:bg-teal-500 text-white active:scale-95"
+                      : "bg-blue-600 hover:bg-blue-500 text-white active:scale-95"
                   }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
@@ -423,6 +442,53 @@ export default function TaxTemplatesPage() {
             </div>
           </div>
         </div>
+
+        {/* กล่องยืนยันก่อนดำเนินการที่ทำลายข้อมูล/มีผลกระทบสำคัญ — แทนที่ browser confirm() */}
+        {confirmDialog && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setConfirmDialog(null)
+            }}
+          >
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="tax-confirm-dialog-title"
+              aria-describedby="tax-confirm-dialog-message"
+              className="w-full max-w-md glass-panel p-6 rounded-3xl border border-red-500/20 shadow-2xl relative space-y-5 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-red-600/10 text-red-400 rounded-xl border border-red-500/20 shrink-0">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <h3 id="tax-confirm-dialog-title" className="text-base font-bold text-slate-100">
+                  {confirmDialog.title}
+                </h3>
+              </div>
+              <p id="tax-confirm-dialog-message" className="text-sm text-slate-400 leading-relaxed">
+                {confirmDialog.message}
+              </p>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setConfirmDialog(null)}
+                  className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDialog.onConfirm}
+                  className="flex-1 py-3 md:py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm md:text-xs font-bold md:font-semibold rounded-xl transition-all shadow-lg shadow-red-600/10"
+                >
+                  {confirmDialog.confirmLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )

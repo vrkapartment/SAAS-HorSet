@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, CheckCircle2, AlertTriangle, Loader2, FileDown, BookOpen } from "lucide-react"
+import Skeleton from "@/components/ui/Skeleton"
 import { PDFDocument } from "pdf-lib"
 import { loadPdfDocument } from "@/lib/pdfjsClient"
 import { inspectPdfFields, type FieldInspectionResult, type InspectedField } from "@/lib/pdfFieldInspector"
@@ -246,9 +247,32 @@ export default function TaxTemplateMappingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        กำลังโหลด template...
+      <div className="min-h-screen bg-slate-950 text-slate-200">
+        <div className="border-b border-slate-800 bg-slate-950/95 sticky top-0 z-20">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+            <Skeleton className="w-9 h-9 rounded-lg shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-64 rounded" />
+              <Skeleton className="h-3 w-80 rounded" />
+            </div>
+            <Skeleton className="h-8 w-24 rounded-lg shrink-0" />
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-16 rounded-lg shrink-0" />
+              ))}
+            </div>
+            <Skeleton className="w-full aspect-[210/297] rounded-xl" />
+          </div>
+          <div className="space-y-2.5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 rounded-lg" />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -443,7 +467,7 @@ export default function TaxTemplateMappingPage() {
                       <option
                         key={entry.key}
                         value={entry.key}
-                        style={existing ? { color: "#fbbf24", fontWeight: 700 } : undefined}
+                        style={existing ? { color: "#f59e0b", fontWeight: 700 } : undefined}
                       >
                         {entry.key}{entry.label ? ` — ${entry.label}` : ""}{existing ? ` (map แล้วที่ ${describeMapping(existing)})` : ""}
                       </option>
@@ -468,7 +492,7 @@ export default function TaxTemplateMappingPage() {
                       <option
                         key={opt}
                         value={opt}
-                        style={existing ? { color: "#fbbf24", fontWeight: 700 } : undefined}
+                        style={existing ? { color: "#f59e0b", fontWeight: 700 } : undefined}
                       >
                         {opt}{existing ? ` (map แล้วที่ ${describeMapping(existing)})` : ""}
                       </option>

@@ -683,6 +683,41 @@ export async function getSuperAdminLineQuotaAction() {
  * ดึงโปรไฟล์ (ชื่อ/รูป) ของ LINE User ID ที่ผูกไว้เป็น Super Admin — มิเรอร์ getLineProfilesAction ของ
  * workspace admin แต่ดึง token จาก super_admin_line_settings แทน workspace_line_settings
  */
+async function fetchLineProfilesForToken(channelAccessToken: string, userIdsStr: string) {
+  const userIds = userIdsStr.split(/[\s,\n]+/).map((id) => id.trim()).filter((id) => id.length > 0).slice(0, 5)
+
+  return Promise.all(
+    userIds.map(async (userId) => {
+      try {
+        const res = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+          headers: { Authorization: `Bearer ${channelAccessToken}` },
+          signal: AbortSignal.timeout(8000)
+        })
+        if (res.ok) {
+          const profile = await res.json()
+          return { userId, displayName: profile.displayName, pictureUrl: profile.pictureUrl, statusMessage: profile.statusMessage, success: true }
+        }
+        const errBody = await res.json().catch(() => ({}))
+        return {
+          userId,
+          displayName: "ไม่พบชื่อ (ยังไม่ได้เพิ่มเพื่อนบอท หรือ ID ไม่ถูกต้อง)",
+          pictureUrl: null,
+          success: false,
+          error: errBody?.message || `HTTP ${res.status}`
+        }
+      } catch (err) {
+        return {
+          userId,
+          displayName: "ไม่สามารถเชื่อมต่อ LINE เพื่อดึงโปรไฟล์ได้",
+          pictureUrl: null,
+          success: false,
+          error: err instanceof Error ? err.message : "unknown error"
+        }
+      }
+    })
+  )
+}
+
 export async function getSuperAdminLineProfilesAction(userIdsStr: string) {
   try {
     if (!userIdsStr || !userIdsStr.trim()) {
@@ -718,42 +753,69 @@ export async function getSuperAdminLineProfilesAction(userIdsStr: string) {
       return { success: false, error: "ไม่มี Channel Access Token ของ LINE" }
     }
 
-    const userIds = userIdsStr.split(/[\s,\n]+/).map((id) => id.trim()).filter((id) => id.length > 0).slice(0, 5)
-
-    const profiles = await Promise.all(
-      userIds.map(async (userId) => {
-        try {
-          const res = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
-            headers: { Authorization: `Bearer ${channelAccessToken}` },
-            signal: AbortSignal.timeout(8000)
-          })
-          if (res.ok) {
-            const profile = await res.json()
-            return { userId, displayName: profile.displayName, pictureUrl: profile.pictureUrl, statusMessage: profile.statusMessage, success: true }
-          }
-          const errBody = await res.json().catch(() => ({}))
-          return {
-            userId,
-            displayName: "ไม่พบชื่อ (ยังไม่ได้เพิ่มเพื่อนบอท หรือ ID ไม่ถูกต้อง)",
-            pictureUrl: null,
-            success: false,
-            error: errBody?.message || `HTTP ${res.status}`
-          }
-        } catch (err) {
-          return {
-            userId,
-            displayName: "ไม่สามารถเชื่อมต่อ LINE เพื่อดึงโปรไฟล์ได้",
-            pictureUrl: null,
-            success: false,
-            error: err instanceof Error ? err.message : "unknown error"
-          }
-        }
-      })
-    )
-
+    const profiles = await fetchLineProfilesForToken(channelAccessToken, userIdsStr)
     return { success: true, data: profiles }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงโปรไฟล์ LINE" }
+  }
+}
+
+/**
+ * รวม 3 การเรียก (settings + quota + profiles) ที่หน้า Super Admin เดิมเคยยิงแยกกัน เข้าเป็นรอบเดียว —
+ * เช็ค role ครั้งเดียว และ query ตาราง super_admin_line_settings ครั้งเดียว (จากเดิมที่ getSuperAdminLineSettingsAction,
+ * getSuperAdminLineQuotaAction, getSuperAdminLineProfilesAction แต่ละตัวต่างคนต่าง query แถวเดียวกันนี้ซ้ำกัน 3 รอบ)
+ * ใช้เฉพาะตอนโหลดหน้าครั้งแรก — ปุ่ม "รีเฟรชโควต้า" แยกยังเรียก getSuperAdminLineQuotaAction() เดี่ยวๆ ได้ตามปกติ
+ */
+export async function getSuperAdminLineBootstrapAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true, data: { settings: null, quota: null, profiles: [] } }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data: settings, error } = await supabaseAdmin
+      .from("super_admin_line_settings")
+      .select("channel_access_token, channel_secret, admin_line_user_id, admin_line_group_id, notification_active, quota_exceeded_behavior")
+      .eq("id", 1)
+      .maybeSingle()
+    if (error) throw error
+
+    const channelAccessToken = settings?.channel_access_token
+    const adminLineUserId = settings?.admin_line_user_id
+
+    const [quota, profiles] = await Promise.all([
+      channelAccessToken
+        ? (async () => {
+            try {
+              const { fetchSuperAdminLineQuota } = await import("@/features/notification/actions")
+              const q = await fetchSuperAdminLineQuota(channelAccessToken)
+              if (q.remaining !== null && q.remaining <= 0 && (settings?.quota_exceeded_behavior || "skip") === "skip") {
+                await supabaseAdmin
+                  .from("super_admin_line_settings")
+                  .update({ notification_active: false, updated_at: new Date().toISOString() })
+                  .eq("id", 1)
+              }
+              return q
+            } catch {
+              return null
+            }
+          })()
+        : Promise.resolve(null),
+      channelAccessToken && adminLineUserId
+        ? fetchLineProfilesForToken(channelAccessToken, adminLineUserId)
+        : Promise.resolve([])
+    ])
+
+    return { success: true, data: { settings, quota, profiles } }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการโหลดข้อมูล LINE ของ Super Admin" }
   }
 }
 
