@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Building, Save, ShieldCheck, Check, AlertTriangle, AlertCircle, Loader2, Droplet, Zap, Sliders, Clock, FileText, UploadCloud, Trash2, Image } from "lucide-react"
 import { getFinanceSettings, saveFinanceSettings, FinanceSettings, cleanupExpiredSlipsAction, savePropertyLogoUrl } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -55,8 +56,8 @@ export default function PropertySettingsTab() {
   const [leaseDuration, setLeaseDuration] = useState<number>(6)
   const [leaseExpiryAction, setLeaseExpiryAction] = useState<"renew" | "original">("renew")
 
-  // ตั้งค่าระยะเวลาการเก็บไฟล์สลิปโอนเงิน (เดือน) -> 0 หมายถึง ไม่จำกัด / ตลอดไป
-  const [slipRetentionMonths, setSlipRetentionMonths] = useState<number>(0)
+  // ตั้งค่าระยะเวลาการเก็บไฟล์สลิปโอนเงิน (เดือน) -> บังคับเป็นค่าจำกัดเสมอ (1-12) ไม่มี "เก็บไว้ตลอดไป" อีกต่อไป
+  const [slipRetentionMonths, setSlipRetentionMonths] = useState<number>(12)
   const [checkoutPolicy, setCheckoutPolicy] = useState<"DAILY_PRORATE" | "FULL_MONTH">("DAILY_PRORATE")
   const [isCleaning, setIsCleaning] = useState(false)
 
@@ -147,7 +148,7 @@ export default function PropertySettingsTab() {
             setElectricMinUnit(cached.electric_min_unit !== undefined ? cached.electric_min_unit : 10)
             setLeaseDuration(cached.lease_duration !== undefined ? cached.lease_duration : 6)
             setLeaseExpiryAction(cached.lease_expiry_action || "renew")
-            setSlipRetentionMonths(cached.slip_retention_months !== undefined ? cached.slip_retention_months : 0)
+            setSlipRetentionMonths(cached.slip_retention_months ? cached.slip_retention_months : 12)
             setCheckoutPolicy(cached.checkout_policy || "DAILY_PRORATE")
             setIsDatabaseBacked(true)
           } else {
@@ -179,7 +180,7 @@ export default function PropertySettingsTab() {
               setElectricMinUnit(res.data.electric_min_unit !== undefined ? res.data.electric_min_unit : 10)
               setLeaseDuration(res.data.lease_duration !== undefined ? res.data.lease_duration : 6)
               setLeaseExpiryAction(res.data.lease_expiry_action || "renew")
-              setSlipRetentionMonths(res.data.slip_retention_months !== undefined ? res.data.slip_retention_months : 0)
+              setSlipRetentionMonths(res.data.slip_retention_months ? res.data.slip_retention_months : 12)
               setCheckoutPolicy(res.data.checkout_policy || "DAILY_PRORATE")
               setIsDatabaseBacked(true)
               setCachedData(currentWsId, cacheKey, res.data)
@@ -1116,7 +1117,6 @@ export default function PropertySettingsTab() {
                     value={slipRetentionMonths}
                     onChange={(e) => setSlipRetentionMonths(Number(e.target.value))}
                   >
-                    <option value={0}>{t("property_settings.retention_always")}</option>
                     <option value={1}>{t("property_settings.retention_1_month")}</option>
                     <option value={3}>{t("property_settings.retention_3_months")}</option>
                     <option value={6}>{t("property_settings.retention_6_months")}</option>
@@ -1125,50 +1125,58 @@ export default function PropertySettingsTab() {
                   <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500 mt-1 leading-normal">
                     {t("property_settings.retention_desc")}
                   </p>
+                  <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-500 leading-normal">
+                    {t("property_settings.retention_gdrive_prefix")}{" "}
+                    <Link
+                      href="/settings?tab=google_drive"
+                      className="underline font-bold hover:text-amber-500 dark:hover:text-amber-400"
+                    >
+                      {t("property_settings.retention_gdrive_link")}
+                    </Link>{" "}
+                    {t("property_settings.retention_gdrive_suffix")}
+                  </p>
                 </div>
 
-                {slipRetentionMonths > 0 && (
-                  <div className="p-3.5 bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/10 rounded-xl space-y-3 animate-fade-in">
-                    <div className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4 text-rose-500" />
-                      <span className="text-xs sm:text-sm text-rose-700 dark:text-rose-400 font-bold">
-                        {t("property_settings.retention_cleanup_title")}
-                      </span>
-                    </div>
-                    <ul className="list-disc list-inside text-xs sm:text-sm text-slate-500 space-y-1.5 leading-normal">
-                      <li>
-                        {t("property_settings.retention_cleanup_item1").replace("{months}", slipRetentionMonths.toString())}
-                      </li>
-                      <li>
-                        {t("property_settings.retention_cleanup_item2")}
-                      </li>
-                    </ul>
-
-                    {/* ปุ่มสั่งงานแบบแมนนวล */}
-                    <button
-                      type="button"
-                      disabled={isCleaning || !hasEditPermission}
-                      onClick={handleManualCleanup}
-                      className={`w-full text-xs sm:text-sm font-bold text-center py-2.5 text-white rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 ${
-                        !hasEditPermission
-                          ? "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50 shadow-none"
-                          : "bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 cursor-pointer"
-                      }`}
-                    >
-                      {isCleaning ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          {t("property_settings.retention_cleaning")}
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="w-4 h-4" />
-                          {t("property_settings.retention_manual_btn")}
-                        </>
-                      )}
-                    </button>
+                <div className="p-3.5 bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/10 rounded-xl space-y-3 animate-fade-in">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-500" />
+                    <span className="text-xs sm:text-sm text-rose-700 dark:text-rose-400 font-bold">
+                      {t("property_settings.retention_cleanup_title")}
+                    </span>
                   </div>
-                )}
+                  <ul className="list-disc list-inside text-xs sm:text-sm text-slate-500 space-y-1.5 leading-normal">
+                    <li>
+                      {t("property_settings.retention_cleanup_item1").replace("{months}", slipRetentionMonths.toString())}
+                    </li>
+                    <li>
+                      {t("property_settings.retention_cleanup_item2")}
+                    </li>
+                  </ul>
+
+                  {/* ปุ่มสั่งงานแบบแมนนวล */}
+                  <button
+                    type="button"
+                    disabled={isCleaning || !hasEditPermission}
+                    onClick={handleManualCleanup}
+                    className={`w-full text-xs sm:text-sm font-bold text-center py-2.5 text-white rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 ${
+                      !hasEditPermission
+                        ? "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50 shadow-none"
+                        : "bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 cursor-pointer"
+                    }`}
+                  >
+                    {isCleaning ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {t("property_settings.retention_cleaning")}
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-4 h-4" />
+                        {t("property_settings.retention_manual_btn")}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

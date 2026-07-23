@@ -3,6 +3,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js"
 
+// ระยะเวลาเก็บสลิปต้องเป็นค่าจำกัดเสมอ (ไม่มี "เก็บไว้ตลอดไป"/0 อีกต่อไป) จำกัดสูงสุดไม่เกิน 1 ปี
+// ป้องกันชั้น server ไว้อีกชั้นแม้ dropdown ฝั่ง UI จะจำกัดตัวเลือกไว้แล้วก็ตาม
+function clampSlipRetentionMonths(value: unknown): number {
+  const num = Math.round(Number(value))
+  if (!Number.isFinite(num) || num < 1) return 12
+  return Math.min(num, 12)
+}
+
 export interface FinanceSettings {
   name?: string
   tax_firstname: string
@@ -375,7 +383,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
     if (settings.deposit_type !== undefined) optionalPayload.deposit_type = settings.deposit_type
     if (settings.lease_duration !== undefined) optionalPayload.lease_duration = Number(settings.lease_duration)
     if (settings.lease_expiry_action !== undefined) optionalPayload.lease_expiry_action = settings.lease_expiry_action
-    if (settings.slip_retention_months !== undefined) optionalPayload.slip_retention_months = Number(settings.slip_retention_months)
+    if (settings.slip_retention_months !== undefined) optionalPayload.slip_retention_months = clampSlipRetentionMonths(settings.slip_retention_months)
     if (settings.checkout_policy !== undefined) optionalPayload.checkout_policy = settings.checkout_policy
     if (settings.taxpayer_status !== undefined) optionalPayload.taxpayer_status = settings.taxpayer_status
     if (settings.partner_count !== undefined) optionalPayload.partner_count = Number(settings.partner_count)
@@ -432,7 +440,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
             advance_rent: Number(settings.advance_rent || 0),
             lease_duration: Number(settings.lease_duration !== undefined ? settings.lease_duration : 6),
             lease_expiry_action: settings.lease_expiry_action || "renew",
-            slip_retention_months: Number(settings.slip_retention_months !== undefined ? settings.slip_retention_months : 0)
+            slip_retention_months: clampSlipRetentionMonths(settings.slip_retention_months)
           })
           .eq("id", workspaceId)
 

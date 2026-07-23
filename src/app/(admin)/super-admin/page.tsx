@@ -1638,7 +1638,7 @@ export default function SuperAdminPage() {
                     <a
                       href={
                         googleDriveOAuthClientId
-                          ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(googleDriveOAuthClientId)}&redirect_uri=${encodeURIComponent((process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app") + "/api/google-drive/oauth-callback")}&response_type=code&scope=${encodeURIComponent("https://www.googleapis.com/auth/drive.file")}&access_type=offline&prompt=consent`
+                          ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(googleDriveOAuthClientId)}&redirect_uri=${encodeURIComponent((process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app") + "/api/google-drive/oauth-callback")}&response_type=code&scope=${encodeURIComponent("https://www.googleapis.com/auth/drive.file")}&access_type=offline&prompt=consent&state=global`
                           : undefined
                       }
                       className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all shrink-0 text-center ${

@@ -69,6 +69,16 @@ export async function GET(request: Request) {
       })
     }
 
+    // หา workspace ที่เชื่อมต่อ Google Drive ของตัวเองไว้แล้ว (มี refresh_token) เพื่อ archive สลิปค่าเช่า
+    // ขึ้น Drive ก่อนลบ — workspace ที่ไม่ได้เชื่อมต่อไว้ยังคงลบไฟล์ตรงๆ เหมือนเดิมทุกประการ (ไม่กระทบพฤติกรรมเดิม)
+    const { data: connectedDriveRows } = await supabaseAdmin
+      .from("workspace_google_drive_settings")
+      .select("workspace_id")
+      .not("refresh_token", "is", null)
+      .in("workspace_id", workspaces.map((w) => w.id))
+
+    const connectedWorkspaceIds = new Set((connectedDriveRows || []).map((r) => r.workspace_id))
+
     const details = []
     let totalWorkspacesProcessed = 0
     let totalFilesDeleted = 0
@@ -87,7 +97,7 @@ export async function GET(request: Request) {
         // ค้นหารายการบิลของอพาร์ทเมนท์นี้ที่หมดอายุ
         const { data: expiredBills, error: billsError } = await supabaseAdmin
           .from("bills")
-          .select("id, slip_url")
+          .select("id, slip_url, created_at")
           .eq("workspace_id", ws.id)
           .not("slip_url", "is", null)
           .lt("created_at", cutoffIso)
@@ -117,20 +127,58 @@ export async function GET(request: Request) {
           continue
         }
 
-        // กรองหา Storage Path เพื่อลบใน Bucket 'payment-slips'
+        // กรองหา Storage Path เพื่อลบใน Bucket 'payment-slips' — ถ้า workspace นี้เชื่อมต่อ Google Drive
+        // ของตัวเองไว้แล้ว จะ archive ขึ้น Drive ก่อน แล้วค่อยลบไฟล์เดิม (ไม่ลบถ้า archive ไม่สำเร็จ)
+        const workspaceHasDrive = connectedWorkspaceIds.has(ws.id)
         const pathsToDelete: string[] = []
         const billIdsToUpdate: string[] = []
+        let archiveFailedCount = 0
 
         for (const bill of expiredBills) {
-          if (bill.slip_url) {
-            const marker = "/payment-slips/"
-            const idx = bill.slip_url.indexOf(marker)
-            if (idx !== -1) {
-              const path = bill.slip_url.substring(idx + marker.length)
-              if (path) {
-                pathsToDelete.push(path)
-                billIdsToUpdate.push(bill.id)
+          if (!bill.slip_url) continue
+
+          if (workspaceHasDrive) {
+            try {
+              const fileRes = await fetch(bill.slip_url)
+              if (!fileRes.ok) {
+                archiveFailedCount++
+                continue // ดาวน์โหลดไฟล์เดิมไม่สำเร็จ -> ไม่ลบไฟล์เดิม รอ cron รอบถัดไป retry ให้เอง
               }
+
+              const arrayBuffer = await fileRes.arrayBuffer()
+              const fileBuffer = Buffer.from(arrayBuffer)
+              const contentType = fileRes.headers.get("content-type") || "image/jpeg"
+
+              const urlPath = new URL(bill.slip_url).pathname
+              const extMatch = urlPath.match(/\.[a-zA-Z0-9]+$/)
+              const ext = extMatch ? extMatch[0] : (contentType.includes("png") ? ".png" : ".jpg")
+              const filename = `rent-slip-${bill.id}${ext}`
+
+              // จัดเก็บแยกโฟลเดอร์ตามเดือน-ปีที่ "เกิดรายการบิล" เช่น "2026-07" เหมือนฝั่ง subscription
+              const billDate = new Date(bill.created_at)
+              const monthFolderName = `${billDate.getFullYear()}-${String(billDate.getMonth() + 1).padStart(2, "0")}`
+
+              const uploadResult = await uploadFileToGoogleDriveAction(fileBuffer, filename, contentType, monthFolderName, ws.id)
+
+              if (!uploadResult.success) {
+                archiveFailedCount++
+                continue // อัปโหลดขึ้น Drive ไม่สำเร็จ -> ไม่ลบไฟล์เดิม (fail-safe กันข้อมูลหาย)
+              }
+            } catch (archiveErr: unknown) {
+              console.error(`Error archiving rent slip for bill ${bill.id}:`, archiveErr)
+              archiveFailedCount++
+              continue
+            }
+          }
+
+          // archive สำเร็จแล้ว (หรือ workspace ไม่ได้เชื่อมต่อ Drive เลย) -> ลบไฟล์เดิมออกจาก storage ตามปกติ
+          const marker = "/payment-slips/"
+          const idx = bill.slip_url.indexOf(marker)
+          if (idx !== -1) {
+            const path = bill.slip_url.substring(idx + marker.length)
+            if (path) {
+              pathsToDelete.push(path)
+              billIdsToUpdate.push(bill.id)
             }
           }
         }
@@ -169,7 +217,11 @@ export async function GET(request: Request) {
           retention_months: retentionMonths,
           expired_found: expiredBills.length,
           deleted_count: deletedCount,
-          message: `ลบสลิปสำเร็จจำนวน ${deletedCount} รูปภาพ`
+          google_drive_connected: workspaceHasDrive,
+          archive_failed_count: archiveFailedCount,
+          message: workspaceHasDrive
+            ? `Archive ขึ้น Google Drive และลบสลิปสำเร็จจำนวน ${deletedCount} รูปภาพ${archiveFailedCount > 0 ? ` (archive ไม่สำเร็จ ${archiveFailedCount} รูป รอ retry รอบถัดไป)` : ""}`
+            : `ลบสลิปสำเร็จจำนวน ${deletedCount} รูปภาพ`
         })
         totalWorkspacesProcessed++
 

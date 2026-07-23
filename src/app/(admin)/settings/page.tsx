@@ -13,7 +13,8 @@ import {
   AlertCircle,
   MessageSquare,
   ShieldCheck,
-  Package
+  Package,
+  HardDrive
 } from "lucide-react"
 
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -28,6 +29,7 @@ import ProfileTab from "@/components/settings/ProfileTab"
 import LineSettingsTab from "@/components/settings/LineSettingsTab"
 import SlipOkSettingsTab from "@/components/settings/SlipOkSettingsTab"
 import PackageSettingsTab from "@/components/settings/PackageSettingsTab"
+import GoogleDriveSettingsTab from "@/components/settings/GoogleDriveSettingsTab"
 
 function SettingsHubContent() {
   const router = useRouter()
@@ -178,6 +180,13 @@ function SettingsHubContent() {
       allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
     },
     {
+      id: "google_drive",
+      name: "Google Drive",
+      icon: HardDrive,
+      description: "เชื่อมต่อ Google Drive ของหอพักเพื่อสำรองสลิปค่าเช่าเก่าก่อนลบออกจากระบบอัตโนมัติ",
+      allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
+    },
+    {
       id: "supabase",
       name: "ตรวจสอบเชื่อมต่อ Supabase",
       icon: Network,
@@ -210,6 +219,8 @@ function SettingsHubContent() {
         return <SlipOkSettingsTab />
       case "package":
         return <PackageSettingsTab />
+      case "google_drive":
+        return <GoogleDriveSettingsTab />
       default:
         return <ProfileTab />
     }
