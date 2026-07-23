@@ -1288,6 +1288,55 @@ export async function sendLineSubscriptionNotificationAction(
   }
 }
 
+export interface SuperAdminLineQuota {
+  limitType: string
+  limit: number | null
+  consumed: number
+  remaining: number | null
+  percentageUsed: number
+  botName: string | null
+  botBasicId: string | null
+}
+
+/**
+ * ดึงโควต้าข้อความ LINE คงเหลือสดจาก LINE Messaging API เท่านั้น (ไม่ผ่าน cache table ใดๆ)
+ * ใช้ทั้งฝั่งหน้าตั้งค่า (แสดงผล) และก่อนส่ง push จริงใน sendLineSuperAdminNotificationAction (ป้องกันยิง
+ * ข้อความต่อทั้งที่โควต้าหมดแล้ว ซึ่งอาจมีค่าใช้จ่ายเพิ่มถ้าแพ็กเกจเป็นแบบเกินแล้วคิดเงิน)
+ * remaining/limit เป็น null เมื่อ type = "none" หมายถึงแพ็กเกจไม่มีเพดานจำกัด
+ */
+export async function fetchSuperAdminLineQuota(channelAccessToken: string): Promise<SuperAdminLineQuota> {
+  const headers = { Authorization: `Bearer ${channelAccessToken}` }
+  const [quotaRes, consumptionRes, infoRes] = await Promise.all([
+    fetch("https://api.line.me/v2/bot/message/quota", { headers, signal: AbortSignal.timeout(8000) }),
+    fetch("https://api.line.me/v2/bot/message/quota/consumption", { headers, signal: AbortSignal.timeout(8000) }),
+    fetch("https://api.line.me/v2/bot/info", { headers, signal: AbortSignal.timeout(8000) })
+  ])
+
+  if (!quotaRes.ok) throw new Error(`LINE API (quota) error: HTTP ${quotaRes.status}`)
+  if (!consumptionRes.ok) throw new Error(`LINE API (quota/consumption) error: HTTP ${consumptionRes.status}`)
+
+  const quotaJson = await quotaRes.json()
+  const consumptionJson = await consumptionRes.json()
+
+  const limitType: string = quotaJson.type
+  const limit = limitType === "none" ? null : Number(quotaJson.value ?? 0)
+  const consumed = Number(consumptionJson.totalUsage ?? 0)
+  const remaining = limit === null ? null : Math.max(0, limit - consumed)
+  const percentageUsed = limit && limit > 0 ? Math.round((consumed / limit) * 100) : 0
+
+  let botName: string | null = null
+  let botBasicId: string | null = null
+  if (infoRes.ok) {
+    const infoJson = await infoRes.json().catch(() => null)
+    if (infoJson) {
+      botName = infoJson.displayName || null
+      botBasicId = infoJson.basicId || null
+    }
+  }
+
+  return { limitType, limit, consumed, remaining, percentageUsed, botName, botBasicId }
+}
+
 /**
  * ส่งข้อความแจ้งเตือนระดับระบบ (ข้อความล้วน ไม่ใช่ flex) ไปยัง Super Admin ของ HorSet เอง
  * ผ่าน LINE ที่ตั้งค่าไว้ใน public.super_admin_line_settings (คนละตารางกับ workspace_line_settings
@@ -1324,6 +1373,22 @@ export async function sendLineSuperAdminNotificationAction(message: string) {
     const channelAccessToken = settings.channel_access_token
     if (!channelAccessToken || !channelAccessToken.trim()) {
       return { success: false, error: "ยังไม่ได้ตั้งค่า LINE Channel Access Token สำหรับ Super Admin" }
+    }
+
+    // เช็คโควต้าสดก่อนยิงจริงทุกครั้ง ถ้าเหลือ 0 ให้ปิดการแจ้งเตือนอัตโนมัติแล้วข้ามการส่ง — ป้องกันไม่ให้ระบบ
+    // พยายามยิง push ต่อไปทั้งที่โควต้าหมดแล้ว (บางแพ็กเกจของ LINE คิดค่าใช้จ่ายส่วนเกินโควต้า)
+    try {
+      const quota = await fetchSuperAdminLineQuota(channelAccessToken)
+      if (quota.remaining !== null && quota.remaining <= 0) {
+        await supabase
+          .from("super_admin_line_settings")
+          .update({ notification_active: false, updated_at: new Date().toISOString() })
+          .eq("id", 1)
+        return { success: true, message: "โควต้าข้อความ LINE ของ Super Admin หมดแล้ว ระบบปิดการแจ้งเตือนอัตโนมัติเพื่อป้องกันค่าใช้จ่ายเพิ่ม" }
+      }
+    } catch (quotaErr) {
+      // เช็คโควต้าไม่ได้ (เช่น LINE API ล่มชั่วคราว) ไม่ควรบล็อกการแจ้งเตือนทั้งหมด แค่ log แล้วส่งต่อไปตามปกติ
+      console.warn("Could not verify LINE quota before sending super admin notification, proceeding anyway:", quotaErr)
     }
 
     const userIds = (settings.admin_line_user_id || "")

@@ -27,7 +27,8 @@ import {
   Copy,
   Check,
   MessageCircle,
-  Send
+  Send,
+  Gauge
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -45,7 +46,9 @@ import {
   testSuperAdminLineNotificationAction,
   generateSuperAdminConnectionCodeAction,
   checkSuperAdminConnectionCodeStatusAction,
-  cancelSuperAdminConnectionCodeAction
+  cancelSuperAdminConnectionCodeAction,
+  getSuperAdminLineQuotaAction,
+  getSuperAdminLineProfilesAction
 } from "@/features/super-admin/actions"
 
 interface Workspace {
@@ -136,6 +139,23 @@ export default function SuperAdminPage() {
   const [lineCodeExpiresAt, setLineCodeExpiresAt] = useState<string | null>(null)
   const [lineCodeCountdown, setLineCodeCountdown] = useState(300)
   const [isGeneratingLineCode, setIsGeneratingLineCode] = useState(false)
+
+  // โควต้าข้อความ LINE คงเหลือ (ดึงสดจาก LINE API เท่านั้น) + ชื่อคนที่ผูก LINE User ID ไว้แล้ว
+  const [lineQuota, setLineQuota] = useState<{
+    limitType: string
+    limit: number | null
+    consumed: number
+    remaining: number | null
+    percentageUsed: number
+    botName: string | null
+    botBasicId: string | null
+  } | null>(null)
+  const [lineQuotaLoading, setLineQuotaLoading] = useState(false)
+  const [lineQuotaError, setLineQuotaError] = useState<string | null>(null)
+  const [lineProfiles, setLineProfiles] = useState<Array<{ userId: string; displayName: string; pictureUrl: string | null; success: boolean }>>([])
+  const [lineProfilesLoading, setLineProfilesLoading] = useState(false)
+
+  const lineQuotaExhausted = lineQuota !== null && lineQuota.remaining !== null && lineQuota.remaining <= 0
 
   // Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2) — คนละกลไกกับ Google Translate ด้านบน (service account)
   const [googleDriveOAuthClientId, setGoogleDriveOAuthClientId] = useState("")
@@ -244,6 +264,47 @@ export default function SuperAdminPage() {
     }
   }
 
+  const loadLineProfiles = async (userIdsStr: string) => {
+    if (!userIdsStr || !userIdsStr.trim()) {
+      setLineProfiles([])
+      return
+    }
+    setLineProfilesLoading(true)
+    try {
+      const res = await getSuperAdminLineProfilesAction(userIdsStr)
+      if (res.success && res.data) {
+        setLineProfiles(res.data)
+      }
+    } catch (err) {
+      console.error("Error loading super admin LINE profiles:", err)
+    } finally {
+      setLineProfilesLoading(false)
+    }
+  }
+
+  const loadLineQuota = async () => {
+    setLineQuotaLoading(true)
+    setLineQuotaError(null)
+    try {
+      const res = await getSuperAdminLineQuotaAction()
+      if (res.success && res.data) {
+        setLineQuota(res.data)
+        // ถ้าโควต้าหมดแล้ว server จะปิด notification_active ให้อัตโนมัติ — sync ค่าใน UI ให้ตรงกันทันที
+        if (res.data.remaining !== null && res.data.remaining <= 0) {
+          setLineNotificationActive(false)
+        }
+      } else {
+        setLineQuota(null)
+        setLineQuotaError(res.error || "ไม่สามารถตรวจสอบโควต้าได้")
+      }
+    } catch (err) {
+      console.error("Error loading super admin LINE quota:", err)
+      setLineQuotaError("เกิดข้อผิดพลาดในการตรวจสอบโควต้า")
+    } finally {
+      setLineQuotaLoading(false)
+    }
+  }
+
   const handleSaveLineSettings = async () => {
     setIsSavingLineSettings(true)
     setError(null)
@@ -260,10 +321,12 @@ export default function SuperAdminPage() {
       setResultSuccess("บันทึกการตั้งค่า LINE ของ Super Admin เรียบร้อยแล้ว")
       if (lineChannelAccessToken && lineChannelAccessToken !== "••••••••••••••••••••••••••••••••••••") {
         setLineChannelAccessToken("••••••••••••••••••••••••••••••••••••")
+        loadLineQuota()
       }
       if (lineChannelSecret && lineChannelSecret !== "••••••••••••••••••••••••••••••••••••") {
         setLineChannelSecret("••••••••••••••••••••••••••••••••••••")
       }
+      loadLineProfiles(lineAdminUserId)
     } catch (err: any) {
       setError(err.message || "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า LINE")
     } finally {
@@ -339,7 +402,9 @@ export default function SuperAdminPage() {
           clearInterval(interval)
           const settingsRes = await getSuperAdminLineSettingsAction()
           if (settingsRes.success && settingsRes.data) {
-            setLineAdminUserId(settingsRes.data.admin_line_user_id || "")
+            const newUserIdStr = settingsRes.data.admin_line_user_id || ""
+            setLineAdminUserId(newUserIdStr)
+            loadLineProfiles(newUserIdStr)
           }
           setResultSuccess("เชื่อมต่อบัญชี LINE สำเร็จ! ระบบผูก LINE User ID ให้อัตโนมัติแล้ว")
           setLineConnectionCode(null)
@@ -432,6 +497,13 @@ export default function SuperAdminPage() {
           setLineAdminUserId(lineSettingsRes.data.admin_line_user_id || "")
           setLineAdminGroupId(lineSettingsRes.data.admin_line_group_id || "")
           setLineNotificationActive(lineSettingsRes.data.notification_active !== false)
+
+          if (lineSettingsRes.data.channel_access_token) {
+            loadLineQuota()
+          }
+          if (lineSettingsRes.data.admin_line_user_id) {
+            loadLineProfiles(lineSettingsRes.data.admin_line_user_id)
+          }
         }
 
         const grantMap: { [key: string]: string } = {}
@@ -1830,6 +1902,69 @@ export default function SuperAdminPage() {
                   <p>• สลิปจ่ายเงิน subscription ตรวจสอบไม่ผ่าน (ทั้งตรวจครั้งแรกและครบจำนวนครั้ง retry แล้ว)</p>
                 </div>
 
+                {/* โควต้าข้อความ LINE คงเหลือ — ดึงสดจาก LINE Messaging API เท่านั้น ไม่มี cache table */}
+                <div className="mb-6 p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20">
+                        <Gauge className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-200">โควต้าข้อความ LINE คงเหลือเดือนนี้</p>
+                        {lineQuota?.botName && (
+                          <p className="text-[11px] text-slate-500">
+                            {lineQuota.botName} {lineQuota.botBasicId ? `(${lineQuota.botBasicId})` : ""}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={loadLineQuota}
+                      disabled={lineQuotaLoading}
+                      className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all disabled:opacity-50 shrink-0"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${lineQuotaLoading ? "animate-spin text-green-400" : ""}`} />
+                    </button>
+                  </div>
+
+                  {lineQuotaError ? (
+                    <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2 text-rose-400 text-xs font-bold">
+                      <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{lineQuotaError}</span>
+                    </div>
+                  ) : lineQuota ? (
+                    <>
+                      {lineQuotaExhausted && (
+                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2 text-rose-400 text-xs font-bold">
+                          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>โควต้าหมดแล้ว ระบบปิดการแจ้งเตือนอัตโนมัติเพื่อป้องกันค่าใช้จ่ายเพิ่มจากการส่งเกินโควต้า</span>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                          <p className="text-[10px] text-slate-500 font-bold mb-1">เพดานรายเดือน</p>
+                          <p className="text-lg font-black text-slate-200">{lineQuota.limit === null ? "ไม่จำกัด" : lineQuota.limit.toLocaleString()}</p>
+                        </div>
+                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                          <p className="text-[10px] text-slate-500 font-bold mb-1">ใช้ไปแล้ว</p>
+                          <p className="text-lg font-black text-amber-400">{lineQuota.consumed.toLocaleString()}</p>
+                        </div>
+                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                          <p className="text-[10px] text-slate-500 font-bold mb-1">คงเหลือ</p>
+                          <p className={`text-lg font-black ${lineQuotaExhausted ? "text-rose-400" : "text-green-400"}`}>
+                            {lineQuota.remaining === null ? "ไม่จำกัด" : lineQuota.remaining.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-500 text-center py-2">
+                      {lineQuotaLoading ? "กำลังดึงข้อมูลโควต้าล่าสุดจาก LINE..." : "กรอก Channel Access Token ด้านล่างและบันทึกก่อน ระบบจะดึงโควต้าให้อัตโนมัติ"}
+                    </p>
+                  )}
+                </div>
+
                 <div className="space-y-5">
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-300 flex justify-between">
@@ -1954,10 +2089,40 @@ export default function SuperAdminPage() {
                       />
                     )}
 
-                    {linePairingMode === "auto" && lineAdminUserId && (
-                      <p className="text-xs text-slate-500">
-                        User ID ที่ผูกไว้แล้ว: <span className="font-mono text-slate-300">{lineAdminUserId}</span>
-                      </p>
+                    {lineAdminUserId && (
+                      <div className="space-y-2 pt-1">
+                        <p className="text-xs font-bold text-slate-400">
+                          คนที่เชื่อมต่อไว้แล้ว {lineProfilesLoading && <RefreshCw className="w-3 h-3 inline animate-spin ml-1" />}
+                        </p>
+                        {lineProfiles.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {lineProfiles.map((p) => (
+                              <div
+                                key={p.userId}
+                                className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs ${
+                                  p.success
+                                    ? "bg-green-500/5 border-green-500/10"
+                                    : "bg-amber-500/5 border-amber-500/10"
+                                }`}
+                              >
+                                {p.pictureUrl ? (
+                                  <img src={p.pictureUrl} alt={p.displayName} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold shrink-0">
+                                    {p.displayName ? p.displayName.charAt(0).toUpperCase() : "?"}
+                                  </div>
+                                )}
+                                <span className={p.success ? "text-slate-300 font-bold" : "text-amber-400 font-semibold"}>{p.displayName}</span>
+                                <span className="font-mono text-slate-600 ml-auto truncate max-w-[120px]">{p.userId}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          !lineProfilesLoading && (
+                            <p className="text-xs text-slate-500">User ID: <span className="font-mono text-slate-400">{lineAdminUserId}</span></p>
+                          )
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -1975,18 +2140,23 @@ export default function SuperAdminPage() {
                   <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div>
                       <p className="text-sm font-bold text-slate-300">เปิดใช้งานการแจ้งเตือน</p>
-                      <p className="text-xs text-slate-500 mt-0.5">ปิดไว้ชั่วคราวได้โดยไม่ต้องลบ Token/User ID ที่ตั้งค่าไว้</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {lineQuotaExhausted
+                          ? "ปิดอัตโนมัติเพราะโควต้าข้อความ LINE หมดแล้ว — กดรีเฟรชโควต้าด้านบนอีกครั้งหลังโควต้าปัดรอบใหม่เพื่อเปิดกลับ"
+                          : "ปิดไว้ชั่วคราวได้โดยไม่ต้องลบ Token/User ID ที่ตั้งค่าไว้"}
+                      </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setLineNotificationActive(!lineNotificationActive)}
+                      onClick={() => !lineQuotaExhausted && setLineNotificationActive(!lineNotificationActive)}
+                      disabled={lineQuotaExhausted}
                       className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
-                        lineNotificationActive ? "bg-green-600" : "bg-slate-700"
+                        lineQuotaExhausted ? "bg-slate-800 cursor-not-allowed opacity-60" : lineNotificationActive ? "bg-green-600" : "bg-slate-700"
                       }`}
                     >
                       <span
                         className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-all ${
-                          lineNotificationActive ? "translate-x-5" : "translate-x-0"
+                          lineNotificationActive && !lineQuotaExhausted ? "translate-x-5" : "translate-x-0"
                         }`}
                       />
                     </button>

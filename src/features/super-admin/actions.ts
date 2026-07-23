@@ -624,6 +624,135 @@ export async function cancelSuperAdminConnectionCodeAction(code: string) {
   }
 }
 
+/**
+ * ดึงโควต้าข้อความ LINE คงเหลือของ Super Admin สดจาก LINE Messaging API เท่านั้น (ไม่มี cache table)
+ * ถ้าพบว่าโควต้าเหลือ 0 จะปิดการแจ้งเตือน (notification_active) ให้อัตโนมัติทันทีเพื่อป้องกันค่าใช้จ่ายไหล
+ * (กันเผื่อกรณีไม่มีการส่งแจ้งเตือนจริงเกิดขึ้นเลยหลังโควต้าหมด — sendLineSuperAdminNotificationAction เองก็เช็คซ้ำอีกชั้นก่อนส่งทุกครั้ง)
+ */
+export async function getSuperAdminLineQuotaAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) {
+      return {
+        success: true,
+        data: { limitType: "limited", limit: 500, consumed: 120, remaining: 380, percentageUsed: 24, botName: "HorSet Ops (Demo)", botBasicId: "@horset_demo" }
+      }
+    }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data: settings } = await supabaseAdmin
+      .from("super_admin_line_settings")
+      .select("channel_access_token")
+      .eq("id", 1)
+      .maybeSingle()
+
+    const channelAccessToken = settings?.channel_access_token
+    if (!channelAccessToken || !channelAccessToken.trim()) {
+      return { success: false, error: "ยังไม่ได้ตั้งค่า LINE Channel Access Token กรุณาตั้งค่าก่อน" }
+    }
+
+    const { fetchSuperAdminLineQuota } = await import("@/features/notification/actions")
+    const quota = await fetchSuperAdminLineQuota(channelAccessToken)
+
+    if (quota.remaining !== null && quota.remaining <= 0) {
+      await supabaseAdmin
+        .from("super_admin_line_settings")
+        .update({ notification_active: false, updated_at: new Date().toISOString() })
+        .eq("id", 1)
+    }
+
+    return { success: true, data: quota }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบโควต้า LINE" }
+  }
+}
+
+/**
+ * ดึงโปรไฟล์ (ชื่อ/รูป) ของ LINE User ID ที่ผูกไว้เป็น Super Admin — มิเรอร์ getLineProfilesAction ของ
+ * workspace admin แต่ดึง token จาก super_admin_line_settings แทน workspace_line_settings
+ */
+export async function getSuperAdminLineProfilesAction(userIdsStr: string) {
+  try {
+    if (!userIdsStr || !userIdsStr.trim()) {
+      return { success: true, data: [] }
+    }
+
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) {
+      const ids = userIdsStr.split(/[\s,\n]+/).map((id) => id.trim()).filter((id) => id.length > 0).slice(0, 5)
+      return {
+        success: true,
+        data: ids.map((id, index) => ({ userId: id, displayName: `Super Admin จำลองท่านที่ ${index + 1}`, pictureUrl: null, success: true }))
+      }
+    }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data: settings } = await supabaseAdmin
+      .from("super_admin_line_settings")
+      .select("channel_access_token")
+      .eq("id", 1)
+      .maybeSingle()
+
+    const channelAccessToken = settings?.channel_access_token
+    if (!channelAccessToken || !channelAccessToken.trim()) {
+      return { success: false, error: "ไม่มี Channel Access Token ของ LINE" }
+    }
+
+    const userIds = userIdsStr.split(/[\s,\n]+/).map((id) => id.trim()).filter((id) => id.length > 0).slice(0, 5)
+
+    const profiles = await Promise.all(
+      userIds.map(async (userId) => {
+        try {
+          const res = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+            headers: { Authorization: `Bearer ${channelAccessToken}` },
+            signal: AbortSignal.timeout(8000)
+          })
+          if (res.ok) {
+            const profile = await res.json()
+            return { userId, displayName: profile.displayName, pictureUrl: profile.pictureUrl, statusMessage: profile.statusMessage, success: true }
+          }
+          const errBody = await res.json().catch(() => ({}))
+          return {
+            userId,
+            displayName: "ไม่พบชื่อ (ยังไม่ได้เพิ่มเพื่อนบอท หรือ ID ไม่ถูกต้อง)",
+            pictureUrl: null,
+            success: false,
+            error: errBody?.message || `HTTP ${res.status}`
+          }
+        } catch (err) {
+          return {
+            userId,
+            displayName: "ไม่สามารถเชื่อมต่อ LINE เพื่อดึงโปรไฟล์ได้",
+            pictureUrl: null,
+            success: false,
+            error: err instanceof Error ? err.message : "unknown error"
+          }
+        }
+      })
+    )
+
+    return { success: true, data: profiles }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงโปรไฟล์ LINE" }
+  }
+}
+
 export async function testSuperAdminLineNotificationAction() {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
