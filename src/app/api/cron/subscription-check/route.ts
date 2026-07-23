@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { verifySlipWithHorSetSlipOk, computeSubscriptionPeriodWithTrialCarryover } from "@/features/subscription/actions"
 import { SLIPOK_RETRYABLE_ERROR_CODES } from "@/features/slipok/constants"
-import { sendLineSubscriptionNotificationAction } from "@/features/notification/actions"
+import { sendLineSubscriptionNotificationAction, sendLineSuperAdminNotificationAction } from "@/features/notification/actions"
 
 export const dynamic = "force-dynamic"
 
@@ -132,6 +132,31 @@ export async function GET(request: Request) {
     }
     for (const row of cancelledToReadOnly || []) {
       notificationJobs.push(sendLineSubscriptionNotificationAction(row.workspace_id, "cancelled_locked"))
+    }
+
+    // แจ้ง Super Admin ของ HorSet เองด้วย ทุกครั้งที่มี workspace ไหนถูกล็อกสิทธิ์ในรอบนี้ (คนละปลายทางจากแอดมินหอพักด้านบน)
+    const lockEventsForSuperAdmin: Array<{ workspaceId: string; label: string }> = [
+      ...(trialToReadOnly || []).map((row) => ({ workspaceId: row.workspace_id, label: "ทดลองใช้งานหมดอายุ" })),
+      ...(activeToPastDue || []).map((row) => ({ workspaceId: row.workspace_id, label: "ค้างชำระ (past due)" })),
+      ...(pastDueToReadOnly || []).map((row) => ({ workspaceId: row.workspace_id, label: "ค้างชำระเลย grace period" })),
+      ...(cancelledToReadOnly || []).map((row) => ({ workspaceId: row.workspace_id, label: "ยกเลิกแพ็กเกจครบวันหมดอายุ" }))
+    ]
+
+    if (lockEventsForSuperAdmin.length > 0) {
+      const { data: wsNameRows } = await supabaseAdmin
+        .from("workspaces")
+        .select("id, name")
+        .in("id", lockEventsForSuperAdmin.map((e) => e.workspaceId))
+      const wsNameMap = new Map((wsNameRows || []).map((w) => [w.id, w.name]))
+
+      for (const evt of lockEventsForSuperAdmin) {
+        const wsName = wsNameMap.get(evt.workspaceId) || "หอพัก"
+        notificationJobs.push(
+          sendLineSuperAdminNotificationAction(
+            `🔒 Workspace ถูกล็อกสิทธิ์การใช้งาน\n\nหอพัก: ${wsName}\nสาเหตุ: ${evt.label}`
+          )
+        )
+      }
     }
 
     if (notificationJobs.length > 0) {
@@ -265,6 +290,17 @@ export async function GET(request: Request) {
             .from("saas_payments")
             .update({ status: "failed" })
             .eq("id", item.saas_payment_id)
+
+          // แจ้ง Super Admin แบบ fire-and-forget (ไม่ await ตรง ๆ) เพื่อไม่ให้ error ของการส่ง LINE
+          // ไปทำให้ item นี้ถูกนับผิดเป็น outcome "error" ทั้งที่การปิดคิว retry สำเร็จแล้ว
+          const { data: failedWs } = await supabaseAdmin
+            .from("workspaces")
+            .select("name")
+            .eq("id", item.workspace_id)
+            .maybeSingle()
+          sendLineSuperAdminNotificationAction(
+            `⚠️ สลิปจ่ายเงิน subscription ตรวจสอบไม่ผ่าน (ครบจำนวนครั้ง retry แล้ว)\n\nหอพัก: ${failedWs?.name || "หอพัก"}\nจำนวนเงิน: ${item.amount} บาท\nกรุณาเข้าไปตรวจสอบที่หน้า Super Admin Console`
+          ).catch((err) => console.error("Error sending super admin payment-failed LINE notification:", err))
 
           paymentRetryDetails.push({ queue_id: item.id, saas_payment_id: item.saas_payment_id, outcome: "failed" })
         } catch (itemErr: unknown) {

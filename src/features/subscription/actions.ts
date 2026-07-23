@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { decryptText } from "@/lib/encryption"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { sendLineSuperAdminNotificationAction } from "@/features/notification/actions"
+import { SLIPOK_RETRYABLE_ERROR_CODES, SLIPOK_ERROR_MESSAGES } from "@/features/slipok/constants"
 
 // ใช้ Service Role Client เมื่อมี Env พร้อม เพื่อให้ฟังก์ชันกลุ่มนี้เรียกได้จากทุกที่ (Cron Job)
 // ที่ไม่มี session คุกกี้ของผู้ใช้ให้ RLS ตรวจสอบ เช่นเดียวกับ pattern ใน features/slipok/actions.ts
@@ -309,13 +311,17 @@ async function getHorSetSlipOkCredentials() {
   }
 }
 
-const HORSET_SLIPOK_ERROR_MESSAGES: Record<number, string> = {
+// ข้อความเฉพาะบางโค้ดที่ต้องเปลี่ยนคำให้ชัดว่าเป็นบัญชี/โควต้าของ HorSet เอง ไม่ใช่ของหอพัก
+// (ต่างจาก SLIPOK_ERROR_MESSAGES ที่ใช้คำกลางๆ สำหรับ SlipOK ของแต่ละ workspace)
+const HORSET_SLIPOK_ERROR_MESSAGE_OVERRIDES: Record<number, string> = {
   1004: "โควต้า SlipOK ของ HorSet หมดสำหรับเดือนนี้ กรุณาติดต่อผู้ดูแลระบบ",
-  1009: "ข้อมูลธนาคารขัดข้องชั่วคราว กรุณาตรวจสอบใหม่อีกครั้งใน 15 นาที",
-  1010: "สลิปจากธนาคารนี้ต้องรอสักครู่ก่อนตรวจสอบได้ กรุณาลองใหม่อีกครั้งหลังจากนี้",
-  1012: "สลิปนี้ถูกส่งเข้าระบบไปแล้วก่อนหน้านี้ (สลิปซ้ำ)",
-  1013: "ยอดเงินที่โอนไม่ตรงกับราคาแผนที่เลือก",
   1014: "บัญชีผู้รับในสลิปไม่ตรงกับบัญชี PromptPay ของ HorSet"
+}
+
+function getHorsetSlipOkErrorMessage(code: number | undefined, fallback: string | undefined) {
+  if (code && HORSET_SLIPOK_ERROR_MESSAGE_OVERRIDES[code]) return HORSET_SLIPOK_ERROR_MESSAGE_OVERRIDES[code]
+  if (code && SLIPOK_ERROR_MESSAGES[code]) return SLIPOK_ERROR_MESSAGES[code]
+  return fallback || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุจาก SlipOK"
 }
 
 /**
@@ -335,14 +341,14 @@ export async function verifySlipWithHorSetSlipOk(imageUrl: string, amount: numbe
 
   if (!response.ok || !json.success) {
     const code = typeof json?.code === "number" ? json.code : undefined
-    const message = (code && HORSET_SLIPOK_ERROR_MESSAGES[code]) || json?.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุจาก SlipOK"
-    return { success: false as const, error: message, code }
+    const message = getHorsetSlipOkErrorMessage(code, json?.message)
+    // ส่ง raw response ของ SlipOK กลับไปด้วยเสมอ (ไม่ใช่แค่ตอนสำเร็จ) เพื่อให้ Super Admin
+    // เปิดดูสาเหตุที่แท้จริงตอนตรวจสอบสลิปด้วยตนเองได้ ไม่ต้องเดาจากข้อความแปลอย่างเดียว
+    return { success: false as const, error: message, code, data: json }
   }
 
   return { success: true as const, data: json.data }
 }
-
-const RETRYABLE_CODES = [1009, 1010]
 
 /**
  * คำนวณ current_period_start/end ของรอบบิลใหม่ พร้อม logic "trial-carryover": ถ้า workspace ยังอยู่ใน
@@ -445,7 +451,7 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
       return { success: true, message: `ชำระเงินสำเร็จ! อัปเกรดเป็นแผน "${plan.name}" เรียบร้อยแล้ว` }
     }
 
-    if (verifyRes.code && RETRYABLE_CODES.includes(verifyRes.code)) {
+    if (verifyRes.code && SLIPOK_RETRYABLE_ERROR_CODES.includes(verifyRes.code)) {
       const serviceClient = await getServiceRoleOrSessionClient()
       await serviceClient.from("saas_payment_retry_queue").insert({
         saas_payment_id: paymentRow.id,
@@ -459,10 +465,24 @@ export async function uploadSubscriptionSlip(workspaceId: string, planId: string
       return { success: false, retrying: true, error: "ข้อมูลธนาคารขัดข้องชั่วคราว ระบบจะตรวจสอบสลิปนี้ให้อีกครั้งอัตโนมัติภายใน 5 นาที" }
     }
 
-    await supabase
+    // หมายเหตุ: saas_payments ไม่มีคอลัมน์ last_error_code (ต่างจาก saas_payment_retry_queue) — เดิมโค้ดนี้เคย
+    // ส่ง last_error_code ไปด้วยและถูก cast เป็น `as never` เพื่อหลบ TypeScript ทำให้ PostgREST ปฏิเสธ request
+    // ทั้งก้อนเงียบๆ (ไม่มีใคร check error) ผลคือ status ไม่ถูกอัปเดตเป็น "failed" จริง ค้างเป็น "pending" ตลอดไป
+    // สาเหตุ/code เก็บอยู่ใน slipok_response (jsonb) อยู่แล้วผ่าน verifyRes.error/verifyRes.code/verifyRes.data
+    const { error: markFailedError } = await supabase
       .from("saas_payments")
-      .update({ status: "failed", slipok_response: verifyRes, last_error_code: verifyRes.code } as never)
+      .update({ status: "failed", slipok_response: verifyRes })
       .eq("id", paymentRow.id)
+
+    if (markFailedError) {
+      console.error("Error marking saas_payments as failed:", markFailedError)
+    }
+
+    // แจ้ง Super Admin แบบ fire-and-forget เพื่อให้เข้าไปตรวจสอบสลิปที่ระบบตรวจสอบแล้วว่าไม่ผ่านทันที
+    const { data: ws } = await supabase.from("workspaces").select("name").eq("id", workspaceId).maybeSingle()
+    sendLineSuperAdminNotificationAction(
+      `⚠️ สลิปจ่ายเงิน subscription ตรวจสอบไม่ผ่าน\n\nหอพัก: ${ws?.name || "หอพัก"}\nแผน: ${plan.name}\nจำนวนเงิน: ${amount} บาท\nสาเหตุ: ${verifyRes.error || "ไม่ทราบสาเหตุ"}`
+    ).catch((err) => console.error("Error sending super admin payment-failed LINE notification:", err))
 
     return { success: false, error: verifyRes.error }
   } catch (error) {
@@ -751,8 +771,132 @@ export async function listSaasPayments(workspaceId?: string) {
       throw error
     }
 
-    return { success: true, data: data || [] }
+    const payments = data || []
+
+    // ดึงเหตุผลล่าสุดจากคิว retry มาแนบให้รายการที่ยังค้าง "pending" อยู่ด้วย (กรณี SlipOK ตรวจไม่ผ่านแบบ
+    // ชั่วคราวและรอ retry อัตโนมัติอยู่ — ตาราง saas_payments เองไม่ได้เก็บ error/attempt ล่าสุดของรอบที่กำลังรอ)
+    const pendingIds = payments.filter((p) => p.status === "pending").map((p) => p.id)
+    const retryQueueMap = new Map<string, { status: string; attempt_count: number; max_attempts: number; last_error_code: number | null; last_error_message: string | null; next_retry_at: string }>()
+
+    if (pendingIds.length > 0) {
+      const { data: retryRows } = await serviceClient
+        .from("saas_payment_retry_queue")
+        .select("saas_payment_id, status, attempt_count, max_attempts, last_error_code, last_error_message, next_retry_at, updated_at")
+        .in("saas_payment_id", pendingIds)
+        .order("updated_at", { ascending: false })
+
+      // มีได้แค่แถวเดียวต่อ payment ตามปกติ แต่กันเหนียวเผื่อมีหลายแถว เอาแถวล่าสุดสุด (เรียง updated_at desc ไว้แล้ว)
+      for (const row of retryRows || []) {
+        if (!retryQueueMap.has(row.saas_payment_id)) retryQueueMap.set(row.saas_payment_id, row)
+      }
+    }
+
+    const enrichedPayments = payments.map((p) => ({
+      ...p,
+      retry_queue_status: retryQueueMap.get(p.id) || null
+    }))
+
+    return { success: true, data: enrichedPayments }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงประวัติการชำระเงิน" }
+  }
+}
+
+/**
+ * Super Admin ตรวจสอบสลิปจ่ายเงิน subscription ด้วยตนเอง (manual review) — ใช้เมื่อ SlipOK ตรวจสอบผิดพลาด
+ * หรือ Super Admin เปิดดูสลิปแล้วเห็นว่าสถานะที่ SlipOK ให้มาไม่ตรงกับความเป็นจริง
+ * - approve: เปิดสิทธิ์ใช้งานให้ workspace เหมือนกับตรวจผ่านอัตโนมัติ (ใช้ logic คำนวณรอบบิลเดียวกัน)
+ * - reject: ปิดรายการเป็น failed อย่างเป็นทางการ (เผื่อกรณี SlipOK ปล่อยผ่านผิดๆ หรือสลิปปลอม)
+ * ทั้งสองกรณีจะปิดคิว retry ที่ค้างอยู่ (ถ้ามี) ก่อนเสมอ ไม่ให้ cron รอบถัดไปมาเขียนทับการตัดสินใจของ Super Admin
+ */
+export async function manuallyReviewSaasPaymentAction(
+  paymentId: string,
+  decision: "approve" | "reject",
+  note?: string
+) {
+  try {
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+    }
+
+    const serviceClient = await getServiceRoleOrSessionClient()
+
+    const { data: payment, error: paymentError } = await serviceClient
+      .from("saas_payments")
+      .select("id, workspace_id, plan_id, billing_cycle, amount, status, saas_plans (name)")
+      .eq("id", paymentId)
+      .single()
+
+    if (paymentError || !payment) throw new Error("ไม่พบรายการชำระเงินนี้")
+    if (payment.status !== "pending") {
+      return { success: false, error: `รายการนี้ถูกดำเนินการไปแล้ว (สถานะปัจจุบัน: ${payment.status})` }
+    }
+
+    // ปิดคิว retry ที่ยังค้างอยู่ก่อนเสมอ ไม่ให้ cron job มาประมวลผลซ้ำทับการตัดสินใจของ Super Admin ภายหลัง
+    await serviceClient
+      .from("saas_payment_retry_queue")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("saas_payment_id", paymentId)
+      .eq("status", "pending")
+
+    const reviewedAt = new Date().toISOString()
+
+    if (decision === "reject") {
+      const { error } = await serviceClient
+        .from("saas_payments")
+        .update({
+          status: "failed",
+          manual_review_note: note?.trim() || null,
+          reviewed_by: profileRes.data.id,
+          reviewed_at: reviewedAt
+        })
+        .eq("id", paymentId)
+      if (error) throw error
+
+      return { success: true, message: "ปฏิเสธสลิปนี้เรียบร้อยแล้ว — ปิดรายการเป็นล้มเหลวอย่างเป็นทางการ" }
+    }
+
+    const { periodStart, currentPeriodEnd, carriedOverDays } = await computeSubscriptionPeriodWithTrialCarryover(
+      serviceClient,
+      payment.workspace_id,
+      payment.billing_cycle
+    )
+
+    const { error: updatePaymentError } = await serviceClient
+      .from("saas_payments")
+      .update({
+        status: "verified",
+        verified_at: reviewedAt,
+        manual_review_note: note?.trim() || null,
+        reviewed_by: profileRes.data.id,
+        reviewed_at: reviewedAt
+      })
+      .eq("id", paymentId)
+    if (updatePaymentError) throw updatePaymentError
+
+    const { error: subUpsertError } = await serviceClient
+      .from("workspace_subscriptions")
+      .upsert(
+        {
+          workspace_id: payment.workspace_id,
+          plan_id: payment.plan_id,
+          status: "active",
+          billing_cycle: payment.billing_cycle,
+          current_period_start: periodStart.toISOString(),
+          current_period_end: currentPeriodEnd.toISOString()
+        },
+        { onConflict: "workspace_id" }
+      )
+    if (subUpsertError) throw subUpsertError
+
+    return {
+      success: true,
+      message: carriedOverDays > 0
+        ? `อนุมัติสลิปด้วยตนเองสำเร็จ! ระบบจะให้ทดลองใช้ฟรีต่ออีก ${carriedOverDays} วันตามเดิม แล้วค่อยเริ่มนับรอบบิลหลังจากนั้น`
+        : "อนุมัติสลิปด้วยตนเองสำเร็จ! เปิดสิทธิ์ใช้งานให้ workspace แล้ว"
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบสลิปด้วยตนเอง" }
   }
 }

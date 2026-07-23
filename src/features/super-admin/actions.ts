@@ -462,6 +462,94 @@ export async function updateSystemSettingAction(key: string, value: string) {
   }
 }
 
+/**
+ * ดึงการตั้งค่า LINE OA สำหรับรับแจ้งเตือนระดับระบบของ Super Admin เอง (public.super_admin_line_settings)
+ * คนละตารางกับ workspace_line_settings ของแต่ละหอพัก
+ */
+export async function getSuperAdminLineSettingsAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true, data: null }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data, error } = await supabaseAdmin
+      .from("super_admin_line_settings")
+      .select("channel_access_token, admin_line_user_id, admin_line_group_id, notification_active")
+      .eq("id", 1)
+      .maybeSingle()
+    if (error) throw error
+
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch super admin LINE settings" }
+  }
+}
+
+export async function updateSuperAdminLineSettingsAction(input: {
+  channelAccessToken?: string
+  adminLineUserId?: string
+  adminLineGroupId?: string
+  notificationActive: boolean
+}) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { error } = await supabaseAdmin.from("super_admin_line_settings").upsert(
+      {
+        id: 1,
+        channel_access_token: input.channelAccessToken?.trim() || null,
+        admin_line_user_id: input.adminLineUserId?.trim() || null,
+        admin_line_group_id: input.adminLineGroupId?.trim() || null,
+        notification_active: input.notificationActive,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "id" }
+    )
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to update super admin LINE settings" }
+  }
+}
+
+export async function testSuperAdminLineNotificationAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true, data: "Demo Mode: จำลองการส่งแจ้งเตือนทดสอบเสร็จสิ้น" }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const { sendLineSuperAdminNotificationAction } = await import("@/features/notification/actions")
+    return sendLineSuperAdminNotificationAction(
+      "🔔 ทดสอบการแจ้งเตือน Super Admin จากระบบ HorSet\n\nถ้าคุณได้รับข้อความนี้ แสดงว่าตั้งค่า LINE เรียบร้อยแล้ว"
+    )
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to send test notification" }
+  }
+}
+
 // ดึงโควต้า SlipOK คงเหลือของบัญชี HorSet เอง (ใช้รับชำระค่า subscription จากเจ้าของหอพัก ไม่เกี่ยวกับ SlipOK ของแต่ละ workspace)
 export async function getHorsetSlipOkQuotaAction() {
   try {

@@ -1289,6 +1289,94 @@ export async function sendLineSubscriptionNotificationAction(
 }
 
 /**
+ * ส่งข้อความแจ้งเตือนระดับระบบ (ข้อความล้วน ไม่ใช่ flex) ไปยัง Super Admin ของ HorSet เอง
+ * ผ่าน LINE ที่ตั้งค่าไว้ใน public.super_admin_line_settings (คนละตารางกับ workspace_line_settings
+ * ของแต่ละหอพัก) — ใช้สำหรับเหตุการณ์ระดับระบบ เช่น หอพักสมัครใหม่, subscription ของหอพักถูกล็อกสิทธิ์,
+ * หรือสลิปจ่ายเงิน subscription ตรวจสอบไม่ผ่าน ไม่เกี่ยวกับการแจ้งเตือนแอดมิน/ผู้เช่าของหอพักใดๆ
+ */
+export async function sendLineSuperAdminNotificationAction(message: string) {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    let supabase = await createClient()
+
+    // ใช้ Service Role Client เพราะฟังก์ชันนี้อาจถูกเรียกจาก cron job ที่ไม่มี session คุกกี้ของผู้ใช้เลย
+    if (url && serviceKey && !serviceKey.includes("placeholder")) {
+      const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+      supabase = createSupabaseClient(url, serviceKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      }) as unknown as typeof supabase
+    }
+
+    const { data: settings } = await supabase
+      .from("super_admin_line_settings")
+      .select("channel_access_token, admin_line_user_id, admin_line_group_id, notification_active")
+      .eq("id", 1)
+      .maybeSingle()
+
+    if (!settings || settings.notification_active === false) {
+      return { success: true, message: "ระบบแจ้งเตือน Super Admin ปิดใช้งานอยู่ ข้ามกระบวนการ" }
+    }
+
+    const channelAccessToken = settings.channel_access_token
+    if (!channelAccessToken || !channelAccessToken.trim()) {
+      return { success: false, error: "ยังไม่ได้ตั้งค่า LINE Channel Access Token สำหรับ Super Admin" }
+    }
+
+    const userIds = (settings.admin_line_user_id || "")
+      .split(/[\s,\n]+/)
+      .map((id: string) => id.trim())
+      .filter((id: string) => id.length > 0)
+      .slice(0, 5)
+    const groupId = settings.admin_line_group_id?.trim()
+
+    if (userIds.length === 0 && !groupId) {
+      return { success: true, message: "ไม่มีการตั้งค่าปลายทางแจ้งเตือนของ Super Admin ข้ามกระบวนการ" }
+    }
+
+    const sendPush = async (toTarget: string) => {
+      return fetch("https://api.line.me/v2/bot/message/push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${channelAccessToken}`
+        },
+        signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({
+          to: toTarget.trim(),
+          messages: [{ type: "text", text: message.slice(0, 4900) }]
+        })
+      })
+    }
+
+    const targets = [...userIds, ...(groupId ? [groupId] : [])]
+    const results = await Promise.all(targets.map(sendPush))
+
+    let anySuccess = false
+    for (const res of results) {
+      if (res.ok) {
+        anySuccess = true
+      } else {
+        const errJson = await res.json().catch(() => ({}))
+        console.error("Error sending super admin push notification via LINE Messaging API:", errJson)
+      }
+    }
+
+    if (anySuccess) {
+      return { success: true, data: "แจ้งเตือน Super Admin สำเร็จ" }
+    } else {
+      return { success: false, error: "ไม่สามารถส่งข้อความแจ้งเตือนไปยัง Super Admin ได้" }
+    }
+  } catch (error) {
+    console.error("sendLineSuperAdminNotificationAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ" }
+  }
+}
+
+/**
  * ดึงโปรไฟล์ LINE จาก User ID ที่กำหนด (รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่)
  * จำกัดสูงสุด 5 คน เพื่อแสดงผลในระบบการตั้งค่าแอดมิน
  */

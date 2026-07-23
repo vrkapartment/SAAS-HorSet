@@ -40,6 +40,7 @@ import {
   type SaasPlanInput
 } from "@/features/subscription/actions"
 import { getSuperAdminDataAction } from "@/features/super-admin/actions"
+import SaasPaymentReviewModal, { type SaasPaymentForReview } from "@/features/subscription/components/SaasPaymentReviewModal"
 
 type SubscriptionStatus = "trial" | "active" | "past_due" | "read_only" | "cancelled"
 type PlansTab = "subscription" | "catalog" | "slipok" | "finance"
@@ -73,10 +74,22 @@ interface SaasPaymentRow {
   billing_cycle: string
   amount: number
   slip_image_url: string | null
+  archived_drive_url?: string | null
   status: "pending" | "verified" | "failed"
   payment_method: string
   verified_at: string | null
   created_at: string
+  slipok_response?: unknown
+  manual_review_note?: string | null
+  reviewed_at?: string | null
+  retry_queue_status?: {
+    status: string
+    attempt_count: number
+    max_attempts: number
+    last_error_code: number | null
+    last_error_message: string | null
+    next_retry_at: string
+  } | null
   saas_plans?: { name: string } | { name: string }[] | null
 }
 
@@ -164,6 +177,7 @@ export default function SuperAdminPlansPage() {
   const [editingSubStatus, setEditingSubStatus] = useState<SubscriptionStatus>("trial")
   const [editingSubPeriodEnd, setEditingSubPeriodEnd] = useState("")
   const [updatingSubscription, setUpdatingSubscription] = useState(false)
+  const [reviewingPayment, setReviewingPayment] = useState<SaasPaymentRow | null>(null)
 
   // แผนราคา (saas_plans) — หน้าจัดการแผนของ Super Admin
   const [catalogPlans, setCatalogPlans] = useState<SaasPlan[]>([])
@@ -634,13 +648,21 @@ export default function SuperAdminPlansPage() {
                       <th className="p-4">จำนวนเงิน</th>
                       <th className="p-4">สถานะ</th>
                       <th className="p-4">วันที่</th>
-                      <th className="p-4 text-center">สลิป</th>
+                      <th className="p-4 text-center">สลิป / ตรวจสอบ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-900/60 bg-slate-950/20">
                     {saasPayments.map((payment) => {
                       const wsName = workspaces.find((w) => w.id === payment.workspace_id)?.name || "ไม่พบชื่อหอพัก"
                       const plan = Array.isArray(payment.saas_plans) ? payment.saas_plans[0] : payment.saas_plans
+                      const retryStatus = payment.retry_queue_status
+                      const rawSlipOk = payment.slipok_response as { error?: string; code?: number } | null
+                      const shortReason =
+                        payment.status === "pending" && retryStatus
+                          ? `รอ retry ครั้งที่ ${retryStatus.attempt_count}/${retryStatus.max_attempts}`
+                          : payment.status === "failed" && rawSlipOk?.error
+                            ? rawSlipOk.error
+                            : null
                       return (
                         <tr key={payment.id} className="hover:bg-slate-900/25 transition-colors">
                           <td className="p-4 font-semibold text-slate-200">{wsName}</td>
@@ -652,23 +674,22 @@ export default function SuperAdminPlansPage() {
                             <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${getPaymentStatusBadgeClass(payment.status)}`}>
                               {payment.status === "verified" ? "ยืนยันแล้ว" : payment.status === "pending" ? "รอตรวจสอบ" : "ล้มเหลว"}
                             </span>
+                            {shortReason && (
+                              <p className="text-[10px] text-amber-400/80 mt-1 max-w-[220px] truncate" title={shortReason}>
+                                {shortReason}
+                              </p>
+                            )}
                           </td>
                           <td className="p-4 text-slate-400 font-mono">
                             {new Date(payment.created_at).toLocaleDateString("th-TH")}
                           </td>
-                          <td className="p-4 text-center">
-                            {payment.slip_image_url ? (
-                              <a
-                                href={payment.slip_image_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 text-xs font-semibold"
-                              >
-                                ดูสลิป <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
-                            ) : (
-                              "-"
-                            )}
+                          <td className="p-4 text-center space-y-1">
+                            <button
+                              onClick={() => setReviewingPayment(payment)}
+                              className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 text-xs font-semibold"
+                            >
+                              ตรวจสอบสลิป <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
                           </td>
                         </tr>
                       )
@@ -1277,6 +1298,18 @@ export default function SuperAdminPlansPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {reviewingPayment && (
+        <SaasPaymentReviewModal
+          payment={reviewingPayment as SaasPaymentForReview}
+          workspaceName={workspaces.find((w) => w.id === reviewingPayment.workspace_id)?.name || "ไม่พบชื่อหอพัก"}
+          planName={
+            (Array.isArray(reviewingPayment.saas_plans) ? reviewingPayment.saas_plans[0] : reviewingPayment.saas_plans)?.name || "-"
+          }
+          onClose={() => setReviewingPayment(null)}
+          onReviewed={loadSubscriptionsData}
+        />
       )}
     </>
   )

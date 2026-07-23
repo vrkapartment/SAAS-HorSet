@@ -25,7 +25,9 @@ import {
   Settings,
   Languages,
   Copy,
-  Check
+  Check,
+  MessageCircle,
+  Send
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -37,7 +39,10 @@ import {
   getSuperAdminDataAction,
   getSystemSettingsAction,
   updateSystemSettingAction,
-  updateGoogleDriveFolderNameAction
+  updateGoogleDriveFolderNameAction,
+  getSuperAdminLineSettingsAction,
+  updateSuperAdminLineSettingsAction,
+  testSuperAdminLineNotificationAction
 } from "@/features/super-admin/actions"
 
 interface Workspace {
@@ -104,7 +109,7 @@ export default function SuperAdminPage() {
   const [supportGrants, setSupportGrants] = useState<{ [key: string]: string }>({})
 
   // ค้นหาและคัดกรอง
-  const [activeTab, setActiveTab] = useState<"workspaces" | "users" | "invites" | "settings">("workspaces")
+  const [activeTab, setActiveTab] = useState<"workspaces" | "users" | "invites" | "settings" | "line">("workspaces")
   const [searchWorkspace, setSearchWorkspace] = useState("")
   const [searchProfile, setSearchProfile] = useState("")
 
@@ -112,6 +117,14 @@ export default function SuperAdminPage() {
   const [googleProjectId, setGoogleProjectId] = useState("")
   const [googleServiceKey, setGoogleServiceKey] = useState("")
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+
+  // LINE (แจ้งเตือน Super Admin เอง) — คนละตารางกับ workspace_line_settings ของแต่ละหอพัก
+  const [lineChannelAccessToken, setLineChannelAccessToken] = useState("")
+  const [lineAdminUserId, setLineAdminUserId] = useState("")
+  const [lineAdminGroupId, setLineAdminGroupId] = useState("")
+  const [lineNotificationActive, setLineNotificationActive] = useState(true)
+  const [isSavingLineSettings, setIsSavingLineSettings] = useState(false)
+  const [isTestingLineNotification, setIsTestingLineNotification] = useState(false)
 
   // Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2) — คนละกลไกกับ Google Translate ด้านบน (service account)
   const [googleDriveOAuthClientId, setGoogleDriveOAuthClientId] = useState("")
@@ -220,6 +233,44 @@ export default function SuperAdminPage() {
     }
   }
 
+  const handleSaveLineSettings = async () => {
+    setIsSavingLineSettings(true)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      const res = await updateSuperAdminLineSettingsAction({
+        channelAccessToken: lineChannelAccessToken === "••••••••••••••••••••••••••••••••••••" ? undefined : lineChannelAccessToken,
+        adminLineUserId: lineAdminUserId,
+        adminLineGroupId: lineAdminGroupId,
+        notificationActive: lineNotificationActive
+      })
+      if (!res.success) throw new Error(res.error)
+      setResultSuccess("บันทึกการตั้งค่า LINE ของ Super Admin เรียบร้อยแล้ว")
+      if (lineChannelAccessToken && lineChannelAccessToken !== "••••••••••••••••••••••••••••••••••••") {
+        setLineChannelAccessToken("••••••••••••••••••••••••••••••••••••")
+      }
+    } catch (err: any) {
+      setError(err.message || "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า LINE")
+    } finally {
+      setIsSavingLineSettings(false)
+    }
+  }
+
+  const handleTestLineNotification = async () => {
+    setIsTestingLineNotification(true)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      const res = await testSuperAdminLineNotificationAction()
+      if (!res.success) throw new Error(res.error)
+      setResultSuccess("ส่งข้อความทดสอบไปยัง LINE ของ Super Admin แล้ว กรุณาตรวจสอบที่แอป LINE")
+    } catch (err: any) {
+      setError(err.message || "ไม่สามารถส่งข้อความทดสอบได้")
+    } finally {
+      setIsTestingLineNotification(false)
+    }
+  }
+
   // Registration Secret Codes
   const [registrationCodes, setRegistrationCodes] = useState<RegistrationCode[]>([])
   const [genWorkspaceId, setGenWorkspaceId] = useState("")
@@ -283,6 +334,17 @@ export default function SuperAdminPage() {
           if (driveFolderIdSetting) setGoogleDriveFolderId(driveFolderIdSetting.value)
           setGoogleDriveFolderName(driveFolderNameSetting?.value || "HorSet Subscription Slips Archive")
           setGoogleDriveConnected(!!driveRefreshTokenSetting?.value)
+        }
+
+        // Load LINE settings ของ Super Admin เอง (คนละตารางกับ workspace_line_settings)
+        const lineSettingsRes = await getSuperAdminLineSettingsAction()
+        if (lineSettingsRes.success && lineSettingsRes.data) {
+          if (lineSettingsRes.data.channel_access_token) {
+            setLineChannelAccessToken("••••••••••••••••••••••••••••••••••••")
+          }
+          setLineAdminUserId(lineSettingsRes.data.admin_line_user_id || "")
+          setLineAdminGroupId(lineSettingsRes.data.admin_line_group_id || "")
+          setLineNotificationActive(lineSettingsRes.data.notification_active !== false)
         }
 
         const grantMap: { [key: string]: string } = {}
@@ -823,7 +885,8 @@ export default function SuperAdminPage() {
             { id: "workspaces", label: "พื้นที่ทำงาน", icon: Building },
             { id: "users", label: "บัญชีผู้ใช้งาน", icon: Users },
             { id: "invites", label: "เชิญชวน & มอบสิทธิ์", icon: Key },
-            { id: "settings", label: "ตั้งค่าระบบ", icon: Settings }
+            { id: "settings", label: "ตั้งค่าระบบ", icon: Settings },
+            { id: "line", label: "แจ้งเตือน LINE", icon: MessageCircle }
           ].map((tab) => {
             const TabIcon = tab.icon
             const isTabActive = activeTab === tab.id
@@ -1649,6 +1712,135 @@ export default function SuperAdminPage() {
                     >
                       {googleDriveConnected ? "เชื่อมต่อใหม่อีกครั้ง" : "เชื่อมต่อ Google Drive"}
                     </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "line" && (
+          <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent pointer-events-none" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-green-500/20 text-green-400 flex items-center justify-center border border-green-500/30">
+                    <MessageCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-extrabold text-slate-100">LINE OA สำหรับ Super Admin</h3>
+                    <p className="text-sm text-slate-400 mt-1">
+                      รับแจ้งเตือนระดับระบบผ่าน LINE ของทีมงาน HorSet เอง — คนละบัญชีจาก LINE OA ของแต่ละหอพัก
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-6 p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1.5">
+                  <p className="font-bold text-slate-300 mb-1">ระบบจะส่งแจ้งเตือนอัตโนมัติเมื่อ:</p>
+                  <p>• มีหอพักสมัครสมาชิกใหม่ (self-serve signup)</p>
+                  <p>• หอพักไหนถูกล็อกสิทธิ์ (ทดลองใช้งานหมดอายุ / ค้างชำระ / ยกเลิกแพ็กเกจครบวันหมดอายุ)</p>
+                  <p>• สลิปจ่ายเงิน subscription ตรวจสอบไม่ผ่าน (ทั้งตรวจครั้งแรกและครบจำนวนครั้ง retry แล้ว)</p>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                      <span>LINE Channel Access Token</span>
+                      <span className="text-xs text-green-400">ถูกส่งเป็น Bearer token ตอนเรียก LINE Messaging API</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={lineChannelAccessToken}
+                      onChange={(e) => setLineChannelAccessToken(e.target.value)}
+                      placeholder="Channel Access Token จาก LINE Developers Console"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                    />
+                    <p className="text-xs text-slate-500">
+                      * ถ้ามี token เดิมบันทึกไว้อยู่แล้ว จะแสดงเป็น ••••••• เพื่อความปลอดภัย หากต้องการเปลี่ยนให้ลบแล้ววาง token ใหม่
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300">LINE User ID ของ Super Admin</label>
+                    <input
+                      type="text"
+                      value={lineAdminUserId}
+                      onChange={(e) => setLineAdminUserId(e.target.value)}
+                      placeholder="รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่ (สูงสุด 5 คน)"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300">LINE Group ID (ถ้าต้องการแจ้งเข้ากลุ่ม)</label>
+                    <input
+                      type="text"
+                      value={lineAdminGroupId}
+                      onChange={(e) => setLineAdminGroupId(e.target.value)}
+                      placeholder="เช่น Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <div>
+                      <p className="text-sm font-bold text-slate-300">เปิดใช้งานการแจ้งเตือน</p>
+                      <p className="text-xs text-slate-500 mt-0.5">ปิดไว้ชั่วคราวได้โดยไม่ต้องลบ Token/User ID ที่ตั้งค่าไว้</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLineNotificationActive(!lineNotificationActive)}
+                      className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
+                        lineNotificationActive ? "bg-green-600" : "bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-all ${
+                          lineNotificationActive ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800/50 flex flex-col sm:flex-row justify-end gap-3">
+                    <button
+                      onClick={handleTestLineNotification}
+                      disabled={isTestingLineNotification}
+                      className={`px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${
+                        isTestingLineNotification
+                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                      }`}
+                    >
+                      {isTestingLineNotification ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      ส่งข้อความทดสอบ
+                    </button>
+                    <button
+                      onClick={handleSaveLineSettings}
+                      disabled={isSavingLineSettings}
+                      className={`px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${
+                        isSavingLineSettings
+                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-green-600 hover:bg-green-500 text-white shadow-green-500/20"
+                      }`}
+                    >
+                      {isSavingLineSettings ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          กำลังบันทึก...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          บันทึกการตั้งค่า
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

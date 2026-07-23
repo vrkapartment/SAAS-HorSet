@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { sendLineSuperAdminNotificationAction } from "@/features/notification/actions"
 
 // Helper to create Supabase Admin Client to bypass RLS for registration code marking
 function getSupabaseAdmin() {
@@ -476,6 +477,12 @@ export async function registerNewWorkspaceAction(data: {
       }
       return { success: false, error: `สมัครสมาชิกไม่สำเร็จ: ${authError?.message}` }
     }
+
+    // แจ้ง Super Admin ของ HorSet ว่ามีหอพักสมัครใหม่ — fire-and-forget ไม่รอผลและไม่ทำให้การสมัครสมาชิกล้มเหลว
+    // แม้ว่าการแจ้งเตือนนี้จะส่งไม่สำเร็จก็ตาม
+    sendLineSuperAdminNotificationAction(
+      `🎉 มีหอพักสมัครสมาชิกใหม่\n\nชื่อหอพัก: ${propertyName}\nอีเมล: ${email}\nเบอร์โทร: ${data.phone.trim() || "-"}`
+    ).catch((err) => console.error("Error sending super admin new-signup LINE notification:", err))
 
     return {
       success: true,
