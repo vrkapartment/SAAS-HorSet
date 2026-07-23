@@ -482,7 +482,7 @@ export async function getSuperAdminLineSettingsAction() {
 
     const { data, error } = await supabaseAdmin
       .from("super_admin_line_settings")
-      .select("channel_access_token, admin_line_user_id, admin_line_group_id, notification_active")
+      .select("channel_access_token, channel_secret, admin_line_user_id, admin_line_group_id, notification_active")
       .eq("id", 1)
       .maybeSingle()
     if (error) throw error
@@ -495,6 +495,7 @@ export async function getSuperAdminLineSettingsAction() {
 
 export async function updateSuperAdminLineSettingsAction(input: {
   channelAccessToken?: string
+  channelSecret?: string
   adminLineUserId?: string
   adminLineGroupId?: string
   notificationActive: boolean
@@ -516,6 +517,7 @@ export async function updateSuperAdminLineSettingsAction(input: {
       {
         id: 1,
         channel_access_token: input.channelAccessToken?.trim() || null,
+        channel_secret: input.channelSecret?.trim() || null,
         admin_line_user_id: input.adminLineUserId?.trim() || null,
         admin_line_group_id: input.adminLineGroupId?.trim() || null,
         notification_active: input.notificationActive,
@@ -528,6 +530,97 @@ export async function updateSuperAdminLineSettingsAction(input: {
     return { success: true }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to update super admin LINE settings" }
+  }
+}
+
+/**
+ * สร้างรหัสความปลอดภัย 6 หลัก อายุ 5 นาที ให้ Super Admin พิมพ์ในแชท LINE OA ของ HorSet เอง
+ * เพื่อผูก LINE User ID ให้อัตโนมัติ (มิเรอร์ generateAdminConnectionCodeAction ของ workspace admin
+ * แต่ไม่มี workspace_id เกี่ยวข้องเลย — ใช้ตาราง super_admin_connection_codes แยกต่างหาก)
+ */
+export async function generateSuperAdminConnectionCodeAction() {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) {
+      return { success: true, code: "123456", expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() }
+    }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    // ลบรหัสที่หมดอายุแล้วออกก่อนเสมอ กันตารางบวมและกันรหัสเก่าสับสนกับรหัสใหม่
+    await supabaseAdmin.from("super_admin_connection_codes").delete().lt("expires_at", new Date().toISOString())
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+
+    const { error } = await supabaseAdmin
+      .from("super_admin_connection_codes")
+      .insert({ code, expires_at: expiresAt, is_used: false })
+    if (error) throw error
+
+    return { success: true, code, expiresAt }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "ไม่สามารถสร้างรหัสเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง" }
+  }
+}
+
+/**
+ * ให้หน้า UI มา poll เช็คว่ารหัสที่สร้างไว้ถูกใช้ไปแล้วหรือยัง (LINE webhook เป็นคนกด mark is_used ให้)
+ */
+export async function checkSuperAdminConnectionCodeStatusAction(code: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true, isUsed: false }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { data, error } = await supabaseAdmin
+      .from("super_admin_connection_codes")
+      .select("is_used")
+      .eq("code", code)
+      .maybeSingle()
+    if (error) throw error
+
+    return { success: true, isUsed: !!data?.is_used }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to check connection code status" }
+  }
+}
+
+export async function cancelSuperAdminConnectionCodeAction(code: string) {
+  try {
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    if (isDemo) return { success: true }
+
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseAdmin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+    const { error } = await supabaseAdmin.from("super_admin_connection_codes").delete().eq("code", code)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to cancel connection code" }
   }
 }
 

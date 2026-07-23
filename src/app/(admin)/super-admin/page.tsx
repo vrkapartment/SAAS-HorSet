@@ -42,7 +42,10 @@ import {
   updateGoogleDriveFolderNameAction,
   getSuperAdminLineSettingsAction,
   updateSuperAdminLineSettingsAction,
-  testSuperAdminLineNotificationAction
+  testSuperAdminLineNotificationAction,
+  generateSuperAdminConnectionCodeAction,
+  checkSuperAdminConnectionCodeStatusAction,
+  cancelSuperAdminConnectionCodeAction
 } from "@/features/super-admin/actions"
 
 interface Workspace {
@@ -120,11 +123,19 @@ export default function SuperAdminPage() {
 
   // LINE (แจ้งเตือน Super Admin เอง) — คนละตารางกับ workspace_line_settings ของแต่ละหอพัก
   const [lineChannelAccessToken, setLineChannelAccessToken] = useState("")
+  const [lineChannelSecret, setLineChannelSecret] = useState("")
   const [lineAdminUserId, setLineAdminUserId] = useState("")
   const [lineAdminGroupId, setLineAdminGroupId] = useState("")
   const [lineNotificationActive, setLineNotificationActive] = useState(true)
   const [isSavingLineSettings, setIsSavingLineSettings] = useState(false)
   const [isTestingLineNotification, setIsTestingLineNotification] = useState(false)
+
+  // เชื่อมต่อ LINE User ID แบบง่าย (auto-pairing ด้วยรหัส 6 หลัก) — มิเรอร์ flow เดียวกับ workspace admin
+  const [linePairingMode, setLinePairingMode] = useState<"auto" | "manual">("auto")
+  const [lineConnectionCode, setLineConnectionCode] = useState<string | null>(null)
+  const [lineCodeExpiresAt, setLineCodeExpiresAt] = useState<string | null>(null)
+  const [lineCodeCountdown, setLineCodeCountdown] = useState(300)
+  const [isGeneratingLineCode, setIsGeneratingLineCode] = useState(false)
 
   // Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2) — คนละกลไกกับ Google Translate ด้านบน (service account)
   const [googleDriveOAuthClientId, setGoogleDriveOAuthClientId] = useState("")
@@ -240,6 +251,7 @@ export default function SuperAdminPage() {
     try {
       const res = await updateSuperAdminLineSettingsAction({
         channelAccessToken: lineChannelAccessToken === "••••••••••••••••••••••••••••••••••••" ? undefined : lineChannelAccessToken,
+        channelSecret: lineChannelSecret === "••••••••••••••••••••••••••••••••••••" ? undefined : lineChannelSecret,
         adminLineUserId: lineAdminUserId,
         adminLineGroupId: lineAdminGroupId,
         notificationActive: lineNotificationActive
@@ -248,6 +260,9 @@ export default function SuperAdminPage() {
       setResultSuccess("บันทึกการตั้งค่า LINE ของ Super Admin เรียบร้อยแล้ว")
       if (lineChannelAccessToken && lineChannelAccessToken !== "••••••••••••••••••••••••••••••••••••") {
         setLineChannelAccessToken("••••••••••••••••••••••••••••••••••••")
+      }
+      if (lineChannelSecret && lineChannelSecret !== "••••••••••••••••••••••••••••••••••••") {
+        setLineChannelSecret("••••••••••••••••••••••••••••••••••••")
       }
     } catch (err: any) {
       setError(err.message || "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า LINE")
@@ -270,6 +285,75 @@ export default function SuperAdminPage() {
       setIsTestingLineNotification(false)
     }
   }
+
+  const handleGenerateLineConnectionCode = async () => {
+    setIsGeneratingLineCode(true)
+    setError(null)
+    try {
+      const res = await generateSuperAdminConnectionCodeAction()
+      if (res.success && res.code && res.expiresAt) {
+        setLineConnectionCode(res.code)
+        setLineCodeExpiresAt(res.expiresAt)
+      } else {
+        setError(res.error || "ไม่สามารถสร้างรหัสเชื่อมต่อได้")
+      }
+    } catch (err: any) {
+      setError(err.message || "เกิดข้อผิดพลาดในการสร้างรหัสเชื่อมต่อ")
+    } finally {
+      setIsGeneratingLineCode(false)
+    }
+  }
+
+  const handleCancelLineConnectionCode = async () => {
+    if (lineConnectionCode) {
+      await cancelSuperAdminConnectionCodeAction(lineConnectionCode).catch(() => {})
+    }
+    setLineConnectionCode(null)
+    setLineCodeExpiresAt(null)
+  }
+
+  // นับเวลาถอยหลังอายุของรหัสเชื่อมต่อ (5 นาที) — หมดเวลาแล้วเคลียร์รหัสทิ้งอัตโนมัติ
+  useEffect(() => {
+    if (!lineCodeExpiresAt) return
+    const tick = () => {
+      const secondsLeft = Math.max(0, Math.floor((new Date(lineCodeExpiresAt).getTime() - Date.now()) / 1000))
+      setLineCodeCountdown(secondsLeft)
+      if (secondsLeft <= 0) {
+        setLineConnectionCode(null)
+        setLineCodeExpiresAt(null)
+      }
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [lineCodeExpiresAt])
+
+  // Poll เช็คว่ารหัสถูกใช้ไปแล้วหรือยัง (ใช้เมื่อ Super Admin ส่งรหัสไปแชทกับ LINE OA ของ HorSet)
+  useEffect(() => {
+    if (!lineConnectionCode) return
+    let isSubscribed = true
+    const interval = setInterval(async () => {
+      try {
+        const res = await checkSuperAdminConnectionCodeStatusAction(lineConnectionCode)
+        if (res.success && res.isUsed && isSubscribed) {
+          clearInterval(interval)
+          const settingsRes = await getSuperAdminLineSettingsAction()
+          if (settingsRes.success && settingsRes.data) {
+            setLineAdminUserId(settingsRes.data.admin_line_user_id || "")
+          }
+          setResultSuccess("เชื่อมต่อบัญชี LINE สำเร็จ! ระบบผูก LINE User ID ให้อัตโนมัติแล้ว")
+          setLineConnectionCode(null)
+          setLineCodeExpiresAt(null)
+        }
+      } catch (err) {
+        console.error("Error polling super admin connection code status:", err)
+      }
+    }, 2500)
+    return () => {
+      isSubscribed = false
+      clearInterval(interval)
+    }
+  }, [lineConnectionCode])
 
   // Registration Secret Codes
   const [registrationCodes, setRegistrationCodes] = useState<RegistrationCode[]>([])
@@ -341,6 +425,9 @@ export default function SuperAdminPage() {
         if (lineSettingsRes.success && lineSettingsRes.data) {
           if (lineSettingsRes.data.channel_access_token) {
             setLineChannelAccessToken("••••••••••••••••••••••••••••••••••••")
+          }
+          if (lineSettingsRes.data.channel_secret) {
+            setLineChannelSecret("••••••••••••••••••••••••••••••••••••")
           }
           setLineAdminUserId(lineSettingsRes.data.admin_line_user_id || "")
           setLineAdminGroupId(lineSettingsRes.data.admin_line_group_id || "")
@@ -1762,14 +1849,116 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300">LINE User ID ของ Super Admin</label>
+                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                      <span>LINE Channel Secret (ไม่บังคับ)</span>
+                      <span className="text-xs text-green-400">ใช้ตรวจสอบ signature ของ webhook เท่านั้น</span>
+                    </label>
                     <input
                       type="text"
-                      value={lineAdminUserId}
-                      onChange={(e) => setLineAdminUserId(e.target.value)}
-                      placeholder="รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่ (สูงสุด 5 คน)"
+                      value={lineChannelSecret}
+                      onChange={(e) => setLineChannelSecret(e.target.value)}
+                      placeholder="Channel Secret จาก LINE Developers Console"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
                     />
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1.5">
+                    <p className="font-bold text-slate-300">Webhook URL (ตั้งค่าใน LINE Developers Console)</p>
+                    <p className="font-mono text-green-400 break-all select-all">
+                      {(process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app").replace(/\/+$/, "")}/api/webhook/line?scope=super_admin
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">เชื่อมต่อ LINE User ID ของ Super Admin</label>
+                    <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-xl w-full max-w-xs">
+                      {[
+                        { id: "auto", label: "อัตโนมัติ (ง่าย)" },
+                        { id: "manual", label: "กรอกเอง" }
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setLinePairingMode(tab.id as "auto" | "manual")}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                            linePairingMode === tab.id
+                              ? "bg-green-600 text-white shadow-md"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {linePairingMode === "auto" ? (
+                      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                        {!lineConnectionCode ? (
+                          <div className="text-center py-2 space-y-3">
+                            <p className="text-xs text-slate-400">
+                              กดปุ่มด้านล่างเพื่อสร้างรหัส 6 หลัก แล้วพิมพ์ส่งในแชท LINE OA ของ HorSet — ระบบจะผูก LINE User ID ให้อัตโนมัติทันที ไม่ต้องคัดลอก User ID เอง
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleGenerateLineConnectionCode}
+                              disabled={isGeneratingLineCode}
+                              className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:opacity-60 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
+                            >
+                              {isGeneratingLineCode ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Key className="w-4 h-4" />
+                              )}
+                              สร้างรหัสเชื่อมต่อ
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 animate-in fade-in duration-200">
+                            <div className="text-center space-y-1.5 py-3 bg-slate-950 border border-green-500/20 rounded-xl">
+                              <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider block">
+                                ส่งรหัสนี้หา LINE OA ของ HorSet
+                              </span>
+                              <div className="text-3xl font-extrabold text-green-400 font-mono tracking-widest select-all">
+                                {lineConnectionCode.split("").join(" ")}
+                              </div>
+                              <span className="text-xs text-rose-400 font-bold block">
+                                หมดอายุใน {Math.floor(lineCodeCountdown / 60)}:{(lineCodeCountdown % 60).toString().padStart(2, "0")}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={handleCancelLineConnectionCode}
+                                className="mt-1 text-[11px] text-rose-400 hover:text-rose-300 font-bold inline-flex items-center gap-1"
+                              >
+                                <X className="w-3.5 h-3.5" /> ยกเลิกรหัสนี้
+                              </button>
+                            </div>
+                            <div className="p-3 bg-green-500/5 border border-green-500/10 rounded-xl flex items-start gap-2.5">
+                              <RefreshCw className="w-4 h-4 text-green-400 shrink-0 mt-0.5 animate-spin" />
+                              <p className="text-xs text-slate-400">กำลังรอรหัสถูกส่งเข้าแชท LINE... ระบบจะผูกบัญชีให้อัตโนมัติทันทีที่ได้รับ</p>
+                            </div>
+                            <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px] pl-1">
+                              <li>แชทกับ LINE OA ของ HorSet (ต้องเป็นเพื่อนกับบอทก่อน)</li>
+                              <li>พิมพ์เฉพาะตัวเลข {lineConnectionCode} ส่งหาบอต</li>
+                              <li>ระบบจะทำรายการให้เสร็จสรรพโดยไม่ต้องกดปุ่มอะไรอีก!</li>
+                            </ol>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={lineAdminUserId}
+                        onChange={(e) => setLineAdminUserId(e.target.value)}
+                        placeholder="รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่ (สูงสุด 5 คน) — พิมพ์ #MYID หากับบอตเพื่อขอ User ID ของตัวเอง"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-mono text-sm"
+                      />
+                    )}
+
+                    {linePairingMode === "auto" && lineAdminUserId && (
+                      <p className="text-xs text-slate-500">
+                        User ID ที่ผูกไว้แล้ว: <span className="font-mono text-slate-300">{lineAdminUserId}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">

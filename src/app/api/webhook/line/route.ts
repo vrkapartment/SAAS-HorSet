@@ -28,19 +28,33 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const urlWorkspaceId = searchParams.get("workspace_id")
-    
+    // scope=super_admin คือ webhook URL แยกต่างหากสำหรับ LINE OA ของทีมงาน HorSet เอง (channel คนละตัว
+    // จากทุก workspace) — ใช้ตั้งค่า/ตาราง super_admin_line_settings + super_admin_connection_codes เท่านั้น
+    const isSuperAdminScope = searchParams.get("scope") === "super_admin"
+
     // Read raw body as text for signature verification
     const rawBody = await request.text()
-    
+
     const signature = request.headers.get("x-line-signature") || ""
     const supabase = getSystemClient()
 
-    // 1. Fetch settings for signature verification if workspaceId is present
-    let channelSecret = process.env.LINE_CHANNEL_SECRET || ""
-    let channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || ""
+    // 1. Fetch settings for signature verification ตาม scope ของ request
+    let channelSecret = isSuperAdminScope ? "" : process.env.LINE_CHANNEL_SECRET || ""
+    let channelAccessToken = isSuperAdminScope ? "" : process.env.LINE_CHANNEL_ACCESS_TOKEN || ""
     let activeWorkspaceId = urlWorkspaceId
 
-    if (urlWorkspaceId) {
+    if (isSuperAdminScope) {
+      const { data: saSettings } = await supabase
+        .from("super_admin_line_settings")
+        .select("channel_secret, channel_access_token")
+        .eq("id", 1)
+        .maybeSingle()
+
+      if (saSettings) {
+        if (saSettings.channel_secret) channelSecret = saSettings.channel_secret
+        if (saSettings.channel_access_token) channelAccessToken = saSettings.channel_access_token
+      }
+    } else if (urlWorkspaceId) {
       const { data: wsSettings } = await supabase
         .from("workspace_line_settings")
         .select("channel_secret, channel_access_token")
@@ -112,8 +126,105 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // Handle 6-digit numeric pairing code for Super Admin LINE Connection (คนละ flow จาก workspace admin
+        // ด้านล่าง — ไม่มี workspace_id เกี่ยวข้องเลย ใช้ super_admin_line_settings/super_admin_connection_codes)
+        if (isSuperAdminScope && /^\d{6}$/.test(text)) {
+          const userId = source.userId
+          if (userId) {
+            const { data: codeData } = await supabase
+              .from("super_admin_connection_codes")
+              .select("expires_at")
+              .eq("code", text)
+              .eq("is_used", false)
+              .gt("expires_at", new Date().toISOString())
+              .maybeSingle()
+
+            if (codeData) {
+              const { data: saSettings } = await supabase
+                .from("super_admin_line_settings")
+                .select("channel_access_token, admin_line_user_id")
+                .eq("id", 1)
+                .maybeSingle()
+
+              const activeToken = saSettings?.channel_access_token || channelAccessToken
+
+              if (activeToken && activeToken !== "placeholder" && activeToken.trim()) {
+                const existingAdminsStr = saSettings?.admin_line_user_id || ""
+                const existingAdmins = existingAdminsStr
+                  .split(/[\s,\n]+/)
+                  .map((id: string) => id.trim())
+                  .filter((id: string) => id.length > 0)
+
+                let replyMessageText = ""
+
+                if (existingAdmins.includes(userId)) {
+                  replyMessageText = `💡 บัญชี LINE ของคุณถูกผูกเป็น Super Admin อยู่แล้วในระบบครับ!`
+                } else if (existingAdmins.length >= 5) {
+                  replyMessageText = `⚠️ ขออภัย ระบบสามารถรองรับการผูกบัญชี LINE Super Admin ได้สูงสุด 5 คนแล้ว หากต้องการเชื่อมต่อเพิ่มเติม กรุณาลบคนเดิมในหน้าตั้งค่า Super Admin ออกก่อนครับ`
+                } else {
+                  existingAdmins.push(userId)
+                  const newAdminsStr = existingAdmins.join(", ")
+
+                  const { error: updateError } = await supabase
+                    .from("super_admin_line_settings")
+                    .update({ admin_line_user_id: newAdminsStr, updated_at: new Date().toISOString() })
+                    .eq("id", 1)
+
+                  if (updateError) {
+                    console.error("Error updating super_admin_line_settings.admin_line_user_id:", updateError)
+                    replyMessageText = `⚠️ เกิดข้อผิดพลาดทางเทคนิคในการผูกบัญชี กรุณาลองใหม่อีกครั้ง`
+                  } else {
+                    await supabase
+                      .from("super_admin_connection_codes")
+                      .update({ is_used: true })
+                      .eq("code", text)
+
+                    let displayName = "Super Admin"
+                    try {
+                      const profileRes = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+                        method: "GET",
+                        headers: { "Authorization": `Bearer ${activeToken}` }
+                      })
+                      if (profileRes.ok) {
+                        const profileData = await profileRes.json()
+                        if (profileData?.displayName) displayName = profileData.displayName
+                      }
+                    } catch (pErr) {
+                      console.error("Error fetching super admin profile name:", pErr)
+                    }
+
+                    replyMessageText = `🎉 เชื่อมต่อบัญชีสำเร็จ!\n\nสวัสดีครับคุณ ${displayName}\n\nบัญชี LINE ของคุณได้รับการเชื่อมต่อเป็น Super Admin ของ HorSet เรียบร้อยแล้ว ตั้งแต่นี้ไปคุณจะได้รับการแจ้งเตือนระดับระบบทันทีครับ 🚀`
+                  }
+                }
+
+                await fetch("https://api.line.me/v2/bot/message/reply", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${activeToken}` },
+                  body: JSON.stringify({
+                    replyToken: event.replyToken,
+                    messages: [{ type: "text", text: replyMessageText }]
+                  })
+                })
+              }
+            } else if (channelAccessToken && channelAccessToken !== "placeholder") {
+              await fetch("https://api.line.me/v2/bot/message/reply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${channelAccessToken}` },
+                body: JSON.stringify({
+                  replyToken: event.replyToken,
+                  messages: [{
+                    type: "text",
+                    text: `❌ รหัสเชื่อมต่อ "${text}" ไม่ถูกต้อง หมดอายุ (เกิน 5 นาที) หรือถูกใช้งานไปแล้ว\n\nกรุณากดปุ่ม "สร้างรหัสเชื่อมต่อ" ในหน้าตั้งค่า Super Admin เพื่อสร้างรหัสใหม่ครับ`
+                  }]
+                })
+              })
+            }
+          }
+          continue
+        }
+
         // Handle 6-digit numeric pairing code for Admin LINE Connection
-        if (/^\d{6}$/.test(text)) {
+        if (!isSuperAdminScope && /^\d{6}$/.test(text)) {
           const userId = source.userId
           if (userId) {
             // Find active valid connection code from DB
@@ -253,8 +364,8 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Handle #CONNECT- command for connecting Group ID
-        if (text.toUpperCase().startsWith("#CONNECT-")) {
+        // Handle #CONNECT- command for connecting Group ID (ยังไม่รองรับฝั่ง Super Admin — ผูกกลุ่มได้ manual เท่านั้น)
+        if (!isSuperAdminScope && text.toUpperCase().startsWith("#CONNECT-")) {
           const connectionCode = text.substring(9).trim().toLowerCase()
           
           if (source.type !== "group") {
