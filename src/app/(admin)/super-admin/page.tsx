@@ -130,6 +130,7 @@ export default function SuperAdminPage() {
   const [lineAdminUserId, setLineAdminUserId] = useState("")
   const [lineAdminGroupId, setLineAdminGroupId] = useState("")
   const [lineNotificationActive, setLineNotificationActive] = useState(true)
+  const [lineQuotaExceededBehavior, setLineQuotaExceededBehavior] = useState<"skip" | "send_anyway">("skip")
   const [isSavingLineSettings, setIsSavingLineSettings] = useState(false)
   const [isTestingLineNotification, setIsTestingLineNotification] = useState(false)
 
@@ -156,6 +157,9 @@ export default function SuperAdminPage() {
   const [lineProfilesLoading, setLineProfilesLoading] = useState(false)
 
   const lineQuotaExhausted = lineQuota !== null && lineQuota.remaining !== null && lineQuota.remaining <= 0
+  // ล็อกปิดการแจ้งเตือนใน UI เฉพาะตอนเลือกโหมด "ข้ามการส่ง" ไว้เท่านั้น — ถ้าเลือก "ส่งต่อแม้เกินโควต้าฟรี" ไว้
+  // ต้องยังกดเปิด/ปิดเองได้ตามปกติ เพราะระบบจะไม่ปิดให้อัตโนมัติอยู่แล้วในโหมดนี้
+  const lineQuotaExhaustedAndSkipping = lineQuotaExhausted && lineQuotaExceededBehavior === "skip"
 
   // Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2) — คนละกลไกกับ Google Translate ด้านบน (service account)
   const [googleDriveOAuthClientId, setGoogleDriveOAuthClientId] = useState("")
@@ -289,8 +293,8 @@ export default function SuperAdminPage() {
       const res = await getSuperAdminLineQuotaAction()
       if (res.success && res.data) {
         setLineQuota(res.data)
-        // ถ้าโควต้าหมดแล้ว server จะปิด notification_active ให้อัตโนมัติ — sync ค่าใน UI ให้ตรงกันทันที
-        if (res.data.remaining !== null && res.data.remaining <= 0) {
+        // ถ้าโควต้าหมดแล้วและตั้งไว้เป็นโหมด "ข้ามการส่ง" server จะปิด notification_active ให้อัตโนมัติ — sync ค่าใน UI ให้ตรงกันทันที
+        if (res.data.remaining !== null && res.data.remaining <= 0 && lineQuotaExceededBehavior === "skip") {
           setLineNotificationActive(false)
         }
       } else {
@@ -315,7 +319,8 @@ export default function SuperAdminPage() {
         channelSecret: lineChannelSecret === "••••••••••••••••••••••••••••••••••••" ? undefined : lineChannelSecret,
         adminLineUserId: lineAdminUserId,
         adminLineGroupId: lineAdminGroupId,
-        notificationActive: lineNotificationActive
+        notificationActive: lineNotificationActive,
+        quotaExceededBehavior: lineQuotaExceededBehavior
       })
       if (!res.success) throw new Error(res.error)
       setResultSuccess("บันทึกการตั้งค่า LINE ของ Super Admin เรียบร้อยแล้ว")
@@ -497,6 +502,7 @@ export default function SuperAdminPage() {
           setLineAdminUserId(lineSettingsRes.data.admin_line_user_id || "")
           setLineAdminGroupId(lineSettingsRes.data.admin_line_group_id || "")
           setLineNotificationActive(lineSettingsRes.data.notification_active !== false)
+          setLineQuotaExceededBehavior(lineSettingsRes.data.quota_exceeded_behavior === "send_anyway" ? "send_anyway" : "skip")
 
           if (lineSettingsRes.data.channel_access_token) {
             loadLineQuota()
@@ -1938,7 +1944,11 @@ export default function SuperAdminPage() {
                       {lineQuotaExhausted && (
                         <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2 text-rose-400 text-xs font-bold">
                           <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                          <span>โควต้าหมดแล้ว ระบบปิดการแจ้งเตือนอัตโนมัติเพื่อป้องกันค่าใช้จ่ายเพิ่มจากการส่งเกินโควต้า</span>
+                          <span>
+                            {lineQuotaExceededBehavior === "skip"
+                              ? "โควต้าหมดแล้ว ระบบปิดการแจ้งเตือนอัตโนมัติเพื่อป้องกันค่าใช้จ่ายเพิ่มจากการส่งเกินโควต้า"
+                              : "โควต้าหมดแล้ว แต่ตั้งค่าไว้ให้ส่งต่อไปตามปกติ — อาจมีค่าใช้จ่ายเพิ่มถ้าแพ็กเกจ LINE คิดเงินส่วนเกิน"}
+                          </span>
                         </div>
                       )}
                       <div className="grid grid-cols-3 gap-3">
@@ -2137,26 +2147,56 @@ export default function SuperAdminPage() {
                     />
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">เมื่อโควต้าข้อความ LINE หมด</label>
+                    <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-xl w-full">
+                      {[
+                        { id: "skip", label: "ข้ามการส่ง (ปลอดภัย)" },
+                        { id: "send_anyway", label: "ส่งต่อแม้เกินโควต้าฟรี" }
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setLineQuotaExceededBehavior(opt.id as "skip" | "send_anyway")}
+                          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                            lineQuotaExceededBehavior === opt.id
+                              ? opt.id === "skip"
+                                ? "bg-green-600 text-white shadow-md"
+                                : "bg-amber-600 text-white shadow-md"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {lineQuotaExceededBehavior === "skip"
+                        ? "แนะนำ — ระบบจะปิดการแจ้งเตือนอัตโนมัติทันทีที่โควต้าเหลือ 0 ไม่มีความเสี่ยงค่าใช้จ่ายเพิ่ม"
+                        : "เผื่อไว้สำหรับกรณีต้องการให้แจ้งเตือนสำคัญส่งต่อไปได้แม้โควต้าฟรีหมด — อาจมีค่าใช้จ่ายเพิ่มถ้าแพ็กเกจ LINE คิดเงินส่วนเกิน"}
+                    </p>
+                  </div>
+
                   <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div>
                       <p className="text-sm font-bold text-slate-300">เปิดใช้งานการแจ้งเตือน</p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {lineQuotaExhausted
+                        {lineQuotaExhaustedAndSkipping
                           ? "ปิดอัตโนมัติเพราะโควต้าข้อความ LINE หมดแล้ว — กดรีเฟรชโควต้าด้านบนอีกครั้งหลังโควต้าปัดรอบใหม่เพื่อเปิดกลับ"
                           : "ปิดไว้ชั่วคราวได้โดยไม่ต้องลบ Token/User ID ที่ตั้งค่าไว้"}
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => !lineQuotaExhausted && setLineNotificationActive(!lineNotificationActive)}
-                      disabled={lineQuotaExhausted}
+                      onClick={() => !lineQuotaExhaustedAndSkipping && setLineNotificationActive(!lineNotificationActive)}
+                      disabled={lineQuotaExhaustedAndSkipping}
                       className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${
-                        lineQuotaExhausted ? "bg-slate-800 cursor-not-allowed opacity-60" : lineNotificationActive ? "bg-green-600" : "bg-slate-700"
+                        lineQuotaExhaustedAndSkipping ? "bg-slate-800 cursor-not-allowed opacity-60" : lineNotificationActive ? "bg-green-600" : "bg-slate-700"
                       }`}
                     >
                       <span
                         className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-all ${
-                          lineNotificationActive && !lineQuotaExhausted ? "translate-x-5" : "translate-x-0"
+                          lineNotificationActive && !lineQuotaExhaustedAndSkipping ? "translate-x-5" : "translate-x-0"
                         }`}
                       />
                     </button>

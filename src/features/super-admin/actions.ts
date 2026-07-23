@@ -482,7 +482,7 @@ export async function getSuperAdminLineSettingsAction() {
 
     const { data, error } = await supabaseAdmin
       .from("super_admin_line_settings")
-      .select("channel_access_token, channel_secret, admin_line_user_id, admin_line_group_id, notification_active")
+      .select("channel_access_token, channel_secret, admin_line_user_id, admin_line_group_id, notification_active, quota_exceeded_behavior")
       .eq("id", 1)
       .maybeSingle()
     if (error) throw error
@@ -499,6 +499,7 @@ export async function updateSuperAdminLineSettingsAction(input: {
   adminLineUserId?: string
   adminLineGroupId?: string
   notificationActive: boolean
+  quotaExceededBehavior?: "skip" | "send_anyway"
 }) {
   try {
     const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
@@ -521,6 +522,7 @@ export async function updateSuperAdminLineSettingsAction(input: {
         admin_line_user_id: input.adminLineUserId?.trim() || null,
         admin_line_group_id: input.adminLineGroupId?.trim() || null,
         notification_active: input.notificationActive,
+        quota_exceeded_behavior: input.quotaExceededBehavior || "skip",
         updated_at: new Date().toISOString()
       },
       { onConflict: "id" }
@@ -650,7 +652,7 @@ export async function getSuperAdminLineQuotaAction() {
 
     const { data: settings } = await supabaseAdmin
       .from("super_admin_line_settings")
-      .select("channel_access_token")
+      .select("channel_access_token, quota_exceeded_behavior")
       .eq("id", 1)
       .maybeSingle()
 
@@ -662,7 +664,9 @@ export async function getSuperAdminLineQuotaAction() {
     const { fetchSuperAdminLineQuota } = await import("@/features/notification/actions")
     const quota = await fetchSuperAdminLineQuota(channelAccessToken)
 
-    if (quota.remaining !== null && quota.remaining <= 0) {
+    // ปิดการแจ้งเตือนอัตโนมัติเมื่อโควต้าหมด เฉพาะกรณีเลือกโหมด "ข้ามการส่ง" (ค่า default) เท่านั้น —
+    // ถ้าเลือก "ส่งต่อแม้เกินโควต้าฟรี" ไว้ ให้ยังคงเปิดแจ้งเตือนต่อไปตามที่ตั้งใจไว้
+    if (quota.remaining !== null && quota.remaining <= 0 && (settings?.quota_exceeded_behavior || "skip") === "skip") {
       await supabaseAdmin
         .from("super_admin_line_settings")
         .update({ notification_active: false, updated_at: new Date().toISOString() })

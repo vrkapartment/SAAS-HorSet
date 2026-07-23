@@ -1362,7 +1362,7 @@ export async function sendLineSuperAdminNotificationAction(message: string) {
 
     const { data: settings } = await supabase
       .from("super_admin_line_settings")
-      .select("channel_access_token, admin_line_user_id, admin_line_group_id, notification_active")
+      .select("channel_access_token, admin_line_user_id, admin_line_group_id, notification_active, quota_exceeded_behavior")
       .eq("id", 1)
       .maybeSingle()
 
@@ -1375,11 +1375,13 @@ export async function sendLineSuperAdminNotificationAction(message: string) {
       return { success: false, error: "ยังไม่ได้ตั้งค่า LINE Channel Access Token สำหรับ Super Admin" }
     }
 
-    // เช็คโควต้าสดก่อนยิงจริงทุกครั้ง ถ้าเหลือ 0 ให้ปิดการแจ้งเตือนอัตโนมัติแล้วข้ามการส่ง — ป้องกันไม่ให้ระบบ
-    // พยายามยิง push ต่อไปทั้งที่โควต้าหมดแล้ว (บางแพ็กเกจของ LINE คิดค่าใช้จ่ายส่วนเกินโควต้า)
+    // เช็คโควต้าสดก่อนยิงจริงทุกครั้ง ถ้าเหลือ 0 และเลือกโหมด "ข้ามการส่ง" (ค่า default) ไว้ ให้ปิดการแจ้งเตือน
+    // อัตโนมัติแล้วข้ามการส่ง — ถ้าเลือกโหมด "ส่งต่อแม้เกินโควต้าฟรี" ไว้ ให้ปล่อยผ่านไปยิงตามปกติ (ยอมรับความเสี่ยง
+    // ค่าใช้จ่ายส่วนเกินเอง ตามที่ Super Admin ตั้งใจเลือกไว้)
+    const quotaExceededBehavior = settings.quota_exceeded_behavior || "skip"
     try {
       const quota = await fetchSuperAdminLineQuota(channelAccessToken)
-      if (quota.remaining !== null && quota.remaining <= 0) {
+      if (quota.remaining !== null && quota.remaining <= 0 && quotaExceededBehavior === "skip") {
         await supabase
           .from("super_admin_line_settings")
           .update({ notification_active: false, updated_at: new Date().toISOString() })
