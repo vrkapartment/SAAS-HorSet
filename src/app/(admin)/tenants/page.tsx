@@ -33,9 +33,10 @@ import {
   LayoutGrid,
   List,
   Edit,
-  ChevronDown
+  ArrowRightLeft
 } from "lucide-react"
 import { getTenants, getOldTenants, deleteOldTenant, createTenantsBatch, updateTenant } from "@/features/tenant/actions"
+import RoomTransferModal from "@/features/tenant/components/RoomTransferModal"
 import { getFinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
@@ -53,12 +54,14 @@ function getCookie(name: string): string | undefined {
 
 interface TenantItem {
   id: string
+  roomId?: string | null
   roomNumber: string
   fullName: string
   phone: string
   lineUserId: string | null
   contractStart: string
   contractEnd: string
+  depositPaid?: number | null
   status?: string
 }
 
@@ -112,9 +115,10 @@ export default function TenantsPage() {
   })
 
   const [hasEditPermission, setHasEditPermission] = useState(true)
+  // ย้ายห้องจำกัดสิทธิ์เฉพาะ Admin/Super Admin เท่านั้น (เข้มกว่า hasEditPermission ทั่วไป เพราะแตะเงินประกัน)
+  const [isAdminOrSuper, setIsAdminOrSuper] = useState(false)
   // Tenant Edit States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false)
   const [selectedTenant, setSelectedTenant] = useState<TenantItem | null>(null)
   const [editFullName, setEditFullName] = useState("")
   const [editPhone, setEditPhone] = useState("")
@@ -123,6 +127,10 @@ export default function TenantsPage() {
   const [editContractEnd, setEditContractEnd] = useState("")
   const [editLineUserId, setEditLineUserId] = useState("")
   const [editSubmitting, setEditSubmitting] = useState(false)
+
+  // Room Transfer (ย้ายห้อง) States
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
+  const [transferTenant, setTransferTenant] = useState<TenantItem | null>(null)
 
   // Sorting State
   const [sortField, setSortField] = useState<"room" | "fullName" | "line" | "lease" | "status">("room")
@@ -461,6 +469,7 @@ export default function TenantsPage() {
         if (res.success && res.data) {
           const profile = res.data
           const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
+          setIsAdminOrSuper(isUserAdminOrSuper)
           if (isUserAdminOrSuper) {
             setHasEditPermission(true)
           } else {
@@ -532,6 +541,15 @@ export default function TenantsPage() {
     setEditContractEnd(formatDateForInput(tenant.contractEnd))
     setEditLineUserId(tenant.lineUserId || "")
     setIsEditModalOpen(true)
+  }
+
+  const handleOpenTransferModal = (tenant: TenantItem) => {
+    if (!isAdminOrSuper) {
+      showToast("ฟีเจอร์ย้ายห้องจำกัดสิทธิ์เฉพาะผู้ดูแลระบบ (Admin) เท่านั้น", "error")
+      return
+    }
+    setTransferTenant(tenant)
+    setTransferModalOpen(true)
   }
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -709,26 +727,8 @@ export default function TenantsPage() {
         bg: "bg-red-50 dark:bg-red-950/40 text-red-500 dark:text-red-400"
       }
 
-  // Filter and sort available rooms plus current tenant's room
-  const availableRoomsDropdownOptions = (() => {
-    if (!selectedTenant) return []
-    // Find all vacant rooms
-    const vacant = rooms.filter(r => r.status === "available" || !r.tenantName)
-    
-    // Create a unique set of room numbers including current tenant's room
-    const roomNumbersSet = new Set<string>()
-    vacant.forEach(r => {
-      if (r.roomNumber) roomNumbersSet.add(r.roomNumber)
-    })
-    if (selectedTenant.roomNumber) {
-      roomNumbersSet.add(selectedTenant.roomNumber)
-    }
-    
-    // Convert back to sorted array
-    return Array.from(roomNumbersSet).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-    )
-  })()
+  // ห้องว่างทั้งหมด (สำหรับ modal ย้ายห้อง — ไม่รวมห้องปัจจุบันของผู้เช่าเพราะสถานะเป็น occupied อยู่แล้ว)
+  const vacantRoomsForTransfer = rooms.filter(r => r.status === "available")
 
   const getRoomFloor = (roomNum: string) => {
     const room = rooms.find(r => r.roomNumber === roomNum)
@@ -1185,6 +1185,15 @@ export default function TenantsPage() {
                                 >
                                   <Edit className="w-3.5 h-3.5" />
                                 </button>
+                                {isAdminOrSuper && (
+                                  <button
+                                    onClick={() => handleOpenTransferModal(tenant)}
+                                    className="p-1 text-teal-600 hover:text-teal-500 dark:text-teal-400 dark:hover:text-teal-300 rounded hover:bg-slate-200/50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                                    title="ย้ายห้อง"
+                                  >
+                                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1309,13 +1318,24 @@ export default function TenantsPage() {
                       </td>
                       {hasEditPermission && (
                         <td className="py-4 px-5 text-center">
-                          <button
-                            onClick={() => handleEditClick(tenant)}
-                            className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center"
-                            title={t("tenants.edit_tenant_tooltip")}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => handleEditClick(tenant)}
+                              className="p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center"
+                              title={t("tenants.edit_tenant_tooltip")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            {isAdminOrSuper && (
+                              <button
+                                onClick={() => handleOpenTransferModal(tenant)}
+                                className="p-1.5 text-teal-600 hover:text-teal-500 dark:text-teal-400 dark:hover:text-teal-300 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center"
+                                title="ย้ายห้อง"
+                              >
+                                <ArrowRightLeft className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -1739,7 +1759,6 @@ export default function TenantsPage() {
               <button
                 onClick={() => {
                   setIsEditModalOpen(false)
-                  setIsRoomDropdownOpen(false)
                   setSelectedTenant(null)
                 }}
                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all cursor-pointer"
@@ -1780,59 +1799,27 @@ export default function TenantsPage() {
                 />
               </div>
 
-              {/* Room Number */}
-              <div className="space-y-1.5 relative">
+              {/* Room Number — แสดงผลอย่างเดียว ย้ายห้องต้องใช้ปุ่ม "ย้ายห้อง" โดยเฉพาะ
+                  (มีการเช็คห้องว่าง/ประวัติ/เงินประกัน/มิเตอร์/แจ้งเตือน LINE ที่ฟอร์มนี้ไม่รองรับ) */}
+              <div className="space-y-1.5">
                 <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">
                   {t("tenants.room_number_label_full")}
                 </label>
-                
-                {/* Custom select trigger button */}
-                <button
-                  type="button"
-                  onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl text-sm md:text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none font-mono font-semibold cursor-pointer flex justify-between items-center text-slate-850 dark:text-slate-100"
-                >
-                  <span>
-                    {t("billing.room_label").replace("{roomNumber}", editRoomNumber)}{" "}
-                    <span className={editRoomNumber === selectedTenant.roomNumber ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
-                      {editRoomNumber === selectedTenant.roomNumber ? t("tenants.current_room_suffix") : t("tenants.vacant_room_suffix")}
-                    </span>
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-slate-450 transition-transform duration-200 ${isRoomDropdownOpen ? "rotate-180" : ""}`} />
-                </button>
-
-                {/* Custom options popover list */}
-                {isRoomDropdownOpen && (
-                  <>
-                    {/* Invisible click backdrop to close on click outside */}
-                    <div className="fixed inset-0 z-10" onClick={() => setIsRoomDropdownOpen(false)} />
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-20 max-h-60 overflow-y-auto py-1 animate-scale-up">
-                      {availableRoomsDropdownOptions.map((roomNum) => {
-                        const isCurrent = roomNum === selectedTenant.roomNumber
-                        return (
-                          <button
-                            key={roomNum}
-                            type="button"
-                            onClick={() => {
-                              setEditRoomNumber(roomNum)
-                              setIsRoomDropdownOpen(false)
-                            }}
-                            className={`w-full px-4 py-3 text-left text-sm md:text-base hover:bg-slate-50 dark:hover:bg-slate-950/40 font-mono font-semibold transition-colors flex justify-between items-center ${
-                              editRoomNumber === roomNum 
-                                ? "bg-slate-50/50 dark:bg-slate-950/10 text-slate-900 dark:text-white" 
-                                : "text-slate-750 dark:text-slate-200"
-                            }`}
-                          >
-                            <span>{t("billing.room_label").replace("{roomNumber}", roomNum)}</span>
-                            <span className={isCurrent ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
-                              {isCurrent ? t("tenants.current_room_suffix") : t("tenants.vacant_room_suffix")}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
+                <div className="w-full px-4 py-3 bg-slate-100/85 dark:bg-slate-950/45 border border-slate-200/50 dark:border-slate-800/80 rounded-xl text-slate-500 dark:text-slate-400 text-sm md:text-base font-mono font-semibold flex justify-between items-center">
+                  <span>{t("billing.room_label").replace("{roomNumber}", editRoomNumber)}</span>
+                  {isAdminOrSuper && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditModalOpen(false)
+                        handleOpenTransferModal(selectedTenant)
+                      }}
+                      className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 text-xs md:text-sm font-extrabold underline underline-offset-2 cursor-pointer"
+                    >
+                      ต้องการย้ายห้อง?
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Date Start & End */}
@@ -1884,7 +1871,6 @@ export default function TenantsPage() {
                   type="button"
                   onClick={() => {
                     setIsEditModalOpen(false)
-                    setIsRoomDropdownOpen(false)
                     setSelectedTenant(null)
                   }}
                   className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs md:text-sm font-extrabold rounded-xl transition-all cursor-pointer"
@@ -1909,6 +1895,28 @@ export default function TenantsPage() {
             </form>
           </div>
         </div>
+      )}
+      {/* Room Transfer Modal */}
+      {transferModalOpen && transferTenant && (
+        <RoomTransferModal
+          tenant={{
+            id: transferTenant.id,
+            roomNumber: transferTenant.roomNumber,
+            fullName: transferTenant.fullName,
+            depositPaid: transferTenant.depositPaid
+          }}
+          vacantRooms={vacantRoomsForTransfer.map(r => ({ id: r.id, roomNumber: r.roomNumber }))}
+          onClose={() => {
+            setTransferModalOpen(false)
+            setTransferTenant(null)
+          }}
+          onSuccess={({ toRoomNumber }) => {
+            setTransferModalOpen(false)
+            setTransferTenant(null)
+            showToast(`ย้ายห้องสำเร็จ! ย้ายไปห้อง ${toRoomNumber} เรียบร้อยแล้ว`, "success")
+            loadData(true)
+          }}
+        />
       )}
     </div>
     </>

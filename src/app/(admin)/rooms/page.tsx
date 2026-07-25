@@ -38,8 +38,10 @@ import {
   Clock,
   Coins,
   Zap,
-  Droplet
+  Droplet,
+  ArrowRightLeft
 } from "lucide-react"
+import RoomTransferModal from "@/features/tenant/components/RoomTransferModal"
 import { 
   getRooms, 
   createRoom, 
@@ -66,7 +68,7 @@ import {
 } from "@/features/tenant/actions"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
-import { calculateDepositProration, checkIfBreakContract } from "@/features/room/deposit-calculator"
+import { calculateDepositProration, checkIfBreakContract, computeStandardDeposit } from "@/features/room/deposit-calculator"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { packWorkspaceAndRoom } from "@/lib/urlPacker"
@@ -98,6 +100,7 @@ interface RoomItem {
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
   extraExpenses?: { name: string; amount: number }[]
+  depositPaid?: number | null
 }
 
 interface RoomTypeItem {
@@ -139,6 +142,9 @@ function RoomsContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasEditPermission, setHasEditPermission] = useState(true)
+  // ย้ายห้องจำกัดสิทธิ์เฉพาะ Admin/Super Admin เท่านั้น (เข้มกว่า hasEditPermission ทั่วไป เพราะแตะเงินประกัน)
+  const [isAdminOrSuper, setIsAdminOrSuper] = useState(false)
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
 
   // CSV Import States
   const [autoMappedRooms, setAutoMappedRooms] = useState<CsvRoomItem[]>([])
@@ -155,6 +161,7 @@ function RoomsContent() {
         if (res.success && res.data) {
           const profile = res.data
           const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
+          setIsAdminOrSuper(isUserAdminOrSuper)
           if (isUserAdminOrSuper) {
             setHasEditPermission(true)
           } else {
@@ -1135,15 +1142,18 @@ function RoomsContent() {
     const initialDate = new Date().toISOString().split("T")[0]
     setCheckoutDate(initialDate)
     
-    // คำนวณเงินประกันสะสมตามโหมด: คิดตามจำนวนเดือน หรือ ยอดเงินคงที่ (แยกตามประเภทห้อง)
-    let calculatedDeposit = 0
-    if (financeSettings) {
-      if (financeSettings.deposit_type === "fixed") {
+    // เงินประกันจริงที่เก็บจากผู้เช่ารายนี้ (ground truth) — คำนวณสดจาก settings เฉพาะกรณี
+    // ผู้เช่ายังไม่ถูก migrate (depositPaid เป็น null) เท่านั้น
+    let calculatedDeposit = selectedRoom.depositPaid ?? 0
+    if (selectedRoom.depositPaid === null || selectedRoom.depositPaid === undefined) {
+      if (financeSettings) {
         const roomTypeDeposit = selectedRoom.roomTypeId ? roomTypeDeposits[selectedRoom.roomTypeId] : undefined
-        calculatedDeposit = roomTypeDeposit !== undefined ? roomTypeDeposit : (financeSettings.deposit_amount || 0)
-      } else {
-        const depositMonths = financeSettings.deposit_amount || 0
-        calculatedDeposit = selectedRoom.baseRent * depositMonths
+        calculatedDeposit = computeStandardDeposit(
+          selectedRoom.baseRent,
+          financeSettings.deposit_type,
+          financeSettings.deposit_amount || 0,
+          roomTypeDeposit
+        )
       }
     }
     setCheckoutDeposit(calculatedDeposit)
@@ -1251,15 +1261,18 @@ function RoomsContent() {
       { id: "1", name: "ค่าล้างแอร์", amount: 500 }
     ])
     
-    // คำนวณเงินประกันตั้งต้น
-    let calculatedDeposit = 0
-    if (financeSettings) {
-      if (financeSettings.deposit_type === "fixed") {
+    // เงินประกันจริงที่เก็บจากผู้เช่ารายนี้ (ground truth) — คำนวณสดจาก settings เฉพาะกรณี
+    // ผู้เช่ายังไม่ถูก migrate (depositPaid เป็น null) เท่านั้น
+    let calculatedDeposit = room.depositPaid ?? 0
+    if (room.depositPaid === null || room.depositPaid === undefined) {
+      if (financeSettings) {
         const roomTypeDeposit = room.roomTypeId ? roomTypeDeposits[room.roomTypeId] : undefined
-        calculatedDeposit = roomTypeDeposit !== undefined ? roomTypeDeposit : (financeSettings.deposit_amount || 0)
-      } else {
-        const depositMonths = financeSettings.deposit_amount || 0
-        calculatedDeposit = room.baseRent * depositMonths
+        calculatedDeposit = computeStandardDeposit(
+          room.baseRent,
+          financeSettings.deposit_type,
+          financeSettings.deposit_amount || 0,
+          roomTypeDeposit
+        )
       }
     }
     setRefundDeposit(calculatedDeposit)
@@ -3789,6 +3802,21 @@ function RoomsContent() {
                         แก้ไขข้อมูลผู้เช่า
                       </button>
 
+                      {/* ย้ายห้อง — จำกัดสิทธิ์เฉพาะ Admin/Super Admin เพราะแตะเงินประกันจริง */}
+                      {isAdminOrSuper && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTenantDetailModalOpen(false)
+                            setTransferModalOpen(true)
+                          }}
+                          className="w-full h-11 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/20 dark:hover:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-150"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                          ย้ายห้อง
+                        </button>
+                      )}
+
                       <div className="flex flex-col sm:flex-row gap-3">
                         <button
                           type="button"
@@ -4805,6 +4833,26 @@ function RoomsContent() {
           </div>
         )}
 
+        {/* ========================================================= */}
+        {/* MODAL 7: ROOM TRANSFER MODAL (ย้ายห้อง) */}
+        {/* ========================================================= */}
+        {transferModalOpen && selectedRoom && selectedRoom.tenantId && (
+          <RoomTransferModal
+            tenant={{
+              id: selectedRoom.tenantId,
+              roomNumber: selectedRoom.roomNumber,
+              fullName: selectedRoom.tenantName || "",
+              depositPaid: selectedRoom.depositPaid
+            }}
+            vacantRooms={rooms.filter(r => r.status === "available").map(r => ({ id: r.id, roomNumber: r.roomNumber }))}
+            onClose={() => setTransferModalOpen(false)}
+            onSuccess={({ toRoomNumber }) => {
+              setTransferModalOpen(false)
+              showToast(`ย้ายห้องสำเร็จ! ย้ายไปห้อง ${toRoomNumber} เรียบร้อยแล้ว`, "success")
+              loadData(true)
+            }}
+          />
+        )}
 
       </div>
     </>

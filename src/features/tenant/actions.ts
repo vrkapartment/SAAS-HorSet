@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
 import { calculateLateDays } from "@/features/billing/utils"
-import { calculateDepositProration } from "@/features/room/deposit-calculator"
+import { calculateDepositProration, computeStandardDeposit } from "@/features/room/deposit-calculator"
 import { getFinanceSettings } from "@/features/finance/actions"
 
 const isSupabaseConfigured = 
@@ -27,7 +27,9 @@ export async function getTenants() {
         line_user_id,
         lease_start,
         lease_end,
+        deposit_paid,
         rooms (
+          id,
           room_number
         )
       `)
@@ -38,12 +40,14 @@ export async function getTenants() {
     // จัดรูปแบบข้อมูลให้เข้ากับ TenantItem interface ของหน้าบ้าน
     const formatted = data.map((t: any) => ({
       id: t.id,
+      roomId: t.rooms?.id || null,
       roomNumber: t.rooms?.room_number || "ไม่มีห้อง",
       fullName: t.tenant_name,
       phone: t.tenant_phone,
       lineUserId: t.line_user_id,
       contractStart: t.lease_start,
       contractEnd: t.lease_end,
+      depositPaid: t.deposit_paid !== null && t.deposit_paid !== undefined ? Number(t.deposit_paid) : null,
       status: new Date(t.lease_end) >= new Date() ? "active" : "expired"
     }))
 
@@ -73,15 +77,31 @@ export async function createTenant(
 
     const supabase = await createClient()
 
-    // 1. ค้นหา roomId จาก roomNumber
+    // 1. ค้นหา roomId จาก roomNumber (พร้อมข้อมูลค่าเช่า/ประเภทห้องสำหรับคำนวณเงินประกันตั้งต้น)
     const { data: room, error: roomError } = await supabase
       .from("rooms")
-      .select("id")
+      .select("id, base_rent, room_types(deposit_amount)")
       .eq("room_number", roomNumber)
       .single()
 
     if (roomError || !room) {
       throw new Error(`ไม่พบห้องหมายเลข ${roomNumber} ในระบบ กรุณาตรวจสอบหรือสร้างห้องพักก่อนทำสัญญา`)
+    }
+
+    // 1.5 คำนวณยอดเงินประกันตั้งต้น (ground truth) จากการตั้งค่า workspace/room_type ปัจจุบัน
+    //     เพื่อให้ deposit_paid มีค่าเสมอตั้งแต่สร้างสัญญา ไม่ต้องรอ backfill
+    let depositPaid: number | null = null
+    if (workspaceId) {
+      const financeRes = await getFinanceSettings(workspaceId)
+      if (financeRes.success && financeRes.data) {
+        const roomTypeDeposit = (room.room_types as any)?.deposit_amount
+        depositPaid = computeStandardDeposit(
+          Number(room.base_rent || 0),
+          financeRes.data.deposit_type,
+          Number(financeRes.data.deposit_amount || 0),
+          roomTypeDeposit !== null && roomTypeDeposit !== undefined ? Number(roomTypeDeposit) : null
+        )
+      }
     }
 
     // 2. เพิ่มข้อมูลผู้เช่าและสัญญา
@@ -93,7 +113,8 @@ export async function createTenant(
         tenant_phone: phone,
         line_user_id: lineUserId || null,
         lease_start: contractStart,
-        lease_end: contractEnd
+        lease_end: contractEnd,
+        deposit_paid: depositPaid
       }])
       .select()
 

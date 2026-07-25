@@ -23,6 +23,24 @@ export interface DepositProrationResult {
   actualRefund: number
 }
 
+/**
+ * คำนวณยอดเงินประกันมาตรฐานจากการตั้งค่า workspace/room_type
+ * (สูตรเดียวกับที่ UI คำนวณสดในหน้าห้องพัก และที่ backfill script ใช้)
+ */
+export function computeStandardDeposit(
+  baseRent: number,
+  depositType: "months" | "fixed" | null | undefined,
+  depositAmount: number,
+  roomTypeDepositOverride?: number | null
+): number {
+  if (depositType === "fixed") {
+    return roomTypeDepositOverride !== undefined && roomTypeDepositOverride !== null
+      ? roomTypeDepositOverride
+      : (depositAmount || 0)
+  }
+  return (baseRent || 0) * (depositAmount || 0)
+}
+
 export function checkIfBreakContract(checkoutDateStr: string, leaseEndStr: string | null | undefined): boolean {
   if (!leaseEndStr || !checkoutDateStr) return false
   const checkDate = new Date(checkoutDateStr)

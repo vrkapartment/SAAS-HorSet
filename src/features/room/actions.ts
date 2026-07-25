@@ -114,7 +114,8 @@ export async function getRooms(workspaceId?: string) {
           tenant_phone,
           line_user_id,
           lease_start,
-          lease_end
+          lease_end,
+          deposit_paid
         )
       `)
 
@@ -140,6 +141,7 @@ export async function getRooms(workspaceId?: string) {
         lineUserId: tenant ? tenant.line_user_id : null,
         leaseStart: tenant ? tenant.lease_start : null,
         leaseEnd: tenant ? tenant.lease_end : null,
+        depositPaid: tenant && tenant.deposit_paid !== null && tenant.deposit_paid !== undefined ? Number(tenant.deposit_paid) : null,
         roomTypeId: room.room_type_id,
         roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ",
         waiveElectricMin: !!room.waive_electric_min,
