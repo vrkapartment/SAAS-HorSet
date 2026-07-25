@@ -315,15 +315,25 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
       // Poll เป็นแค่ fallback สำรอง (เผื่อ Realtime channel ด้านล่างหลุดการเชื่อมต่อ) เพราะการอัปเดตหลักทำผ่าน
       // Supabase Realtime + window focus refetch ด้านล่างอยู่แล้ว ซึ่งไวกว่าและไม่ต้องยิง Server Action ทุก 15 วิ
+      // หยุด poll เมื่อแท็บถูกซ่อน (ประหยัด CPU ฝั่งเซิร์ฟเวอร์) แล้วรีเฟรชทันทีเมื่อกลับมาเปิดดูอีกครั้ง
       const intervalId = setInterval(() => {
-        fetchNotifications(true, currentWorkspace.id)
-      }, 120000)
+        if (document.visibilityState === "visible") {
+          fetchNotifications(true, currentWorkspace.id)
+        }
+      }, 180000)
 
       // ดึงข้อมูลทันทีเมื่อเปิดแท็บหรือหน้าจอเบราว์เซอร์กลับมาโฟกัสอีกครั้ง (ทำงานเงียบๆ ในพื้นหลัง)
       const handleWindowFocus = () => {
         fetchNotifications(true, currentWorkspace.id)
       }
       window.addEventListener("focus", handleWindowFocus)
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          fetchNotifications(true, currentWorkspace.id)
+        }
+      }
+      document.addEventListener("visibilitychange", handleVisibilityChange)
 
       // เชื่อมต่อการแจ้งเตือน Real-time ด้วย Supabase Realtime Channels
       const supabase = createClient()

@@ -682,8 +682,24 @@ function UnifiedBillingContent() {
 
   useEffect(() => {
     // Poll เป็นแค่ fallback สำรอง เผื่อ Realtime channel ด้านบนหลุดการเชื่อมต่อ
-    const interval = setInterval(refreshIfSafe, 45000)
-    return () => clearInterval(interval)
+    // หยุด poll เมื่อแท็บถูกซ่อน (ประหยัด CPU ฝั่งเซิร์ฟเวอร์) แล้ว refresh ทันทีเมื่อกลับมาเปิดดูอีกครั้ง
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refreshIfSafe()
+      }
+    }, 60000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshIfSafe()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
   }, [billingCycle])
 
   useEffect(() => {

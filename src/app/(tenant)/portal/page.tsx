@@ -317,10 +317,26 @@ export default function TenantPortal() {
 
   useEffect(() => {
     loadPortalData(true)
-    // Poll ทุก 20s เพื่ออัปเดตสถานะบิลอัตโนมัติ (ไม่ใช้ Supabase Realtime ที่นี่ เพราะหน้านี้เข้าถึงได้แบบไม่ต้อง
+    // Poll ทุก 30s เพื่ออัปเดตสถานะบิลอัตโนมัติ (ไม่ใช้ Supabase Realtime ที่นี่ เพราะหน้านี้เข้าถึงได้แบบไม่ต้อง
     // login ผ่านลิงก์ LINE ด้วย token ซึ่งไม่มี RLS session ให้ subscribe ตรงจากเบราว์เซอร์ได้อย่างปลอดภัย)
-    const timer = setInterval(() => loadPortalData(false), 20000)
-    return () => clearInterval(timer)
+    // หยุด poll เมื่อแท็บถูกซ่อน (ประหยัด CPU ฝั่งเซิร์ฟเวอร์) แล้วรีเฟรชทันทีเมื่อกลับมาเปิดดูอีกครั้ง
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadPortalData(false)
+      }
+    }, 30000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadPortalData(false)
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
   }, [])
 
 

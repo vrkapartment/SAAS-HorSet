@@ -498,9 +498,11 @@ export async function getTenantPortalData() {
     let latePenaltyRate = 0
     let workspaceLogo = ""
     if (tenant && tenant.workspace_id) {
+      // logo_url และ late_penalty_rate เป็นคอลัมน์ในตาราง workspaces ตั้งแต่ base schema (schema_multi_workspace.sql)
+      // จึงรวมเข้ากับ query หลักได้โดยไม่ต้องแยกยิงซ้ำเพื่อความปลอดภัยแบบเดิมอีกต่อไป
       const { data: ws } = await supabase
         .from("workspaces")
-        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
+        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate")
         .eq("id", tenant.workspace_id)
         .maybeSingle()
       if (ws) {
@@ -517,34 +519,8 @@ export async function getTenantPortalData() {
         if (ws.water_min_unit !== null && ws.water_min_unit !== undefined) waterMinUnit = Number(ws.water_min_unit)
         if (ws.electric_min_checked !== null && ws.electric_min_checked !== undefined) electricMinChecked = Boolean(ws.electric_min_checked)
         if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
-
-        // ดึงโลโก้ประจำหอพักแบบปลอดภัย เผื่อตารางยังไม่ได้เพิ่มคอลัมน์ logo_url
-        try {
-          const { data: wsLogoData } = await supabase
-            .from("workspaces")
-            .select("logo_url")
-            .eq("id", tenant.workspace_id)
-            .maybeSingle()
-          if (wsLogoData && wsLogoData.logo_url) {
-            workspaceLogo = wsLogoData.logo_url
-          }
-        } catch (logoErr) {
-          console.warn("Could not query logo_url from workspaces:", logoErr)
-        }
-      }
-
-      // ดึงข้อมูล late_penalty_rate แบบปลอดภัย เผื่อคอลัมน์ยังไม่มีในตาราง
-      try {
-        const { data: lpData } = await supabase
-          .from("workspaces")
-          .select("late_penalty_rate")
-          .eq("id", tenant.workspace_id)
-          .maybeSingle()
-        if (lpData && lpData.late_penalty_rate !== null && lpData.late_penalty_rate !== undefined) {
-          latePenaltyRate = Number(lpData.late_penalty_rate)
-        }
-      } catch (err) {
-        console.warn("Could not query late_penalty_rate, defaulting to 0:", err)
+        if (ws.logo_url) workspaceLogo = ws.logo_url
+        if (ws.late_penalty_rate !== null && ws.late_penalty_rate !== undefined) latePenaltyRate = Number(ws.late_penalty_rate)
       }
     }
 
@@ -773,9 +749,11 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     const tenant = tenantsList && tenantsList.length > 0 ? tenantsList[0] : null
 
     // 3. ค้นหารายละเอียดของ Workspace และการตั้งค่าพร้อมเพย์
+    // logo_url และ late_penalty_rate เป็นคอลัมน์ในตาราง workspaces ตั้งแต่ base schema (schema_multi_workspace.sql)
+    // จึงรวมเข้ากับ query หลักได้โดยไม่ต้องแยกยิงซ้ำเพื่อความปลอดภัยแบบเดิมอีกต่อไป
     const { data: ws } = await supabase
       .from("workspaces")
-      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit")
+      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate")
       .eq("id", workspaceId)
       .maybeSingle()
 
@@ -809,34 +787,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       if (ws.water_min_unit !== null && ws.water_min_unit !== undefined) waterMinUnit = Number(ws.water_min_unit)
       if (ws.electric_min_checked !== null && ws.electric_min_checked !== undefined) electricMinChecked = Boolean(ws.electric_min_checked)
       if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
-
-      // ดึงโลโก้ประจำหอพักแบบปลอดภัย เผื่อตารางยังไม่ได้เพิ่มคอลัมน์ logo_url
-      try {
-        const { data: wsLogoData } = await supabase
-          .from("workspaces")
-          .select("logo_url")
-          .eq("id", workspaceId)
-          .maybeSingle()
-        if (wsLogoData && wsLogoData.logo_url) {
-          workspaceLogo = wsLogoData.logo_url
-        }
-      } catch (logoErr) {
-        console.warn("Could not query logo_url from workspaces (NoLogin):", logoErr)
-      }
-    }
-
-    // ดึงข้อมูล late_penalty_rate แบบปลอดภัย เผื่อคอลัมน์ยังไม่มีในตาราง
-    try {
-      const { data: lpData } = await supabase
-        .from("workspaces")
-        .select("late_penalty_rate")
-        .eq("id", workspaceId)
-        .maybeSingle()
-      if (lpData && lpData.late_penalty_rate !== null && lpData.late_penalty_rate !== undefined) {
-        latePenaltyRate = Number(lpData.late_penalty_rate)
-      }
-    } catch (err) {
-      console.warn("Could not query late_penalty_rate, defaulting to 0:", err)
+      if (ws.logo_url) workspaceLogo = ws.logo_url
+      if (ws.late_penalty_rate !== null && ws.late_penalty_rate !== undefined) latePenaltyRate = Number(ws.late_penalty_rate)
     }
 
     // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้

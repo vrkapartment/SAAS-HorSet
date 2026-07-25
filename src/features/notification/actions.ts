@@ -470,24 +470,40 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
 
     const notifications: AppNotification[] = []
 
-    // Fetch active rooms in workspace to filter out notifications of deleted rooms
-    const { data: activeRooms } = await supabase
-      .from("rooms")
-      .select("room_number")
-      .eq("workspace_id", workspaceId)
+    // ยิง query ที่เป็นอิสระต่อกัน (ไม่ต้องรอผลลัพธ์ของกันและกัน) พร้อมกันแทนการรอทีละตัวตามลำดับ
+    const [roomsResult, pendingBillsQueryResult, unpaidBillsResult, lineSettingsResult, workspaceResult] = await Promise.all([
+      supabase
+        .from("rooms")
+        .select("room_number")
+        .eq("workspace_id", workspaceId),
+      // ใช้ Try-Catch / Fallback เผื่อไว้กรณีผู้ใช้ยังไม่ได้รัน SQL Patch เพิ่มคอลัมน์ updated_at
+      supabase
+        .from("bills")
+        .select("id, room_number, billing_cycle, slip_url, created_at, updated_at")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "pending"),
+      supabase
+        .from("bills")
+        .select("id, room_number, billing_cycle, created_at")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "unpaid"),
+      supabase
+        .from("workspace_line_settings")
+        .select("channel_access_token")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle(),
+      supabase
+        .from("workspaces")
+        .select("lease_expiry_action")
+        .eq("id", workspaceId)
+        .maybeSingle(),
+    ])
 
-    const activeRoomSet = new Set(activeRooms?.map((r: any) => r.room_number) || [])
+    const activeRoomSet = new Set(roomsResult.data?.map((r: any) => r.room_number) || [])
 
     // 2. Query Bills pending verification (Slips waiting)
-    // ใช้ Try-Catch / Fallback เผื่อไว้กรณีผู้ใช้ยังไม่ได้รัน SQL Patch เพิ่มคอลัมน์ updated_at
-    let pendingBillsResult = await supabase
-      .from("bills")
-      .select("id, room_number, billing_cycle, slip_url, created_at, updated_at")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "pending")
-
-    let pendingBills: any[] | null = pendingBillsResult.data
-    let billsError = pendingBillsResult.error
+    let pendingBills: any[] | null = pendingBillsQueryResult.data
+    let billsError = pendingBillsQueryResult.error
 
     if (billsError) {
       // Fallback: ถ้าหากดึง updated_at แล้ว error (เช่น ตารางยังไม่มีคอลัมน์นี้) ให้ดึงเฉพาะฟิลด์มาตรฐานเดิม
@@ -521,11 +537,7 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
     }
 
     // 3. Query Overdue Unpaid Bills
-    const { data: unpaidBills, error: unpaidError } = await supabase
-      .from("bills")
-      .select("id, room_number, billing_cycle, created_at")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "unpaid")
+    const { data: unpaidBills, error: unpaidError } = unpaidBillsResult
 
     if (!unpaidError && unpaidBills) {
       unpaidBills.forEach((b: any) => {
@@ -556,11 +568,7 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
     }
 
     // 4. Query LINE OA Settings
-    const { data: lineSettings, error: lineError } = await supabase
-      .from("workspace_line_settings")
-      .select("channel_access_token")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle()
+    const { data: lineSettings } = lineSettingsResult
 
     const isLineOADisconnected = !lineSettings || !lineSettings.channel_access_token || lineSettings.channel_access_token === "placeholder" || !lineSettings.channel_access_token.trim()
 
@@ -576,11 +584,7 @@ export async function getNotificationsAction(selectedWorkspaceId?: string) {
     }
 
     // 5. Query Lease Expiration (Check lease expiry action)
-    const { data: workspace, error: wsError } = await supabase
-      .from("workspaces")
-      .select("lease_expiry_action")
-      .eq("id", workspaceId)
-      .maybeSingle()
+    const { data: workspace } = workspaceResult
 
     const leaseExpiryAction = workspace?.lease_expiry_action || "renew"
 

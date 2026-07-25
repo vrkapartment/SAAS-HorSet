@@ -3,10 +3,16 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { uploadFileToGoogleDriveAction } from "@/lib/googleDrive"
 
 export const dynamic = "force-dynamic"
+// เพดานสูงสุดของ Vercel Hobby plan (Pro ตั้งได้ถึง 300s) — ต้องอัป plan ก่อนถึงจะเพิ่มได้
+export const maxDuration = 60
 
 // ระยะเวลาเก็บสลิปค่า subscription (saas_payments) ก่อน archive ขึ้น Google Drive แล้วลบออกจาก storage
 // (คนละค่ากับ retention ของสลิปค่าเช่าที่ตั้งได้ต่อ workspace ผ่าน slip_retention_months)
 const SUBSCRIPTION_SLIP_RETENTION_MONTHS = 3
+
+// จำนวนไฟล์ที่ดาวน์โหลด+อัปโหลด Google Drive พร้อมกันในแต่ละชุด (แทนที่จะทำทีละไฟล์) เพื่อให้เวลารวมขึ้นกับ
+// ไฟล์ที่ช้าที่สุดของแต่ละชุด ไม่ใช่ผลรวมของทุกไฟล์ — ผลลัพธ์ต่อไฟล์เหมือนเดิมทุกประการ แค่ประมวลผลเร็วขึ้น
+const ARCHIVE_CONCURRENCY = 5
 
 export async function GET(request: Request) {
   try {
@@ -134,15 +140,16 @@ export async function GET(request: Request) {
         const billIdsToUpdate: string[] = []
         let archiveFailedCount = 0
 
-        for (const bill of expiredBills) {
-          if (!bill.slip_url) continue
+        // ประมวลผล 1 บิล คืนค่า path/id ที่ควรลบกลับไปแทนการ push เข้า array ตรงๆ เพื่อให้เรียกพร้อมกันหลายบิลได้ปลอดภัย
+        async function processExpiredBill(bill: { id: string; slip_url: string | null; created_at: string }): Promise<{ path: string; billId: string } | null> {
+          if (!bill.slip_url) return null
 
           if (workspaceHasDrive) {
             try {
               const fileRes = await fetch(bill.slip_url)
               if (!fileRes.ok) {
                 archiveFailedCount++
-                continue // ดาวน์โหลดไฟล์เดิมไม่สำเร็จ -> ไม่ลบไฟล์เดิม รอ cron รอบถัดไป retry ให้เอง
+                return null // ดาวน์โหลดไฟล์เดิมไม่สำเร็จ -> ไม่ลบไฟล์เดิม รอ cron รอบถัดไป retry ให้เอง
               }
 
               const arrayBuffer = await fileRes.arrayBuffer()
@@ -162,23 +169,32 @@ export async function GET(request: Request) {
 
               if (!uploadResult.success) {
                 archiveFailedCount++
-                continue // อัปโหลดขึ้น Drive ไม่สำเร็จ -> ไม่ลบไฟล์เดิม (fail-safe กันข้อมูลหาย)
+                return null // อัปโหลดขึ้น Drive ไม่สำเร็จ -> ไม่ลบไฟล์เดิม (fail-safe กันข้อมูลหาย)
               }
             } catch (archiveErr: unknown) {
               console.error(`Error archiving rent slip for bill ${bill.id}:`, archiveErr)
               archiveFailedCount++
-              continue
+              return null
             }
           }
 
           // archive สำเร็จแล้ว (หรือ workspace ไม่ได้เชื่อมต่อ Drive เลย) -> ลบไฟล์เดิมออกจาก storage ตามปกติ
           const marker = "/payment-slips/"
           const idx = bill.slip_url.indexOf(marker)
-          if (idx !== -1) {
-            const path = bill.slip_url.substring(idx + marker.length)
-            if (path) {
-              pathsToDelete.push(path)
-              billIdsToUpdate.push(bill.id)
+          if (idx === -1) return null
+          const path = bill.slip_url.substring(idx + marker.length)
+          if (!path) return null
+          return { path, billId: bill.id }
+        }
+
+        // ประมวลผลเป็นชุดๆ ละ ARCHIVE_CONCURRENCY บิลพร้อมกัน (แทนทีละบิล) เรียงชุดถัดไปหลังชุดก่อนหน้าเสร็จ
+        for (let i = 0; i < expiredBills.length; i += ARCHIVE_CONCURRENCY) {
+          const chunk = expiredBills.slice(i, i + ARCHIVE_CONCURRENCY)
+          const chunkResults = await Promise.all(chunk.map((bill) => processExpiredBill(bill)))
+          for (const result of chunkResults) {
+            if (result) {
+              pathsToDelete.push(result.path)
+              billIdsToUpdate.push(result.billId)
             }
           }
         }
@@ -256,9 +272,11 @@ export async function GET(request: Request) {
     if (paymentsError) {
       console.error("Error fetching saas_payments for Drive archival:", paymentsError)
     } else if (expiredPayments && expiredPayments.length > 0) {
-      for (const payment of expiredPayments) {
+      // ประมวลผล 1 รายการชำระเงิน push ผลลัพธ์เข้า subscriptionSlipDetails/totalSubscriptionSlipsArchived เอง
+      // เพื่อให้เรียกพร้อมกันหลายรายการได้ปลอดภัย (แต่ละรายการ archive+update DB+ลบ storage เป็นอิสระต่อกัน)
+      async function processExpiredSubscriptionSlip(payment: { id: string; slip_image_url: string | null; created_at: string }) {
         try {
-          if (!payment.slip_image_url) continue
+          if (!payment.slip_image_url) return
 
           const fileRes = await fetch(payment.slip_image_url)
           if (!fileRes.ok) {
@@ -267,7 +285,7 @@ export async function GET(request: Request) {
               success: false,
               error: `ดาวน์โหลดไฟล์สลิปเดิมไม่สำเร็จ (HTTP ${fileRes.status})`
             })
-            continue
+            return
           }
 
           const arrayBuffer = await fileRes.arrayBuffer()
@@ -288,7 +306,7 @@ export async function GET(request: Request) {
           if (!uploadResult.success) {
             // ไม่ลบไฟล์เดิมเมื่อ archive ไม่สำเร็จ (เช่นยังไม่ได้ตั้งค่า Drive Folder ID) รอ cron รอบถัดไป retry ให้เอง
             subscriptionSlipDetails.push({ payment_id: payment.id, success: false, error: uploadResult.error })
-            continue
+            return
           }
 
           const { error: updateError } = await supabaseAdmin
@@ -303,7 +321,7 @@ export async function GET(request: Request) {
               success: false,
               error: "อัปโหลดขึ้น Google Drive สำเร็จ แต่บันทึกฐานข้อมูลไม่สำเร็จ (ไม่ลบไฟล์เดิม)"
             })
-            continue
+            return
           }
 
           // ลบไฟล์จริงออกจาก Supabase Storage หลัง archive + บันทึก DB สำเร็จแล้วเท่านั้น
@@ -329,6 +347,12 @@ export async function GET(request: Request) {
             error: paymentErr instanceof Error ? paymentErr.message : "เกิดข้อผิดพลาดที่ไม่รู้จัก"
           })
         }
+      }
+
+      // ประมวลผลเป็นชุดๆ ละ ARCHIVE_CONCURRENCY รายการพร้อมกัน (แทนทีละรายการ)
+      for (let i = 0; i < expiredPayments.length; i += ARCHIVE_CONCURRENCY) {
+        const chunk = expiredPayments.slice(i, i + ARCHIVE_CONCURRENCY)
+        await Promise.all(chunk.map((payment) => processExpiredSubscriptionSlip(payment)))
       }
     }
 
