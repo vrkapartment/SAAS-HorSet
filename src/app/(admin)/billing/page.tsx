@@ -32,6 +32,8 @@ import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
+import { getBuildings } from "@/features/building/actions"
+import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "@/features/billing/building-utility-actions"
 
 import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS, ADMIN_DEFAULT_PERMISSIONS } from "@/features/permissions/types"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
@@ -42,6 +44,7 @@ import SavingProgressOverlay from "@/features/billing/components/SavingProgressO
 import SlipVerificationModal from "@/features/billing/components/SlipVerificationModal"
 import CreateBillModal from "@/features/billing/components/CreateBillModal"
 import MeterReadingTable from "@/features/billing/components/MeterReadingTable"
+import BuildingUtilityBillPanel from "@/features/billing/components/BuildingUtilityBillPanel"
 
 
 
@@ -236,6 +239,10 @@ function UnifiedBillingContent() {
   const [commonFee, setCommonFee] = useState<number>(50)
   const [elecRate, setElecRate] = useState<number>(7)
   const [waterRate, setWaterRate] = useState<number>(18)
+  const [electricBillingMode, setElectricBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
+  const [waterBillingMode, setWaterBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
+  const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
+  const [buildingUtilityBills, setBuildingUtilityBills] = useState<BuildingUtilityBill[]>([])
   const [waterMinChecked, setWaterMinChecked] = useState<boolean>(true)
   const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
   const [electricMinChecked, setElectricMinChecked] = useState<boolean>(true)
@@ -301,12 +308,32 @@ function UnifiedBillingContent() {
   const isElecWaived = selectedManualRoom?.waiveElectricMin ?? false
   const isWaterWaived = selectedManualRoom?.waiveWaterMin ?? false
 
+  // Resolve อัตราไฟฟ้า/น้ำที่จะใช้ "จริง" ตอนกดบันทึก — ถ้าเปิดโหมดหารตามสัดส่วนทั้งอาคาร ต้องใช้
+  // rate_per_unit ที่กรอกไว้ของอาคารห้องนั้น ไม่ใช่อัตราคงที่ (elecRate/waterRate) เหมือนก่อนหน้านี้
+  // เพื่อให้พรีวิวในหน้านี้ตรงกับยอดที่ createBill() จะคำนวณจริงฝั่ง server (ดู resolveUtilityRate ใน billing/actions.ts)
+  const resolveManualRate = (
+    mode: "fixed_rate" | "building_total",
+    flatRate: number,
+    utilityType: "electric" | "water"
+  ): { rate: number; missing: boolean } => {
+    if (mode !== "building_total") return { rate: flatRate, missing: false }
+    const buildingId = selectedManualRoom?.buildingId
+    if (!buildingId) return { rate: 0, missing: true }
+    const row = buildingUtilityBills.find(b => b.buildingId === buildingId && b.utilityType === utilityType)
+    if (!row) return { rate: 0, missing: true }
+    return { rate: row.ratePerUnit, missing: false }
+  }
+
+  const electricRateResolved = resolveManualRate(electricBillingMode, elecRate, "electric")
+  const waterRateResolved = resolveManualRate(waterBillingMode, waterRate, "water")
+  const manualBillRateMissing = electricRateResolved.missing || waterRateResolved.missing
+
   const computedElecCost = !isElecWaived && electricMinChecked && elecUnitsManual <= electricMinUnit
-    ? electricMinUnit * elecRate
-    : elecUnitsManual * elecRate
+    ? electricMinUnit * electricRateResolved.rate
+    : elecUnitsManual * electricRateResolved.rate
   const computedWaterCost = !isWaterWaived && waterMinChecked && waterUnitsManual <= waterMinUnit
-    ? waterMinUnit * waterRate
-    : waterUnitsManual * waterRate
+    ? waterMinUnit * waterRateResolved.rate
+    : waterUnitsManual * waterRateResolved.rate
 
   const selectedManualRoomExtraExpensesSum = selectedManualRoom?.extraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
   const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual + selectedManualRoomExtraExpensesSum
@@ -772,6 +799,8 @@ function UnifiedBillingContent() {
             if (financeData.water_min_unit !== undefined) setWaterMinUnit(financeData.water_min_unit)
             setElectricMinChecked(!!financeData.electric_min_checked)
             if (financeData.electric_min_unit !== undefined) setElectricMinUnit(financeData.electric_min_unit)
+            setElectricBillingMode(financeData.electric_billing_mode || "fixed_rate")
+            setWaterBillingMode(financeData.water_billing_mode || "fixed_rate")
             if (financeData.late_penalty_rate !== undefined) setLatePenaltyRate(financeData.late_penalty_rate)
             if (financeData.promptpay_id) setPromptPayId(financeData.promptpay_id)
             if (financeData.promptpay_name) setPromptPayName(financeData.promptpay_name)
@@ -780,6 +809,11 @@ function UnifiedBillingContent() {
             if (financeData.tax_phone) setWorkspacePhone(financeData.tax_phone)
             if (financeData.tax_id) setWorkspaceTaxId(financeData.tax_id)
           }
+
+          const buildingsRes = await getBuildings(wsId)
+          if (buildingsRes.success && buildingsRes.data) {
+            setBuildings(buildingsRes.data.map(b => ({ id: b.id, name: b.name })))
+          }
         }
       } catch (err) {
         console.error("Failed to load finance settings with cache:", err)
@@ -787,6 +821,27 @@ function UnifiedBillingContent() {
     }
     loadFinance()
   }, [])
+
+  // ดึงยอดบิลรวมทั้งอาคารของรอบบิลนี้ (ใช้พรีวิวราคาที่ถูกต้องใน modal "สร้างบิลด้วยตนเอง"
+  // เมื่อเปิดโหมดหารตามสัดส่วนทั้งอาคาร — เซิร์ฟเวอร์คำนวณยอดจริงตอนบันทึกอยู่แล้วไม่ว่ากรณีใด
+  // แต่พรีวิวเดิมยังอิงอัตราคงที่เสมอทำให้ตัวเลขที่เห็นก่อนกดบันทึกไม่ตรงกับที่จะถูกเรียกเก็บจริง)
+  useEffect(() => {
+    let cancelled = false
+    async function loadBuildingUtilityBills() {
+      if (!currentWorkspaceId || !billingCycle) return
+      if (electricBillingMode !== "building_total" && waterBillingMode !== "building_total") {
+        setBuildingUtilityBills([])
+        return
+      }
+      const res = await getBuildingUtilityBillsForWorkspaceCycle(currentWorkspaceId, billingCycle)
+      if (cancelled) return
+      if (res.success && res.data) {
+        setBuildingUtilityBills(res.data)
+      }
+    }
+    loadBuildingUtilityBills()
+    return () => { cancelled = true }
+  }, [currentWorkspaceId, billingCycle, electricBillingMode, waterBillingMode])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -1493,6 +1548,24 @@ function UnifiedBillingContent() {
     }
   }
 
+  // หายอดบิลรวมทั้งอาคาร (ไฟฟ้า/น้ำ) ของห้องนี้ในรอบบิลปัจจุบัน — ใช้แสดง "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน"
+  // ในบิล PDF เฉพาะตอนเปิดโหมด building_total เท่านั้น (คืนค่า null ถ้าไม่เข้าเงื่อนไข ไม่ใช้ 0)
+  const getBuildingTotalsForRoom = (roomNumber: string) => {
+    const roomBuildingId = roomsList?.find((r: any) => r.roomNumber === roomNumber)?.buildingId
+    const electricRow = roomBuildingId && electricBillingMode === "building_total"
+      ? buildingUtilityBills.find(b => b.buildingId === roomBuildingId && b.utilityType === "electric")
+      : undefined
+    const waterRow = roomBuildingId && waterBillingMode === "building_total"
+      ? buildingUtilityBills.find(b => b.buildingId === roomBuildingId && b.utilityType === "water")
+      : undefined
+    return {
+      electricBuildingTotalAmount: electricRow ? electricRow.totalAmount : null,
+      electricBuildingTotalUnits: electricRow ? electricRow.totalUnits : null,
+      waterBuildingTotalAmount: waterRow ? waterRow.totalAmount : null,
+      waterBuildingTotalUnits: waterRow ? waterRow.totalUnits : null
+    }
+  }
+
   // ดาวน์โหลดบิล PDF
   const handleDownloadBillPdf = async (item: UnifiedRoomBillingItem) => {
     if (!userPermissions.billing_download_pdf) {
@@ -1540,7 +1613,13 @@ function UnifiedBillingContent() {
         lateDays: item.lateDays || 0,
         latePenaltyRate: latePenaltyRate,
         otherServiceAmount: item.otherServiceAmount || 0,
-        invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`
+        invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
+        elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
+        elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
+        waterPrev: item.waterPrev === "" ? null : Number(item.waterPrev),
+        waterCurr: item.waterCurr === "" ? null : Number(item.waterCurr),
+        billingCycleRaw: billingCycle,
+        ...getBuildingTotalsForRoom(item.roomNumber)
       })
 
       const link = document.createElement("a")
@@ -1620,7 +1699,13 @@ function UnifiedBillingContent() {
           lateDays: item.lateDays || 0,
           latePenaltyRate: latePenaltyRate,
           otherServiceAmount: item.otherServiceAmount || 0,
-          invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`
+          invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
+          elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
+          elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
+          waterPrev: item.waterPrev === "" ? null : Number(item.waterPrev),
+          waterCurr: item.waterCurr === "" ? null : Number(item.waterCurr),
+          billingCycleRaw: billingCycle,
+          ...getBuildingTotalsForRoom(item.roomNumber)
         })
 
         const fileName = `bill_room${item.roomNumber}_${billingCycle}.pdf`
@@ -1770,6 +1855,23 @@ function UnifiedBillingContent() {
         unpaidCount={unpaidCount}
         showOnlyMeterSaved={true}
       />
+
+      {/* ยอดบิลรวมทั้งอาคาร (แสดงเฉพาะเมื่อเปิดโหมดหารตามสัดส่วนของไฟฟ้าและ/หรือน้ำประปา) */}
+      <div className="mt-6">
+        <BuildingUtilityBillPanel
+          workspaceId={currentWorkspaceId}
+          billingCycle={billingCycle}
+          electricBillingMode={electricBillingMode}
+          waterBillingMode={waterBillingMode}
+          buildings={buildings}
+          onSaved={(row) => {
+            setBuildingUtilityBills(prev => [
+              ...prev.filter(b => !(b.buildingId === row.buildingId && b.utilityType === row.utilityType)),
+              row
+            ])
+          }}
+        />
+      </div>
 
       {/* Tab Switcher */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 mt-8 mb-8">
@@ -2142,13 +2244,14 @@ function UnifiedBillingContent() {
         setOtherServiceAmountManual={setOtherServiceAmountManual}
         rentPrice={rentPrice}
         commonFee={commonFee}
-        elecRate={elecRate}
-        waterRate={waterRate}
+        elecRate={electricRateResolved.rate}
+        waterRate={waterRateResolved.rate}
         electricMinChecked={electricMinChecked}
         electricMinUnit={electricMinUnit}
         waterMinChecked={waterMinChecked}
         waterMinUnit={waterMinUnit}
         computedTotal={computedTotal}
+        rateMissingWarning={manualBillRateMissing ? "ห้องนี้เปิดโหมด \"หารตามสัดส่วนทั้งอาคาร\" แต่ยังไม่ได้กรอกยอดบิลรวมทั้งอาคารของรอบนี้ (หรือห้องนี้ยังไม่ได้กำหนดอาคาร) กรุณากรอกที่หน้าออกบิลก่อน — ตัวเลขค่าไฟ/น้ำด้านล่างจะยังไม่ถูกต้องจนกว่าจะกรอก" : undefined}
         onClose={() => setCreateBillModalOpen(false)}
         onSubmit={handleCreateBillManual}
       />

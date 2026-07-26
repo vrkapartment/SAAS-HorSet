@@ -55,6 +55,7 @@ import {
   importRoomsFromCSV,
   createRoomsBatch
 } from "@/features/room/actions"
+import { getBuildings } from "@/features/building/actions"
 import { 
   createTenant, 
   deleteTenant, 
@@ -101,6 +102,7 @@ interface RoomItem {
   waiveWaterMin?: boolean
   extraExpenses?: { name: string; amount: number }[]
   depositPaid?: number | null
+  buildingId?: string | null
 }
 
 interface RoomTypeItem {
@@ -232,6 +234,8 @@ function RoomsContent() {
   const [waiveElectricMin, setWaiveElectricMin] = useState(false)
   const [waiveWaterMin, setWaiveWaterMin] = useState(false)
   const [extraExpenses, setExtraExpenses] = useState<{ name: string; amount: number }[]>([])
+  const [newRoomBuildingId, setNewRoomBuildingId] = useState("")
+  const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
   const [formSubmitting, setFormSubmitting] = useState(false)
 
   // Room Type Form State (inside Manage Types modal)
@@ -611,6 +615,14 @@ function RoomsContent() {
         }
       })
 
+      // ดึงรายชื่ออาคาร (ใช้กับดรอปดาวน์เลือกอาคารในฟอร์มห้องพัก กรณีมีมากกว่า 1 อาคาร)
+      getBuildings(wsId).then(res => {
+        if (currentFetchId !== fetchCounterRef.current) return
+        if (res.success && res.data) {
+          setBuildings(res.data.map(b => ({ id: b.id, name: b.name })))
+        }
+      })
+
       if (forceRefresh && wsId) {
         clearWorkspaceCache(wsId)
       }
@@ -743,7 +755,8 @@ function RoomsContent() {
     setWaiveElectricMin(false)
     setWaiveWaterMin(false)
     setExtraExpenses([])
-    
+    setNewRoomBuildingId(buildings.length > 0 ? buildings[0].id : "")
+
     // ตั้งค่าประเภทห้องแรกเป็นดีฟอลต์ถ้ามี
     if (roomTypes.length > 0) {
       setSelectedRoomTypeId(roomTypes[0].id)
@@ -762,6 +775,7 @@ function RoomsContent() {
     setWaiveElectricMin(!!room.waiveElectricMin)
     setWaiveWaterMin(!!room.waiveWaterMin)
     setExtraExpenses(room.extraExpenses || [])
+    setNewRoomBuildingId(room.buildingId || (buildings.length > 0 ? buildings[0].id : ""))
     setModalOpen(true)
   }
 
@@ -849,7 +863,8 @@ function RoomsContent() {
         newRoomFloor,
         waiveElectricMin,
         waiveWaterMin,
-        extraExpenses
+        extraExpenses,
+        newRoomBuildingId || undefined
       )
       if (res.success) {
         showToast(t("rooms.toasts.update_room_success"), "success")
@@ -860,7 +875,7 @@ function RoomsContent() {
       }
     } else {
       // เพิ่มห้องพักใหม่
-      const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent), newRoomFloor, extraExpenses)
+      const res = await createRoom(newRoomNumber, selectedRoomTypeId, Number(newBaseRent), newRoomFloor, extraExpenses, newRoomBuildingId || undefined)
       if (res.success) {
         showToast(t("rooms.toasts.add_room_success"), "success")
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
@@ -2913,6 +2928,23 @@ function RoomsContent() {
                     onChange={(e) => setNewRoomFloor(e.target.value)}
                   />
                 </div>
+
+                {buildings.length > 1 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">อาคาร (Building)</label>
+                    <select
+                      required
+                      className="w-full h-12 md:h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-base md:text-xs transition-colors cursor-pointer"
+                      value={newRoomBuildingId}
+                      onChange={(e) => setNewRoomBuildingId(e.target.value)}
+                    >
+                      <option value="" disabled>-- เลือกอาคาร --</option>
+                      {buildings.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">ประเภทห้องพัก (Room Type)</label>

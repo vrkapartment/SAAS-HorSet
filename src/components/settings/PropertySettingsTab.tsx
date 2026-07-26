@@ -8,6 +8,7 @@ import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { createClient } from "@/lib/supabase/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { getRoomTypes, updateRoomTypeDeposit, migrateRoomTypeDeposits } from "@/features/room/actions"
+import { getBuildings, createBuilding, updateBuilding, deleteBuilding, type Building as BuildingData } from "@/features/building/actions"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 
@@ -51,7 +52,21 @@ export default function PropertySettingsTab() {
   const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
   const [electricMinChecked, setElectricMinChecked] = useState<boolean>(true)
   const [electricMinUnit, setElectricMinUnit] = useState<number>(10)
-  
+
+  // โหมดคำนวณค่าน้ำ-ไฟ: fixed_rate (เดิม) หรือ building_total (หารตามสัดส่วนยอดบิลจริงทั้งอาคาร)
+  const [electricBillingMode, setElectricBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
+  const [waterBillingMode, setWaterBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
+
+  // จัดการอาคาร (buildings) — ใช้กับโหมดหารตามสัดส่วนทั้งอาคาร
+  const [buildings, setBuildings] = useState<BuildingData[]>([])
+  const [buildingsLoading, setBuildingsLoading] = useState(false)
+  const [newBuildingName, setNewBuildingName] = useState("")
+  const [newBuildingAddress, setNewBuildingAddress] = useState("")
+  const [buildingSubmitting, setBuildingSubmitting] = useState(false)
+  const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null)
+  const [editingBuildingName, setEditingBuildingName] = useState("")
+  const [editingBuildingAddress, setEditingBuildingAddress] = useState("")
+
   // ตั้งค่าระยะเวลาสัญญาเช่าเริ่มต้นและประเภทสัญญา
   const [leaseDuration, setLeaseDuration] = useState<number>(6)
   const [leaseExpiryAction, setLeaseExpiryAction] = useState<"renew" | "original">("renew")
@@ -150,6 +165,8 @@ export default function PropertySettingsTab() {
             setLeaseExpiryAction(cached.lease_expiry_action || "renew")
             setSlipRetentionMonths(cached.slip_retention_months ? cached.slip_retention_months : 12)
             setCheckoutPolicy(cached.checkout_policy || "DAILY_PRORATE")
+            setElectricBillingMode(cached.electric_billing_mode || "fixed_rate")
+            setWaterBillingMode(cached.water_billing_mode || "fixed_rate")
             setIsDatabaseBacked(true)
           } else {
             const res = await getFinanceSettings(currentWsId)
@@ -182,6 +199,8 @@ export default function PropertySettingsTab() {
               setLeaseExpiryAction(res.data.lease_expiry_action || "renew")
               setSlipRetentionMonths(res.data.slip_retention_months ? res.data.slip_retention_months : 12)
               setCheckoutPolicy(res.data.checkout_policy || "DAILY_PRORATE")
+              setElectricBillingMode(res.data.electric_billing_mode || "fixed_rate")
+              setWaterBillingMode(res.data.water_billing_mode || "fixed_rate")
               setIsDatabaseBacked(true)
               setCachedData(currentWsId, cacheKey, res.data)
             } else if (res.error) {
@@ -224,6 +243,14 @@ export default function PropertySettingsTab() {
             }
           })
           setRoomTypeDeposits(rtDeposits)
+
+          // โหลดรายชื่ออาคาร (ใช้กับโหมดหารค่าน้ำ-ไฟตามสัดส่วนทั้งอาคาร)
+          setBuildingsLoading(true)
+          const buildingsRes = await getBuildings(currentWsId)
+          if (buildingsRes.success && buildingsRes.data) {
+            setBuildings(buildingsRes.data)
+          }
+          setBuildingsLoading(false)
         } else {
           setErrorMsg(t("property_settings.workspace_load_error"))
         }
@@ -273,6 +300,67 @@ export default function PropertySettingsTab() {
     }
   }
 
+  const handleAddBuilding = async () => {
+    if (!hasEditPermission) {
+      showToast(t("property_settings.permission_error"))
+      return
+    }
+    if (!newBuildingName.trim()) return
+    setBuildingSubmitting(true)
+    try {
+      const res = await createBuilding(newBuildingName, newBuildingAddress)
+      if (res.success && res.data) {
+        setBuildings(prev => [...prev, res.data!].sort((a, b) => a.name.localeCompare(b.name)))
+        setNewBuildingName("")
+        setNewBuildingAddress("")
+        showToast("เพิ่มอาคารสำเร็จ")
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการเพิ่มอาคาร")
+      }
+    } finally {
+      setBuildingSubmitting(false)
+    }
+  }
+
+  const handleStartEditBuilding = (b: BuildingData) => {
+    setEditingBuildingId(b.id)
+    setEditingBuildingName(b.name)
+    setEditingBuildingAddress(b.address || "")
+  }
+
+  const handleSaveEditBuilding = async (id: string) => {
+    if (!editingBuildingName.trim()) return
+    setBuildingSubmitting(true)
+    try {
+      const res = await updateBuilding(id, editingBuildingName, editingBuildingAddress)
+      if (res.success && res.data) {
+        setBuildings(prev => prev.map(b => b.id === id ? res.data! : b).sort((a, b) => a.name.localeCompare(b.name)))
+        setEditingBuildingId(null)
+        showToast("แก้ไขอาคารสำเร็จ")
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการแก้ไขอาคาร")
+      }
+    } finally {
+      setBuildingSubmitting(false)
+    }
+  }
+
+  const handleDeleteBuilding = async (id: string) => {
+    if (!confirm("ต้องการลบอาคารนี้ใช่หรือไม่?")) return
+    setBuildingSubmitting(true)
+    try {
+      const res = await deleteBuilding(id)
+      if (res.success) {
+        setBuildings(prev => prev.filter(b => b.id !== id))
+        showToast("ลบอาคารสำเร็จ")
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการลบอาคาร")
+      }
+    } finally {
+      setBuildingSubmitting(false)
+    }
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hasEditPermission) {
@@ -307,7 +395,9 @@ export default function PropertySettingsTab() {
         lease_expiry_action: leaseExpiryAction,
         slip_retention_months: slipRetentionMonths,
         checkout_policy: checkoutPolicy,
-        logo_url: logoUrl
+        logo_url: logoUrl,
+        electric_billing_mode: electricBillingMode,
+        water_billing_mode: waterBillingMode
       }
 
       const res = await saveFinanceSettings(workspaceId, payload)
@@ -907,7 +997,8 @@ export default function PropertySettingsTab() {
                         min={0}
                         step="0.01"
                         placeholder="18"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base transition-all"
+                        disabled={waterBillingMode === "building_total"}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         value={waterRate}
                         onChange={(e) => setWaterRate(Number(e.target.value))}
                       />
@@ -926,6 +1017,44 @@ export default function PropertySettingsTab() {
                       <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">{t("property_settings.util_min_check")}</span>
                     </label>
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">รูปแบบคำนวณค่าน้ำประปา</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setWaterBillingMode("fixed_rate")}
+                      className={`py-2.5 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all border cursor-pointer ${
+                        waterBillingMode === "fixed_rate"
+                          ? "bg-blue-600/10 border-blue-500 text-blue-500"
+                          : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      อัตราคงที่ (เดิม)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWaterBillingMode("building_total")}
+                      className={`py-2.5 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all border cursor-pointer ${
+                        waterBillingMode === "building_total"
+                          ? "bg-blue-600/10 border-blue-500 text-blue-500"
+                          : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      หารตามสัดส่วนทั้งอาคาร (กฎหมายใหม่)
+                    </button>
+                  </div>
+                  {waterBillingMode === "building_total" && (
+                    <p className="text-xs sm:text-sm text-slate-450 mt-1">
+                      ระบบจะใช้ยอดบิลน้ำประปาจริงทั้งอาคาร ÷ จำนวนหน่วยรวม ที่กรอกไว้ที่หน้าออกบิลแต่ละรอบแทนอัตราด้านบน (ต้องกรอกยอดรวมทุกรอบบิลก่อนออกบิลให้ผู้เช่า)
+                    </p>
+                  )}
+                  {waterMinChecked && waterBillingMode === "building_total" && (
+                    <p className="text-xs sm:text-sm text-amber-500 mt-1">
+                      หมายเหตุ: เปิด "หน่วยขั้นต่ำ" พร้อมกับโหมดหารตามสัดส่วน อาจทำให้ยอดที่เก็บจากผู้เช่ารวมกันเกินยอดบิลจริงที่กรอกไว้
+                    </p>
+                  )}
                 </div>
 
                 {waterMinChecked && (
@@ -967,7 +1096,8 @@ export default function PropertySettingsTab() {
                         min={0}
                         step="0.01"
                         placeholder="7"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base transition-all"
+                        disabled={electricBillingMode === "building_total"}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         value={electricRate}
                         onChange={(e) => setElectricRate(Number(e.target.value))}
                       />
@@ -986,6 +1116,44 @@ export default function PropertySettingsTab() {
                       <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-bold">{t("property_settings.util_min_check")}</span>
                     </label>
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs sm:text-sm text-slate-400 font-bold block">รูปแบบคำนวณค่าไฟฟ้า</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setElectricBillingMode("fixed_rate")}
+                      className={`py-2.5 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all border cursor-pointer ${
+                        electricBillingMode === "fixed_rate"
+                          ? "bg-amber-600/10 border-amber-500 text-amber-500"
+                          : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      อัตราคงที่ (เดิม)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setElectricBillingMode("building_total")}
+                      className={`py-2.5 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all border cursor-pointer ${
+                        electricBillingMode === "building_total"
+                          ? "bg-amber-600/10 border-amber-500 text-amber-500"
+                          : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      หารตามสัดส่วนทั้งอาคาร (กฎหมายใหม่)
+                    </button>
+                  </div>
+                  {electricBillingMode === "building_total" && (
+                    <p className="text-xs sm:text-sm text-slate-450 mt-1">
+                      ระบบจะใช้ยอดบิลไฟฟ้าจริงทั้งอาคาร ÷ จำนวนหน่วยรวม ที่กรอกไว้ที่หน้าออกบิลแต่ละรอบแทนอัตราด้านบน (ต้องกรอกยอดรวมทุกรอบบิลก่อนออกบิลให้ผู้เช่า)
+                    </p>
+                  )}
+                  {electricMinChecked && electricBillingMode === "building_total" && (
+                    <p className="text-xs sm:text-sm text-amber-500 mt-1">
+                      หมายเหตุ: เปิด "หน่วยขั้นต่ำ" พร้อมกับโหมดหารตามสัดส่วน อาจทำให้ยอดที่เก็บจากผู้เช่ารวมกันเกินยอดบิลจริงที่กรอกไว้
+                    </p>
+                  )}
                 </div>
 
                 {electricMinChecked && (
@@ -1011,7 +1179,91 @@ export default function PropertySettingsTab() {
                 )}
               </div>
             </div>
-            
+
+            {/* กล่อง 3.5: จัดการอาคาร (ใช้กับโหมดหารค่าน้ำ-ไฟตามสัดส่วนทั้งอาคาร กรณีมีหลายอาคารใน workspace เดียว) */}
+            {(electricBillingMode === "building_total" || waterBillingMode === "building_total" || buildings.length > 1) && (
+              <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-4 shadow-xl">
+                <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">
+                  <Building className="w-5 h-5 text-teal-400" /> จัดการอาคาร
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-450 -mt-2">
+                  ถ้าหอของคุณมีหลายอาคาร แต่ละอาคารมีมิเตอร์หลัก/บิลไฟฟ้า-น้ำประปาแยกกันคนละใบ ให้เพิ่มอาคารที่นี่ แล้วไปกำหนดอาคารให้แต่ละห้องพักในหน้าจัดการห้องพัก
+                </p>
+
+                {buildingsLoading ? (
+                  <p className="text-xs text-slate-400">กำลังโหลดรายชื่ออาคาร...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {buildings.map((b) => (
+                      <div key={b.id} className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl">
+                        {editingBuildingId === b.id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingBuildingName}
+                              onChange={(e) => setEditingBuildingName(e.target.value)}
+                              className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold outline-none focus:border-teal-500"
+                            />
+                            <input
+                              type="text"
+                              value={editingBuildingAddress}
+                              onChange={(e) => setEditingBuildingAddress(e.target.value)}
+                              placeholder="ที่อยู่ (ไม่บังคับ)"
+                              className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-teal-500"
+                            />
+                            <button type="button" onClick={() => handleSaveEditBuilding(b.id)} disabled={buildingSubmitting} className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg cursor-pointer disabled:opacity-50">
+                              บันทึก
+                            </button>
+                            <button type="button" onClick={() => setEditingBuildingId(null)} className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg cursor-pointer">
+                              ยกเลิก
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{b.name}</p>
+                              {b.address && <p className="text-xs text-slate-450">{b.address}</p>}
+                            </div>
+                            <button type="button" onClick={() => handleStartEditBuilding(b)} className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg cursor-pointer">
+                              แก้ไข
+                            </button>
+                            <button type="button" onClick={() => handleDeleteBuilding(b.id)} disabled={buildingSubmitting} className="px-3 py-1.5 bg-rose-500/10 text-rose-500 text-xs font-bold rounded-lg cursor-pointer disabled:opacity-50">
+                              ลบ
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-900/40">
+                  <input
+                    type="text"
+                    value={newBuildingName}
+                    onChange={(e) => setNewBuildingName(e.target.value)}
+                    placeholder="ชื่ออาคารใหม่"
+                    className="flex-1 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold outline-none focus:border-teal-500"
+                  />
+                  <input
+                    type="text"
+                    value={newBuildingAddress}
+                    onChange={(e) => setNewBuildingAddress(e.target.value)}
+                    placeholder="ที่อยู่ (ไม่บังคับ)"
+                    className="flex-1 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:border-teal-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddBuilding}
+                    disabled={buildingSubmitting || !newBuildingName.trim()}
+                    className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl cursor-pointer whitespace-nowrap"
+                  >
+                    + เพิ่มอาคาร
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* กล่อง 4: ตั้งค่าสัญญาเช่าเริ่มต้น (Default Lease Settings) */}
             <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
               <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200 dark:border-slate-900 pb-3">

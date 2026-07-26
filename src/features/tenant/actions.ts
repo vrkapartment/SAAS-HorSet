@@ -487,6 +487,7 @@ export async function getTenantPortalData() {
           id,
           room_number,
           base_rent,
+          building_id,
           waive_electric_min,
           waive_water_min,
           extra_expenses,
@@ -515,6 +516,8 @@ export async function getTenantPortalData() {
     let waterMinUnit = 3
     let electricMinChecked = true
     let electricMinUnit = 10
+    let electricBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
+    let waterBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
 
     let latePenaltyRate = 0
     let workspaceLogo = ""
@@ -523,7 +526,7 @@ export async function getTenantPortalData() {
       // จึงรวมเข้ากับ query หลักได้โดยไม่ต้องแยกยิงซ้ำเพื่อความปลอดภัยแบบเดิมอีกต่อไป
       const { data: ws } = await supabase
         .from("workspaces")
-        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate")
+        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate, electric_billing_mode, water_billing_mode")
         .eq("id", tenant.workspace_id)
         .maybeSingle()
       if (ws) {
@@ -542,6 +545,8 @@ export async function getTenantPortalData() {
         if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
         if (ws.logo_url) workspaceLogo = ws.logo_url
         if (ws.late_penalty_rate !== null && ws.late_penalty_rate !== undefined) latePenaltyRate = Number(ws.late_penalty_rate)
+        if (ws.electric_billing_mode === "building_total") electricBillingMode = "building_total"
+        if (ws.water_billing_mode === "building_total") waterBillingMode = "building_total"
       }
     }
 
@@ -568,7 +573,9 @@ export async function getTenantPortalData() {
           waterMinUnit,
           electricMinChecked,
           electricMinUnit,
-          latePenaltyRate
+          latePenaltyRate,
+          electricBillingMode,
+          waterBillingMode
         }
       }
     }
@@ -615,6 +622,52 @@ export async function getTenantPortalData() {
           filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
         }
 
+        // ดึงเลขมิเตอร์ก่อนหน้า-ปัจจุบันของทุกรอบบิลที่จะแสดง (ครั้งเดียว ไม่ query แยกทีละบิล)
+        // เพื่อเอาไปโชว์ "เลขมิเตอร์เดือนก่อนหน้า - เลขมิเตอร์เดือนที่วางบิล" ในหน้าบิลของผู้เช่า
+        const billingCyclesForMeters = Array.from(new Set(filteredBills.map((b: any) => b.billing_cycle)))
+        const meterByCycle = new Map<string, { elecPrev: number; elecCurr: number | null; waterPrev: number; waterCurr: number | null }>()
+        if (roomNumber && billingCyclesForMeters.length > 0) {
+          const { data: meterRows } = await supabase
+            .from("meter_records")
+            .select("billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
+            .eq("workspace_id", tenant.workspace_id)
+            .eq("room_number", roomNumber)
+            .in("billing_cycle", billingCyclesForMeters)
+
+          meterRows?.forEach((m: any) => {
+            meterByCycle.set(m.billing_cycle, {
+              elecPrev: Number(m.elec_prev),
+              elecCurr: m.elec_curr === null || m.elec_curr === undefined ? null : Number(m.elec_curr),
+              waterPrev: Number(m.water_prev),
+              waterCurr: m.water_curr === null || m.water_curr === undefined ? null : Number(m.water_curr)
+            })
+          })
+        }
+
+        // ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของทุกรอบบิลที่จะแสดง
+        // (ครั้งเดียว) เพื่อเอาไปโชว์ "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน" ในหน้าบิลของผู้เช่า
+        // ใช้ building_id ที่ snapshot ไว้ ณ ตอนออกบิล (bills.building_id) ไม่ใช่ building_id ปัจจุบันของห้อง
+        // เพราะห้องอาจถูกย้ายไปอาคารอื่นภายหลัง บิลเก่าต้องอ้างอิงอาคารที่ถูกต้อง ณ ตอนออกบิลเสมอ
+        const currentRoomBuildingId = (tenant.rooms as any)?.building_id ?? null
+        const buildingIdsForUtility = Array.from(new Set(
+          filteredBills.map((b: any) => b.building_id ?? currentRoomBuildingId).filter(Boolean)
+        ))
+        const buildingUtilityByCycle = new Map<string, { electric?: { amount: number; units: number }; water?: { amount: number; units: number } }>()
+        if (buildingIdsForUtility.length > 0 && (electricBillingMode === "building_total" || waterBillingMode === "building_total") && billingCyclesForMeters.length > 0) {
+          const { data: buildingBillRows } = await supabase
+            .from("building_utility_bills")
+            .select("billing_cycle, building_id, utility_type, total_amount, total_units")
+            .in("building_id", buildingIdsForUtility)
+            .in("billing_cycle", billingCyclesForMeters)
+
+          buildingBillRows?.forEach((row: any) => {
+            const key = `${row.building_id}:${row.billing_cycle}`
+            const entry = buildingUtilityByCycle.get(key) || {}
+            entry[row.utility_type as "electric" | "water"] = { amount: Number(row.total_amount), units: Number(row.total_units) }
+            buildingUtilityByCycle.set(key, entry)
+          })
+        }
+
         formattedBills = filteredBills.map((b: any) => {
           let lateDays = b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
           let penaltyAmount = b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null
@@ -627,6 +680,12 @@ export async function getTenantPortalData() {
             penaltyAmount = calculatedPenalty
             amount = amount + penaltyAmount
           }
+
+          const meter = meterByCycle.get(b.billing_cycle)
+          const billBuildingId = b.building_id ?? currentRoomBuildingId
+          const buildingUtility = billBuildingId ? buildingUtilityByCycle.get(`${billBuildingId}:${b.billing_cycle}`) : undefined
+          const electricBuildingTotal = electricBillingMode === "building_total" ? buildingUtility?.electric : undefined
+          const waterBuildingTotal = waterBillingMode === "building_total" ? buildingUtility?.water : undefined
 
           return {
             id: b.id,
@@ -641,7 +700,15 @@ export async function getTenantPortalData() {
             penaltyAmount: penaltyAmount,
             lateDays: lateDays,
             otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
-            invoiceId: b.invoice_id
+            invoiceId: b.invoice_id,
+            elecPrev: meter?.elecPrev ?? null,
+            elecCurr: meter?.elecCurr ?? null,
+            waterPrev: meter?.waterPrev ?? null,
+            waterCurr: meter?.waterCurr ?? null,
+            electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
+            electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
+            waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
+            waterBuildingTotalUnits: waterBuildingTotal?.units ?? null
           }
         })
       }
@@ -658,6 +725,8 @@ export async function getTenantPortalData() {
         waiveWaterMin: tenant.rooms?.waive_water_min,
         extraExpenses: tenant.rooms?.extra_expenses || [],
         bills: formattedBills,
+        electricBillingMode,
+        waterBillingMode,
         promptPayId,
         promptPayName,
         workspaceName,
@@ -749,7 +818,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     // 1. ค้นหาข้อมูลห้องพัก
     const { data: room, error: roomError } = await supabase
       .from("rooms")
-      .select("id, base_rent, waive_electric_min, waive_water_min, extra_expenses, room_types(default_rent)")
+      .select("id, base_rent, building_id, waive_electric_min, waive_water_min, extra_expenses, room_types(default_rent)")
       .eq("workspace_id", workspaceId)
       .eq("room_number", roomNumber)
       .maybeSingle()
@@ -774,7 +843,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     // จึงรวมเข้ากับ query หลักได้โดยไม่ต้องแยกยิงซ้ำเพื่อความปลอดภัยแบบเดิมอีกต่อไป
     const { data: ws } = await supabase
       .from("workspaces")
-      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate")
+      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate, electric_billing_mode, water_billing_mode")
       .eq("id", workspaceId)
       .maybeSingle()
 
@@ -792,6 +861,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     let electricMinChecked = true
     let electricMinUnit = 10
     let latePenaltyRate = 0
+    let electricBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
+    let waterBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
 
     let workspaceLogo = ""
     if (ws) {
@@ -810,6 +881,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
       if (ws.logo_url) workspaceLogo = ws.logo_url
       if (ws.late_penalty_rate !== null && ws.late_penalty_rate !== undefined) latePenaltyRate = Number(ws.late_penalty_rate)
+      if (ws.electric_billing_mode === "building_total") electricBillingMode = "building_total"
+      if (ws.water_billing_mode === "building_total") waterBillingMode = "building_total"
     }
 
     // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้
@@ -845,6 +918,50 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
       }
 
+      // ดึงเลขมิเตอร์ก่อนหน้า-ปัจจุบันของทุกรอบบิลที่จะแสดง (ครั้งเดียว ไม่ query แยกทีละบิล)
+      const billingCyclesForMeters = Array.from(new Set(filteredBills.map((b: any) => b.billing_cycle)))
+      const meterByCycle = new Map<string, { elecPrev: number; elecCurr: number | null; waterPrev: number; waterCurr: number | null }>()
+      if (billingCyclesForMeters.length > 0) {
+        const { data: meterRows } = await supabase
+          .from("meter_records")
+          .select("billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
+          .eq("workspace_id", workspaceId)
+          .eq("room_number", roomNumber)
+          .in("billing_cycle", billingCyclesForMeters)
+
+        meterRows?.forEach((m: any) => {
+          meterByCycle.set(m.billing_cycle, {
+            elecPrev: Number(m.elec_prev),
+            elecCurr: m.elec_curr === null || m.elec_curr === undefined ? null : Number(m.elec_curr),
+            waterPrev: Number(m.water_prev),
+            waterCurr: m.water_curr === null || m.water_curr === undefined ? null : Number(m.water_curr)
+          })
+        })
+      }
+
+      // ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของทุกรอบบิลที่จะแสดง
+      // ใช้ building_id ที่ snapshot ไว้ ณ ตอนออกบิล (bills.building_id) ไม่ใช่ building_id ปัจจุบันของห้อง
+      // เพราะห้องอาจถูกย้ายไปอาคารอื่นภายหลัง บิลเก่าต้องอ้างอิงอาคารที่ถูกต้อง ณ ตอนออกบิลเสมอ
+      const currentRoomBuildingId = (room as any).building_id ?? null
+      const buildingIdsForUtility = Array.from(new Set(
+        filteredBills.map((b: any) => b.building_id ?? currentRoomBuildingId).filter(Boolean)
+      ))
+      const buildingUtilityByCycle = new Map<string, { electric?: { amount: number; units: number }; water?: { amount: number; units: number } }>()
+      if (buildingIdsForUtility.length > 0 && (electricBillingMode === "building_total" || waterBillingMode === "building_total") && billingCyclesForMeters.length > 0) {
+        const { data: buildingBillRows } = await supabase
+          .from("building_utility_bills")
+          .select("billing_cycle, building_id, utility_type, total_amount, total_units")
+          .in("building_id", buildingIdsForUtility)
+          .in("billing_cycle", billingCyclesForMeters)
+
+        buildingBillRows?.forEach((row: any) => {
+          const key = `${row.building_id}:${row.billing_cycle}`
+          const entry = buildingUtilityByCycle.get(key) || {}
+          entry[row.utility_type as "electric" | "water"] = { amount: Number(row.total_amount), units: Number(row.total_units) }
+          buildingUtilityByCycle.set(key, entry)
+        })
+      }
+
       formattedBills = filteredBills.map((b: any) => {
         let lateDays = b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
         let penaltyAmount = b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null
@@ -857,6 +974,12 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
           penaltyAmount = calculatedPenalty
           amount = amount + penaltyAmount
         }
+
+        const meter = meterByCycle.get(b.billing_cycle)
+        const billBuildingId = b.building_id ?? currentRoomBuildingId
+        const buildingUtility = billBuildingId ? buildingUtilityByCycle.get(`${billBuildingId}:${b.billing_cycle}`) : undefined
+        const electricBuildingTotal = electricBillingMode === "building_total" ? buildingUtility?.electric : undefined
+        const waterBuildingTotal = waterBillingMode === "building_total" ? buildingUtility?.water : undefined
 
         return {
           id: b.id,
@@ -871,7 +994,15 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
           penaltyAmount: penaltyAmount,
           lateDays: lateDays,
           otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
-          invoiceId: b.invoice_id
+          invoiceId: b.invoice_id,
+          elecPrev: meter?.elecPrev ?? null,
+          elecCurr: meter?.elecCurr ?? null,
+          waterPrev: meter?.waterPrev ?? null,
+          waterCurr: meter?.waterCurr ?? null,
+          electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
+          electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
+          waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
+          waterBuildingTotalUnits: waterBuildingTotal?.units ?? null
         }
       })
     }
@@ -888,6 +1019,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         waiveWaterMin: room.waive_water_min,
         extraExpenses: room.extra_expenses || [],
         bills: formattedBills,
+        electricBillingMode,
+        waterBillingMode,
         promptPayId,
         promptPayName,
         workspaceName,

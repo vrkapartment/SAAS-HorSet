@@ -139,6 +139,8 @@ export default function TenantPortal() {
   const [electricMinChecked, setElectricMinChecked] = useState(true)
   const [electricMinUnit, setElectricMinUnit] = useState(10)
   const [extraExpenses, setExtraExpenses] = useState<any[]>([])
+  const [electricBillingMode, setElectricBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
+  const [waterBillingMode, setWaterBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
   const [workspaceLogo, setWorkspaceLogo] = useState<string>("")
   const [combinedQrUrl, setCombinedQrUrl] = useState<string>("")
   const [isQrLoading, setIsQrLoading] = useState<boolean>(false)
@@ -159,6 +161,24 @@ export default function TenantPortal() {
       const monthIdx = parseInt(month, 10) - 1
       if (monthIdx >= 0 && monthIdx < 12) {
         return `${t("dashboard.month_" + month)} ${year}`
+      }
+    }
+    return cycleStr
+  }
+
+  // แปลงรอบบิล "YYYY-MM" เป็น "เดือน ปี" ภาษาไทยเสมอ (ไม่ผูกกับภาษา UI ที่เลือกไว้) — ใช้เฉพาะกล่อง
+  // "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน" ที่เป็นข้อความราชการ/กฎหมายซึ่งควรเป็นภาษาไทยเสมอ
+  const formatCycleThai = (cycleStr: string) => {
+    if (!cycleStr) return ""
+    if (cycleStr.includes("-")) {
+      const [year, month] = cycleStr.split("-")
+      const monthsThai = [
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+      ]
+      const monthIdx = parseInt(month, 10) - 1
+      if (monthIdx >= 0 && monthIdx < 12) {
+        return `${monthsThai[monthIdx]} ${year}`
       }
     }
     return cycleStr
@@ -244,6 +264,16 @@ export default function TenantPortal() {
           setElectricMinUnit(Number(data.electricMinUnit))
         }
         setExtraExpenses(data.extraExpenses || [])
+        if (data.electricBillingMode === "building_total") {
+          setElectricBillingMode("building_total")
+        } else {
+          setElectricBillingMode("fixed_rate")
+        }
+        if (data.waterBillingMode === "building_total") {
+          setWaterBillingMode("building_total")
+        } else {
+          setWaterBillingMode("fixed_rate")
+        }
         if (data.workspaceLogo) {
           setWorkspaceLogo(data.workspaceLogo)
         } else {
@@ -384,6 +414,24 @@ export default function TenantPortal() {
   const waterUnits = bill ? bill.waterUnits : 0
   const finalWaterUnits = !waiveWaterMin && waterMinChecked && waterUnits <= waterMinUnit ? waterMinUnit : waterUnits
   const waterAmount = finalWaterUnits * waterRate
+
+  // ช่วงเลขมิเตอร์ก่อนหน้า-ปัจจุบัน (แสดงเฉพาะเมื่อมีข้อมูลมิเตอร์จริงของรอบบิลนี้)
+  const elecPrev = bill && bill.elecPrev !== null && bill.elecPrev !== undefined ? bill.elecPrev : null
+  const elecCurr = bill && bill.elecCurr !== null && bill.elecCurr !== undefined ? bill.elecCurr : null
+  const waterPrev = bill && bill.waterPrev !== null && bill.waterPrev !== undefined ? bill.waterPrev : null
+  const waterCurr = bill && bill.waterCurr !== null && bill.waterCurr !== undefined ? bill.waterCurr : null
+  const hasElecMeterRange = elecPrev !== null && elecCurr !== null
+  const hasWaterMeterRange = waterPrev !== null && waterCurr !== null
+
+  // รายละเอียดใบแจ้งหนี้จริงทั้งอาคาร (แสดงเฉพาะเปิดโหมด "หารตามสัดส่วน" และมีข้อมูลของรอบบิลนี้จริง)
+  const electricBuildingTotalAmount = bill && bill.electricBuildingTotalAmount !== null && bill.electricBuildingTotalAmount !== undefined ? bill.electricBuildingTotalAmount : null
+  const electricBuildingTotalUnits = bill && bill.electricBuildingTotalUnits !== null && bill.electricBuildingTotalUnits !== undefined ? bill.electricBuildingTotalUnits : null
+  const waterBuildingTotalAmount = bill && bill.waterBuildingTotalAmount !== null && bill.waterBuildingTotalAmount !== undefined ? bill.waterBuildingTotalAmount : null
+  const waterBuildingTotalUnits = bill && bill.waterBuildingTotalUnits !== null && bill.waterBuildingTotalUnits !== undefined ? bill.waterBuildingTotalUnits : null
+  const hasElectricDisclosure = electricBillingMode === "building_total" && electricBuildingTotalAmount !== null && electricBuildingTotalUnits !== null
+  const hasWaterDisclosure = waterBillingMode === "building_total" && waterBuildingTotalAmount !== null && waterBuildingTotalUnits !== null
+  const disclosureCycleThai = bill ? formatCycleThai(bill.billingCycle) : ""
+
   const commonAreaFee = commonFee
   const otherServiceAmount = bill ? (bill.otherServiceAmount || 0) : 0
 
@@ -550,7 +598,16 @@ export default function TenantPortal() {
         waiveElectricMin,
         waiveWaterMin,
         invoiceId: bill ? (bill.invoiceId || bill.invoice_id) : `INV-${(bill?.billingCycle || '2026-06').replace('-', '')}-${roomNumber}`,
-        extraExpenses: extraExpenses
+        extraExpenses: extraExpenses,
+        elecPrev,
+        elecCurr,
+        waterPrev,
+        waterCurr,
+        billingCycleRaw: bill ? bill.billingCycle : "",
+        electricBuildingTotalAmount,
+        electricBuildingTotalUnits,
+        waterBuildingTotalAmount,
+        waterBuildingTotalUnits
       })
 
       const link = document.createElement("a")
@@ -766,7 +823,11 @@ export default function TenantPortal() {
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
                   <span>{t("tenant_portal.item_electric")}</span>
                 </div>
-                <p className="text-[10px] text-slate-500 pl-5">{t("tenant_portal.electric_units_used").replace("{units}", String(elecUnits))}</p>
+                <p className="text-[10px] text-slate-500 pl-5">
+                  {hasElecMeterRange
+                    ? t("tenant_portal.electric_meter_reading").replace("{prev}", String(elecPrev)).replace("{curr}", String(elecCurr)).replace("{units}", String(elecUnits))
+                    : t("tenant_portal.electric_units_used").replace("{units}", String(elecUnits))}
+                </p>
               </div>
               <span className="font-semibold text-slate-200">{elecAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
@@ -778,7 +839,11 @@ export default function TenantPortal() {
                   <Droplet className="w-3.5 h-3.5 text-teal-400" />
                   <span>{t("tenant_portal.item_water")}</span>
                 </div>
-                <p className="text-[10px] text-slate-500 pl-5">{t("tenant_portal.water_units_used").replace("{units}", String(waterUnits))}</p>
+                <p className="text-[10px] text-slate-500 pl-5">
+                  {hasWaterMeterRange
+                    ? t("tenant_portal.water_meter_reading").replace("{prev}", String(waterPrev)).replace("{curr}", String(waterCurr)).replace("{units}", String(waterUnits))
+                    : t("tenant_portal.water_units_used").replace("{units}", String(waterUnits))}
+                </p>
               </div>
               <span className="font-semibold text-slate-200">{waterAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
@@ -836,6 +901,36 @@ export default function TenantPortal() {
               <span className="font-bold text-slate-300">{t("tenant_portal.net_total_label")}</span>
               <span className="text-lg font-bold text-blue-400">{totalAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
+
+            {/* รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน (แสดงเฉพาะเปิดโหมด "หารตามสัดส่วนทั้งอาคาร" และมีข้อมูลของรอบบิลนี้) */}
+            {(hasElectricDisclosure || hasWaterDisclosure) && (
+              <div className="mt-2 p-3.5 bg-slate-900/50 border border-slate-800 rounded-xl space-y-2 text-[11px] leading-relaxed">
+                <p className="font-bold text-slate-300">
+                  รายละเอียด ใบแจ้งหนี้ของการไฟฟ้า/การประปา ประจำรอบเดือน {disclosureCycleThai}
+                </p>
+
+                {hasElectricDisclosure && (
+                  <div className="space-y-0.5">
+                    <p className="text-slate-400">การไฟฟ้านครหลวง/การไฟฟ้าส่วนภูมิภาค</p>
+                    <p className="text-slate-400">จำนวนหน่วยที่ใช้ {Number(electricBuildingTotalUnits).toLocaleString()} หน่วย</p>
+                    <p className="text-slate-400">ยอดที่ต้องชำระ {Number(electricBuildingTotalAmount).toLocaleString()} บาท</p>
+                  </div>
+                )}
+
+                {hasWaterDisclosure && (
+                  <div className="space-y-0.5">
+                    <p className="text-slate-400">การประปานครหลวง/การประปาส่วนภูมิภาค</p>
+                    <p className="text-slate-400">จำนวนน้ำใช้ {Number(waterBuildingTotalUnits).toLocaleString()} หน่วย</p>
+                    <p className="text-slate-400">ยอดที่ต้องชำระ {Number(waterBuildingTotalAmount).toLocaleString()} บาท</p>
+                  </div>
+                )}
+
+                <p className="text-slate-500 pt-1 border-t border-slate-800">
+                  หมายเหตุ: อัตราค่าไฟฟ้าและค่าน้ำประปาคำนวณจาก (เลขมิเตอร์ปัจจุบัน - เลขมิเตอร์ครั้งก่อน) × อัตราเฉลี่ยจริงตามใบแจ้งหนี้ของการไฟฟ้า/การประปา
+                  ประจำรอบเดือน {disclosureCycleThai} โดยไม่มีการบวกกำไรเพิ่มใดๆ ทั้งสิ้น
+                </p>
+              </div>
+            )}
 
             {/* ปุ่มดาวน์โหลดบิล PDF */}
             <button

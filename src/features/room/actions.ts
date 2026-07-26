@@ -1,6 +1,29 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+/**
+ * หา building_id ที่จะใช้ตอนสร้าง/แก้ไขห้อง — ถ้าไม่ได้ระบุมา (buildingId ว่าง) และ workspace
+ * นี้มีอาคารเดียว จะใช้อาคารนั้นให้อัตโนมัติ (ครอบคลุมเคสส่วนใหญ่ที่มีอาคารเดียวโดยไม่ต้องเลือกเอง)
+ * ถ้ามีมากกว่า 1 อาคารและไม่ได้ระบุมา จะคืนค่า null (ห้ามเดา ต้องให้ผู้ใช้เลือกจาก UI)
+ */
+async function resolveBuildingId(
+  supabase: SupabaseClient,
+  workspaceId: string | null | undefined,
+  buildingId?: string | null
+): Promise<string | null> {
+  if (buildingId) return buildingId
+  if (!workspaceId) return null
+
+  const { data } = await supabase
+    .from("buildings")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+
+  if (data && data.length === 1) return data[0].id
+  return null
+}
 
 // =========================================================================
 // 1. Room Types Actions (จัดการประเภทห้องพัก แอร์/พัดลม)
@@ -142,6 +165,7 @@ export async function getRooms(workspaceId?: string) {
         leaseStart: tenant ? tenant.lease_start : null,
         leaseEnd: tenant ? tenant.lease_end : null,
         depositPaid: tenant && tenant.deposit_paid !== null && tenant.deposit_paid !== undefined ? Number(tenant.deposit_paid) : null,
+        buildingId: room.building_id || null,
         roomTypeId: room.room_type_id,
         roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ",
         waiveElectricMin: !!room.waive_electric_min,
@@ -165,7 +189,7 @@ export async function getRooms(workspaceId?: string) {
   }
 }
 
-export async function createRoom(roomNumber: string, roomTypeId: string, baseRent: number, floor: string, extraExpenses: any[] = []) {
+export async function createRoom(roomNumber: string, roomTypeId: string, baseRent: number, floor: string, extraExpenses: any[] = [], buildingId?: string) {
   try {
     const { assertSubscriptionActive, checkWorkspaceQuota, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
     const workspaceId = await getCurrentWorkspaceId()
@@ -175,15 +199,18 @@ export async function createRoom(roomNumber: string, roomTypeId: string, baseRen
     }
 
     const supabase = await createClient()
+    const resolvedBuildingId = await resolveBuildingId(supabase, workspaceId, buildingId)
+
     const { data, error } = await supabase
       .from("rooms")
-      .insert([{ 
-        room_number: roomNumber, 
-        room_type_id: roomTypeId || null, 
-        base_rent: baseRent, 
+      .insert([{
+        room_number: roomNumber,
+        room_type_id: roomTypeId || null,
+        base_rent: baseRent,
         status: "available",
         floor: floor || null,
-        extra_expenses: extraExpenses
+        extra_expenses: extraExpenses,
+        building_id: resolvedBuildingId
       }])
       .select()
 
@@ -196,15 +223,16 @@ export async function createRoom(roomNumber: string, roomTypeId: string, baseRen
 }
 
 export async function updateRoom(
-  id: string, 
-  roomNumber: string, 
-  roomTypeId: string, 
-  baseRent: number, 
+  id: string,
+  roomNumber: string,
+  roomTypeId: string,
+  baseRent: number,
   status: "occupied" | "available" | "Pending_Refund",
   floor: string,
   waiveElectricMin: boolean = false,
   waiveWaterMin: boolean = false,
-  extraExpenses: any[] = []
+  extraExpenses: any[] = [],
+  buildingId?: string
 ) {
   try {
     const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
@@ -214,19 +242,38 @@ export async function updateRoom(
     }
 
     const supabase = await createClient()
+
+    const updatePayload: {
+      room_number: string
+      room_type_id: string | null
+      base_rent: number
+      status: "occupied" | "available" | "Pending_Refund"
+      floor: string | null
+      waive_electric_min: boolean
+      waive_water_min: boolean
+      extra_expenses: any[]
+      updated_at: string
+      building_id?: string | null
+    } = {
+      room_number: roomNumber,
+      room_type_id: roomTypeId || null,
+      base_rent: baseRent,
+      status: status,
+      floor: floor || null,
+      waive_electric_min: waiveElectricMin,
+      waive_water_min: waiveWaterMin,
+      extra_expenses: extraExpenses,
+      updated_at: new Date().toISOString()
+    }
+    // เซ็ต building_id เฉพาะตอนที่ผู้เรียกส่งมาจริง ไม่งั้นปล่อยค่าเดิมของห้องไว้ (ไม่ auto-resolve
+    // ตอนแก้ไข เพราะห้องนี้อาจถูกกำหนดอาคารไว้แล้วก่อนหน้า ไม่ควรเดาทับ)
+    if (buildingId !== undefined) {
+      updatePayload.building_id = buildingId || null
+    }
+
     const { data, error } = await supabase
       .from("rooms")
-      .update({
-        room_number: roomNumber,
-        room_type_id: roomTypeId || null,
-        base_rent: baseRent,
-        status: status,
-        floor: floor || null,
-        waive_electric_min: waiveElectricMin,
-        waive_water_min: waiveWaterMin,
-        extra_expenses: extraExpenses,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select()
 
@@ -386,6 +433,9 @@ export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
       roomTypeMap.set(rt.name.trim().toLowerCase(), { id: rt.id, defaultRent: Number(rt.default_rent || 0) })
     })
 
+    // 1.5 หาอาคารเริ่มต้นของ workspace นี้ (ใช้ตอนที่ workspace มีอาคารเดียวเท่านั้น กันเดาผิดถ้ามีหลายอาคาร)
+    const defaultBuildingId = await resolveBuildingId(supabase, workspaceId, undefined)
+
     // 2. แปลงไฟล์ CSV เป็นอาร์เรย์แถว
     const rows = parseCSV(csvText)
     if (rows.length < 2) {
@@ -449,7 +499,8 @@ export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
         base_rent: matchedType.defaultRent,
         status: "available",
         floor: floor || null,
-        workspace_id: workspaceId
+        workspace_id: workspaceId,
+        building_id: defaultBuildingId
       })
     }
 
@@ -510,6 +561,7 @@ export async function createRoomsBatch(rooms: {
   status: "available" | "occupied"
   floor: string | null
   workspace_id: string
+  building_id?: string | null
 }[]) {
   try {
     if (rooms.length === 0) {
@@ -529,9 +581,16 @@ export async function createRoomsBatch(rooms: {
 
     const supabase = await createClient()
 
+    // ถ้าแถวไหนไม่ได้ระบุ building_id มา ให้ resolve อาคารเริ่มต้นของ workspace นั้น (เฉพาะกรณีมีอาคารเดียว)
+    const defaultBuildingId = await resolveBuildingId(supabase, workspaceId, undefined)
+    const roomsWithBuilding = rooms.map(r => ({
+      ...r,
+      building_id: r.building_id !== undefined ? r.building_id : defaultBuildingId
+    }))
+
     const { data, error } = await supabase
       .from("rooms")
-      .insert(rooms)
+      .insert(roomsWithBuilding)
       .select()
 
     if (error) {

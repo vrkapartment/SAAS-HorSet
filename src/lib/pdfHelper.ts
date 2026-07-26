@@ -932,6 +932,37 @@ export interface BillPdfData {
   waiveWaterMin?: boolean
   invoiceId?: string
   extraExpenses?: Array<{ name: string; amount: number }>
+  // เลขมิเตอร์ก่อนหน้า-ปัจจุบัน (ไม่บังคับ — ถ้าไม่มีค่าจะไม่แสดงช่วงเลขมิเตอร์ในบิล)
+  elecPrev?: number | null
+  elecCurr?: number | null
+  waterPrev?: number | null
+  waterCurr?: number | null
+  // รอบบิลดิบรูปแบบ "YYYY-MM" — ใช้ format เดือน-ปีไทยเองสำหรับกล่อง "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน"
+  // (แยกจาก billingCycle ด้านบนเพราะผู้เรียกแต่ละที่ format มาไม่เหมือนกัน)
+  billingCycleRaw?: string
+  // ยอดบิลจริง+หน่วยรวมทั้งอาคารจากหน่วยงาน (โหมด "หารตามสัดส่วนทั้งอาคาร") — ไม่บังคับ, ถ้าไม่มีค่าจะไม่แสดงกล่องนี้
+  electricBuildingTotalAmount?: number | null
+  electricBuildingTotalUnits?: number | null
+  waterBuildingTotalAmount?: number | null
+  waterBuildingTotalUnits?: number | null
+}
+
+// แปลงรอบบิล "YYYY-MM" เป็น "เดือน ปี" ภาษาไทย (ซ้ำกับ helper ในหน้า admin billing/manage-bills
+// โดยตั้งใจ — ไฟล์เหล่านั้นมี copy ของตัวเองอยู่แล้ว ไม่ extract เป็น shared util เพิ่มเติม)
+function formatCycleThai(cycleStr: string): string {
+  if (!cycleStr) return ""
+  if (cycleStr.includes("-")) {
+    const [year, month] = cycleStr.split("-")
+    const monthsThai = [
+      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ]
+    const monthIdx = parseInt(month, 10) - 1
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${monthsThai[monthIdx]} ${year}`
+    }
+  }
+  return cycleStr
 }
 
 export async function generateBillPdf(data: BillPdfData) {
@@ -1042,12 +1073,24 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText(adjustedBaseRent.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(adjustedBaseRent.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
+  // ช่วงเลขมิเตอร์ก่อนหน้า-ปัจจุบัน เช่น "651 - 690 จำนวน 39" — แสดงเฉพาะเมื่อมีข้อมูลมิเตอร์จริง
+  const elecMeterRange = data.elecPrev !== null && data.elecPrev !== undefined && data.elecCurr !== null && data.elecCurr !== undefined
+    ? `${data.elecPrev.toLocaleString()} - ${data.elecCurr.toLocaleString()} จำนวน ${data.electricUnits} หน่วย`
+    : null
+  const waterMeterRange = data.waterPrev !== null && data.waterPrev !== undefined && data.waterCurr !== null && data.waterCurr !== undefined
+    ? `${data.waterPrev.toLocaleString()} - ${data.waterCurr.toLocaleString()} จำนวน ${data.waterUnits} หน่วย`
+    : null
+
   y -= 25
   // รายการ 2: ค่าไฟฟ้า
   drawText(elecDesc, 50, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(data.electricUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(isElecMin ? "-" : data.electricRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(elecAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+  if (elecMeterRange) {
+    y -= 12
+    drawText(elecMeterRange, 55, y, 8, rgb(0.4, 0.4, 0.4))
+  }
 
   y -= 25
   // รายการ 3: ค่าน้ำประปา
@@ -1055,6 +1098,10 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText(data.waterUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(isWaterMin ? "-" : data.waterRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(waterAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+  if (waterMeterRange) {
+    y -= 12
+    drawText(waterMeterRange, 55, y, 8, rgb(0.4, 0.4, 0.4))
+  }
 
   y -= 25
   // รายการ 4: ค่าส่วนกลาง
@@ -1115,11 +1162,51 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText("ยอดชำระเงินสุทธิทั้งสิ้น (Grand Total):", 280, y, 10, rgb(0.1, 0.1, 0.1))
   drawText(`${data.amount.toLocaleString()} บาท`, 470, y, 11, rgb(0.06, 0.45, 0.35))
 
+  // รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน (แสดงเฉพาะเมื่อเปิดโหมด "หารตามสัดส่วนทั้งอาคาร" และมีข้อมูลจริง)
+  const hasElectricDisclosure = data.electricBuildingTotalAmount !== null && data.electricBuildingTotalAmount !== undefined
+    && data.electricBuildingTotalUnits !== null && data.electricBuildingTotalUnits !== undefined
+  const hasWaterDisclosure = data.waterBuildingTotalAmount !== null && data.waterBuildingTotalAmount !== undefined
+    && data.waterBuildingTotalUnits !== null && data.waterBuildingTotalUnits !== undefined
+
+  if (hasElectricDisclosure || hasWaterDisclosure) {
+    const cycleThai = formatCycleThai(data.billingCycleRaw || "")
+    y -= 24
+    drawText(`รายละเอียด ใบแจ้งหนี้ของการไฟฟ้า/การประปา ประจำรอบเดือน ${cycleThai}`, 50, y, 9, rgb(0.15, 0.2, 0.3))
+
+    if (hasElectricDisclosure) {
+      y -= 16
+      drawText("การไฟฟ้านครหลวง/การไฟฟ้าส่วนภูมิภาค", 55, y, 8.5, rgb(0.3, 0.3, 0.3))
+      y -= 13
+      drawText(`จำนวนหน่วยที่ใช้ ${data.electricBuildingTotalUnits!.toLocaleString()} หน่วย`, 55, y, 8.5, rgb(0.3, 0.3, 0.3))
+      y -= 13
+      drawText(`ยอดที่ต้องชำระ ${data.electricBuildingTotalAmount!.toLocaleString()} บาท`, 55, y, 8.5, rgb(0.3, 0.3, 0.3))
+    }
+
+    if (hasWaterDisclosure) {
+      y -= 16
+      drawText("การประปานครหลวง/การประปาส่วนภูมิภาค", 55, y, 8.5, rgb(0.3, 0.3, 0.3))
+      y -= 13
+      drawText(`จำนวนน้ำใช้ ${data.waterBuildingTotalUnits!.toLocaleString()} หน่วย`, 55, y, 8.5, rgb(0.3, 0.3, 0.3))
+      y -= 13
+      drawText(`ยอดที่ต้องชำระ ${data.waterBuildingTotalAmount!.toLocaleString()} บาท`, 55, y, 8.5, rgb(0.3, 0.3, 0.3))
+    }
+
+    y -= 18
+    drawText("หมายเหตุ: อัตราค่าไฟฟ้าและค่าน้ำประปาคำนวณจาก (เลขมิเตอร์ปัจจุบัน - เลขมิเตอร์ครั้งก่อน) × อัตราเฉลี่ยจริงตามใบแจ้งหนี้ของการไฟฟ้า/การประปา", 50, y, 7.5, rgb(0.45, 0.45, 0.45))
+    y -= 11
+    drawText(`ประจำรอบเดือน ${cycleThai} โดยไม่มีการบวกกำไรเพิ่มใดๆ ทั้งสิ้น`, 50, y, 7.5, rgb(0.45, 0.45, 0.45))
+  }
+
   // ส่วนของการชำระเงินพร้อมเพย์
   y -= 60
+  // กันกล่อง/QR ตกขอบล่างของหน้า (y=0 คือขอบล่างสุด) ในบิลที่เนื้อหายาวผิดปกติ (มีทั้ง 2 disclosure
+  // + ค่าใช้จ่ายเพิ่มเติมจำนวนมาก + ค่าปรับ) ที่ดันตำแหน่ง y ลงมาจนต่ำเกินไปหรือติดลบ — บังคับให้กล่อง
+  // (สูง 180) มีขอบล่างอย่างน้อยที่ y=20 เสมอ ยอมให้ทับเนื้อหาด้านบนเล็กน้อยในกรณีสุดโต่งนี้ ดีกว่าปล่อยให้
+  // QR Code สำหรับจ่ายเงินหายไปนอกหน้ากระดาษทั้งหมด
+  const boxY = Math.max(180, y)
   page.drawRectangle({
     x: 40,
-    y: y - 160,
+    y: boxY - 160,
     width: 515,
     height: 180,
     color: rgb(0.96, 0.98, 1.0),
@@ -1127,7 +1214,7 @@ export async function generateBillPdf(data: BillPdfData) {
     borderWidth: 1,
   })
 
-  const promptPayTextY = y + 5
+  const promptPayTextY = boxY + 5
   drawText("ช่องทางการชำระเงินด้วย PromptPay QR (ระบบแสกนจ่ายอัตโนมัติ)", 60, promptPayTextY, 10, rgb(0.06, 0.15, 0.35))
 
   drawText(`ชื่อบัญชีรับโอน: ${data.promptPayName}`, 60, promptPayTextY - 20, 9, rgb(0.2, 0.2, 0.2))
@@ -1152,7 +1239,7 @@ export async function generateBillPdf(data: BillPdfData) {
       const qrImage = await pdfDoc.embedPng(qrBytes)
       page.drawImage(qrImage, {
         x: 390,
-        y: y - 145,
+        y: boxY - 145,
         width: 130,
         height: 130,
       })
@@ -1161,8 +1248,10 @@ export async function generateBillPdf(data: BillPdfData) {
     console.warn("ไม่สามารถฝัง QR Code ลงใน PDF บิลได้:", qrErr)
   }
 
-  // ท้ายบิล
-  drawText(`ขอขอบคุณที่ใช้บริการ${workspaceName} หากมีข้อสงสัยติดต่อเจ้าหน้าที่หอพักโดยตรง`, 60, 45, 7.5, rgb(0.5, 0.5, 0.5))
+  // ท้ายบิล — ปกติอยู่ที่ y=45 คงที่ แต่ถ้ากล่อง "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน" ด้านบนดันเนื้อหาลงมาเยอะ
+  // (ยาวเกินพื้นที่ที่เผื่อไว้) ให้เลื่อนลงต่ำกว่ากล่องพร้อมเพย์เสมอ กันทับกัน แต่ไม่ต่ำกว่าขอบล่างของหน้า
+  const footerY = Math.max(20, Math.min(45, boxY - 160 - 20))
+  drawText(`ขอขอบคุณที่ใช้บริการ${workspaceName} หากมีข้อสงสัยติดต่อเจ้าหน้าที่หอพักโดยตรง`, 60, footerY, 7.5, rgb(0.5, 0.5, 0.5))
 
   // เซฟและบันทึกไฟล์เป็น Blob
   const pdfBytes = await pdfDoc.save()

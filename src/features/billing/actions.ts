@@ -10,6 +10,33 @@ import { getMeterRecords, getMeterReplacements } from "@/features/meter/actions"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
 
 import { calculateBillTotal } from "./bill-calculator"
+import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "./building-utility-actions"
+
+/**
+ * Resolve อัตราไฟฟ้า/น้ำที่จะใช้จริงสำหรับห้องหนึ่งในรอบบิลหนึ่ง ตามโหมดที่ workspace ตั้งไว้
+ * (fixed_rate = อัตราคงที่เดิม, building_total = ยอดบิลจริงทั้งอาคาร ÷ หน่วยรวม ที่กรอกไว้ล่วงหน้า)
+ * คืน error ชัดเจนถ้าเปิดโหมด building_total แล้วยังไม่ได้กรอกยอดของอาคารนั้นในรอบบิลนี้
+ */
+function resolveUtilityRate(
+  utilityType: "electric" | "water",
+  mode: "fixed_rate" | "building_total" | undefined,
+  fixedRate: number,
+  buildingId: string | null | undefined,
+  buildingBillsMap: Map<string, BuildingUtilityBill>
+): { rate: number; error?: string } {
+  if (mode !== "building_total") {
+    return { rate: fixedRate }
+  }
+  const utilityLabel = utilityType === "electric" ? "ไฟฟ้า" : "น้ำประปา"
+  if (!buildingId) {
+    return { rate: 0, error: `ห้องนี้ยังไม่ได้กำหนดอาคาร กรุณาตั้งค่าอาคารให้ห้องนี้ก่อนออกบิลค่า${utilityLabel}แบบหารตามสัดส่วน` }
+  }
+  const row = buildingBillsMap.get(`${buildingId}:${utilityType}`)
+  if (!row) {
+    return { rate: 0, error: `ยังไม่ได้กรอกยอดค่า${utilityLabel}รวมทั้งอาคารของรอบบิลนี้ กรุณากรอกที่หน้าออกบิลก่อน` }
+  }
+  return { rate: row.ratePerUnit }
+}
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -173,13 +200,26 @@ export async function createBill(
     const extraExpenses = roomData.extra_expenses || []
     const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
+    // 3.5 Resolve อัตราไฟฟ้า/น้ำตามโหมดที่ workspace ตั้งไว้ (fixed_rate เดิม หรือ building_total ใหม่)
+    let buildingBillsMap = new Map<string, BuildingUtilityBill>()
+    if (settings.electric_billing_mode === "building_total" || settings.water_billing_mode === "building_total") {
+      const bRes = await getBuildingUtilityBillsForWorkspaceCycle(workspaceId, billingCycle)
+      if (bRes.success && bRes.data) {
+        buildingBillsMap = new Map(bRes.data.map(row => [`${row.buildingId}:${row.utilityType}`, row]))
+      }
+    }
+    const electricResolved = resolveUtilityRate("electric", settings.electric_billing_mode, settings.electric_rate, roomData.building_id, buildingBillsMap)
+    if (electricResolved.error) return { success: false, error: electricResolved.error }
+    const waterResolved = resolveUtilityRate("water", settings.water_billing_mode, settings.water_rate, roomData.building_id, buildingBillsMap)
+    if (waterResolved.error) return { success: false, error: waterResolved.error }
+
     // 4. Calculate total on Server
     const { elecCost, waterCost, total: serverCalculatedTotal } = calculateBillTotal({
       baseRent,
       electricUnitsUsed: electricUnits,
       waterUnitsUsed: waterUnits,
-      electricRate: settings.electric_rate,
-      waterRate: settings.water_rate,
+      electricRate: electricResolved.rate,
+      waterRate: waterResolved.rate,
       commonFee: settings.common_fee,
       otherServiceAmount,
       extraExpensesSum,
@@ -223,7 +263,8 @@ export async function createBill(
           electric_units: electricUnits,
           water_units: waterUnits,
           other_service_amount: otherServiceAmount,
-          invoice_id: invoiceId
+          invoice_id: invoiceId,
+          building_id: roomData.building_id ?? null
         })
         .eq("id", existing.id)
         .select()
@@ -241,7 +282,8 @@ export async function createBill(
           other_service_amount: otherServiceAmount,
           late_days: null,
           penalty_amount: null,
-          invoice_id: `INV-${billingCycle.replace('-', '')}-${roomNumber}`
+          invoice_id: `INV-${billingCycle.replace('-', '')}-${roomNumber}`,
+          building_id: roomData.building_id ?? null
         }])
         .select()
     }
@@ -966,6 +1008,15 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
     if (roomsError) throw roomsError
     const roomsMap = new Map(roomsData.map(r => [r.room_number, r]))
 
+    // 1.5 ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของรอบนี้มาครั้งเดียว
+    let buildingBillsMap = new Map<string, BuildingUtilityBill>()
+    if (settings.electric_billing_mode === "building_total" || settings.water_billing_mode === "building_total") {
+      const bRes = await getBuildingUtilityBillsForWorkspaceCycle(workspaceId, billingCycle)
+      if (bRes.success && bRes.data) {
+        buildingBillsMap = new Map(bRes.data.map(row => [`${row.buildingId}:${row.utilityType}`, row]))
+      }
+    }
+
     // 2. คำนวณทุกห้องใน memory (ไม่มี await ในลูปนี้เลย)
     const meterRows: any[] = []
     const billRows: any[] = []
@@ -992,6 +1043,12 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const roomData = roomsMap.get(item.roomNumber)
       if (!roomData) { skippedRooms.push(item.roomNumber); continue }
 
+      // Resolve อัตราไฟฟ้า/น้ำตามโหมดของ workspace — ถ้า building_total ยังไม่ได้กรอกยอดของอาคารนี้
+      // ในรอบบิลนี้ ให้ข้ามห้องนี้ไปก่อน (ห้ามเดา/ใช้อัตราคงที่แทนแบบเงียบๆ) ห้องอื่นที่ไม่ติดเงื่อนไขนี้ยังออกบิลต่อได้ปกติ
+      const electricResolved = resolveUtilityRate("electric", settings.electric_billing_mode, settings.electric_rate, roomData.building_id, buildingBillsMap)
+      const waterResolved = resolveUtilityRate("water", settings.water_billing_mode, settings.water_rate, roomData.building_id, buildingBillsMap)
+      if (electricResolved.error || waterResolved.error) { skippedRooms.push(item.roomNumber); continue }
+
       const eUnits = elecVal !== null ? Math.max(0, elecVal - item.elecPrev) : 0
       const wUnits = waterVal !== null ? Math.max(0, waterVal - item.waterPrev) : 0
       const baseRent = roomData.room_types ? Number(roomData.room_types.default_rent) : Number(roomData.base_rent || 0)
@@ -1000,7 +1057,7 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       // ใช้ calculateBillTotal ตัวเดียวกับที่ createBill ใช้อยู่ (ห้ามเขียนสูตรซ้ำ)
       const { total } = calculateBillTotal({
         baseRent, electricUnitsUsed: eUnits, waterUnitsUsed: wUnits,
-        electricRate: settings.electric_rate, waterRate: settings.water_rate,
+        electricRate: electricResolved.rate, waterRate: waterResolved.rate,
         commonFee: settings.common_fee, otherServiceAmount: item.otherServiceAmount,
         extraExpensesSum,
         waiveWaterMin: !!roomData.waive_water_min, waterMinChecked: settings.water_min_checked, waterMinUnit: settings.water_min_unit,
@@ -1017,7 +1074,8 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         electric_units: eUnits,
         water_units: wUnits,
         other_service_amount: item.otherServiceAmount,
-        invoice_id: `INV-${billingCycle.replace(/-/g, "")}-${item.roomNumber}`
+        invoice_id: `INV-${billingCycle.replace(/-/g, "")}-${item.roomNumber}`,
+        building_id: roomData.building_id ?? null
       })
     }
 

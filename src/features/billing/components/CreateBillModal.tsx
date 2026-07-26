@@ -1,5 +1,5 @@
 import React from "react"
-import { X, Receipt } from "lucide-react"
+import { X, Receipt, AlertTriangle } from "lucide-react"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 
 interface CreateBillModalProps {
@@ -24,6 +24,7 @@ interface CreateBillModalProps {
   waterMinChecked: boolean
   waterMinUnit: number
   computedTotal: number
+  rateMissingWarning?: string
   onClose: () => void
   onSubmit: (e: React.FormEvent) => Promise<void>
 }
@@ -50,6 +51,7 @@ export default function CreateBillModal({
   waterMinChecked,
   waterMinUnit,
   computedTotal,
+  rateMissingWarning,
   onClose,
   onSubmit
 }: CreateBillModalProps) {
@@ -140,6 +142,15 @@ export default function CreateBillModal({
             </div>
           </div>
 
+          {rateMissingWarning && (
+            <div className={`p-3 rounded-xl border flex items-start gap-2 text-xs font-semibold ${
+              isDark ? "bg-amber-950/30 border-amber-900/50 text-amber-400" : "bg-amber-50 border-amber-200 text-amber-700"
+            }`}>
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{rateMissingWarning}</span>
+            </div>
+          )}
+
           {/* ค่าบริการอื่น ๆ */}
           <div className="space-y-1">
             <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>{t("manage_bills.cbm_other_service_label")}</label>
@@ -202,7 +213,8 @@ export default function CreateBillModal({
 
           <button
             type="submit"
-            className="w-full h-12 md:h-10 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm md:text-xs font-bold shadow-lg shadow-blue-600/15 active:scale-[0.98] transition-all flex items-center justify-center cursor-pointer"
+            disabled={!!rateMissingWarning}
+            className="w-full h-12 md:h-10 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm md:text-xs font-bold shadow-lg shadow-blue-600/15 active:scale-[0.98] transition-all flex items-center justify-center cursor-pointer"
           >
             {t("manage_bills.cbm_submit_btn")}
           </button>

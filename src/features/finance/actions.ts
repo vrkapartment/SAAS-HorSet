@@ -37,6 +37,9 @@ export interface FinanceSettings {
   slip_retention_months?: number
   checkout_policy?: "DAILY_PRORATE" | "FULL_MONTH"
   logo_url?: string
+  // โหมดคำนวณค่าน้ำ-ไฟ: fixed_rate = อัตราคงที่ต่อหน่วยที่ตั้งเอง (เดิม) | building_total = หารตามสัดส่วนยอดบิลจริงทั้งอาคาร (ตามกฎหมายใหม่)
+  electric_billing_mode?: "fixed_rate" | "building_total"
+  water_billing_mode?: "fixed_rate" | "building_total"
   // สถานภาพผู้เสียภาษี (กำหนดค่าลดหย่อนส่วนตัว ข.1 ของแบบฟอร์ม ภ.ง.ด. 90/94)
   taxpayer_status?: "individual" | "partnership"
   partner_count?: number
@@ -193,6 +196,26 @@ export async function getFinanceSettings(workspaceId: string) {
       return "DAILY_PRORATE"
     }
 
+    // 7.5 โหมดคำนวณค่าน้ำ-ไฟ (แยกการดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ถูกสร้าง)
+    const fetchBillingMode = async (): Promise<{ electricBillingMode: "fixed_rate" | "building_total"; waterBillingMode: "fixed_rate" | "building_total" }> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("electric_billing_mode, water_billing_mode")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) {
+          return {
+            electricBillingMode: (data.electric_billing_mode as "fixed_rate" | "building_total") || "fixed_rate",
+            waterBillingMode: (data.water_billing_mode as "fixed_rate" | "building_total") || "fixed_rate"
+          }
+        }
+      } catch (e) {
+        console.warn("Columns electric_billing_mode/water_billing_mode not available in workspaces. Defaulting to fixed_rate.")
+      }
+      return { electricBillingMode: "fixed_rate", waterBillingMode: "fixed_rate" }
+    }
+
     // 8. รูปภาพ Logo ของหอพัก (แยกดึงเพื่อความปลอดภัย)
     const fetchLogo = async (): Promise<string> => {
       try {
@@ -234,7 +257,8 @@ export async function getFinanceSettings(workspaceId: string) {
       slipRetentionMonths,
       checkoutPolicy,
       logoUrl,
-      taxpayerStatusData
+      taxpayerStatusData,
+      { electricBillingMode, waterBillingMode }
     ] = await Promise.all([
       fetchCore(),
       fetchUtility(),
@@ -244,7 +268,8 @@ export async function getFinanceSettings(workspaceId: string) {
       fetchSlipRetention(),
       fetchCheckoutPolicy(),
       fetchLogo(),
-      fetchTaxpayerStatus()
+      fetchTaxpayerStatus(),
+      fetchBillingMode()
     ])
 
     const merged = {
@@ -264,7 +289,9 @@ export async function getFinanceSettings(workspaceId: string) {
       lease_duration: leaseDuration,
       lease_expiry_action: leaseExpiryAction,
       slip_retention_months: slipRetentionMonths,
-      checkout_policy: checkoutPolicy
+      checkout_policy: checkoutPolicy,
+      electric_billing_mode: electricBillingMode,
+      water_billing_mode: waterBillingMode
     }
 
     return { 
@@ -294,6 +321,8 @@ export async function getFinanceSettings(workspaceId: string) {
         lease_expiry_action: (merged.lease_expiry_action as "renew" | "original") || "renew",
         slip_retention_months: Number(merged.slip_retention_months !== null && merged.slip_retention_months !== undefined ? merged.slip_retention_months : 0),
         checkout_policy: merged.checkout_policy || "DAILY_PRORATE",
+        electric_billing_mode: (merged.electric_billing_mode as "fixed_rate" | "building_total") || "fixed_rate",
+        water_billing_mode: (merged.water_billing_mode as "fixed_rate" | "building_total") || "fixed_rate",
         logo_url: logoUrl,
         taxpayer_status: (taxpayerStatusData?.taxpayer_status as "individual" | "partnership") || "individual",
         partner_count: Number(taxpayerStatusData?.partner_count || 1),
@@ -385,6 +414,8 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
     if (settings.lease_expiry_action !== undefined) optionalPayload.lease_expiry_action = settings.lease_expiry_action
     if (settings.slip_retention_months !== undefined) optionalPayload.slip_retention_months = clampSlipRetentionMonths(settings.slip_retention_months)
     if (settings.checkout_policy !== undefined) optionalPayload.checkout_policy = settings.checkout_policy
+    if (settings.electric_billing_mode !== undefined) optionalPayload.electric_billing_mode = settings.electric_billing_mode
+    if (settings.water_billing_mode !== undefined) optionalPayload.water_billing_mode = settings.water_billing_mode
     if (settings.taxpayer_status !== undefined) optionalPayload.taxpayer_status = settings.taxpayer_status
     if (settings.partner_count !== undefined) optionalPayload.partner_count = Number(settings.partner_count)
     if (settings.tax_address_building !== undefined) optionalPayload.tax_address_building = settings.tax_address_building.trim()
