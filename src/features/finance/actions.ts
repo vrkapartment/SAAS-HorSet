@@ -2,6 +2,19 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js"
+import { DEFAULT_STAFF_PERMISSIONS, type StaffPermissions } from "@/features/permissions/types"
+
+// เพจที่เรียก saveFinanceSettings ใช้กันคนละสิทธิ์ staff แยกย่อย (ตั้งค่าการเงิน/ตั้งค่าหอพัก/ภาษี) —
+// staff ที่ admin มอบสิทธิ์แก้ไขให้ในสามหน้านี้หน้าใดหน้าหนึ่งต้อง save ผ่านได้ ไม่ใช่แค่ role "admin" เท่านั้น
+// (เดิมเช็คแค่ role ทำให้ staff ที่ได้รับสิทธิ์ access_tax_edit กด toggle ได้แต่ save ถูกปฏิเสธเงียบๆ ทุกครั้ง)
+function hasStaffEditAccess(rawPermissions: unknown): boolean {
+  let perms = rawPermissions
+  if (typeof perms === "string") {
+    try { perms = JSON.parse(perms) } catch { perms = null }
+  }
+  const userPerms: StaffPermissions = { ...DEFAULT_STAFF_PERMISSIONS, ...(perms as Partial<StaffPermissions> | null) }
+  return !!(userPerms.manage_finance_settings_edit || userPerms.manage_property_settings_edit || userPerms.access_tax_edit)
+}
 
 // ระยะเวลาเก็บสลิปต้องเป็นค่าจำกัดเสมอ (ไม่มี "เก็บไว้ตลอดไป"/0 อีกต่อไป) จำกัดสูงสุดไม่เกิน 1 ปี
 // ป้องกันชั้น server ไว้อีกชั้นแม้ dropdown ฝั่ง UI จะจำกัดตัวเลือกไว้แล้วก็ตาม
@@ -405,7 +418,7 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
     // ดึงโปรไฟล์ตรวจสอบสิทธิ์ว่าเป็น Admin หรือ Super Admin และตรงกับ workspace_id หรือไม่
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role, workspace_id")
+      .select("role, workspace_id, permissions")
       .eq("id", user.id)
       .single()
 
@@ -414,13 +427,14 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
     }
 
     const isAdmin = profile.role === "admin" || profile.role === "super_admin"
+    const isAuthorized = isAdmin || (profile.role === "staff" && hasStaffEditAccess(profile.permissions))
     const isSameWorkspace = profile.workspace_id === workspaceId || profile.role === "super_admin"
 
-    if (!isAdmin || !isSameWorkspace) {
-      return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
+    if (!isAuthorized || !isSameWorkspace) {
+      return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์ในการจัดการข้อมูลส่วนนี้" }
     }
 
-    // สิทธิ์ถูกตรวจสอบด้วยโค้ดข้างบนแล้ว (isAdmin + isSameWorkspace) จึงเขียนข้อมูลด้วย Service Role Client แทน
+    // สิทธิ์ถูกตรวจสอบด้วยโค้ดข้างบนแล้ว (isAuthorized + isSameWorkspace) จึงเขียนข้อมูลด้วย Service Role Client แทน
     // client ปกติที่ผูกกับ RLS โดยตรง — เพราะ RLS policy เดิมของตาราง workspaces เช็คแค่ profiles.workspace_id
     // ตรงกับ id แถวเป๊ะๆ ซึ่งสำหรับ super_admin ที่ profiles.workspace_id เป็น NULL แล้ว จะไม่ match แถวไหนเลย
     // ทำให้ UPDATE จับคู่ได้ 0 แถวแบบเงียบๆ (ไม่ error) เหมือนบันทึกสำเร็จทั้งที่ไม่มีอะไรถูกเขียนจริง

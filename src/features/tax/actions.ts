@@ -2,21 +2,13 @@
 
 import { createClient } from "@/lib/supabase/server"
 import type { PndFieldMapping, PndFieldFormat } from "@/lib/pdfHelper"
-import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getBills } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
 import { getTenants, getCancelledContracts } from "@/features/tenant/actions"
 import { getExpenses } from "@/features/expenses/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 import { buildIncomeRows, buildExpenseRows, toTaxSettings, type HorSetTaxSourceData } from "@/lib/tax/adapter"
-import type { PitFiling, Pp30Filing, TaxDataset, DeductionItem, Bucket, IncomeTaxResult } from "@/types/tax"
-import {
-  calculateFinalTaxDue,
-  calculateMinimumTax,
-  calculatePersonalDeduction,
-  calculateProgressiveTax,
-  capActualExpenseDeduction,
-} from "@/lib/thaiTax"
+import type { PitFiling, Pp30Filing, TaxDataset, DeductionItem, IncomeTaxResult } from "@/types/tax"
 
 /**
  * ฟังก์ชันจำลองสำหรับการส่งออก/คำนวณข้อมูลยื่นภาษี
@@ -104,13 +96,29 @@ export async function getTaxFormFieldMappingsAction(templateId: string) {
 /**
  * ตรวจสอบว่าผู้ใช้ปัจจุบันมีสิทธิ์ (admin/staff/super_admin) และ workspaceId ที่ขอตรงกับของตัวเอง
  * (ยกเว้น super_admin) — ใช้ร่วมกันทุก action ในไฟล์นี้ที่แตะข้อมูลภาษีของ workspace หนึ่งๆ
+ *
+ * เช็ค auth + profiles ตรงๆ แทนเรียก getCurrentUserProfileAction() (เดิม) — ฟังก์ชันนั้นมี query
+ * เพิ่มไปที่ตาราง workspaces เพื่อดึง workspace_created_at สำหรับแสดงผลบนหน้า UI เท่านั้น ซึ่ง assertTaxAccess
+ * ไม่ได้ใช้เลย แต่ต้องจ่าย round-trip นั้นทุกครั้งที่ loadTaxDataset/upsertPp30Filing/filePitReturn ฯลฯ ถูกเรียก
  */
 async function assertTaxAccess(workspaceId: string) {
-  const profileRes = await getCurrentUserProfileAction()
-  if (!profileRes.success || !profileRes.data) {
+  const supabase = await createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
     return { ok: false as const, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
   }
-  const { role, workspace_id } = profileRes.data
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role, workspace_id")
+    .eq("id", user.id)
+    .single()
+
+  if (profileError || !profile) {
+    return { ok: false as const, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
+  }
+
+  const { role, workspace_id } = profile
   const isSameWorkspace = workspace_id === workspaceId || role === "super_admin"
   if (!["admin", "staff", "super_admin"].includes(role) || !isSameWorkspace) {
     return { ok: false as const, error: "คุณไม่มีสิทธิ์เข้าถึงข้อมูลภาษีของหอพักนี้" }
@@ -121,8 +129,11 @@ async function assertTaxAccess(workspaceId: string) {
 /**
  * ข้อมูลที่หน้าเรียกอยู่แล้ว (เช่น loadInitialData ใน tax/page.tsx) ส่งมาให้แทนการยิง query ซ้ำเอง —
  * ลด round-trip ซ้ำซ้อนระหว่าง pipeline ข้อมูลสรุปเดิมกับ pipeline ของฟีเจอร์นี้ (ดูหมายเหตุที่เรียกใช้)
- * ทุกฟิลด์เป็น "ข้อมูลปีภาษีปัจจุบัน" เท่านั้น — ปีก่อนหน้า (สำหรับเกณฑ์ VAT แบบ rolling 12 เดือน) ไม่มี
- * ที่ไหนเคยดึงมาก่อน จึงยังต้องยิงเองเสมอ
+ *
+ * prevYearBills/prevYearExpenses/pp30Filings/deductions/pitFilings ไม่มี pipeline เดิมดึงไว้ก่อน แต่หน้าเรียก
+ * ยิงคำสั่งเหล่านี้คู่ขนานไปพร้อมกับ wave1 ได้เลยตั้งแต่รู้ workspaceId (ไม่ต้องรอ wave1 เสร็จก่อนเหมือนเดิม)
+ * แล้วส่งผลลัพธ์มาที่นี่ — ทำให้เมื่อถึงตอนเรียก loadTaxDataset() จริง ฟังก์ชันนี้ไม่ต้องยิง query อะไรเพิ่มเลย
+ * (ดูหมายเหตุที่เรียกใช้ใน tax/page.tsx สำหรับที่มาของ parallel fetch นี้)
  */
 export interface LoadTaxDatasetPrefetch {
   rooms?: { roomNumber: string; baseRent: number }[]
@@ -131,6 +142,11 @@ export interface LoadTaxDatasetPrefetch {
   financeSettings?: Awaited<ReturnType<typeof getFinanceSettings>>["data"]
   thisYearBills?: Awaited<ReturnType<typeof getBills>>["data"]
   thisYearExpenses?: Awaited<ReturnType<typeof getExpenses>>["data"]
+  prevYearBills?: Awaited<ReturnType<typeof getBills>>["data"]
+  prevYearExpenses?: Awaited<ReturnType<typeof getExpenses>>["data"]
+  pp30Filings?: Awaited<ReturnType<typeof getPp30Filings>>["data"]
+  deductions?: Awaited<ReturnType<typeof getTaxDeductions>>["data"]
+  pitFilings?: Awaited<ReturnType<typeof getPitFilings>>["data"]
 }
 
 /**
@@ -162,16 +178,16 @@ export async function loadTaxDataset(workspaceId: string, year: number, prefetch
       pitFilingsRes,
     ] = await Promise.all([
       prefetch?.thisYearBills ? Promise.resolve({ success: true, data: prefetch.thisYearBills }) : getBills(undefined, thisYear),
-      getBills(undefined, prevYear),
+      prefetch?.prevYearBills ? Promise.resolve({ success: true, data: prefetch.prevYearBills }) : getBills(undefined, prevYear),
       prefetch?.rooms ? Promise.resolve({ success: true, data: null }) : getRooms(workspaceId),
       prefetch?.tenants ? Promise.resolve({ success: true, data: prefetch.tenants }) : getTenants(),
       prefetch?.cancelledContracts ? Promise.resolve({ success: true, data: prefetch.cancelledContracts }) : getCancelledContracts(workspaceId),
       prefetch?.thisYearExpenses ? Promise.resolve({ success: true, data: prefetch.thisYearExpenses }) : getExpenses(thisYear, workspaceId),
-      getExpenses(prevYear, workspaceId),
+      prefetch?.prevYearExpenses ? Promise.resolve({ success: true, data: prefetch.prevYearExpenses }) : getExpenses(prevYear, workspaceId),
       prefetch?.financeSettings ? Promise.resolve({ success: true, data: prefetch.financeSettings }) : getFinanceSettings(workspaceId),
-      getPp30Filings(workspaceId),
-      getTaxDeductions(workspaceId, year),
-      getPitFilings(workspaceId),
+      prefetch?.pp30Filings ? Promise.resolve({ success: true, data: prefetch.pp30Filings }) : getPp30Filings(workspaceId),
+      prefetch?.deductions ? Promise.resolve({ success: true, data: prefetch.deductions }) : getTaxDeductions(workspaceId, year),
+      prefetch?.pitFilings ? Promise.resolve({ success: true, data: prefetch.pitFilings }) : getPitFilings(workspaceId),
     ])
 
     if (!financeRes.success || !financeRes.data) {
@@ -546,121 +562,6 @@ export async function getPitFilingSnapshot(workspaceId: string, year: number, fo
   }
 }
 
-/**
- * คำนวณผลภาษีเงินได้เต็มชุด (สำหรับ PitBreakdown) จาก src/lib/thaiTax.ts เท่านั้น — ห้ามใช้ lib/tax/pit.ts
- * (computeIncomeTax) แทน เพื่อให้ตัวเลขบนจอตรงกับ PDF ที่ดาวน์โหลดเป๊ะ — ดูหมายเหตุหัวไฟล์ PitBreakdown.tsx
- *
- * รับ income/expense ที่ประกอบมาแล้วจากหน้า tax/page.tsx (ใช้สูตรเดิมของหน้านั้นทุกจุด ไม่เปลี่ยน)
- * แล้วคืนค่าโครงสร้างแบบ IncomeTaxResult ให้ตรงกับ prop ที่ PitBreakdown ต้องการ
- */
-export async function computePitBreakdownFromThaiTax(input: {
-  form: "PND90" | "PND94"
-  incomeA: number
-  /** ค่าน้ำไฟ/บริการส่วนกลาง 40(8) — ฐานที่มีสิทธิหักเหมา/ตามจริงตาม expenseB */
-  incomeB: number
-  /** รายได้อื่น 40(8) (ค่าปรับ/ริบเงินประกัน) — ไม่มีสิทธิหักเหมาเลยตามกฎหมาย บวกเข้าไปเต็มจำนวนหลังหักค่าใช้จ่ายของ B แล้ว
-   *  (ตรงกับ computePnd90Values/computePnd94Values เดิมที่ other408 ไม่ถูกหักอะไรเลย) */
-  incomeOther?: number
-  expenseA: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }
-  expenseB: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }
-  /** โหมดระมัดระวัง — จำกัดยอดหักตามจริงไม่ให้เกินรายได้ของตะกร้านั้น (ค่าเริ่มต้น false = หักข้ามตะกร้าได้ ตรงกับแนวทางยื่นจริง) */
-  capExpensePerBucket: boolean
-  taxpayerType: "individual" | "partnership"
-  partnerCount: number
-  otherDeductions: number
-  withholdingTax?: number
-  pnd94Paid?: number
-}): Promise<IncomeTaxResult> {
-  const clamp0 = (n: number) => (n > 0 ? n : 0)
-  const r2 = (n: number) => Math.round(n * 100) / 100
-
-  const incomeA = clamp0(input.incomeA)
-  const incomeBBase = clamp0(input.incomeB)
-  const incomeOther = clamp0(input.incomeOther || 0)
-  const grossAssessable = r2(incomeA + incomeBBase + incomeOther)
-
-  const dedFor = (income: number, cfg: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }) => {
-    const requested = cfg.mode === "actual" ? clamp0(cfg.actualAmount || 0) : r2(income * cfg.lumpRate)
-    const exceedsIncome = requested > income
-    const deduction = r2(capActualExpenseDeduction(cfg.mode, requested, income, input.capExpensePerBucket))
-    const capped = deduction < requested
-    return { mode: cfg.mode, rate: cfg.mode === "lump" ? cfg.lumpRate : null, requested, deduction, capped, exceedsIncome, income, afterExpense: r2(income - deduction) }
-  }
-
-  const dedA = dedFor(incomeA, input.expenseA)
-  const dedBUtil = dedFor(incomeBBase, input.expenseB)
-  // รวมรายได้ "อื่น" (ไม่มีสิทธิหักเหมา) เข้ากับตะกร้า B เพื่อแสดงผลรวม — afterExpense ของส่วนนี้ไม่ถูกหักเลย
-  const dedB = {
-    ...dedBUtil,
-    income: r2(dedBUtil.income + incomeOther),
-    afterExpense: r2(dedBUtil.afterExpense + incomeOther),
-  }
-  const afterExpense = r2(dedA.afterExpense + dedB.afterExpense)
-
-  const personalAllowance = calculatePersonalDeduction(
-    input.form === "PND94" ? "94" : "90",
-    input.taxpayerType === "partnership" ? "partnership" : "individual",
-    input.partnerCount
-  )
-  const otherDeductions = clamp0(input.otherDeductions)
-  const deductionsRequested = r2(personalAllowance + otherDeductions)
-  const deductionsApplied = r2(clamp0(Math.min(deductionsRequested, afterExpense)))
-  const netIncome = r2(clamp0(afterExpense - deductionsApplied))
-
-  const progressiveTax = calculateProgressiveTax(netIncome)
-  const minTaxAmount = calculateMinimumTax(grossAssessable)
-  const taxBeforeCredits = calculateFinalTaxDue(progressiveTax, minTaxAmount)
-
-  const withholdingTax = clamp0(input.withholdingTax || 0)
-  const pnd94Paid = input.form === "PND90" ? clamp0(input.pnd94Paid || 0) : 0
-  const creditsTotal = r2(withholdingTax + pnd94Paid)
-  const balance = r2(taxBeforeCredits - creditsTotal)
-
-  // ขั้นบันไดแบบละเอียด (เพื่อแสดงใน ProgressiveBracketTable) — ใช้ bracket มาตรฐานเดียวกับ thaiTax.ts
-  // (ตัวเลขคงที่ตามกฎหมาย ไม่ใช่ settings ที่ปรับได้ จึงไม่มีทางต่างจาก calculateProgressiveTax ข้างต้น)
-  const brackets = [
-    { upTo: 150_000, rate: 0 },
-    { upTo: 300_000, rate: 0.05 },
-    { upTo: 500_000, rate: 0.10 },
-    { upTo: 750_000, rate: 0.15 },
-    { upTo: 1_000_000, rate: 0.20 },
-    { upTo: 2_000_000, rate: 0.25 },
-    { upTo: 5_000_000, rate: 0.30 },
-    { upTo: Infinity, rate: 0.35 },
-  ]
-  let lower = 0
-  const steps: Array<{ from: number; to: number; rate: number; amount: number; tax: number }> = []
-  for (const b of brackets) {
-    if (netIncome <= lower) break
-    const slice = Math.min(netIncome, b.upTo) - lower
-    const stepTax = r2(slice * b.rate)
-    steps.push({ from: lower, to: b.upTo, rate: b.rate, amount: r2(slice), tax: stepTax })
-    lower = b.upTo
-  }
-
-  const minThreshold = input.form === "PND94" ? 60_000 : 120_000
-  const minApplies = grossAssessable >= minThreshold && minTaxAmount > 5_000 && minTaxAmount > progressiveTax
-
-  return {
-    form: input.form,
-    taxpayerType: input.taxpayerType,
-    income: { a: incomeA, b: r2(incomeBBase + incomeOther), gross: grossAssessable },
-    expense: { a: dedA, b: dedB, total: r2(dedA.deduction + dedB.deduction) },
-    crossBucketDeduction: {
-      triggered: dedA.exceedsIncome || dedB.exceedsIncome,
-      buckets: ([dedA.exceedsIncome && "A", dedB.exceedsIncome && "B"] as const).filter((b): b is Bucket => b !== false),
-      capExpensePerBucket: input.capExpensePerBucket,
-    },
-    afterExpense,
-    deductions: { personalAllowance, other: otherDeductions, requested: deductionsRequested, applied: deductionsApplied, capped: deductionsRequested > afterExpense },
-    netIncome,
-    progressive: { netIncome, tax: progressiveTax, steps },
-    minTax: { enabled: true, rate: 0.005, threshold: minThreshold, amount: minTaxAmount, applies: minApplies, exempted: minTaxAmount > 0 && minTaxAmount <= 5_000 },
-    taxBeforeCredits,
-    credits: { withholdingTax, pnd94Paid, total: creditsTotal },
-    balance,
-    payable: clamp0(balance),
-    refundable: clamp0(-balance),
-    status: balance > 0 ? "pay" : balance < 0 ? "refund" : "zero",
-  }
-}
+// computePitBreakdownFromThaiTax() ย้ายไปเป็น computePitBreakdown() ใน src/lib/thaiTax.ts แล้ว —
+// เป็นการคำนวณคณิตศาสตร์ล้วน ไม่แตะ database จึงเรียกตรงจาก client component ได้เลย ไม่ต้องผ่าน Server Action
+// (ของเดิมยิง 2 round-trip ต่อ PND94/PND90 ทุกครั้งที่ toggle ค่าตั้งเปลี่ยน ทำให้หน้า /tax หน่วงเวลาโต้ตอบ)

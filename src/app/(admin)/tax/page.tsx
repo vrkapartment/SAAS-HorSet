@@ -47,7 +47,9 @@ import {
   loadTaxDataset,
   filePitReturn,
   getPitFilingSnapshot,
-  computePitBreakdownFromThaiTax,
+  getPp30Filings,
+  getTaxDeductions,
+  getPitFilings,
 } from "@/features/tax/actions"
 import {
   VatGate,
@@ -68,7 +70,7 @@ import {
 } from "@/features/tax/components"
 import { useVatStatus, useTaxOverview, usePp30 } from "@/features/tax/hooks/useTax"
 import { firstThresholdBreach, DEFAULT_TAX_SETTINGS } from "@/lib/tax"
-import { capActualExpenseDeduction } from "@/lib/thaiTax"
+import { capActualExpenseDeduction, computePitBreakdown } from "@/lib/thaiTax"
 import type { TaxDataset, TaxSettings } from "@/types/tax"
 
 interface BillItem {
@@ -166,23 +168,21 @@ export default function TaxPage() {
   const pp30 = usePp30(taxDataset, Number(taxYear))
 
   // ⚠️ ตัวเลข ภ.ง.ด.90/94 ที่ใช้ยื่นจริง (แสดงใน PitBreakdown ด้านล่าง) คำนวณผ่าน
-  // computePitBreakdownFromThaiTax() (src/lib/thaiTax.ts เท่านั้น) — ห้ามใช้ taxDataset/lib-tax/pit.ts
-  // คำนวณตัวเลขชุดนี้ เพื่อให้ตรงกับ PDF ที่ดาวน์โหลดเป๊ะ
-  type PitBreakdownResult = Awaited<ReturnType<typeof computePitBreakdownFromThaiTax>>
+  // computePitBreakdown() (src/lib/thaiTax.ts เท่านั้น) — ห้ามใช้ taxDataset/lib-tax/pit.ts
+  // คำนวณตัวเลขชุดนี้ เพื่อให้ตรงกับ PDF ที่ดาวน์โหลดเป๊ะ (ดู useMemo ท้ายไฟล์ที่ประกอบ pitResult90/94)
   type PitFilingSnapshot = NonNullable<Awaited<ReturnType<typeof getPitFilingSnapshot>>["data"]>
-  const [pitResult90, setPitResult90] = useState<PitBreakdownResult | null>(null)
-  const [pitResult94, setPitResult94] = useState<PitBreakdownResult | null>(null)
   const [pitFiledSnapshot90, setPitFiledSnapshot90] = useState<PitFilingSnapshot | null>(null)
   const [pitFiledSnapshot94, setPitFiledSnapshot94] = useState<PitFilingSnapshot | null>(null)
   const [filingPit, setFilingPit] = useState<"90" | "94" | null>(null)
 
   const handleVatSettingsChange = async (patch: Partial<TaxSettings>) => {
-    const nextSettings = { ...taxDataset.settings, ...patch } as TaxSettings
+    const previousSettings = taxDataset.settings
+    const nextSettings = { ...previousSettings, ...patch } as TaxSettings
     setTaxDataset(prev => ({ ...prev, settings: nextSettings }))
     if (!workspaceId) return
     setSavingVatSettings(true)
     try {
-      await saveFinanceSettings(workspaceId, {
+      const res = await saveFinanceSettings(workspaceId, {
         tax_firstname: firstName, tax_lastname: lastName, tax_id: taxId, tax_address: address, tax_phone: phone,
         promptpay_type: "phone", promptpay_id: "", promptpay_name: "",
         common_fee: commonFee, water_rate: waterRate, electric_rate: electricRate,
@@ -202,7 +202,12 @@ export default function TaxPage() {
         min_tax_threshold_pnd94: nextSettings.minTaxRule.incomeThresholdPND94,
         min_tax_exempt_below: nextSettings.minTaxRule.exemptBelow,
       })
-      clearWorkspaceCache(workspaceId)
+      if (res.success) {
+        clearWorkspaceCache(workspaceId)
+      } else {
+        setTaxDataset(prev => ({ ...prev, settings: previousSettings }))
+        alert(res.error || "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า กรุณาลองใหม่อีกครั้ง")
+      }
     } finally {
       setSavingVatSettings(false)
     }
@@ -328,6 +333,25 @@ export default function TaxPage() {
 
         if (currentWsId) {
           setWorkspaceId(currentWsId)
+
+          // ยิง query ที่ loadTaxDataset() ต้องใช้แต่ไม่มี pipeline เดิมดึงไว้ก่อน (ปีก่อนหน้า/ภ.พ.30/ค่าลดหย่อน/
+          // การยื่นแบบ) ไปคู่ขนานกับ fetchPromises ด้านล่างตั้งแต่ตอนนี้เลย แทนที่จะรอ fetchPromises เสร็จก่อน
+          // แล้วค่อยเรียก loadTaxDataset() ต่อท้าย (เดิมทำให้เวลาโหลดรวมเป็น T(wave1)+T(wave2) แทน max ของสองฝั่ง)
+          const taxDatasetCacheKey = `tax_dataset_${taxYear}`
+          const cachedTaxDataset = getCachedData<TaxDataset>(currentWsId, taxDatasetCacheKey)
+          const extraTaxDatasetPromise = cachedTaxDataset ? null : Promise.all([
+            getBills(undefined, String(Number(taxYear) - 1)),
+            getExpenses(String(Number(taxYear) - 1), currentWsId),
+            getPp30Filings(currentWsId),
+            getTaxDeductions(currentWsId, Number(taxYear)),
+            getPitFilings(currentWsId),
+          ]).then(([prevBillsRes, prevExpensesRes, pp30Res, deductionsRes, pitFilingsRes]) => ({
+            prevYearBills: prevBillsRes.success ? prevBillsRes.data : undefined,
+            prevYearExpenses: prevExpensesRes.success ? prevExpensesRes.data : undefined,
+            pp30Filings: pp30Res.success ? pp30Res.data : undefined,
+            deductions: deductionsRes.success ? deductionsRes.data : undefined,
+            pitFilings: pitFilingsRes.success ? pitFilingsRes.data : undefined,
+          }))
 
           // โหลดข้อมูลประวัติยกเลิกสัญญาจาก Supabase และย้ายข้อมูลหากยังมีใน Local Storage
           let tempCancellations: any[] = []
@@ -521,14 +545,13 @@ export default function TaxPage() {
             await Promise.all(fetchPromises)
           }
 
-          // โหลด TaxDataset เต็มชุดสำหรับฟีเจอร์ VAT/ภ.พ.30 — ต่อท้าย pipeline เดิมแทนที่จะเป็น effect
-          // คู่ขนานแยกกัน (เดิม) ซึ่งทำให้ยิง query ซ้ำกับด้านบน 6 คำสั่งและจบช้ากว่าเสมอ ตอนนี้ส่ง prefetch
-          // ที่เพิ่งเก็บไว้เข้าไปแทน ให้ loadTaxDataset() ข้ามคำสั่งที่ซ้ำได้
-          const taxDatasetCacheKey = `tax_dataset_${taxYear}`
-          const cachedTaxDataset = getCachedData<TaxDataset>(currentWsId, taxDatasetCacheKey)
+          // โหลด TaxDataset เต็มชุดสำหรับฟีเจอร์ VAT/ภ.พ.30 — ส่ง prefetch ของ wave1 (ด้านบน) รวมกับผลลัพธ์ของ
+          // extraTaxDatasetPromise (ยิงคู่ขนานกับ wave1 ไปตั้งแต่ต้นฟังก์ชัน) ให้ loadTaxDataset() ไม่ต้องยิง
+          // query อะไรเพิ่มเลย — ตอนนี้แค่รอ promise ที่ยิงไปพร้อมกันแล้ว ไม่ใช่ค่อยเริ่มยิงใหม่ต่อท้าย
           if (cachedTaxDataset) {
             setTaxDataset(cachedTaxDataset)
           } else {
+            const extra = extraTaxDatasetPromise ? await extraTaxDatasetPromise : {}
             const taxDatasetRes = await loadTaxDataset(currentWsId, Number(taxYear), {
               rooms: prefetchRooms,
               tenants: prefetchTenants,
@@ -536,6 +559,7 @@ export default function TaxPage() {
               financeSettings: prefetchFinanceSettings,
               thisYearBills: prefetchBills,
               thisYearExpenses: prefetchExpenses,
+              ...extra,
             })
             if (taxDatasetRes.success && taxDatasetRes.data) {
               setTaxDataset(taxDatasetRes.data)
@@ -1018,66 +1042,54 @@ export default function TaxPage() {
   const halfTotalRevenue = rent405Half + utilities408Half + other408Half
   const netIncomeHalf = halfTotalRevenue - (deductionRent405Half + deductionUtilities408Half)
 
-  // คำนวณผลภาษี ภ.ง.ด.90/94 เต็มชุด (สำหรับ PitBreakdown) ผ่าน src/lib/thaiTax.ts เท่านั้น (ดูหมายเหตุ
-  // ที่ computePitBreakdownFromThaiTax) — ต้องคำนวณ 94 ก่อนเสมอ เพราะ 90 ต้องใช้ยอดภาษีครึ่งปีมาหักกลบ
+  // คำนวณผลภาษี ภ.ง.ด.90/94 เต็มชุด (สำหรับ PitBreakdown) ผ่าน computePitBreakdown() ใน src/lib/thaiTax.ts
+  // เท่านั้น — ต้องคำนวณ 94 ก่อนเสมอ เพราะ 90 ต้องใช้ยอดภาษีครึ่งปีมาหักกลบ เป็นการคำนวณคณิตศาสตร์ล้วนที่เบามาก
+  // จึงคำนวณตรงเป็นค่าธรรมดาในทุก render เหมือนตัวแปรอื่นๆ ในไฟล์นี้ (rent405Full, netIncomeFull ฯลฯ)
+  // ไม่ต้องพึ่ง useEffect + state แยกเหมือนเดิม (ตอนนั้นยังเป็น Server Action จึงต้อง await + เก็บ state)
   // ⚠️ รอให้ isSummaryLoading = false และ taxDatasetLoaded = true ก่อนเสมอ ไม่งั้นจะคำนวณด้วยข้อมูลที่โหลดมาไม่ครบ
   // (bills/expenses/taxDataset.settings ทยอยมาทีละก้อน) แล้วโชว์ตัวเลขชั่วคราวที่ผิดวาบขึ้นมาก่อนค่อยแก้เป็นตัวจริง
-  useEffect(() => {
-    if (isSummaryLoading || !taxDatasetLoaded) return
-    let cancelled = false
-    async function computeBoth() {
-      const expenseACfg = {
-        mode: taxDataset.settings.expenseA.mode,
-        lumpRate: taxDataset.settings.expenseA.lumpRate,
-        actualAmount: actualExpense405,
-      }
-      const expenseBCfg = {
-        mode: taxDataset.settings.expenseB.mode,
-        lumpRate: taxDataset.settings.expenseB.lumpRate,
-        actualAmount: actualExpense408,
-      }
+  const pitResult94 = (isSummaryLoading || !taxDatasetLoaded) ? null : computePitBreakdown({
+    form: "PND94",
+    incomeA: rent405Half,
+    incomeB: utilities408Half,
+    incomeOther: other408Half,
+    expenseA: {
+      mode: taxDataset.settings.expenseA.mode,
+      lumpRate: taxDataset.settings.expenseA.lumpRate,
+      actualAmount: actualExpense405Half,
+    },
+    expenseB: {
+      mode: taxDataset.settings.expenseB.mode,
+      lumpRate: taxDataset.settings.expenseB.lumpRate,
+      actualAmount: actualExpense408Half,
+    },
+    capExpensePerBucket: taxDataset.settings.capExpensePerBucket,
+    taxpayerType: taxpayerStatus,
+    partnerCount,
+    otherDeductions: 0,
+  })
 
-      const result94 = await computePitBreakdownFromThaiTax({
-        form: "PND94",
-        incomeA: rent405Half,
-        incomeB: utilities408Half,
-        incomeOther: other408Half,
-        expenseA: { ...expenseACfg, actualAmount: actualExpense405Half },
-        expenseB: { ...expenseBCfg, actualAmount: actualExpense408Half },
-        capExpensePerBucket: taxDataset.settings.capExpensePerBucket,
-        taxpayerType: taxpayerStatus,
-        partnerCount,
-        otherDeductions: 0,
-      })
-      if (cancelled) return
-      setPitResult94(result94)
-
-      const result90 = await computePitBreakdownFromThaiTax({
-        form: "PND90",
-        incomeA: rent405Full,
-        incomeB: utilities408Full,
-        incomeOther: other408Full,
-        expenseA: expenseACfg,
-        expenseB: expenseBCfg,
-        capExpensePerBucket: taxDataset.settings.capExpensePerBucket,
-        taxpayerType: taxpayerStatus,
-        partnerCount,
-        otherDeductions: 0,
-        pnd94Paid: result94.payable ?? 0,
-      })
-      if (cancelled) return
-      setPitResult90(result90)
-    }
-    computeBoth().catch(err => console.error("Failed to compute PIT breakdown:", err))
-    return () => { cancelled = true }
-  }, [
-    isSummaryLoading, taxDatasetLoaded,
-    rent405Full, utilities408Full, other408Full,
-    rent405Half, utilities408Half, other408Half,
-    taxDataset.settings.expenseA, taxDataset.settings.expenseB, taxDataset.settings.capExpensePerBucket,
-    actualExpense405, actualExpense408, actualExpense405Half, actualExpense408Half,
-    taxpayerStatus, partnerCount,
-  ])
+  const pitResult90 = (isSummaryLoading || !taxDatasetLoaded || !pitResult94) ? null : computePitBreakdown({
+    form: "PND90",
+    incomeA: rent405Full,
+    incomeB: utilities408Full,
+    incomeOther: other408Full,
+    expenseA: {
+      mode: taxDataset.settings.expenseA.mode,
+      lumpRate: taxDataset.settings.expenseA.lumpRate,
+      actualAmount: actualExpense405,
+    },
+    expenseB: {
+      mode: taxDataset.settings.expenseB.mode,
+      lumpRate: taxDataset.settings.expenseB.lumpRate,
+      actualAmount: actualExpense408,
+    },
+    capExpensePerBucket: taxDataset.settings.capExpensePerBucket,
+    taxpayerType: taxpayerStatus,
+    partnerCount,
+    otherDeductions: 0,
+    pnd94Paid: pitResult94.payable ?? 0,
+  })
 
   // โหลด snapshot ของปีนี้ (ถ้าเคยกดยื่นแบบไปแล้ว) — ใช้บอกผู้ใช้ว่ายื่นไปแล้วเมื่อไร ไม่ได้ล็อกการแก้ settings
   useEffect(() => {
@@ -1430,7 +1442,7 @@ export default function TaxPage() {
               {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
-                <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300">
+                <p className="text-2xl font-black tracking-tight mt-3 text-blue-600 dark:text-blue-400">
                   {formatMoney(rent405Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
                 </p>
               )}
@@ -1468,7 +1480,7 @@ export default function TaxPage() {
               {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
-                <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-emerald-500 to-green-600 dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
+                <p className="text-2xl font-black tracking-tight mt-3 text-teal-600 dark:text-teal-400">
                   {formatMoney(utilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
                 </p>
               )}
@@ -1506,7 +1518,7 @@ export default function TaxPage() {
               {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
-                <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-amber-600 via-orange-500 to-rose-650 dark:from-amber-400 dark:via-orange-400 dark:to-rose-450">
+                <p className="text-2xl font-black tracking-tight mt-3 text-amber-600 dark:text-amber-400">
                   {formatMoney(other408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
                 </p>
               )}
@@ -1545,7 +1557,7 @@ export default function TaxPage() {
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.total_deduction_title")}</h4>
               <p className="text-xs text-slate-400 leading-none">{t("tax_page.total_deduction_subtitle")}</p>
-              <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-650 dark:from-purple-400 dark:via-fuchsia-400 dark:to-pink-450">
+              <p className="text-2xl font-black tracking-tight mt-3 text-purple-600 dark:text-purple-400">
                 {formatMoney(deductionRent405Full + deductionUtilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
               </p>
             </div>
@@ -2105,8 +2117,8 @@ export default function TaxPage() {
           <button
             onClick={() => handleDownloadPdf("94")}
             disabled={loadingPdf !== null}
-            className={`w-full py-2.5 bg-blue-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-600/10 transition-colors ${
-              !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-blue-500 cursor-pointer"
+            className={`w-full py-2.5 bg-blue-600 disabled:opacity-50 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-600/10 transition-colors ${
+              !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-blue-500 cursor-pointer disabled:cursor-not-allowed"
             }`}
           >
             {loadingPdf === "94" ? (
@@ -2149,8 +2161,8 @@ export default function TaxPage() {
           <button
             onClick={() => handleDownloadPdf("90")}
             disabled={loadingPdf !== null}
-            className={`w-full py-2.5 bg-teal-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-600/10 transition-colors ${
-              !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 cursor-pointer"
+            className={`w-full py-2.5 bg-teal-600 disabled:opacity-50 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-600/10 transition-colors ${
+              !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 cursor-pointer disabled:cursor-not-allowed"
             }`}
           >
             {loadingPdf === "90" ? (

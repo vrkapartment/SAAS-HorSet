@@ -1,6 +1,8 @@
 // ยูทิลิตี้คำนวณภาษีเงินได้บุคคลธรรมดาแบบขั้นบันได (ใช้ร่วมกันระหว่าง ภ.ง.ด. 90 และ ภ.ง.ด. 94)
 // หมายเหตุ: เป็นข้อมูลอ้างอิงเบื้องต้นเท่านั้น ผู้ใช้งานต้องตรวจสอบความถูกต้องก่อนยื่นแบบจริงเสมอ
 
+import type { IncomeTaxResult, Bucket } from "@/types/tax"
+
 // อัตราภาษีก้าวหน้ามาตรฐานของไทย (คงที่มาหลายปี ไม่เปลี่ยนตามปีภาษี)
 const TAX_BRACKETS = [
   { upTo: 150_000, rate: 0 },
@@ -69,4 +71,114 @@ export function calculatePersonalDeduction(
 
   const partners = Math.max(1, Math.floor(partnerCount || 1))
   return Math.min(perPersonAmount * partners, cap)
+}
+
+export interface PitBreakdownInput {
+  form: "PND90" | "PND94"
+  incomeA: number
+  /** ค่าน้ำไฟ/บริการส่วนกลาง 40(8) — ฐานที่มีสิทธิหักเหมา/ตามจริงตาม expenseB */
+  incomeB: number
+  /** รายได้อื่น 40(8) (ค่าปรับ/ริบเงินประกัน) — ไม่มีสิทธิหักเหมาเลยตามกฎหมาย บวกเข้าไปเต็มจำนวนหลังหักค่าใช้จ่ายของ B แล้ว
+   *  (ตรงกับ computePnd90Values/computePnd94Values เดิมที่ other408 ไม่ถูกหักอะไรเลย) */
+  incomeOther?: number
+  expenseA: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }
+  expenseB: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }
+  /** โหมดระมัดระวัง — จำกัดยอดหักตามจริงไม่ให้เกินรายได้ของตะกร้านั้น (ค่าเริ่มต้น false = หักข้ามตะกร้าได้ ตรงกับแนวทางยื่นจริง) */
+  capExpensePerBucket: boolean
+  taxpayerType: "individual" | "partnership"
+  partnerCount: number
+  otherDeductions: number
+  withholdingTax?: number
+  pnd94Paid?: number
+}
+
+/**
+ * คำนวณผลภาษีเงินได้เต็มชุด (สำหรับ PitBreakdown) — engine เดียวที่ใช้ยื่นจริง ห้ามใช้ lib/tax/pit.ts
+ * (computeIncomeTax) แทน เพื่อให้ตัวเลขบนจอตรงกับ PDF ที่ดาวน์โหลดเป๊ะ
+ *
+ * เป็นการคำนวณคณิตศาสตร์ล้วน ไม่แตะ database — เรียกตรงจาก client component ได้เลยโดยไม่ต้องผ่าน Server Action
+ */
+export function computePitBreakdown(input: PitBreakdownInput): IncomeTaxResult {
+  const clamp0 = (n: number) => (n > 0 ? n : 0)
+  const r2 = (n: number) => Math.round(n * 100) / 100
+
+  const incomeA = clamp0(input.incomeA)
+  const incomeBBase = clamp0(input.incomeB)
+  const incomeOther = clamp0(input.incomeOther || 0)
+  const grossAssessable = r2(incomeA + incomeBBase + incomeOther)
+
+  const dedFor = (income: number, cfg: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }) => {
+    const requested = cfg.mode === "actual" ? clamp0(cfg.actualAmount || 0) : r2(income * cfg.lumpRate)
+    const exceedsIncome = requested > income
+    const deduction = r2(capActualExpenseDeduction(cfg.mode, requested, income, input.capExpensePerBucket))
+    const capped = deduction < requested
+    return { mode: cfg.mode, rate: cfg.mode === "lump" ? cfg.lumpRate : null, requested, deduction, capped, exceedsIncome, income, afterExpense: r2(income - deduction) }
+  }
+
+  const dedA = dedFor(incomeA, input.expenseA)
+  const dedBUtil = dedFor(incomeBBase, input.expenseB)
+  // รวมรายได้ "อื่น" (ไม่มีสิทธิหักเหมา) เข้ากับตะกร้า B เพื่อแสดงผลรวม — afterExpense ของส่วนนี้ไม่ถูกหักเลย
+  const dedB = {
+    ...dedBUtil,
+    income: r2(dedBUtil.income + incomeOther),
+    afterExpense: r2(dedBUtil.afterExpense + incomeOther),
+  }
+  const afterExpense = r2(dedA.afterExpense + dedB.afterExpense)
+
+  const personalAllowance = calculatePersonalDeduction(
+    input.form === "PND94" ? "94" : "90",
+    input.taxpayerType === "partnership" ? "partnership" : "individual",
+    input.partnerCount
+  )
+  const otherDeductions = clamp0(input.otherDeductions)
+  const deductionsRequested = r2(personalAllowance + otherDeductions)
+  const deductionsApplied = r2(clamp0(Math.min(deductionsRequested, afterExpense)))
+  const netIncome = r2(clamp0(afterExpense - deductionsApplied))
+
+  const progressiveTax = calculateProgressiveTax(netIncome)
+  const minTaxAmount = calculateMinimumTax(grossAssessable)
+  const taxBeforeCredits = calculateFinalTaxDue(progressiveTax, minTaxAmount)
+
+  const withholdingTax = clamp0(input.withholdingTax || 0)
+  const pnd94Paid = input.form === "PND90" ? clamp0(input.pnd94Paid || 0) : 0
+  const creditsTotal = r2(withholdingTax + pnd94Paid)
+  const balance = r2(taxBeforeCredits - creditsTotal)
+
+  // ขั้นบันไดแบบละเอียด (เพื่อแสดงใน ProgressiveBracketTable) — ใช้ bracket มาตรฐานเดียวกับข้างบน
+  // (ตัวเลขคงที่ตามกฎหมาย ไม่ใช่ settings ที่ปรับได้ จึงไม่มีทางต่างจาก calculateProgressiveTax ข้างบน)
+  let lower = 0
+  const steps: Array<{ from: number; to: number; rate: number; amount: number; tax: number }> = []
+  for (const b of TAX_BRACKETS) {
+    if (netIncome <= lower) break
+    const slice = Math.min(netIncome, b.upTo) - lower
+    const stepTax = r2(slice * b.rate)
+    steps.push({ from: lower, to: b.upTo, rate: b.rate, amount: r2(slice), tax: stepTax })
+    lower = b.upTo
+  }
+
+  const minThreshold = input.form === "PND94" ? 60_000 : 120_000
+  const minApplies = grossAssessable >= minThreshold && minTaxAmount > 5_000 && minTaxAmount > progressiveTax
+
+  return {
+    form: input.form,
+    taxpayerType: input.taxpayerType,
+    income: { a: incomeA, b: r2(incomeBBase + incomeOther), gross: grossAssessable },
+    expense: { a: dedA, b: dedB, total: r2(dedA.deduction + dedB.deduction) },
+    crossBucketDeduction: {
+      triggered: dedA.exceedsIncome || dedB.exceedsIncome,
+      buckets: ([dedA.exceedsIncome && "A", dedB.exceedsIncome && "B"] as const).filter((b): b is Bucket => b !== false),
+      capExpensePerBucket: input.capExpensePerBucket,
+    },
+    afterExpense,
+    deductions: { personalAllowance, other: otherDeductions, requested: deductionsRequested, applied: deductionsApplied, capped: deductionsRequested > afterExpense },
+    netIncome,
+    progressive: { netIncome, tax: progressiveTax, steps },
+    minTax: { enabled: true, rate: 0.005, threshold: minThreshold, amount: minTaxAmount, applies: minApplies, exempted: minTaxAmount > 0 && minTaxAmount <= 5_000 },
+    taxBeforeCredits,
+    credits: { withholdingTax, pnd94Paid, total: creditsTotal },
+    balance,
+    payable: clamp0(balance),
+    refundable: clamp0(-balance),
+    status: balance > 0 ? "pay" : balance < 0 ? "refund" : "zero",
+  }
 }
