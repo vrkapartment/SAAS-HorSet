@@ -16,11 +16,11 @@
  *                            ปิด/ปรับได้ เพราะเป็นข้อกำหนดตามกฎหมาย ไม่ใช่ทางเลือกทางธุรกิจ
  */
 
-import { RefreshCw } from 'lucide-react';
+import { Percent, RefreshCw } from 'lucide-react';
 import type { TaxSettings } from '../../../types/tax';
 import { PERSONAL_ALLOWANCE, TAXPAYER_LABEL, num } from '../../../lib/tax';
 import { baht, pct } from '../../../lib/tax/format';
-import { Alert, Card, CardBody, CardHeader, HelpNote, tableClasses as tc } from './primitives';
+import { Alert, Card, CardBody, CardHeader, HelpNote, Switch, tableClasses as tc } from './primitives';
 
 /* ================================================================== *
  * สถานะผู้เสียภาษี
@@ -28,9 +28,24 @@ import { Alert, Card, CardBody, CardHeader, HelpNote, tableClasses as tc } from 
 
 export function TaxpayerTypeSection({
   settings,
+  loading = false,
 }: {
   settings: Pick<TaxSettings, 'taxpayerType' | 'partnerCount'>;
+  /** ยังโหลด settings จริงไม่เสร็จ — โชว์หัวข้อการ์ดตามปกติ แต่สลับตารางเป็น skeleton ไปก่อน */
+  loading?: boolean;
 }) {
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader title="สถานะผู้เสียภาษี" subtitle="มีผลกับค่าลดหย่อนส่วนตัวของ ภ.ง.ด.94 และ ภ.ง.ด.90" />
+        <CardBody className="space-y-4">
+          <div className="h-4 w-40 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          <div className="h-24 w-full rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader
@@ -100,6 +115,7 @@ export function ExpenseModeSection({
   actualAmountB = 0,
   onRefreshActual,
   refreshingActual = false,
+  loading = false,
 }: {
   settings: Pick<TaxSettings, 'expenseA' | 'expenseB' | 'capExpensePerBucket'>;
   onChange: (patch: Partial<TaxSettings>) => void;
@@ -110,7 +126,36 @@ export function ExpenseModeSection({
   /** ดึงยอดตามจริงล่าสุดจากหน้าค่าใช้จ่ายมาแสดง (ไม่ใช่การบันทึกอะไร) */
   onRefreshActual?: () => void;
   refreshingActual?: boolean;
+  /** ยังโหลด settings จริงไม่เสร็จ — โชว์หัวข้อการ์ดตามปกติ แต่สลับแถวควบคุมเป็น skeleton ไปก่อน
+   *  (กันไม่ให้โชว์ค่า default ชั่วคราวก่อนสลับเป็นค่าจริงตอนโหลดเสร็จ) */
+  loading?: boolean;
 }) {
+  if (loading) {
+    return (
+      <Card glow="bucketA" className="rounded-3xl">
+        <CardHeader icon={<Percent className="h-4 w-4" />} title="รูปแบบการหักค่าใช้จ่าย" subtitle="ใช้ทั้งใน ภ.ง.ด.94 และ ภ.ง.ด.90" />
+        <CardBody className="divide-y divide-slate-200 dark:divide-slate-800">
+          {(['A', 'B'] as const).map((bucket) => (
+            <div key={bucket} className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <div className="h-9 w-28 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              <div className="h-11 w-40 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              <div className="h-6 w-24 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+            </div>
+          ))}
+        </CardBody>
+        <CardBody className="space-y-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="h-4 w-2/3 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              <div className="h-3 w-full rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+            </div>
+            <div className="h-6 w-11 shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+
   const blocks = [
     {
       bucket: 'A' as const,
@@ -135,8 +180,9 @@ export function ExpenseModeSection({
   ];
 
   return (
-    <Card>
+    <Card glow="bucketA" className="rounded-3xl">
       <CardHeader
+        icon={<Percent className="h-4 w-4" />}
         title="รูปแบบการหักค่าใช้จ่าย"
         subtitle="ใช้ทั้งใน ภ.ง.ด.94 และ ภ.ง.ด.90"
       />
@@ -151,7 +197,7 @@ export function ExpenseModeSection({
                 <div className="mt-0.5 text-sm font-semibold">{b.title}</div>
               </div>
 
-              <div className="inline-flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-700">
+              <div className="inline-flex gap-2 rounded-2xl border border-slate-200/50 bg-slate-100/50 p-1.5 dark:border-slate-900/80 dark:bg-slate-950/40">
                 {(['lump', 'actual'] as const).map((m) => (
                   <button
                     key={m}
@@ -160,8 +206,8 @@ export function ExpenseModeSection({
                     onClick={() => onChange({ [b.key]: { ...b.cfg, mode: m } } as Partial<TaxSettings>)}
                     className={
                       b.cfg.mode === m
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm'
-                        : 'px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                        ? 'rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 dark:shadow-blue-500/10'
+                        : 'rounded-xl px-4 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
                     }
                   >
                     {m === 'lump' ? 'หักเหมา' : 'หักตามจริง'}
@@ -232,33 +278,13 @@ export function ExpenseModeSection({
               ไม่ให้เกินรายได้ของตะกร้านั้นเอง (ระมัดระวังกว่า แต่ไม่ตรงกับแนวทางปฏิบัติทั่วไปที่ยื่นกันจริง)
             </div>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={settings.capExpensePerBucket}
-            aria-label="จำกัดค่าใช้จ่ายจริงไม่ให้เกินรายได้ต่อตะกร้า"
+          <Switch
+            checked={settings.capExpensePerBucket}
+            onChange={(next) => onChange({ capExpensePerBucket: next })}
             disabled={busy}
-            onClick={() => onChange({ capExpensePerBucket: !settings.capExpensePerBucket })}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-              settings.capExpensePerBucket ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                settings.capExpensePerBucket ? 'translate-x-[22px]' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+            label="จำกัดค่าใช้จ่ายจริงไม่ให้เกินรายได้ต่อตะกร้า"
+          />
         </div>
-
-        <Alert tone="info" title='ทำไมค่าเริ่มต้นถึงเป็น "ปล่อยให้หักข้ามตะกร้าได้"'>
-          เพราะแกนคำนวณเดิมของระบบ (และแนวทางยื่น ภ.ง.ด.90/94 ทั่วไป) ไม่ได้จำกัดค่าใช้จ่ายจริงต่อตะกร้า —
-          สิทธิ์หักค่าใช้จ่ายตามจริงที่มีเอกสารครบยังใช้ได้เต็มจำนวน ไม่เสียสิทธิ์แค่เพราะบันทึกไว้คนละหมวดรายได้
-          <HelpNote>
-            ไม่ว่าจะเปิดหรือปิดสวิตช์นี้ หากยอดหักตามจริงของตะกร้าใดสูงกว่ารายได้ของตะกร้านั้น ระบบจะแสดง
-            คำเตือนเรื่องเอกสารเสมอ (ดูที่ตาราง &ldquo;ขั้นที่ 1 — หักค่าใช้จ่าย&rdquo;)
-          </HelpNote>
-        </Alert>
       </CardBody>
     </Card>
   );

@@ -13,10 +13,6 @@ import {
   CheckCircle2,
   HelpCircle,
   TrendingUp,
-  Plus,
-  Trash2,
-  Edit,
-  X,
   Info,
   Coins,
   Calendar,
@@ -26,15 +22,10 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  X
 } from "lucide-react"
-import { 
-  getExpenses, 
-  createExpense, 
-  updateExpense, 
-  deleteExpense, 
-  ExpenseItem 
-} from "@/features/expenses/actions"
+import { getExpenses, ExpenseItem } from "@/features/expenses/actions"
 import { getFinanceSettings, saveFinanceSettings } from "@/features/finance/actions"
 import { getRooms } from "@/features/room/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
@@ -48,13 +39,16 @@ import {
   filePitReturn,
   getPitFilingSnapshot,
   getPp30Filings,
+  upsertPp30Filing,
   getTaxDeductions,
   getPitFilings,
 } from "@/features/tax/actions"
 import {
   VatGate,
+  VatNotRegisteredOnly,
   VatThresholdCard,
   TaxOverviewDashboard,
+  MonthlyVatOverviewTable,
   VatSettingsSection,
   TaxpayerTypeSection,
   ExpenseModeSection,
@@ -64,14 +58,13 @@ import {
   PitBalanceSummary,
   PitComparisonTable,
   Pp30Report,
-  ExpenseVatFields,
-  computeExpenseVat,
-  type ExpenseVatMode,
+  Pp30FilingForm,
 } from "@/features/tax/components"
 import { useVatStatus, useTaxOverview, usePp30 } from "@/features/tax/hooks/useTax"
-import { firstThresholdBreach, DEFAULT_TAX_SETTINGS } from "@/lib/tax"
+import { firstThresholdBreach, DEFAULT_TAX_SETTINGS, todayISO } from "@/lib/tax"
+import { toCsv, downloadCsv, thaiMonth } from "@/lib/tax/format"
 import { capActualExpenseDeduction, computePitBreakdown } from "@/lib/thaiTax"
-import type { TaxDataset, TaxSettings } from "@/types/tax"
+import type { TaxDataset, TaxSettings, Pp30Filing, Pp30Row } from "@/types/tax"
 
 interface BillItem {
   id: string
@@ -175,6 +168,10 @@ export default function TaxPage() {
   const [pitFiledSnapshot94, setPitFiledSnapshot94] = useState<PitFilingSnapshot | null>(null)
   const [filingPit, setFilingPit] = useState<"90" | "94" | null>(null)
 
+  // Modal กรอกภาษีซื้อ/ยื่น ภ.พ.30 รายเดือน — เปิดจากปุ่มใน <Pp30Report onOpenFiling>
+  const [filingPp30Row, setFilingPp30Row] = useState<Pp30Row | null>(null)
+  const [savingPp30, setSavingPp30] = useState(false)
+
   const handleVatSettingsChange = async (patch: Partial<TaxSettings>) => {
     const previousSettings = taxDataset.settings
     const nextSettings = { ...previousSettings, ...patch } as TaxSettings
@@ -210,6 +207,103 @@ export default function TaxPage() {
       }
     } finally {
       setSavingVatSettings(false)
+    }
+  }
+
+  // upsertPp30Filing เขียนทับทุกคอลัมน์ตามที่ส่งไป (ไม่ merge บางส่วนให้) จึงต้องรวมค่าที่ยังไม่แตะ
+  // จาก filing เดิมเข้าไปด้วยเสมอ กัน field อื่นหายตอน upsert — Pp30FilingForm ไม่ส่ง filedAt มาด้วยแล้ว
+  // (ปุ่ม "บันทึก" ในฟอร์มมีไว้บันทึกยอดภาษีขาย/ซื้อเท่านั้น ไม่แตะสถานะยื่น — ดู onMarkFiled แยกต่างหาก)
+  // จึงต้องคงค่า filedAt เดิมไว้เสมอตรงนี้ ไม่ default เป็น null มิฉะนั้นเดือนที่ยื่นแล้วจะถูกยกเลิกโดยไม่ตั้งใจ
+  const handleSubmitPp30Filing = async (patch: Pp30Filing) => {
+    if (!workspaceId) return
+    const previousFilings = taxDataset.pp30Filings
+    const existing = previousFilings.find(f => f.period === patch.period)
+    const nextFiling: Pp30Filing = {
+      period: patch.period,
+      outputVatManual: patch.outputVatManual ?? null,
+      inputVatManual: patch.inputVatManual ?? null,
+      filedAt: patch.filedAt !== undefined ? patch.filedAt : (existing?.filedAt ?? null),
+      note: patch.note ?? "",
+      paidAmount: existing?.paidAmount ?? null,
+    }
+    setSavingPp30(true)
+    setTaxDataset(prev => ({
+      ...prev,
+      pp30Filings: [...prev.pp30Filings.filter(f => f.period !== patch.period), nextFiling],
+    }))
+    try {
+      const res = await upsertPp30Filing(workspaceId, patch.period, nextFiling)
+      if (res.success) {
+        clearWorkspaceCache(workspaceId)
+        setFilingPp30Row(null)
+      } else {
+        setTaxDataset(prev => ({ ...prev, pp30Filings: previousFilings }))
+        alert(res.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล ภ.พ.30 กรุณาลองใหม่อีกครั้ง")
+      }
+    } finally {
+      setSavingPp30(false)
+    }
+  }
+
+  const handleUnfilePp30 = async (period: string) => {
+    if (!workspaceId) return
+    const previousFilings = taxDataset.pp30Filings
+    const existing = previousFilings.find(f => f.period === period)
+    const nextFiling: Pp30Filing = {
+      period,
+      outputVatManual: existing?.outputVatManual ?? null,
+      inputVatManual: existing?.inputVatManual ?? null,
+      filedAt: null,
+      note: existing?.note ?? "",
+      paidAmount: existing?.paidAmount ?? null,
+    }
+    setSavingPp30(true)
+    setTaxDataset(prev => ({
+      ...prev,
+      pp30Filings: [...prev.pp30Filings.filter(f => f.period !== period), nextFiling],
+    }))
+    try {
+      const res = await upsertPp30Filing(workspaceId, period, nextFiling)
+      if (res.success) {
+        clearWorkspaceCache(workspaceId)
+      } else {
+        setTaxDataset(prev => ({ ...prev, pp30Filings: previousFilings }))
+        alert(res.error || "เกิดข้อผิดพลาดในการยกเลิกการยื่น ภ.พ.30 กรุณาลองใหม่อีกครั้ง")
+      }
+    } finally {
+      setSavingPp30(false)
+    }
+  }
+
+  // ทำเครื่องหมายว่ายื่นแล้ว (ตั้ง filedAt = วันนี้) — ปุ่มลัดในตารางรายเดือน ไม่เปิด modal
+  // ไม่แตะยอดภาษีขาย/ซื้อที่กรอกไว้ก่อนหน้า (ถ้ามี) เก็บค่าเดิมไว้ทั้งหมด
+  const handleMarkPp30Filed = async (row: Pp30Row) => {
+    if (!workspaceId) return
+    const previousFilings = taxDataset.pp30Filings
+    const existing = previousFilings.find(f => f.period === row.period)
+    const nextFiling: Pp30Filing = {
+      period: row.period,
+      outputVatManual: existing?.outputVatManual ?? null,
+      inputVatManual: existing?.inputVatManual ?? null,
+      filedAt: todayISO(),
+      note: existing?.note ?? "",
+      paidAmount: existing?.paidAmount ?? null,
+    }
+    setSavingPp30(true)
+    setTaxDataset(prev => ({
+      ...prev,
+      pp30Filings: [...prev.pp30Filings.filter(f => f.period !== row.period), nextFiling],
+    }))
+    try {
+      const res = await upsertPp30Filing(workspaceId, row.period, nextFiling)
+      if (res.success) {
+        clearWorkspaceCache(workspaceId)
+      } else {
+        setTaxDataset(prev => ({ ...prev, pp30Filings: previousFilings }))
+        alert(res.error || "เกิดข้อผิดพลาดในการทำเครื่องหมายว่ายื่นแล้ว กรุณาลองใหม่อีกครั้ง")
+      }
+    } finally {
+      setSavingPp30(false)
     }
   }
 
@@ -260,24 +354,9 @@ export default function TaxPage() {
   // ข้อมูลค่าใช้จ่ายจาก DB
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
   const [loadingExpenses, setLoadingExpenses] = useState(false)
-  const [dbActualExpense405, setDbActualExpense405] = useState(0)
-  const [dbActualExpense408, setDbActualExpense408] = useState(0)
 
-  // สำหรับการซ่อน/แสดงคู่มือคำแนะนำ
-  const [showGuide, setShowGuide] = useState(true)
-
-  // State ฟอร์มบันทึกค่าใช้จ่าย
-  const [expenseModalOpen, setExpenseModalOpen] = useState(false)
-  const [editingExpense, setEditingExpense] = useState<ExpenseItem | null>(null)
-  const [expenseTitle, setExpenseTitle] = useState("")
-  const [expenseAmount, setExpenseAmount] = useState<number | string>("")
-  const [expenseCategory, setExpenseCategory] = useState<"40_5" | "40_8">("40_5")
-  const [expenseDate, setExpenseDate] = useState("")
-  const [expenseSubmitting, setExpenseSubmitting] = useState(false)
-  const [expenseError, setExpenseError] = useState<string | null>(null)
-  // ภาษีซื้อของค่าใช้จ่ายรายการนี้ — แสดงเฉพาะเมื่อ workspace จด VAT แล้ว (ดู VatGate ใน JSX ด้านล่าง)
-  const [expenseVatMode, setExpenseVatMode] = useState<ExpenseVatMode>("novat")
-  const [expenseClaimInputVat, setExpenseClaimInputVat] = useState(true)
+  // สำหรับการซ่อน/แสดงคู่มือคำแนะนำ — ค่าเริ่มต้นซ่อนไว้ก่อน (ปุ่มเปิดดูเน้นสีให้เห็นชัดว่ากดดูได้)
+  const [showGuide, setShowGuide] = useState(false)
 
   const [bills, setBills] = useState<BillItem[]>([])
   // true จนกว่าข้อมูลชุดแรก (รวมถึงประวัติยกเลิกสัญญา) จะโหลดครบ ป้องกันการ์ดสรุปยอดโชว์เลขที่ยังไม่ครบก่อนเด้งเป็นเลขจริง
@@ -579,7 +658,7 @@ export default function TaxPage() {
   }, [taxYear])
 
   // ฟังก์ชันโหลดข้อมูลค่าใช้จ่ายจาก DB
-  const loadExpensesData = async (year: string, explicitWsId?: string, forceRefresh = false) => {
+  async function loadExpensesData(year: string, explicitWsId?: string, forceRefresh = false) {
     setLoadingExpenses(true)
     try {
       let activeWsId = explicitWsId
@@ -608,10 +687,7 @@ export default function TaxPage() {
           const sum408 = cached
             .filter(e => e.category === "40_8")
             .reduce((sum, e) => sum + e.amount, 0)
-            
-          setDbActualExpense405(sum405)
-          setDbActualExpense408(sum408)
-          
+
           // อัปเดตตัวแปรจริงที่ใช้คำนวณแบบเรียลไทม์
           setActualExpense405(sum405)
           setActualExpense408(sum408)
@@ -635,9 +711,6 @@ export default function TaxPage() {
           .filter(e => e.category === "40_8")
           .reduce((sum, e) => sum + e.amount, 0)
 
-        setDbActualExpense405(sum405)
-        setDbActualExpense408(sum408)
-
         // อัปเดตตัวแปรจริงที่ใช้คำนวณแบบเรียลไทม์
         setActualExpense405(sum405)
         setActualExpense408(sum408)
@@ -650,158 +723,6 @@ export default function TaxPage() {
     }
     return undefined
   }
-
-  // จัดการฟอร์มบันทึกค่าใช้จ่าย
-  const handleOpenAddExpense = () => {
-    if (!hasEditPermission) {
-      showToast(t("tax_page.toast_no_permission"))
-      return
-    }
-    setEditingExpense(null)
-    setExpenseTitle("")
-    setExpenseAmount("")
-    setExpenseCategory("40_5")
-    setExpenseVatMode("novat")
-    setExpenseClaimInputVat(true)
-    // ค่าเริ่มต้นวันที่: ถ้ากำลังดูปีภาษีปัจจุบันให้ใช้วันนี้ ถ้าเป็นปีอื่นให้เริ่มที่ต้นปีนั้นแทน
-    const currentRealYear = new Date().getFullYear().toString()
-    setExpenseDate(taxYear === currentRealYear ? new Date().toISOString().slice(0, 10) : `${taxYear}-01-01`)
-    setExpenseError(null)
-    setExpenseModalOpen(true)
-  }
-
-  const handleOpenEditExpense = (expense: ExpenseItem) => {
-    if (!hasEditPermission) {
-      showToast(t("tax_page.toast_no_permission"))
-      return
-    }
-    setEditingExpense(expense)
-    setExpenseTitle(expense.title)
-    // ถ้าเคยมีภาษีซื้อบันทึกไว้ ให้กลับมาเป็นโหมด "ยังไม่รวม VAT" (base + vat แยกกันแล้วในฐานข้อมูล)
-    // แล้วแสดงยอด base ในช่องจำนวนเงิน — ไม่รวม vat กลับเข้าไปเพื่อไม่ให้กดบันทึกซ้ำแล้ว VAT ถูกคิดซ้อน
-    setExpenseAmount(expense.amount)
-    setExpenseVatMode(expense.vat_amount && expense.vat_amount > 0 ? "base" : "novat")
-    setExpenseClaimInputVat(expense.claim_input_vat !== false)
-    setExpenseCategory(expense.category)
-    setExpenseDate(expense.created_at ? expense.created_at.slice(0, 10) : "")
-    setExpenseError(null)
-    setExpenseModalOpen(true)
-  }
-
-  const handleSubmitExpense = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!hasEditPermission) {
-      showToast(t("tax_page.toast_no_permission"))
-      return
-    }
-    if (!expenseTitle.trim()) {
-      setExpenseError(t("tax_page.toast_validation_title"))
-      return
-    }
-    const amt = Number(expenseAmount)
-    if (isNaN(amt) || amt <= 0) {
-      setExpenseError(t("tax_page.toast_validation_amount"))
-      return
-    }
-    if (!expenseDate) {
-      setExpenseError(t("tax_page.toast_validation_date"))
-      return
-    }
-
-    setExpenseSubmitting(true)
-    setExpenseError(null)
-
-    // ใช้เที่ยงวันตามเวลาท้องถิ่นกันปัญหาวันที่เพี้ยนข้ามเขตเวลาตอนแปลงเป็น ISO
-    const expenseCreatedAt = new Date(`${expenseDate}T12:00:00`).toISOString()
-
-    // แยก base/vat จากยอดที่กรอก — ถ้ายังไม่จด VAT หรือเลือก "ไม่มี VAT" จะได้ base = amt เป๊ะ, vat = 0 เหมือนเดิมทุกจุด
-    const { base: expenseBase, vat: expenseVat, claimInputVat } = computeExpenseVat(
-      { amount: amt, vatMode: expenseVatMode, claimInputVat: expenseClaimInputVat },
-      taxDataset.settings
-    )
-
-    try {
-      let res
-      if (editingExpense) {
-        res = await updateExpense(
-          editingExpense.id,
-          expenseTitle.trim(),
-          expenseBase,
-          taxYear,
-          expenseCategory,
-          expenseCreatedAt,
-          expenseVat,
-          claimInputVat
-        )
-      } else {
-        res = await createExpense(
-          expenseTitle.trim(),
-          expenseBase,
-          taxYear,
-          expenseCategory,
-          undefined,
-          expenseCreatedAt,
-          expenseVat,
-          claimInputVat
-        )
-      }
-
-      if (res.success) {
-        setExpenseModalOpen(false)
-        const userRes = await getCurrentUserProfileClient()
-        if (userRes.success && userRes.data) {
-          const isSuperAdmin = userRes.data.role === "super_admin"
-          const activeWsId = isSuperAdmin 
-            ? (getCookie("horset_current_workspace_id") || userRes.data.workspace_id)
-            : userRes.data.workspace_id
-          if (activeWsId) {
-            clearWorkspaceCache(activeWsId)
-          }
-        }
-        await loadExpensesData(taxYear, undefined, true)
-      } else {
-        setExpenseError(res.error || t("tax_page.toast_error_save"))
-      }
-    } catch (err) {
-      setExpenseError(t("tax_page.toast_error_connection"))
-    } finally {
-      setExpenseSubmitting(false)
-    }
-  }
-
-  const handleDeleteExpense = async (id: string, title: string) => {
-    if (!hasEditPermission) {
-      showToast(t("tax_page.toast_no_permission"))
-      return
-    }
-    if (!confirm(t("tax_page.confirm_delete", { title }))) return
-
-    setLoadingExpenses(true)
-    try {
-      const res = await deleteExpense(id)
-      if (res.success) {
-        const userRes = await getCurrentUserProfileClient()
-        if (userRes.success && userRes.data) {
-          const isSuperAdmin = userRes.data.role === "super_admin"
-          const activeWsId = isSuperAdmin 
-            ? (getCookie("horset_current_workspace_id") || userRes.data.workspace_id)
-            : userRes.data.workspace_id
-          if (activeWsId) {
-            clearWorkspaceCache(activeWsId)
-          }
-        }
-        await loadExpensesData(taxYear, undefined, true)
-      } else {
-        alert(res.error || t("tax_page.toast_error_delete"))
-      }
-    } catch (err) {
-      alert(t("tax_page.toast_error_connection"))
-    } finally {
-      setLoadingExpenses(false)
-    }
-  }
-
-
 
   // บันทึกการตั้งค่าเมื่อมีการเปลี่ยนแปลง
   const handleDataSourceChange = (val: "system" | "manual") => {
@@ -1091,6 +1012,20 @@ export default function TaxPage() {
     pnd94Paid: pitResult94.payable ?? 0,
   })
 
+  // ประกอบ PeriodComputation สำหรับ PitBalanceSummary — แยกจาก pitResult94/90 (ผลคำนวณดิบ) เพราะ
+  // PitBalanceSummary ต้องใช้ pnd94Paid/pnd94IsEstimate/pnd94Result เพิ่มด้วย (ดูหมายเหตุที่ใช้ด้านล่าง)
+  const pnd94Computation = pitResult94 ? {
+    year: Number(taxYear), form: "PND94" as const, from: "", to: "", months: 6,
+    income: taxOverview.yearIncome, expense: taxOverview.yearExpense,
+    tax: pitResult94, filing: null, pnd94Paid: 0, pnd94IsEstimate: false, pnd94Result: null,
+  } : null
+  const pnd90Computation = (pitResult90 && pnd94Computation) ? {
+    year: Number(taxYear), form: "PND90" as const, from: "", to: "", months: 12,
+    income: taxOverview.yearIncome, expense: taxOverview.yearExpense,
+    tax: pitResult90, filing: null, pnd94Paid: pitResult94?.payable ?? 0, pnd94IsEstimate: !pitFiledSnapshot94,
+    pnd94Result: pnd94Computation,
+  } : null
+
   // โหลด snapshot ของปีนี้ (ถ้าเคยกดยื่นแบบไปแล้ว) — ใช้บอกผู้ใช้ว่ายื่นไปแล้วเมื่อไร ไม่ได้ล็อกการแก้ settings
   useEffect(() => {
     if (!workspaceId) return
@@ -1183,6 +1118,66 @@ export default function TaxPage() {
     }
   }
 
+  // ดาวน์โหลด PDF แบบ ภ.พ.30 ของเดือนที่เลือก — กรอกลง template จริง public/templates/PP30_Template.pdf
+  // (ไม่มีระบบอัปโหลด template เองของ super admin แบบ ภ.ง.ด.90/94 จึงใช้ mapping เริ่มต้นที่ bundle มาเสมอ)
+  const handleExportPp30Pdf = async (row: Pp30Row) => {
+    if (!hasEditPermission) {
+      showToast(t("tax_page.toast_no_permission"))
+      return
+    }
+    try {
+      const { generatePp30Pdf } = await import("@/lib/pdfHelper")
+      const { buildPp30FormFields } = await import("@/lib/pp30-fields")
+      const { parseAddress } = await import("@/lib/thaiAddress")
+      const form = buildPp30FormFields(row, {
+        name: `${firstName} ${lastName}`.trim(),
+        taxId,
+        addressParts: {
+          ...parseAddress(address),
+          building: addressBuilding,
+          room: addressRoom,
+          floor: addressFloor,
+          village: addressVillage,
+          moo: addressMoo,
+          soi: addressSoi,
+          yaek: addressYaek,
+        },
+        phone,
+      })
+      const blob = await generatePp30Pdf(form)
+
+      const link = document.createElement("a")
+      link.href = URL.createObjectURL(blob)
+      link.download = `pp30_${row.period}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (e) {
+      console.error(e)
+      alert(t("tax_page.alert_pdf_error"))
+    }
+  }
+
+  // ส่งออก CSV สรุป ภ.พ.30 ทั้งปีที่เลือก — ข้อมูลเดียวกับตารางที่แสดงบนจอ ไม่ต้องกรอกในแอปหรือของทางการ
+  const handleExportPp30Csv = () => {
+    const headers = [
+      "เดือนภาษี", "ฐานค่าบริการ 40(8)", "ภาษีขาย", "ภาษีซื้อ", "เครดิตยกมา",
+      "ยอดที่ต้องโอนจ่าย", "เครดิตยกไป", "สถานะการยื่น", "วันที่ยื่น",
+    ]
+    const rows = pp30.rows.map((r) => [
+      thaiMonth(r.period, true),
+      r.serviceBase,
+      r.outputVat,
+      r.inputVat,
+      r.creditBrought,
+      r.payable,
+      r.carryForward,
+      r.filed ? "ยื่นแล้ว" : "ยังไม่ยื่น",
+      r.filedAt || "",
+    ])
+    downloadCsv(`pp30_${taxYear}.csv`, toCsv(headers, rows))
+  }
+
   // ลิสต์แสดงรายเดือน
   const monthsList = [
     { num: "01", name: "มกราคม" },
@@ -1260,24 +1255,222 @@ export default function TaxPage() {
         </div>
       </div>
 
-      {/* ภาพรวม VAT — แสดงเฉพาะเมื่อ workspace จดทะเบียน VAT แล้ว (ยกเว้นคำเตือนใกล้/เกินเกณฑ์ 1.8 ล้าน) */}
+      {/* ภาพรวม VAT — แสดงเฉพาะเมื่อ workspace จดทะเบียน VAT แล้ว (ยกเว้นคำเตือนใกล้/เกินเกณฑ์ 1.8 ล้าน)
+          การ์ดเกณฑ์ VAT (VatThresholdCard) render แค่ที่นี่จุดเดียว — TaxOverviewDashboard ไม่มีการ์ดนี้ซ้ำแล้ว */}
       {dataReady && (
         <>
           <VatThresholdCard status={vatStatus} breach={vatBreach} />
           <VatGate settings={taxDataset.settings}>
             <TaxOverviewDashboard
-              year={Number(taxYear)}
-              vat={vatStatus}
               vatEnabled={taxOverview.vatEnabled}
               yearIncome={taxOverview.yearIncome}
-              yearExpense={taxOverview.yearExpense}
-              months={taxOverview.months}
-              hasData={taxOverview.hasData}
-              breach={vatBreach}
             />
           </VatGate>
         </>
       )}
+
+      {/* บัตรรายได้และหักลดหย่อน (The Four Income Cards) — แสดงเฉพาะตอนยังไม่จด VAT
+          ตอนจด VAT แล้ว ใช้การ์ดสรุปตะกร้า A/B ของ TaxOverviewDashboard ด้านบนแทน กันโชว์ 2 แดชบอร์ดซ้อนกัน */}
+      <VatNotRegisteredOnly settings={taxDataset.settings}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        {/* บัตร 1: ม. 40(5) */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-blue-100 dark:border-blue-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-blue-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/[0.03] dark:bg-blue-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-blue-500/[0.08] transition-all duration-300"></div>
+
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10 tracking-wider">
+                {t("tax_page.sec_405")}
+              </span>
+              <div className="p-2.5 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Landmark className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_rent_title")}</h4>
+              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_rent_subtitle")}</p>
+              {!dataReady ? (
+                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              ) : (
+                <p className="text-2xl font-black tracking-tight mt-3 text-blue-600 dark:text-blue-400">
+                  {formatMoney(rent405Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-455 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
+              {!dataReady ? (
+                <>
+                  <div className="h-3 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                  <div className="h-4 w-20 mt-1 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{t("tax_page.deduction_by_method", { method: deductionMethod405 === "เหมา 30%" ? t("tax_page.flat_30_label") : t("tax_page.actual_deduction") })}</span>
+                  <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">
+                    {formatMoney(deductionRent405Full)} {t("tax_page.baht")}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* บัตร 2: ม. 40(8) ค่าน้ำไฟ */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-teal-100 dark:border-teal-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-teal-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/[0.03] dark:bg-teal-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-teal-500/[0.08] transition-all duration-300"></div>
+
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-teal-500/[0.08] dark:bg-teal-500/[0.12] text-teal-600 dark:text-teal-400 border border-teal-500/10 tracking-wider">
+                {t("tax_page.sec_408")}
+              </span>
+              <div className="p-2.5 bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-teal-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Zap className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_util_title")}</h4>
+              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_util_subtitle")}</p>
+              {!dataReady ? (
+                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              ) : (
+                <p className="text-2xl font-black tracking-tight mt-3 text-teal-600 dark:text-teal-400">
+                  {formatMoney(utilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-455 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
+              {!dataReady ? (
+                <>
+                  <div className="h-3 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                  <div className="h-4 w-20 mt-1 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{t("tax_page.deduction_by_method", { method: deductionMethod408 === "เหมา 60%" ? t("tax_page.flat_60_label") : t("tax_page.actual_deduction") })}</span>
+                  <span className="text-xs font-extrabold text-teal-600 dark:text-teal-400 tracking-tight">
+                    {formatMoney(deductionUtilities408Full)} {t("tax_page.baht")}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* บัตร 3: ม. 40(8) อื่นๆ */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-amber-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.03] dark:bg-amber-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-amber-500/[0.08] transition-all duration-300"></div>
+
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10 tracking-wider">
+                {t("tax_page.sec_408_other")}
+              </span>
+              <div className="p-2.5 bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Coins className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_other_title")}</h4>
+              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_other_subtitle")}</p>
+              {!dataReady ? (
+                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              ) : (
+                <p className="text-2xl font-black tracking-tight mt-3 text-amber-600 dark:text-amber-400">
+                  {formatMoney(other408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
+              {!dataReady ? (
+                <>
+                  <div className="h-3 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                  <div className="h-4 w-20 mt-1 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{t("tax_page.no_flat_deduction")}</span>
+                  <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
+                    {deductionMethod408 === "เหมา 60%" ? (
+                      t("tax_page.flat_deduction_zero")
+                    ) : (
+                      t("tax_page.actual_deduction_shared")
+                    )}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* บัตร 4: รายจ่ายรวมหักลดหย่อน */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-purple-100 dark:border-purple-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-purple-500/[0.05] transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/[0.03] dark:bg-purple-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-purple-500/[0.08] transition-all duration-300"></div>
+
+          <div className="space-y-5">
+            <div className="flex justify-between items-start">
+              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/[0.08] dark:bg-purple-500/[0.12] text-purple-600 dark:text-purple-450 border border-purple-500/10 tracking-wider">
+                {t("tax_page.total_deduction")}
+              </span>
+              <div className="p-2.5 bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Calculator className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="space-y-1 relative z-10">
+              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.total_deduction_title")}</h4>
+              <p className="text-xs text-slate-400 leading-none">{t("tax_page.total_deduction_subtitle")}</p>
+              {!dataReady ? (
+                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              ) : (
+                <p className="text-2xl font-black tracking-tight mt-3 text-purple-600 dark:text-purple-400">
+                  {formatMoney(deductionRent405Full + deductionUtilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-455 uppercase tracking-wider mb-2">{t("tax_page.deduction_composition")}</p>
+            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 text-xs text-slate-500 dark:text-slate-400 space-y-1">
+              {!dataReady ? (
+                <>
+                  <div className="h-3 w-full rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                  <div className="h-3 w-full rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between font-medium">
+                    <span>{t("tax_page.rent_405_composition")}</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-bold">{formatMoney(deductionRent405Full)} {t("tax_page.baht")}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>{t("tax_page.util_408_composition")}</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-bold">{formatMoney(deductionUtilities408Full)} {t("tax_page.baht")}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      </VatNotRegisteredOnly>
 
       {/* ส่วนตั้งค่าแหล่งข้อมูลการคำนวณและลดหย่อนภาษี */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1325,24 +1518,37 @@ export default function TaxPage() {
 
               {dataSource === "system" ? (
                 <div className="p-4 bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl border border-slate-200/50 dark:border-slate-900/80 text-sm space-y-3 shadow-inner">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-900/80 pb-2.5">
-                    <span className="text-slate-500 dark:text-slate-400 font-medium">{t("tax_page.bill_status_label")}</span>
-                    {hasPaidBills ? (
-                      <span className="inline-flex items-center gap-1.5 text-teal-700 dark:text-teal-400 font-bold bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border border-emerald-500/20 px-3 py-1 rounded-full text-xs">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {t("tax_page.system_success", { count: paidBillsInYear.length })}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/20 px-3 py-1 rounded-full text-xs">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> {t("tax_page.no_paid_bills")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed">
-                    {hasPaidBills 
-                      ? t("tax_page.system_desc_active", { year: taxYear })
-                      : t("tax_page.system_desc_empty", { year: taxYear })
-                    }
-                  </p>
+                  {!dataReady ? (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-900/80 pb-2.5">
+                        <span className="text-slate-500 dark:text-slate-400 font-medium">{t("tax_page.bill_status_label")}</span>
+                        <div className="h-6 w-32 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                      </div>
+                      <div className="h-3 w-full rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                      <div className="h-3 w-2/3 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-900/80 pb-2.5">
+                        <span className="text-slate-500 dark:text-slate-400 font-medium">{t("tax_page.bill_status_label")}</span>
+                        {hasPaidBills ? (
+                          <span className="inline-flex items-center gap-1.5 text-teal-700 dark:text-teal-400 font-bold bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border border-emerald-500/20 px-3 py-1 rounded-full text-xs">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {t("tax_page.system_success", { count: paidBillsInYear.length })}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/20 px-3 py-1 rounded-full text-xs">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> {t("tax_page.no_paid_bills")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed">
+                        {hasPaidBills
+                          ? t("tax_page.system_desc_active", { year: taxYear })
+                          : t("tax_page.system_desc_empty", { year: taxYear })
+                        }
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
@@ -1386,9 +1592,12 @@ export default function TaxPage() {
         </div>
 
         {/* รูปแบบการหักค่าใช้จ่าย — ฟีเจอร์ 5 (ของใหม่) ย้ายมาแทนที่การ์ดเดิมซึ่งไม่เคยบันทึกลง DB
-            เพื่อไม่ให้มีการตั้งค่าเดียวกัน 2 จุดที่ขัดกันเอง (ดูหมายเหตุหัวไฟล์ TaxRulesSettingsSection.tsx) */}
-        {dataReady && hasEditPermission ? (
+            เพื่อไม่ให้มีการตั้งค่าเดียวกัน 2 จุดที่ขัดกันเอง (ดูหมายเหตุหัวไฟล์ TaxRulesSettingsSection.tsx)
+            หัวข้อการ์ดโชว์ทันที ไม่รอ dataReady — ส่ง loading ให้สลับเฉพาะแถวควบคุมเป็น skeleton ระหว่างรอ
+            (กันไม่ให้การ์ดนี้ดู "หลุดจังหวะ" จากการ์ดอื่นที่โชว์หัวข้อทันทีเหมือนกัน) */}
+        {hasEditPermission ? (
           <ExpenseModeSection
+            loading={!dataReady}
             settings={taxDataset.settings}
             onChange={handleVatSettingsChange}
             busy={savingVatSettings}
@@ -1402,10 +1611,14 @@ export default function TaxPage() {
         )}
       </div>
 
-      {/* ตั้งค่า VAT + กฎภาษี — ฟีเจอร์ 5 (ของใหม่ทั้งบล็อก) ดู src/features/tax/components */}
-      {dataReady && hasEditPermission && (
+      {/* ตั้งค่า VAT + กฎภาษี — ฟีเจอร์ 5 (ของใหม่ทั้งบล็อก) ดู src/features/tax/components
+          หัวข้อการ์ดโชว์ทันทีเหมือนการ์ดอื่นในหน้านี้ — ส่ง loading={!dataReady} ให้สลับเฉพาะตัวควบคุม/ตาราง
+          เป็น skeleton ระหว่างรอ ไม่ต้องซ่อนทั้งบล็อกจนกว่าจะโหลดเสร็จ (MinTaxRuleSection เป็นค่าคงที่ตามกฎหมาย
+          ไม่มีอะไรต้องรอโหลด จึงไม่ต้องส่ง loading ให้) */}
+      {hasEditPermission && (
         <div className="space-y-6">
           <VatSettingsSection
+            loading={!dataReady}
             settings={taxDataset.settings}
             onChange={handleVatSettingsChange}
             status={vatStatus}
@@ -1413,171 +1626,11 @@ export default function TaxPage() {
             busy={savingVatSettings}
           />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TaxpayerTypeSection settings={taxDataset.settings} />
+            <TaxpayerTypeSection loading={!dataReady} settings={taxDataset.settings} />
             <MinTaxRuleSection />
           </div>
         </div>
       )}
-
-      {/* บัตรรายได้และหักลดหย่อน (The Four Income Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        {/* บัตร 1: ม. 40(5) */}
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-blue-100 dark:border-blue-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-blue-500/[0.05] transition-all duration-300 group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/[0.03] dark:bg-blue-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-blue-500/[0.08] transition-all duration-300"></div>
-          
-          <div className="space-y-5">
-            <div className="flex justify-between items-start">
-              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10 tracking-wider">
-                {t("tax_page.sec_405")}
-              </span>
-              <div className="p-2.5 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
-                <Landmark className="w-5 h-5" />
-              </div>
-            </div>
-            
-            <div className="space-y-1 relative z-10">
-              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_rent_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_rent_subtitle")}</p>
-              {!dataReady ? (
-                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
-              ) : (
-                <p className="text-2xl font-black tracking-tight mt-3 text-blue-600 dark:text-blue-400">
-                  {formatMoney(rent405Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
-                </p>
-              )}
-            </div>
-          </div>
-          
-          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-455 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
-            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
-              <span className="text-xs text-slate-500 dark:text-slate-400">{t("tax_page.deduction_by_method", { method: deductionMethod405 === "เหมา 30%" ? t("tax_page.flat_30_label") : t("tax_page.actual_deduction") })}</span>
-              <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">
-                {formatMoney(deductionRent405Full)} {t("tax_page.baht")}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* บัตร 2: ม. 40(8) ค่าน้ำไฟ */}
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-teal-100 dark:border-teal-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-teal-500/[0.05] transition-all duration-300 group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/[0.03] dark:bg-teal-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-teal-500/[0.08] transition-all duration-300"></div>
-          
-          <div className="space-y-5">
-            <div className="flex justify-between items-start">
-              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-teal-500/[0.08] dark:bg-teal-500/[0.12] text-teal-600 dark:text-teal-400 border border-teal-500/10 tracking-wider">
-                {t("tax_page.sec_408")}
-              </span>
-              <div className="p-2.5 bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-teal-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
-                <Zap className="w-5 h-5" />
-              </div>
-            </div>
-            
-            <div className="space-y-1 relative z-10">
-              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_util_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_util_subtitle")}</p>
-              {!dataReady ? (
-                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
-              ) : (
-                <p className="text-2xl font-black tracking-tight mt-3 text-teal-600 dark:text-teal-400">
-                  {formatMoney(utilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
-                </p>
-              )}
-            </div>
-          </div>
-          
-          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-455 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
-            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
-              <span className="text-xs text-slate-500 dark:text-slate-400">{t("tax_page.deduction_by_method", { method: deductionMethod408 === "เหมา 60%" ? t("tax_page.flat_60_label") : t("tax_page.actual_deduction") })}</span>
-              <span className="text-xs font-extrabold text-teal-600 dark:text-teal-400 tracking-tight">
-                {formatMoney(deductionUtilities408Full)} {t("tax_page.baht")}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* บัตร 3: ม. 40(8) อื่นๆ */}
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-amber-500/[0.05] transition-all duration-300 group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.03] dark:bg-amber-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-amber-500/[0.08] transition-all duration-300"></div>
-          
-          <div className="space-y-5">
-            <div className="flex justify-between items-start">
-              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10 tracking-wider">
-                {t("tax_page.sec_408_other")}
-              </span>
-              <div className="p-2.5 bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
-                <Coins className="w-5 h-5" />
-              </div>
-            </div>
-            
-            <div className="space-y-1 relative z-10">
-              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_other_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_other_subtitle")}</p>
-              {!dataReady ? (
-                <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
-              ) : (
-                <p className="text-2xl font-black tracking-tight mt-3 text-amber-600 dark:text-amber-400">
-                  {formatMoney(other408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
-                </p>
-              )}
-            </div>
-          </div>
-          
-          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
-            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
-              <span className="text-xs text-slate-500 dark:text-slate-400">{t("tax_page.no_flat_deduction")}</span>
-              <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
-                {deductionMethod408 === "เหมา 60%" ? (
-                  t("tax_page.flat_deduction_zero")
-                ) : (
-                  t("tax_page.actual_deduction_shared")
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* บัตร 4: รายจ่ายรวมหักลดหย่อน */}
-        <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-purple-100 dark:border-purple-900/40 shadow-[0_8px_30px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)] rounded-3xl p-6 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-xl hover:shadow-purple-500/[0.05] transition-all duration-300 group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/[0.03] dark:bg-purple-500/[0.06] rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-purple-500/[0.08] transition-all duration-300"></div>
-          
-          <div className="space-y-5">
-            <div className="flex justify-between items-start">
-              <span className="inline-flex text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/[0.08] dark:bg-purple-500/[0.12] text-purple-600 dark:text-purple-450 border border-purple-500/10 tracking-wider">
-                {t("tax_page.total_deduction")}
-              </span>
-              <div className="p-2.5 bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-450 rounded-xl shadow-inner group-hover:scale-110 transition-transform duration-300">
-                <Calculator className="w-5 h-5" />
-              </div>
-            </div>
-            
-            <div className="space-y-1 relative z-10">
-              <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.total_deduction_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.total_deduction_subtitle")}</p>
-              <p className="text-2xl font-black tracking-tight mt-3 text-purple-600 dark:text-purple-400">
-                {formatMoney(deductionRent405Full + deductionUtilities408Full)} <span className="text-xs font-bold text-slate-500 dark:text-slate-450">{t("tax_page.baht")}</span>
-              </p>
-            </div>
-          </div>
-          
-          <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-455 uppercase tracking-wider mb-2">{t("tax_page.deduction_composition")}</p>
-            <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 text-xs text-slate-500 dark:text-slate-400 space-y-1">
-              <div className="flex justify-between font-medium">
-                <span>{t("tax_page.rent_405_composition")}</span>
-                <span className="text-slate-700 dark:text-slate-300 font-bold">{formatMoney(deductionRent405Full)} {t("tax_page.baht")}</span>
-              </div>
-              <div className="flex justify-between font-medium">
-                <span>{t("tax_page.util_408_composition")}</span>
-                <span className="text-slate-700 dark:text-slate-300 font-bold">{formatMoney(deductionUtilities408Full)} {t("tax_page.baht")}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* 3. ระบบบันทึกค่าใช้จ่ายและคู่มือคำแนะนำทางภาษี */}
       <div className="space-y-6">
@@ -1597,7 +1650,11 @@ export default function TaxPage() {
             
             <button
               onClick={() => setShowGuide(!showGuide)}
-              className="px-4 py-2 bg-slate-100 dark:bg-slate-900/40 hover:bg-slate-200 dark:hover:bg-slate-900 hover:text-slate-800 dark:hover:text-slate-250 text-slate-600 dark:text-slate-400 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-transparent hover:border-slate-200/30 active:scale-95"
+              className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                showGuide
+                  ? "bg-slate-100 dark:bg-slate-900/40 hover:bg-slate-200 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400 border border-transparent hover:border-slate-200/30"
+                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30"
+              }`}
             >
               {showGuide ? (
                 <>{t("tax_page.hide_guide")} <ChevronUp className="w-4 h-4" /></>
@@ -1725,141 +1782,12 @@ export default function TaxPage() {
             </div>
           )}
         </div>
-
-
-        {/* ตารางและเครื่องมือจัดการรายจ่าย (Expense Tracker) */}
-        <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-slate-900/60 p-6 md:p-8 space-y-6 shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-100 dark:border-slate-900/40">
-            <div>
-              <h3 className="text-base font-bold text-slate-850 dark:text-slate-50 flex items-center gap-2.5">
-                <Coins className="w-5 h-5 text-amber-500" /> {t("daily_bills.notebook_title", { year: taxYear })}
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                {t("daily_bills.desc")}
-              </p>
-            </div>
-            
-            <button
-              onClick={handleOpenAddExpense}
-              className={`glow-btn bg-teal-600 text-white font-semibold py-2.5 px-5 rounded-2xl flex items-center gap-2 text-sm shadow-lg shadow-teal-600/10 transition-all ${
-                !hasEditPermission ? "opacity-50 cursor-not-allowed font-medium" : "hover:bg-teal-500 active:scale-95 hover:shadow-teal-600/25 cursor-pointer"
-              }`}
-            >
-              <Plus className="w-4 h-4" /> {t("daily_bills.add_new_btn")}
-            </button>
-          </div>
-
-          {loadingExpenses ? (
-            <div className="py-16 text-center text-xs text-slate-550 flex flex-col items-center gap-3 justify-center">
-              <div className="w-6 h-6 border-2 border-slate-300 border-t-teal-500 rounded-full animate-spin" />
-              <p className="font-medium">{t("tax_page.loading_expenses")}</p>
-            </div>
-          ) : expenses.length > 0 ? (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950/20">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm sm:text-base border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/80 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 font-bold text-xs sm:text-sm uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-800/60">
-                        <th className="py-4 px-5 pl-5">{t("daily_bills.col_desc")}</th>
-                        <th className="py-4 px-4">{t("daily_bills.col_category")}</th>
-                        <th className="py-4 px-4 text-right">{t("daily_bills.col_amount")}</th>
-                        <th className="py-4 px-4 text-center">{t("daily_bills.col_date")}</th>
-                        <th className="py-4 px-5 text-center">{t("daily_bills.col_actions")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
-                      {expenses.map((exp) => (
-                        <tr key={exp.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors duration-200">
-                          <td className="py-4 px-5 pl-5 font-semibold text-slate-800 dark:text-slate-200">{exp.title}</td>
-                          <td className="py-4 px-4">
-                            {exp.category === "40_5" ? (
-                              <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold bg-blue-50/80 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-lg border border-blue-200/60 dark:border-blue-500/10 shadow-sm">
-                                <Landmark className="w-3.5 h-3.5" /> {t("daily_bills.category_405_full")}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold bg-teal-50/80 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 px-2.5 py-1 rounded-lg border border-teal-200/60 dark:border-teal-500/10 shadow-sm">
-                                <Zap className="w-3.5 h-3.5" /> {t("daily_bills.category_408_full")}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-4 px-4 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
-                            {formatMoney(exp.amount)} {t("tax_page.baht")}
-                          </td>
-                          <td className="py-4 px-4 text-center text-slate-550 dark:text-slate-400 text-xs sm:text-sm font-mono">
-                            {new Date(exp.created_at).toLocaleDateString(locale === "th" ? "th-TH" : "en-US", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </td>
-                          <td className="py-4 px-5 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => handleOpenEditExpense(exp)}
-                                className={`p-2 rounded-xl text-slate-400 dark:text-slate-500 transition-all duration-200 ${
-                                  !hasEditPermission ? "opacity-50 cursor-not-allowed" : "hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
-                                }`}
-                                title={t("daily_bills.edit_tooltip")}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteExpense(exp.id, exp.title)}
-                                className={`p-2 rounded-xl text-slate-400 dark:text-slate-500 transition-all duration-200 ${
-                                  !hasEditPermission ? "opacity-50 cursor-not-allowed" : "hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
-                                }`}
-                                title={t("daily_bills.delete_tooltip")}
-                              >
-                                <Trash2 className="w-4 h-4 text-red-500/80 group-hover:text-red-500" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-5 border-t border-slate-200/80 dark:border-slate-800 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                <div>
-                  {t("tax_page.showing_expenses_count", { year: taxYear, count: expenses.length })}
-                </div>
-                <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    <span>{t("tax_page.total_405_accum")}</span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400 font-mono text-sm">{formatMoney(dbActualExpense405)} {t("tax_page.baht")}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-                    <span>{t("tax_page.total_408_accum")}</span>
-                    <span className="font-bold text-teal-600 dark:text-teal-400 font-mono text-sm">{formatMoney(dbActualExpense408)} {t("tax_page.baht")}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="py-16 text-center rounded-2xl bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 text-slate-500 text-xs space-y-3 shadow-inner">
-              <Coins className="w-10 h-10 text-slate-400/80 dark:text-slate-700 mx-auto animate-pulse" />
-              <p className="font-semibold text-slate-755 dark:text-slate-300">{t("tax_page.no_expenses_recorded", { year: taxYear })}</p>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">{t("tax_page.no_expenses_recorded_desc")}</p>
-              <button
-                onClick={handleOpenAddExpense}
-                className={`inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold underline underline-offset-4 transition-all ${
-                  !hasEditPermission ? "opacity-50 cursor-not-allowed" : "text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 cursor-pointer"
-                }`}
-              >
-                {t("tax_page.add_first_expense_btn")}
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
 
-      {/* ตารางแสดงรายรับรายเดือน */}
+      {/* ตารางแสดงรายรับรายเดือน — แสดงเฉพาะตอนยังไม่จด VAT เท่านั้น พอจดแล้วสลับไปโชว์แบบ ภ.พ.30
+          รายเดือนแทนที่ตำแหน่งนี้เลย (ดู VatGate ด้านล่าง) เพราะเป็นข้อมูลชุดเดียวกันแค่มุมมองต่างกัน */}
+      <VatNotRegisteredOnly settings={taxDataset.settings}>
       <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-slate-900/60 p-6 md:p-8 space-y-6 shadow-sm hover:shadow-md transition-all duration-300">
         <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-900/40">
           <TrendingUp className="w-5 h-5 text-blue-500" />
@@ -2017,7 +1945,59 @@ export default function TaxPage() {
           </div>
         </div>
       </div>
+      </VatNotRegisteredOnly>
 
+      {/* สรุปรายเดือนแบบมี VAT — แสดงแทนตารางรายรับรายเดือนด้านบนทันทีที่จดทะเบียน VAT แล้ว (ตำแหน่งเดียวกัน)
+          แบบ ภ.พ.30 รายเดือน (การยื่นแบบจริง) ย้ายไปอยู่ใต้บล็อกค่าเช่าล่วงหน้าสะสม มาตรา 40(5) แทนแล้ว */}
+      {dataReady && (
+        <VatGate settings={taxDataset.settings}>
+          <MonthlyVatOverviewTable
+            year={Number(taxYear)}
+            vatEnabled={taxOverview.vatEnabled}
+            yearIncome={taxOverview.yearIncome}
+            yearExpense={taxOverview.yearExpense}
+            months={taxOverview.months}
+            hasData={taxOverview.hasData}
+          />
+        </VatGate>
+      )}
+
+      {/* Modal กรอกภาษีซื้อ/ยื่น ภ.พ.30 ของเดือนที่เลือก */}
+      {filingPp30Row && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300 animate-fade-in">
+          <div className="relative w-full md:max-w-2xl bg-white dark:bg-slate-900 border-t md:border border-slate-200 dark:border-slate-800 rounded-t-3xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm tracking-tight">
+                แบบ ภ.พ.30 — {taxYear}
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleExportPp30Pdf(filingPp30Row)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" /> ดาวน์โหลด PDF
+                </button>
+                <button
+                  onClick={() => setFilingPp30Row(null)}
+                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-100 text-slate-500 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <Pp30FilingForm
+                row={filingPp30Row}
+                expensesInMonth={taxDataset.expenses.filter(e => e.date.slice(0, 7) === filingPp30Row.period)}
+                onSubmitFiling={handleSubmitPp30Filing}
+                onUnfile={handleUnfilePp30}
+                onCancel={() => setFilingPp30Row(null)}
+                busy={savingPp30}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ส่วนจัดการสัญญา ค่าเช่าล่วงหน้า (มาตรา 40(5)) */}
       <div>
@@ -2079,7 +2059,7 @@ export default function TaxPage() {
                 <span className="text-slate-500 dark:text-slate-400 font-medium">
                   {t("tax_page.contracts_started_count", { count: advanceRentBills.length })}
                 </span>
-                <span className="text-blue-600 dark:text-blue-400 font-bold font-mono text-xs sm:text-sm bg-blue-50/50 dark:bg-blue-550/10 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-550/10 shadow-sm">
+                <span className="text-blue-600 dark:text-blue-400 font-bold font-mono text-xs sm:text-sm bg-blue-50/50 dark:bg-blue-500/[0.12] px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-500/20 shadow-sm">
                   {t("tax_page.total_advance_accum", { amount: formatMoney(totalAdvanceRentAmount) })}
                 </span>
               </div>
@@ -2093,26 +2073,61 @@ export default function TaxPage() {
         </div>
       </div>
 
+      {/* แบบ ภ.พ.30 รายเดือน — ย้ายมาอยู่ใต้บล็อกค่าเช่าล่วงหน้าสะสม มาตรา 40(5) แล้ว (เดิมอยู่ติดกับ
+          MonthlyVatOverviewTable ด้านบน) */}
+      {dataReady && (
+        <VatGate settings={taxDataset.settings}>
+          <Pp30Report
+            year={Number(taxYear)}
+            rows={pp30.rows}
+            totals={pp30.totals}
+            enabled={pp30.enabled}
+            vat={vatStatus}
+            onOpenFiling={(row) => setFilingPp30Row(row)}
+            onMarkFiled={handleMarkPp30Filed}
+            onExportCsv={handleExportPp30Csv}
+            onExportPdf={handleExportPp30Pdf}
+          />
+        </VatGate>
+      )}
 
-      {/* แถวการคำนวณแบ่งยื่นครึ่งปีและเต็มปี */}
+
+      {/* แถวการคำนวณแบ่งยื่นครึ่งปีและเต็มปี — รวมสรุปยอด/ค่าลดหย่อนส่วนตัว/ขั้นบันได/ยอดชำระ เป็นการ์ดเดียวต่อแบบ
+          ปุ่มดาวน์โหลด PDF และปุ่มบันทึกว่ายื่นแบบแล้วอยู่ล่างสุดของการ์ด */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ครึ่งปี ภ.ง.ด. 94 */}
         <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-5">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <FileCheck className="w-4 h-4 text-blue-500" /> {t("tax_page.pnd94_title")}
           </h3>
-          
+
+          <PersonalAllowanceLockNotice hideHeader form="PND94" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
+
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.revenue_first_half_label")}</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(halfTotalRevenue)} {t("tax_page.baht")}</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.deduction_rent_label", { method: deductionMethod405 === "เหมา 30%" ? t("tax_page.flat_30_label") : t("tax_page.actual_deduction") })}</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionRent405Half)} {t("tax_page.baht")}</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.deduction_util_half_label")}</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionUtilities408Half)} {t("tax_page.baht")}</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.personal_allowance_label")}</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(pitResult94?.deductions.personalAllowance ?? 0)} {t("tax_page.baht")}</span></div>
             <div className="h-px bg-slate-200 dark:bg-slate-900 my-2" />
-            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>{t("tax_page.net_income_half_label")}</span><span className="text-blue-600 dark:text-blue-400">{formatMoney(netIncomeHalf)} {t("tax_page.baht")}</span></div>
+            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>{t("tax_page.net_income_half_label")}</span><span className="text-blue-600 dark:text-blue-400">{formatMoney(pitResult94?.netIncome ?? netIncomeHalf)} {t("tax_page.baht")}</span></div>
           </div>
-          
+
           <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-xs text-slate-550 dark:text-slate-400 leading-relaxed">
             <span className="font-bold text-slate-700 dark:text-slate-300">{t("tax_page.filing_period_title")}</span> {t("tax_page.pnd94_filing_period_desc")}
           </div>
+
+          {pitResult94 && (
+            <>
+              <div className="h-px bg-slate-200 dark:bg-slate-900" />
+              <ProgressiveBracketTable bare result={pitResult94} />
+              {pnd94Computation && (
+                <>
+                  <div className="h-px bg-slate-200 dark:bg-slate-900" />
+                  <PitBalanceSummary bare computation={pnd94Computation} />
+                </>
+              )}
+            </>
+          )}
 
           <button
             onClick={() => handleDownloadPdf("94")}
@@ -2146,17 +2161,33 @@ export default function TaxPage() {
             <FileCheck className="w-4 h-4 text-teal-500" /> {t("tax_page.pnd90_title")}
           </h3>
 
+          <PersonalAllowanceLockNotice hideHeader form="PND90" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
+
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.revenue_full_year_label")}</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(fullTotalRevenue)} {t("tax_page.baht")}</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.deduction_rent_label", { method: deductionMethod405 === "เหมา 30%" ? t("tax_page.flat_30_label") : t("tax_page.actual_deduction") })}</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionRent405Full)} {t("tax_page.baht")}</span></div>
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.deduction_util_full_label")}</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(deductionUtilities408Full)} {t("tax_page.baht")}</span></div>
+            <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.personal_allowance_label")}</span><span className="font-semibold text-red-600 dark:text-red-400">-{formatMoney(pitResult90?.deductions.personalAllowance ?? 0)} {t("tax_page.baht")}</span></div>
             <div className="h-px bg-slate-200 dark:bg-slate-900 my-2" />
-            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>{t("tax_page.net_income_full_label")}</span><span className="text-teal-600 dark:text-teal-400">{formatMoney(netIncomeFull)} {t("tax_page.baht")}</span></div>
+            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200"><span>{t("tax_page.net_income_full_label")}</span><span className="text-teal-600 dark:text-teal-400">{formatMoney(pitResult90?.netIncome ?? netIncomeFull)} {t("tax_page.baht")}</span></div>
           </div>
 
           <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl text-xs text-slate-550 dark:text-slate-400 leading-relaxed">
             <span className="font-bold text-slate-700 dark:text-slate-300">{t("tax_page.filing_period_title")}</span> {t("tax_page.pnd90_filing_period_desc")}
           </div>
+
+          {pitResult90 && (
+            <>
+              <div className="h-px bg-slate-200 dark:bg-slate-900" />
+              <ProgressiveBracketTable bare result={pitResult90} />
+              {pnd90Computation && (
+                <>
+                  <div className="h-px bg-slate-200 dark:bg-slate-900" />
+                  <PitBalanceSummary bare computation={pnd90Computation} />
+                </>
+              )}
+            </>
+          )}
 
           <button
             onClick={() => handleDownloadPdf("90")}
@@ -2185,269 +2216,8 @@ export default function TaxPage() {
         </div>
       </div>
 
-      {/* ส่วนขยาย ภ.ง.ด.90/94 — คำนวณจาก src/lib/thaiTax.ts เท่านั้น (ตรงกับ PDF ด้านบนเป๊ะ) */}
-      {dataReady && pitResult94 && pitResult90 && (() => {
-        const pnd94Computation = {
-          year: Number(taxYear), form: "PND94" as const, from: "", to: "", months: 6,
-          income: taxOverview.yearIncome, expense: taxOverview.yearExpense,
-          tax: pitResult94, filing: null, pnd94Paid: 0, pnd94IsEstimate: false, pnd94Result: null,
-        }
-        const pnd90Computation = {
-          year: Number(taxYear), form: "PND90" as const, from: "", to: "", months: 12,
-          income: taxOverview.yearIncome, expense: taxOverview.yearExpense,
-          tax: pitResult90, filing: null, pnd94Paid: pitResult94.payable ?? 0, pnd94IsEstimate: !pitFiledSnapshot94,
-          pnd94Result: pnd94Computation,
-        }
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PersonalAllowanceLockNotice form="PND94" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
-              <PersonalAllowanceLockNotice form="PND90" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ProgressiveBracketTable result={pitResult94} />
-              <ProgressiveBracketTable result={pitResult90} />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PitBalanceSummary computation={pnd94Computation} />
-              <PitBalanceSummary computation={pnd90Computation} />
-            </div>
-            <PitComparisonTable pnd90={pnd90Computation} />
-          </div>
-        )
-      })()}
-
-      {/* ภ.พ.30 — แสดงเฉพาะเมื่อจดทะเบียน VAT แล้ว และข้อมูลพร้อมครบแล้วเท่านั้น */}
-      {dataReady && (
-        <VatGate settings={taxDataset.settings}>
-          <Pp30Report
-            year={Number(taxYear)}
-            rows={pp30.rows}
-            totals={pp30.totals}
-            enabled={pp30.enabled}
-            vat={vatStatus}
-          />
-        </VatGate>
-      )}
-
-      {/* Modal บันทึกค่าใช้จ่าย */}
-      {expenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center">
-                  <Coins className="w-4.5 h-4.5" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-base">
-                    {editingExpense ? t("tax_page.modal_edit_title") : t("tax_page.modal_add_title")}
-                  </h3>
-                  <p className="text-sm text-slate-555 dark:text-slate-400">{t("tax_page.modal_tax_year", { year: taxYear })}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setExpenseModalOpen(false)}
-                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmitExpense} className="flex-1 overflow-y-auto p-5 space-y-4">
-              {expenseError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>{expenseError}</span>
-                </div>
-              )}
-
-              {/* ชื่อรายการ */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t("tax_page.modal_expense_name_label")} <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  required
-                  placeholder={t("tax_page.modal_expense_name_placeholder")}
-                  value={expenseTitle}
-                  onChange={(e) => setExpenseTitle(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all"
-                />
-              </div>
-
-              {/* จำนวนเงิน */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t("tax_page.modal_amount_label")} <span className="text-red-400">*</span></label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    placeholder="0.00"
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-3.5 pr-12 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-sm text-slate-500 dark:text-slate-400 font-medium">
-                    {t("tax_page.baht")}
-                  </div>
-                </div>
-              </div>
-
-              {/* วันที่เกิดค่าใช้จ่าย */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t("tax_page.modal_date_label")} <span className="text-red-400">*</span></label>
-                <input
-                  type="date"
-                  required
-                  value={expenseDate}
-                  onChange={(e) => setExpenseDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all"
-                />
-                <p className="text-[11px] text-slate-450 dark:text-slate-500">
-                  {t("tax_page.modal_date_hint")}
-                </p>
-              </div>
-
-              {/* เลือกประเภท */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t("tax_page.modal_category_label")} <span className="text-red-400">*</span></label>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  {/* 40(5) */}
-                  <button
-                    type="button"
-                    onClick={() => setExpenseCategory("40_5")}
-                    className={`flex flex-col text-left p-3.5 rounded-xl border transition-all duration-200 ${
-                      expenseCategory === "40_5"
-                        ? "bg-blue-50 dark:bg-blue-500/10 border-blue-500/40 ring-1 ring-blue-500/40"
-                        : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">{t("tax_page.modal_cat_405_title")}</span>
-                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                        expenseCategory === "40_5" ? "border-blue-500 bg-blue-500" : "border-slate-300 dark:border-slate-600"
-                      }`}>
-                        {expenseCategory === "40_5" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t("tax_page.modal_cat_405_name")}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{t("tax_page.modal_cat_405_hint")}</span>
-                  </button>
-
-                  {/* 40(8) */}
-                  <button
-                    type="button"
-                    onClick={() => setExpenseCategory("40_8")}
-                    className={`flex flex-col text-left p-3.5 rounded-xl border transition-all duration-200 ${
-                      expenseCategory === "40_8"
-                        ? "bg-teal-50 dark:bg-teal-500/10 border-teal-500/40 ring-1 ring-teal-500/40"
-                        : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-sm font-bold text-teal-600 dark:text-teal-400 font-mono">{t("tax_page.modal_cat_408_title")}</span>
-                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                        expenseCategory === "40_8" ? "border-teal-500 bg-teal-500" : "border-slate-300 dark:border-slate-600"
-                      }`}>
-                        {expenseCategory === "40_8" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t("tax_page.modal_cat_408_name")}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{t("tax_page.modal_cat_408_hint")}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* ภาษีซื้อ — แสดงเฉพาะ workspace ที่จด VAT แล้ว และข้อมูลพร้อมครบแล้ว (ฟีเจอร์ 2) */}
-              {dataReady && (
-              <VatGate settings={taxDataset.settings}>
-                <ExpenseVatFields
-                  value={{ amount: expenseAmount, vatMode: expenseVatMode, claimInputVat: expenseClaimInputVat }}
-                  onChange={(next) => {
-                    setExpenseAmount(next.amount)
-                    setExpenseVatMode(next.vatMode)
-                    setExpenseClaimInputVat(next.claimInputVat)
-                  }}
-                  settings={taxDataset.settings}
-                  bucket={expenseCategory === "40_5" ? "A" : "B"}
-                />
-              </VatGate>
-              )}
-
-              {/* Dynamic Guidance / Recommendation Tooltip */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
-                <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  <Info className={`w-4 h-4 ${expenseCategory === "40_5" ? "text-blue-600 dark:text-blue-400" : "text-teal-600 dark:text-teal-400"}`} />
-                  <span>{t("tax_page.modal_guidance_title")}</span>
-                </div>
-                
-                {expenseCategory === "40_5" ? (
-                  <div className="text-xs sm:text-sm text-slate-650 dark:text-slate-400 space-y-1.5 leading-relaxed">
-                    <p className="text-slate-700 dark:text-slate-300 font-medium">{t("tax_page.modal_guidance_deductible_title_prefix")} <span className="text-blue-600 dark:text-blue-400 font-bold">40(5) - {t("tax_page.modal_guidance_rent_text")}</span> {t("tax_page.modal_guidance_deductible_title_suffix")}</p>
-                    <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-450">
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_rent_item1_bold")}</strong> {t("tax_page.modal_rent_item1_desc")}</li>
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_rent_item2_bold")}</strong> {t("tax_page.modal_rent_item2_desc")}</li>
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_rent_item3_bold")}</strong> {t("tax_page.modal_rent_item3_desc")}</li>
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_rent_item4_bold")}</strong> {t("tax_page.modal_rent_item4_desc")}</li>
-                    </ul>
-                    <p className="text-xs text-amber-750 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/5 p-1.5 rounded border border-amber-200 dark:border-amber-500/10 mt-1">
-                      {t("tax_page.modal_rent_tip")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-xs sm:text-sm text-slate-650 dark:text-slate-400 space-y-1.5 leading-relaxed">
-                    <p className="text-slate-700 dark:text-slate-300 font-medium">{t("tax_page.modal_guidance_deductible_title_prefix")} <span className="text-teal-600 dark:text-teal-400 font-bold">40(8) - {t("tax_page.modal_guidance_service_text")}</span> {t("tax_page.modal_guidance_deductible_title_suffix")}</p>
-                    <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-450">
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_util_item1_bold")}</strong> {t("tax_page.modal_util_item1_desc")}</li>
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_util_item2_bold")}</strong> {t("tax_page.modal_util_item2_desc")}</li>
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_util_item3_bold")}</strong> {t("tax_page.modal_util_item3_desc")}</li>
-                      <li><strong className="text-slate-700 dark:text-slate-300">{t("tax_page.modal_util_item4_bold")}</strong> {t("tax_page.modal_util_item4_desc")}</li>
-                    </ul>
-                    <p className="text-xs text-amber-750 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/5 p-1.5 rounded border border-amber-200 dark:border-amber-500/10 mt-1">
-                      {t("tax_page.modal_util_tip")}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </form>
-
-            {/* Footer Actions */}
-            <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setExpenseModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 rounded-xl text-sm font-semibold transition-colors"
-              >
-                {t("tax_page.cancel_btn")}
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitExpense}
-                disabled={expenseSubmitting}
-                className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-lg shadow-teal-500/10 hover:shadow-teal-500/20 active:scale-[0.98] transition-all"
-              >
-                {expenseSubmitting ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {t("tax_page.saving")}
-                  </>
-                ) : (
-                  <>
-                    <FileCheck className="w-4 h-4" />
-                    {t("tax_page.save_btn")}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* ตารางเทียบครึ่งปี vs สิ้นปี — คำนวณจาก src/lib/thaiTax.ts เท่านั้น (ตรงกับ PDF ด้านบนเป๊ะ) */}
+      {dataReady && pnd90Computation && <PitComparisonTable pnd90={pnd90Computation} />}
 
     </div>
   )

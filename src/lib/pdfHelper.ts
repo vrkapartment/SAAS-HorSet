@@ -910,21 +910,36 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
 //
 // ⚠️ สถานะ mapping: ตาราง "การคำนวณภาษี" (Text2.1-16) มั่นใจสูง — ตรวจสอบด้วย pdf-lib.getWidgets()
 //    แล้วว่าจำนวน field ตรงกับจำนวนบรรทัด 1-16 บนแบบฟอร์มพอดีและเรียง y ต่อเนื่องตามลำดับ
-//    ส่วนหัว (ชื่อ/ที่อยู่/เดือนภาษี) เป็น best-effort จากตำแหน่ง x/y ของแต่ละ field ยังไม่ได้ยืนยันด้วย
-//    การ render เทียบภาพจริง — ควรตรวจก่อนใช้งานจริง (ดู verification plan ในแผนที่วางไว้)
-//    ที่อยู่ผู้ประกอบการในแบบฟอร์มแยกเป็น 9+ ช่องย่อย (อาคาร/ห้อง/ชั้น/หมู่บ้าน/เลขที่/หมู่/ซอย/ถนน/ตำบล/
-//    อำเภอ/จังหวัด/รหัสไปรษณีย์) แต่ Pp30TaxpayerInfo.address เป็น string เดียว — รอบนี้ map เข้าช่องเดียว
-//    (Text1.02) เป็นการชั่วคราว การแยกช่องย่อยเต็มรูปแบบเป็นงานต่อยอด (ต้องต่อกับ workspaces.tax_address_*
-//    ที่มีอยู่แล้วสำหรับ ภ.ง.ด.94 เหมือนกัน)
+//    ที่อยู่ผู้ประกอบการ (Text1.4-1.16) ยืนยันแล้วด้วย getRectangle()/getMaxLength() ของแต่ละ field:
+//      - จัดกลุ่มตาม y เป็นแถวตรงกับป้ายกำกับบนแบบฟอร์มจริงทีละแถว (อาคาร/ห้องเลขที่/ชั้นที่ ฯลฯ)
+//      - ลำดับ x ซ้าย→ขวาในแต่ละแถวตรงกับลำดับป้ายกำกับซ้าย→ขวาเป๊ะ
+//      - Text1.15 มี maxLength=5 ซึ่งตรงกับ "รหัสไปรษณีย์" (5 หลัก) เท่านั้นในกลุ่มนี้ — ยืนยันตำแหน่งชัดเจน
+//    Text1.02 (เดิม map "address" ไว้ที่นี่) คือช่อง "ชื่อสถานประกอบการ" ไม่ใช่ที่อยู่ — HorSet ไม่ได้แยกเก็บ
+//    ชื่อสถานประกอบการต่างหากจากชื่อผู้ประกอบการ จึงปล่อยว่างไว้ตั้งใจ (ไม่ map อะไรเข้าไป)
+//    Text1.3 (ระหว่าง Text1.02 กับแถวที่อยู่) ยังไม่ทราบวัตถุประสงค์แน่ชัด — ปล่อยว่างไว้เช่นกัน
 // ============================================================================
 
 export const DEFAULT_PP30_MAPPING: PndFieldMapping[] = [
   { logicalKey: "taxId", fieldKind: "text", physicalFieldName: "Text1.0", valueFormat: "raw" },
   { logicalKey: "branchNo", fieldKind: "text", physicalFieldName: "Text1.1", valueFormat: "raw" },
   { logicalKey: "taxpayerName", fieldKind: "text", physicalFieldName: "Text1.01", valueFormat: "raw" },
-  { logicalKey: "address", fieldKind: "text", physicalFieldName: "Text1.02", valueFormat: "raw" },
   { logicalKey: "taxYearBE", fieldKind: "text", physicalFieldName: "Text1.22", valueFormat: "raw" },
   { logicalKey: "additionalFilingNo", fieldKind: "text", physicalFieldName: "Text1.21", valueFormat: "raw" },
+
+  // ที่อยู่แยกช่องย่อย (Text1.02/Text1.3 เว้นว่างตั้งใจ — ดูหมายเหตุด้านบน)
+  { logicalKey: "address.building", fieldKind: "text", physicalFieldName: "Text1.4", valueFormat: "raw" },
+  { logicalKey: "address.room", fieldKind: "text", physicalFieldName: "Text1.5", valueFormat: "raw" },
+  { logicalKey: "address.floor", fieldKind: "text", physicalFieldName: "Text1.6", valueFormat: "raw" },
+  { logicalKey: "address.village", fieldKind: "text", physicalFieldName: "Text1.7", valueFormat: "raw" },
+  { logicalKey: "address.no", fieldKind: "text", physicalFieldName: "Text1.8", valueFormat: "raw" },
+  { logicalKey: "address.moo", fieldKind: "text", physicalFieldName: "Text1.9", valueFormat: "raw" },
+  { logicalKey: "address.soi", fieldKind: "text", physicalFieldName: "Text1.10", valueFormat: "raw" },
+  { logicalKey: "address.road", fieldKind: "text", physicalFieldName: "Text1.11", valueFormat: "raw" },
+  { logicalKey: "address.subdistrict", fieldKind: "text", physicalFieldName: "Text1.12", valueFormat: "raw" },
+  { logicalKey: "address.district", fieldKind: "text", physicalFieldName: "Text1.13", valueFormat: "raw" },
+  { logicalKey: "address.province", fieldKind: "text", physicalFieldName: "Text1.14", valueFormat: "raw" },
+  { logicalKey: "address.zipcode", fieldKind: "text", physicalFieldName: "Text1.15", valueFormat: "raw" },
+  { logicalKey: "phone", fieldKind: "text", physicalFieldName: "Text1.16", valueFormat: "raw" },
 
   // เดือนภาษี — เช็คบ็อกซ์ 12 ตัวใน field เดียว (Radio Button3) เรียง 4 คอลัมน์ x 3 แถวตามแบบฟอร์มจริง
   // widgetIndex เรียงตามลำดับที่ pdf-lib คืนมาจาก getWidgets() ไม่ใช่ตามเลขเดือน — อ้างอิงจากผลตรวจสอบจริง
@@ -959,9 +974,12 @@ export const DEFAULT_PP30_MAPPING: PndFieldMapping[] = [
   { logicalKey: "grandTotal", fieldKind: "text", physicalFieldName: "Text2.15", valueFormat: "plain_decimal" },
   { logicalKey: "netOverpaidAfterAdjustment", fieldKind: "text", physicalFieldName: "Text2.16", valueFormat: "plain_decimal" },
 
-  // วิธีขอคืนภาษี — เงินสด/โอนธนาคาร (checkbox เดี่ยว 1 widget ต่อ field)
-  { logicalKey: "requestRefund", fieldKind: "radio", physicalFieldName: "Radio Button11", optionKey: "checked", widgetIndex: 0 },
-  { logicalKey: "carryForwardCredit", fieldKind: "radio", physicalFieldName: "Radio Button12", optionKey: "checked", widgetIndex: 0 },
+  // ช่องเลือกข้อ 11 (ต้องชำระ) / ข้อ 12 (ชำระเกิน) — ยืนยันตำแหน่งจาก getRectangle(): Radio Button11
+  // อยู่ติดกับ Text2.11 (netVatPayable, ข้อ 11 พอดี) และ Radio Button12 อยู่ติดกับ Text2.12 (netVatOverpaid,
+  // ข้อ 12 พอดี) — เดิม logicalKey ตั้งชื่อผิดว่า requestRefund/carryForwardCredit (เข้าใจว่าเป็นวิธีขอคืนภาษี)
+  // ทำให้ requestRefund ถูก hardcode เป็น 0 เสมอ ไม่เคยติ๊กข้อ 11 ให้เลย แก้เป็นคำนวณจาก row.payable ที่ถูกต้อง
+  { logicalKey: "netVatPayableChecked", fieldKind: "radio", physicalFieldName: "Radio Button11", optionKey: "checked", widgetIndex: 0 },
+  { logicalKey: "netVatOverpaidChecked", fieldKind: "radio", physicalFieldName: "Radio Button12", optionKey: "checked", widgetIndex: 0 },
 ]
 
 /**
@@ -984,9 +1002,21 @@ export function computePp30Values(form: {
     taxId: raw(form.byKey.taxId),
     branchNo: raw(form.byKey.branchNo),
     taxpayerName: raw(form.byKey.taxpayerName),
-    address: raw(form.byKey.address),
     taxYearBE: raw(form.byKey.taxYearBE),
     additionalFilingNo: form.byKey.additionalFilingNo ? raw(form.byKey.additionalFilingNo) : null,
+    "address.building": raw(form.byKey["address.building"]),
+    "address.room": raw(form.byKey["address.room"]),
+    "address.floor": raw(form.byKey["address.floor"]),
+    "address.village": raw(form.byKey["address.village"]),
+    "address.no": raw(form.byKey["address.no"]),
+    "address.moo": raw(form.byKey["address.moo"]),
+    "address.soi": raw(form.byKey["address.soi"]),
+    "address.road": raw(form.byKey["address.road"]),
+    "address.subdistrict": raw(form.byKey["address.subdistrict"]),
+    "address.district": raw(form.byKey["address.district"]),
+    "address.province": raw(form.byKey["address.province"]),
+    "address.zipcode": raw(form.byKey["address.zipcode"]),
+    phone: raw(form.byKey.phone),
     totalSales: money(form.byKey.totalSales),
     zeroRatedSales: money(form.byKey.zeroRatedSales),
     exemptSales: money(form.byKey.exemptSales),
@@ -1007,8 +1037,8 @@ export function computePp30Values(form: {
 
   const radio: Record<string, string | null> = {
     taxMonth: String(form.month),
-    requestRefund: Number(form.byKey.requestRefund) === 1 ? "checked" : null,
-    carryForwardCredit: Number(form.byKey.carryForwardCredit) === 1 ? "checked" : null,
+    netVatPayableChecked: Number(form.byKey.netVatPayableChecked) === 1 ? "checked" : null,
+    netVatOverpaidChecked: Number(form.byKey.netVatOverpaidChecked) === 1 ? "checked" : null,
   }
 
   return { text, radio }

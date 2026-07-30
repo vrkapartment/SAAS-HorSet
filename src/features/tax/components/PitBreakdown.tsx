@@ -4,13 +4,17 @@
  * ฟีเจอร์ 4: ส่วนที่ "เพิ่มเข้าไป" ในหน้า ภ.ง.ด.94 / ภ.ง.ด.90 ที่มีอยู่แล้ว
  *
  * ตั้งใจ export เป็นชิ้นๆ ไม่ได้มัดรวมเป็นหน้าเดียว เพื่อให้เลือกหยิบเฉพาะที่ยังไม่มี:
- *   - PersonalAllowanceLockNotice  แสดงว่าค่าลดหย่อนส่วนตัวถูกล็อกที่เท่าไร และทำไม
- *   - ExpenseDeductionTable        ขั้นที่ 1 หักค่าใช้จ่ายรายตะกร้า (สลับเหมา/จริงได้ในที่)
- *   - DeductionBreakdown           ขั้นที่ 2 หักค่าลดหย่อน (เห็นทุกบรรทัด + เตือนเมื่อถูก cap)
- *   - ProgressiveBracketTable      ขั้นที่ 3 อัตราก้าวหน้าแบบเห็นทีละขั้น
+ *   - PersonalAllowanceLockNotice  แสดงว่าค่าลดหย่อนส่วนตัวถูกล็อกที่เท่าไร และทำไม (hideHeader ฝังใต้หัวข้ออื่นได้)
+ *   - ExpenseDeductionTable        ขั้นที่ 1 หักค่าใช้จ่ายรายตะกร้า (สลับเหมา/จริงได้ในที่) — ยังไม่ได้ใช้ใน tax/page.tsx
+ *   - DeductionBreakdown           ขั้นที่ 2 หักค่าลดหย่อน (เห็นทุกบรรทัด + เตือนเมื่อถูก cap) — ยังไม่ได้ใช้ใน tax/page.tsx
+ *   - ProgressiveBracketTable      อัตราก้าวหน้าแบบเห็นทีละขั้น
  *   - MinTaxNotice                 ภาษีขั้นต่ำ 0.5% (ม.48(2))
- *   - PitBalanceSummary            ขั้นที่ 4 หักกลบเครดิต → จ่ายเพิ่ม/ขอคืน
+ *   - PitBalanceSummary            หักกลบเครดิต → จ่ายเพิ่ม/ขอคืน
  *   - PitComparisonTable           ตารางเทียบครึ่งปี vs สิ้นปี
+ *
+ * ⚠️ เลข "ขั้นที่ N" ในหัวข้อของ ProgressiveBracketTable/PitBalanceSummary เขียนเป็นเลข 2/3 ตรงกับที่
+ *    tax/page.tsx เรียกจริง (รวมสรุปยอด+ค่าลดหย่อนส่วนตัวเป็น "1" การ์ดเดียว ไม่ได้ใช้ ExpenseDeductionTable/
+ *    DeductionBreakdown ข้างบน) — ถ้าจะเอา 2 ตัวนั้นมาต่อในหน้าเดียวกันด้วย ต้องรีนัมเบอร์ให้สอดคล้องกันใหม่ทั้งชุด
  *
  * ⚠️ ทุก component ในไฟล์นี้เป็น presentational ล้วน — รับผลคำนวณเข้ามาแล้วแสดงผลเท่านั้น
  *    ไม่แตะ PDF mapping ของ ภ.ง.ด.90/94 และไม่ผูกกับ engine คำนวณตัวไหนเป็นการเฉพาะ
@@ -19,6 +23,7 @@
  *    ป้อนค่าที่หน้านี้ เพื่อให้ตัวเลขบนจอตรงกับ PDF ที่ดาวน์โหลดเป๊ะ
  */
 
+import { TrendingUp, Wallet } from 'lucide-react';
 import type {
   DeductionItem,
   IncomeTaxResult,
@@ -55,11 +60,16 @@ export function PersonalAllowanceLockNotice({
   taxpayerType,
   partnerCount,
   onChangeTaxpayerType,
+  bare = false,
+  hideHeader = false,
 }: {
   form: PitForm;
   taxpayerType: TaxpayerType;
   partnerCount?: number;
   onChangeTaxpayerType?: () => void;
+  bare?: boolean;
+  /** ไม่มี CardHeader/หัวข้อของตัวเอง — แสดงแค่ badge + ข้อความล็อกค่าลดหย่อน ใช้ตอนฝังไว้ใต้หัวข้ออื่นที่มีอยู่แล้ว */
+  hideHeader?: boolean;
 }) {
   const info = PIT_FORM_INFO[form];
   const amount = PERSONAL_ALLOWANCE[form][taxpayerType];
@@ -67,31 +77,43 @@ export function PersonalAllowanceLockNotice({
   const otherAmount =
     PERSONAL_ALLOWANCE[form === 'PND94' ? 'PND90' : 'PND94'][taxpayerType];
 
+  const badges = (
+    <>
+      <Badge tone="info">
+        {TAXPAYER_LABEL[taxpayerType]}
+        {taxpayerType === 'partnership' && partnerCount ? ` (${partnerCount} คน)` : ''}
+      </Badge>
+      <Badge tone="bucketB">ค่าลดหย่อนส่วนตัว {baht(amount, 0)} บาท</Badge>
+      {onChangeTaxpayerType && (
+        <button type="button" onClick={onChangeTaxpayerType} className={btnCls}>
+          เปลี่ยนสถานะ →
+        </button>
+      )}
+    </>
+  );
+  const note = (
+    <p className="text-xs text-slate-500 dark:text-slate-400">
+      ค่าลดหย่อนส่วนตัวของ {info.title} = <b>{baht(amount, 0)} บาท</b> (ของ {other} คือ{' '}
+      {baht(otherAmount, 0)} บาท) — ระบบล็อกตามแบบ + สถานะผู้เสียภาษี สลับกันไม่ได้
+    </p>
+  );
+
+  if (hideHeader) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">{badges}</div>
+    );
+  }
+
   return (
-    <Card>
+    <Card bare={bare}>
       <CardHeader
+        bare={bare}
         title={`${info.title} — ${info.label}`}
         subtitle={`รอบ ${info.range} · ${info.due}`}
-        actions={
-          <>
-            <Badge tone="info">
-              {TAXPAYER_LABEL[taxpayerType]}
-              {taxpayerType === 'partnership' && partnerCount ? ` (${partnerCount} คน)` : ''}
-            </Badge>
-            <Badge tone="bucketB">ค่าลดหย่อนส่วนตัว {baht(amount, 0)} บาท</Badge>
-            {onChangeTaxpayerType && (
-              <button type="button" onClick={onChangeTaxpayerType} className={btnCls}>
-                เปลี่ยนสถานะ →
-              </button>
-            )}
-          </>
-        }
+        actions={badges}
       />
-      <CardBody className="py-3">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          ค่าลดหย่อนส่วนตัวของ {info.title} = <b>{baht(amount, 0)} บาท</b> (ของ {other} คือ{' '}
-          {baht(otherAmount, 0)} บาท) — ระบบล็อกตามแบบ + สถานะผู้เสียภาษี สลับกันไม่ได้
-        </p>
+      <CardBody bare={bare} className="py-3">
+        {note}
       </CardBody>
     </Card>
   );
@@ -345,17 +367,31 @@ export function DeductionBreakdown({
  * ขั้นที่ 3 — อัตราก้าวหน้า + ภาษีขั้นต่ำ
  * ================================================================== */
 
-export function ProgressiveBracketTable({ result }: { result: IncomeTaxResult }) {
+export function ProgressiveBracketTable({
+  result,
+  bare = false,
+}: {
+  result: IncomeTaxResult;
+  bare?: boolean;
+}) {
   const steps = result.progressive.steps;
+  // สีไอคอนตามแบบ — ให้ตรงกับหัวข้อ "1. แบบยื่นภาษี..." ของ ภ.ง.ด.94/90 ในหน้า tax/page.tsx (blue/teal)
+  const accent = result.form === 'PND94' ? 'text-blue-500' : 'text-teal-500';
 
   return (
-    <Card>
+    <Card bare={bare}>
       <CardHeader
-        title="ขั้นที่ 3 — คำนวณตามอัตราภาษีก้าวหน้า (ขั้นบันได)"
+        bare={bare}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <TrendingUp className={`h-4 w-4 ${accent}`} />
+            ขั้นที่ 2 — คำนวณตามอัตราภาษีก้าวหน้า (ขั้นบันได)
+          </span>
+        }
         subtitle={`เงินได้สุทธิ ${baht(result.netIncome)} บาท`}
       />
       {steps.length === 0 ? (
-        <CardBody>
+        <CardBody bare={bare}>
           <p className="text-sm text-slate-500">เงินได้สุทธิ 0 บาท — ไม่มีภาษีตามขั้นบันได</p>
         </CardBody>
       ) : (
@@ -392,7 +428,7 @@ export function ProgressiveBracketTable({ result }: { result: IncomeTaxResult })
           </table>
         </div>
       )}
-      <CardBody className="py-3">
+      <CardBody bare={bare} className="py-3">
         <MinTaxNotice result={result} />
       </CardBody>
     </Card>
@@ -439,22 +475,28 @@ export function MinTaxNotice({ result }: { result: IncomeTaxResult }) {
 export function PitBalanceSummary({
   computation,
   onGoToPnd94,
+  bare = false,
 }: {
   computation: PeriodComputation;
   onGoToPnd94?: () => void;
+  bare?: boolean;
 }) {
   const { tax, form, pnd94IsEstimate } = computation;
+  // สีไอคอนตามแบบ — ให้ตรงกับหัวข้อ "1. แบบยื่นภาษี..." ของ ภ.ง.ด.94/90 ในหน้า tax/page.tsx (blue/teal)
+  const accent = form === 'PND94' ? 'text-blue-500' : 'text-teal-500';
 
   return (
-    <Card>
+    <Card bare={bare}>
       <CardHeader
+        bare={bare}
         title={
-          form === 'PND94'
-            ? 'ขั้นที่ 4 — ภาษีครึ่งปีที่ต้องชำระ'
-            : 'ขั้นที่ 4 — หักกลบลบหนี้กับครึ่งปี'
+          <span className="inline-flex items-center gap-2">
+            <Wallet className={`h-4 w-4 ${accent}`} />
+            {form === 'PND94' ? 'ขั้นที่ 3 — ภาษีครึ่งปีที่ต้องชำระ' : 'ขั้นที่ 3 — หักกลบลบหนี้กับครึ่งปี'}
+          </span>
         }
       />
-      <CardBody>
+      <CardBody bare={bare}>
         <Breakdown>
           <BreakdownRow
             label={form === 'PND94' ? 'ภาษีครึ่งปีที่คำนวณได้' : 'ยอดภาษีรวมทั้งปี'}

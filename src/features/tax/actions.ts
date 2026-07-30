@@ -319,7 +319,7 @@ export async function getPp30Filings(workspaceId: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("pp30_filings")
-      .select("period, input_vat_manual, filed_at, paid_amount, note")
+      .select("period, output_vat_manual, input_vat_manual, filed_at, paid_amount, note")
       .eq("workspace_id", workspaceId)
       .order("period", { ascending: false })
 
@@ -327,6 +327,7 @@ export async function getPp30Filings(workspaceId: string) {
 
     const formatted: Pp30Filing[] = (data || []).map((f) => ({
       period: String(f.period).slice(0, 7),
+      outputVatManual: f.output_vat_manual === null || f.output_vat_manual === undefined ? null : Number(f.output_vat_manual),
       inputVatManual: f.input_vat_manual === null || f.input_vat_manual === undefined ? null : Number(f.input_vat_manual),
       filedAt: f.filed_at,
       note: f.note || "",
@@ -347,7 +348,7 @@ export async function getPp30Filings(workspaceId: string) {
 export async function upsertPp30Filing(
   workspaceId: string,
   period: string,
-  patch: { inputVatManual?: number | null; filedAt?: string | null; paidAmount?: number | null; note?: string }
+  patch: { outputVatManual?: number | null; inputVatManual?: number | null; filedAt?: string | null; paidAmount?: number | null; note?: string }
 ) {
   const access = await assertTaxAccess(workspaceId)
   if (!access.ok) return { success: false, error: access.error }
@@ -360,6 +361,7 @@ export async function upsertPp30Filing(
         {
           workspace_id: workspaceId,
           period: `${period}-01`,
+          output_vat_manual: patch.outputVatManual ?? null,
           input_vat_manual: patch.inputVatManual ?? null,
           filed_at: patch.filedAt ?? null,
           paid_amount: patch.paidAmount ?? null,

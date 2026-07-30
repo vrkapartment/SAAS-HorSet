@@ -13,6 +13,28 @@
 import type { Pp30Row } from '../types/tax';
 import { r2 } from './tax';
 
+/**
+ * ที่อยู่แยกช่องย่อยตามแบบฟอร์ม ภ.พ.30 จริง (อาคาร/ห้องเลขที่/ชั้นที่/หมู่บ้าน/เลขที่/หมู่ที่/ตรอกซอย/
+ * ถนน/ตำบล-แขวง/อำเภอ-เขต/จังหวัด/รหัสไปรษณีย์) — โครงเดียวกับ PndData.addressParts ใน pdfHelper.ts
+ * (ที่ ภ.ง.ด.90/94 ใช้อยู่แล้ว) ตั้งใจให้ผู้เรียกประกอบจาก parseAddress() + tax_address_building/room/
+ * floor/village/moo/soi/yaek ชุดเดียวกัน ไม่ต้องแยกโค้ดคนละชุด
+ */
+export interface Pp30AddressParts {
+  building: string;
+  room: string;
+  floor: string;
+  village: string;
+  no: string;
+  moo: string;
+  soi: string;
+  yaek: string;
+  road: string;
+  subdistrict: string;
+  district: string;
+  province: string;
+  zipcode: string;
+}
+
 /** ข้อมูลผู้ประกอบการ — ดึงจากโปรไฟล์หอพักใน Supabase */
 export interface Pp30TaxpayerInfo {
   /** ชื่อผู้ประกอบการ (บุคคล/ห้างหุ้นส่วน) */
@@ -21,7 +43,8 @@ export interface Pp30TaxpayerInfo {
   taxId: string;
   /** เลขที่สาขา — สำนักงานใหญ่ใช้ '00000' */
   branchNo?: string;
-  address?: string;
+  /** ที่อยู่แยกช่องย่อย — ไม่ระบุ = ปล่อยช่องที่อยู่ทั้งหมดว่าง (ไม่มี fallback ไปช่องเดียวรวมอีกต่อไป) */
+  addressParts?: Pp30AddressParts;
   phone?: string;
 }
 
@@ -91,12 +114,13 @@ export function buildPp30FormFields(
   const surcharge = r2(manual.surcharge ?? 0);
   const grandTotal = r2(row.payable + penalty + surcharge);
 
+  const addr = taxpayer.addressParts;
+
   const fields: Pp30Field[] = [
     /* ---------- ส่วนหัว ---------- */
     { key: 'taxpayerName', label: 'ชื่อผู้ประกอบการ', value: taxpayer.name, type: 'text' },
     { key: 'taxId', label: 'เลขประจำตัวผู้เสียภาษีอากร', value: taxpayer.taxId, type: 'text' },
     { key: 'branchNo', label: 'สาขาที่', value: taxpayer.branchNo ?? '00000', type: 'text' },
-    { key: 'address', label: 'ที่ตั้งสถานประกอบการ', value: taxpayer.address ?? '', type: 'text' },
     { key: 'taxMonth', label: 'เดือนภาษี', value: month, type: 'text' },
     { key: 'taxYearBE', label: 'ปี (พ.ศ.)', value: yearBE, type: 'text' },
     {
@@ -105,6 +129,27 @@ export function buildPp30FormFields(
       value: manual.additionalFilingNo ?? 0,
       type: 'text',
     },
+
+    /* ---------- ที่อยู่ (แยกช่องย่อยตามแบบฟอร์มจริง) ---------- */
+    { key: 'address.building', label: 'อาคาร', value: addr?.building ?? '', type: 'text' },
+    { key: 'address.room', label: 'ห้องเลขที่', value: addr?.room ?? '', type: 'text' },
+    { key: 'address.floor', label: 'ชั้นที่', value: addr?.floor ?? '', type: 'text' },
+    { key: 'address.village', label: 'หมู่บ้าน', value: addr?.village ?? '', type: 'text' },
+    { key: 'address.no', label: 'เลขที่', value: addr?.no ?? '', type: 'text' },
+    { key: 'address.moo', label: 'หมู่ที่', value: addr?.moo ?? '', type: 'text' },
+    {
+      key: 'address.soi',
+      label: 'ตรอก/ซอย',
+      // แบบฟอร์มนี้มีช่องเดียวสำหรับ "ตรอก/ซอย" ไม่มีช่อง "แยก" แยกต่างหากแบบ ภ.ง.ด.94 — ต่อท้ายรวมกันแทนที่จะทิ้งข้อมูล
+      value: [addr?.soi, addr?.yaek ? `แยก${addr.yaek}` : ''].filter(Boolean).join(' '),
+      type: 'text',
+    },
+    { key: 'address.road', label: 'ถนน', value: addr?.road ?? '', type: 'text' },
+    { key: 'address.subdistrict', label: 'ตำบล/แขวง', value: addr?.subdistrict ?? '', type: 'text' },
+    { key: 'address.district', label: 'อำเภอ/เขต', value: addr?.district ?? '', type: 'text' },
+    { key: 'address.province', label: 'จังหวัด', value: addr?.province ?? '', type: 'text' },
+    { key: 'address.zipcode', label: 'รหัสไปรษณีย์', value: addr?.zipcode ?? '', type: 'text' },
+    { key: 'phone', label: 'โทรศัพท์', value: taxpayer.phone ?? '', type: 'text' },
 
     /* ---------- ยอดขาย ---------- */
     { key: 'totalSales', label: 'ยอดขายในเดือนนี้', formLine: '1', value: totalSales, type: 'money' },
@@ -181,16 +226,16 @@ export function buildPp30FormFields(
     { key: 'surcharge', label: 'เงินเพิ่ม', formLine: '13', value: surcharge, type: 'money' },
     { key: 'grandTotal', label: 'รวมภาษีที่ต้องชำระทั้งสิ้น', formLine: '15', value: grandTotal, type: 'money' },
 
-    /* ---------- ช่องเลือก ---------- */
+    /* ---------- ช่องเลือกข้อ 11/12 (ต้องชำระ / ชำระเกิน — เลือกได้ข้อเดียวตามเงื่อนไข net) ---------- */
     {
-      key: 'requestRefund',
-      label: 'ขอคืนเป็นเงินสด',
-      value: 0,
+      key: 'netVatPayableChecked',
+      label: 'ติ๊กข้อ 11 ต้องชำระ (ถ้า 8. มากกว่า 10.)',
+      value: row.payable > 0 ? 1 : 0,
       type: 'checkbox',
     },
     {
-      key: 'carryForwardCredit',
-      label: 'ขอนำไปเครดิตภาษีเดือนถัดไป',
+      key: 'netVatOverpaidChecked',
+      label: 'ติ๊กข้อ 12 ชำระเกิน ((ถ้า 10. มากกว่า 8.) หรือ (9. รวมกับ 10.))',
       value: row.carryForward > 0 ? 1 : 0,
       type: 'checkbox',
     },

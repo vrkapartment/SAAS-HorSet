@@ -27,15 +27,18 @@ import {
   Users,
   Phone
 } from "lucide-react"
-import { 
-  getExpenses, 
-  createExpense, 
-  updateExpense, 
-  deleteExpense, 
-  ExpenseItem 
+import {
+  getExpenses,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+  ExpenseItem
 } from "@/features/expenses/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
+import { getFinanceSettings } from "@/features/finance/actions"
+import { ExpenseVatFields, computeExpenseVat } from "@/features/tax/components"
+import type { ExpenseVatMode } from "@/features/tax/components"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
@@ -136,16 +139,25 @@ export default function DailyBillsPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // ภาษีซื้อ (Input VAT) — เห็นเฉพาะ workspace ที่จดทะเบียน VAT แล้ว (ดู ExpenseVatFields/VatGate)
+  const [vatSettings, setVatSettings] = useState<{ vatRegistered: boolean; vatRate: number }>({
+    vatRegistered: false,
+    vatRate: 0.07,
+  })
+  const [formVatMode, setFormVatMode] = useState<ExpenseVatMode>("novat")
+  const [formClaimInputVat, setFormClaimInputVat] = useState(true)
+  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined)
+
   // ดึงข้อมูล
   const loadData = async (year: string, forceRefresh = false) => {
     setLoading(true)
     try {
       const userRes = await getCurrentUserProfileClient(forceRefresh)
       let wsId: string | undefined = undefined
-      
+
       if (userRes.success && userRes.data) {
         const isSuperAdmin = userRes.data.role === "super_admin"
-        
+
         if (!isSuperAdmin && userRes.data.workspace_id) {
           // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
           wsId = userRes.data.workspace_id
@@ -155,6 +167,8 @@ export default function DailyBillsPage() {
           wsId = cookieWsId || userRes.data.workspace_id || undefined
         }
       }
+
+      setWorkspaceId(wsId)
 
       if (wsId) {
         if (forceRefresh) {
@@ -261,6 +275,19 @@ export default function DailyBillsPage() {
     }
   }, [taxYear, supportApproved])
 
+  // ตั้งค่า VAT ของ workspace — ใช้คำนวณภาษีซื้อ (ExpenseVatFields จะซ่อนตัวเองถ้ายังไม่จด VAT)
+  useEffect(() => {
+    if (!workspaceId) return
+    getFinanceSettings(workspaceId).then((res) => {
+      if (res.success && res.data) {
+        setVatSettings({
+          vatRegistered: !!res.data.vat_registered,
+          vatRate: res.data.vat_rate ?? 0.07,
+        })
+      }
+    })
+  }, [workspaceId])
+
   // คำนวณยอดรวมสุทธิแยกประเภท
   const total405 = expenses
     .filter(item => item.category === "40_5")
@@ -297,7 +324,9 @@ export default function DailyBillsPage() {
     setFormTitle("")
     setFormAmount("")
     setFormCategory("40_5")
-    
+    setFormVatMode("novat")
+    setFormClaimInputVat(true)
+
     const today = new Date()
     const yyyy = today.getFullYear()
     const mm = String(today.getMonth() + 1).padStart(2, '0')
@@ -317,7 +346,10 @@ export default function DailyBillsPage() {
     setFormTitle(item.title)
     setFormAmount(item.amount)
     setFormCategory(item.category)
-    
+    // amount ที่บันทึกไว้คือฐานก่อน VAT เสมอ (ดู handleSubmit) — โหมด "base" จึงคำนวณ preview ย้อนกลับได้ตรงกับที่เคยบันทึก
+    setFormVatMode(item.vat_amount && item.vat_amount > 0 ? "base" : "novat")
+    setFormClaimInputVat(item.claim_input_vat ?? true)
+
     if (item.created_at) {
       const d = new Date(item.created_at)
       const yyyy = d.getFullYear()
@@ -348,6 +380,13 @@ export default function DailyBillsPage() {
       return
     }
 
+    // แปลงยอดที่กรอกเป็นฐาน (ก่อน VAT) + ภาษีซื้อ ตามโหมดที่เลือก — บันทึก `amount` เป็นฐานเสมอ
+    // เพื่อไม่ให้ VAT ปนอยู่ในยอดที่ใช้หักค่าใช้จ่ายจริงของ ภ.ง.ด. (ดู ExpenseVatFields.computeExpenseVat)
+    const vatComputed = computeExpenseVat(
+      { amount: amt, vatMode: formVatMode, claimInputVat: formClaimInputVat },
+      vatSettings,
+    )
+
     setSubmitting(true)
     setFormError(null)
 
@@ -355,10 +394,10 @@ export default function DailyBillsPage() {
       let res
       const userRes = await getCurrentUserProfileClient()
       let wsId: string | undefined = undefined
-      
+
       if (userRes.success && userRes.data) {
         const isSuperAdmin = userRes.data.role === "super_admin"
-        
+
         if (!isSuperAdmin && userRes.data.workspace_id) {
           // สำหรับ Admin และ Staff ทั่วไป: ให้ใช้ workspace_id จาก Profile เสมอ
           wsId = userRes.data.workspace_id
@@ -376,9 +415,9 @@ export default function DailyBillsPage() {
       }
 
       if (editingExpense) {
-        res = await updateExpense(editingExpense.id, formTitle.trim(), amt, taxYear, formCategory, createdAtStr)
+        res = await updateExpense(editingExpense.id, formTitle.trim(), vatComputed.base, taxYear, formCategory, createdAtStr, vatComputed.vat, vatComputed.claimInputVat)
       } else {
-        res = await createExpense(formTitle.trim(), amt, taxYear, formCategory, wsId, createdAtStr)
+        res = await createExpense(formTitle.trim(), vatComputed.base, taxYear, formCategory, wsId, createdAtStr, vatComputed.vat, vatComputed.claimInputVat)
       }
 
       if (res.success) {
@@ -446,7 +485,9 @@ export default function DailyBillsPage() {
     setFormCategory(category)
     setEditingExpense(null)
     setFormAmount("")
-    
+    setFormVatMode("novat")
+    setFormClaimInputVat(true)
+
     const today = new Date()
     const yyyy = today.getFullYear()
     const mm = String(today.getMonth() + 1).padStart(2, '0')
@@ -1095,6 +1136,17 @@ export default function DailyBillsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* ภาษีซื้อ — ซ่อนตัวเองถ้ายังไม่จด VAT (ดู ExpenseVatFields) */}
+              <ExpenseVatFields
+                value={{ amount: formAmount, vatMode: formVatMode, claimInputVat: formClaimInputVat }}
+                onChange={(next) => {
+                  setFormVatMode(next.vatMode)
+                  setFormClaimInputVat(next.claimInputVat)
+                }}
+                settings={vatSettings}
+                bucket={formCategory === "40_5" ? "A" : "B"}
+              />
 
               {/* ข้อแนะนำไดนามิก */}
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 space-y-1">

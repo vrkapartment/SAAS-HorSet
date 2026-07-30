@@ -13,7 +13,7 @@
 import { useMemo, useState } from 'react';
 
 import type { ExpenseRow, Pp30Filing, Pp30Row } from '../../../types/tax';
-import { computePP30, num, todayISO } from '../../../lib/tax';
+import { computePP30, num } from '../../../lib/tax';
 import { baht, pct, thaiMonth } from '../../../lib/tax/format';
 import {
   Breakdown,
@@ -32,7 +32,10 @@ export interface Pp30FilingFormProps {
   expensesInMonth?: ExpenseRow[];
   /** บันทึกร่าง (เก็บภาษีซื้อ แต่ยังไม่ทำเครื่องหมายว่ายื่น) */
   onSaveDraft?: (patch: Pp30Filing) => void | Promise<void>;
-  /** บันทึกและทำเครื่องหมายว่ายื่นแล้ว */
+  /**
+   * บันทึกยอดภาษีขาย/ภาษีซื้อของเดือนนี้ — ไม่แตะสถานะยื่นแล้ว (ปุ่ม "ทำเครื่องหมายว่ายื่นแล้ว"
+   * แยกไปอยู่ที่ตาราง ภ.พ.30 รายเดือนแทน ดู onMarkFiled ใน Pp30Report)
+   */
   onSubmitFiling: (patch: Pp30Filing) => void | Promise<void>;
   /** ยกเลิกสถานะยื่นแล้ว */
   onUnfile?: (period: string) => void | Promise<void>;
@@ -49,11 +52,14 @@ export function Pp30FilingForm({
   onCancel,
   busy = false,
 }: Pp30FilingFormProps) {
+  const [useManualOutput, setUseManualOutput] = useState(row.outputVatManual != null);
+  const [outputVat, setOutputVat] = useState(
+    String(row.outputVatManual != null ? row.outputVatManual : row.outputVatFromLedger),
+  );
   const [useManual, setUseManual] = useState(row.inputVatManual != null);
   const [inputVat, setInputVat] = useState(
     String(row.inputVatManual != null ? row.inputVatManual : row.inputVatFromLedger),
   );
-  const [filedAt, setFiledAt] = useState(row.filedAt || todayISO());
   const [note, setNote] = useState(row.note || '');
 
   const claimable = useMemo(
@@ -64,15 +70,16 @@ export function Pp30FilingForm({
   const result = useMemo(
     () =>
       computePP30({
-        outputVat: row.outputVat,
+        outputVat: useManualOutput ? num(outputVat) : row.outputVatFromLedger,
         inputVat: useManual ? num(inputVat) : row.inputVatFromLedger,
         creditBrought: row.creditBrought,
       }),
-    [row.outputVat, row.inputVatFromLedger, row.creditBrought, useManual, inputVat],
+    [row.outputVatFromLedger, row.inputVatFromLedger, row.creditBrought, useManualOutput, outputVat, useManual, inputVat],
   );
 
   const patch = (): Pp30Filing => ({
     period: row.period,
+    outputVatManual: useManualOutput ? num(outputVat) : null,
     inputVatManual: useManual ? num(inputVat) : null,
     note,
   });
@@ -85,8 +92,41 @@ export function Pp30FilingForm({
 
       {/* ---------- ขั้นที่ 1 ---------- */}
       <Card>
-        <CardHeader title="ขั้นที่ 1 — ระบุภาษีซื้อ" />
+        <CardHeader title="ขั้นที่ 1 — ระบุภาษีขาย/ภาษีซื้อ" />
         <CardBody>
+          <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 cursor-pointer accent-blue-600"
+              checked={useManualOutput}
+              onChange={(e) => setUseManualOutput(e.target.checked)}
+            />
+            <span className="min-w-0">
+              <span className="text-slate-800 dark:text-slate-100">กรอกยอดภาษีขายเอง</span>
+              <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                ไม่ติ๊ก = ใช้ยอดที่คำนวณจากบิลจริง ({baht(row.outputVatFromLedger)} บาท)
+              </span>
+            </span>
+          </label>
+
+          {useManualOutput && (
+            <div className="mt-3 flex max-w-xs flex-col gap-1.5">
+              <label className={labelCls} htmlFor="pp30-output-vat">
+                ภาษีขายที่เก็บจากผู้เช่า (บาท)
+              </label>
+              <input
+                id="pp30-output-vat"
+                inputMode="decimal"
+                className={`${inputCls} text-right tabular-nums`}
+                value={outputVat}
+                onChange={(e) => setOutputVat(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          )}
+
+          <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800" />
+
           <label className="flex cursor-pointer items-start gap-2 text-sm">
             <input
               type="checkbox"
@@ -198,28 +238,16 @@ export function Pp30FilingForm({
         </CardBody>
       </Card>
 
-      {/* ---------- ข้อมูลการยื่น ---------- */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label className={labelCls} htmlFor="pp30-filed-at">วันที่ยื่นแบบ</label>
-          <input
-            id="pp30-filed-at"
-            type="date"
-            className={inputCls}
-            value={filedAt}
-            onChange={(e) => setFiledAt(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className={labelCls} htmlFor="pp30-note">หมายเหตุ</label>
-          <input
-            id="pp30-note"
-            className={inputCls}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="เลขที่อ้างอิงการยื่น / ช่องทางชำระ"
-          />
-        </div>
+      {/* ---------- หมายเหตุ ---------- */}
+      <div className="flex flex-col gap-1.5">
+        <label className={labelCls} htmlFor="pp30-note">หมายเหตุ</label>
+        <input
+          id="pp30-note"
+          className={inputCls}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="เลขที่อ้างอิงการยื่น / ช่องทางชำระ"
+        />
       </div>
 
       {/* ---------- ปุ่ม ---------- */}
@@ -253,10 +281,10 @@ export function Pp30FilingForm({
         <button
           type="button"
           disabled={busy}
-          onClick={() => onSubmitFiling({ ...patch(), filedAt: filedAt || todayISO() })}
+          onClick={() => onSubmitFiling(patch())}
           className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-default"
         >
-          บันทึกและทำเครื่องหมายว่ายื่นแล้ว
+          บันทึก
         </button>
       </div>
     </div>

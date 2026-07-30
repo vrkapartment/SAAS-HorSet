@@ -225,6 +225,10 @@ export interface Pp30Row extends Pp30Result {
   rate: number;
   /** ฐานค่าบริการ 40(8) ของเดือนนั้น */
   serviceBase: number;
+  /** ภาษีขายที่คำนวณได้จากบิลจริง (ก่อนถูกทับด้วยค่าที่กรอกมือ) */
+  outputVatFromLedger: number;
+  /** ค่าที่ผู้ใช้กรอกเอง (null = ใช้ค่าจากบิล) */
+  outputVatManual: number | null;
   /** ภาษีซื้อที่คำนวณได้จากสมุดค่าใช้จ่าย (ก่อนถูกทับด้วยค่าที่กรอกมือ) */
   inputVatFromLedger: number;
   /** ค่าที่ผู้ใช้กรอกเอง (null = ใช้ค่าจากสมุด) */
@@ -237,6 +241,7 @@ export interface Pp30Row extends Pp30Result {
 /** บันทึกการยื่น ภ.พ.30 ที่เก็บลง DB */
 export interface Pp30Filing {
   period: MonthKey;
+  outputVatManual?: number | null;
   inputVatManual?: number | null;
   filedAt?: DateKey | null;
   note?: string;

@@ -86,11 +86,13 @@ export function buildPP30Series(
     const inc = summarizeIncomeForMonth(incomes, period);
     const exp = summarizeExpensesForMonth(expenses, period);
     const filing = filingMap.get(period);
+    const outputVat =
+      filing && filing.outputVatManual != null ? num(filing.outputVatManual) : inc.outputVat;
     const inputVat =
       filing && filing.inputVatManual != null ? num(filing.inputVatManual) : exp.inputVat;
 
     const calc = computePP30({
-      outputVat: inc.outputVat,
+      outputVat,
       inputVat,
       creditBrought: credit,
     });
@@ -100,6 +102,8 @@ export function buildPP30Series(
       rate,
       serviceBase: inc.incomeB,
       ...calc,
+      outputVatFromLedger: inc.outputVat,
+      outputVatManual: filing?.outputVatManual ?? null,
       inputVatFromLedger: exp.inputVat,
       inputVatManual: filing?.inputVatManual ?? null,
       filed: Boolean(filing?.filedAt),

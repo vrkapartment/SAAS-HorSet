@@ -48,15 +48,50 @@ export function Money({
  * Card
  * ------------------------------------------------------------------ */
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
+/** สีของ blob เบลอตกแต่งมุมการ์ด (Card prop `glow`) — ใช้โทนเดียวกับ BADGE_TONE เพื่อให้จับคู่กับหัวข้อ/ไอคอนได้ */
+const GLOW_TONE: Record<BadgeTone, string> = {
+  neutral: 'bg-slate-500/[0.06]',
+  bucketA: 'bg-blue-500/[0.06]',
+  bucketB: 'bg-teal-500/[0.06]',
+  success: 'bg-emerald-500/[0.06]',
+  danger: 'bg-red-500/[0.06]',
+  warning: 'bg-amber-500/[0.06]',
+  info: 'bg-indigo-500/[0.06]',
+};
+
+export function Card({
+  children,
+  className,
+  bare = false,
+  glow,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** ไม่ใส่กรอบ/เงา/glass ของตัวเอง — ใช้เมื่อฝังเป็นส่วนหนึ่งของการ์ดใหญ่ที่ครอบไว้แล้ว (กันการ์ดซ้อนการ์ด) */
+  bare?: boolean;
+  /** blob เบลอตกแต่งมุมขวาบนของการ์ด (ดู "แหล่งข้อมูลรายได้ภาษี" ใน tax/page.tsx) — ไม่ระบุ = ไม่มี */
+  glow?: BadgeTone;
+}) {
+  if (bare) {
+    return <div className={className}>{children}</div>;
+  }
   return (
     <section
       className={cx(
-        'glass-card overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm',
+        'glass-card relative overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm',
         'transition-all duration-300 hover:shadow-md dark:border-slate-900/60',
         className,
       )}
     >
+      {glow && (
+        <div
+          aria-hidden
+          className={cx(
+            'pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl',
+            GLOW_TONE[glow],
+          )}
+        />
+      )}
       {children}
     </section>
   );
@@ -66,13 +101,29 @@ export function CardHeader({
   title,
   subtitle,
   actions,
+  icon,
+  iconTone = 'bucketA',
+  bare = false,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
+  /** ไอคอนในกล่องสีเหลี่ยมมุมโค้งหน้าหัวข้อ (ดู "แหล่งข้อมูลรายได้ภาษี" ใน tax/page.tsx) — ไม่ระบุ = ไม่มี */
+  icon?: ReactNode;
+  iconTone?: BadgeTone;
+  /** ไม่มี padding แนวนอน/เส้นขอบของตัวเอง — ใช้เมื่อฝังใน Card ที่ bare (การ์ดใหญ่ครอบไว้แล้วมีเส้นแบ่งของตัวเอง) */
+  bare?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-900">
+    <div
+      className={cx(
+        'relative flex flex-wrap items-center gap-3',
+        bare ? 'py-1' : 'border-b border-slate-100 px-5 py-4 dark:border-slate-900',
+      )}
+    >
+      {icon && (
+        <div className={cx('rounded-xl p-2 shadow-inner', ICON_BOX_TONE[iconTone])}>{icon}</div>
+      )}
       <div className="min-w-0">
         <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">{title}</h2>
         {subtitle && (
@@ -87,14 +138,17 @@ export function CardHeader({
 export function CardBody({
   children,
   flush = false,
+  bare = false,
   className,
 }: {
   children: ReactNode;
   /** ไม่มี padding — ใช้เวลาใส่ตารางเต็มความกว้าง */
   flush?: boolean;
+  /** ไม่มี padding แนวนอนของตัวเอง — ใช้เมื่อฝังใน Card ที่ bare (คงแค่ padding แนวตั้งไว้จัดระยะห่างภายใน) */
+  bare?: boolean;
   className?: string;
 }) {
-  return <div className={cx(flush ? '' : 'p-5', className)}>{children}</div>;
+  return <div className={cx(flush || bare ? '' : 'p-5', bare && 'px-0 py-2', className)}>{children}</div>;
 }
 
 export function CardFooter({ children }: { children: ReactNode }) {
@@ -102,6 +156,50 @@ export function CardFooter({ children }: { children: ReactNode }) {
     <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs dark:border-slate-900 dark:bg-slate-950/40">
       {children}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Switch
+ * ------------------------------------------------------------------ */
+
+/**
+ * ปุ่ม toggle มาตรฐาน — ใช้ pattern `inline-flex items-center` + knob เลื่อนด้วย translate-x ค่าคงที่
+ * (ไม่ใช่ absolute + คำนวณ px เอง) ตาม Tailwind UI Switch ทั่วไป กันบั๊กลูกกลมเลื่อนไม่สุดขอบ/ไม่ตรงกับ
+ * สถานะสีพื้นหลัง เวลาที่ track ถูก class อื่นมาบีบ/ยืดความกว้างโดยไม่ได้ตั้งใจ
+ */
+export function Switch({
+  checked,
+  onChange,
+  disabled = false,
+  label,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  /** aria-label — จำเป็นเพราะปุ่มนี้ไม่มีข้อความในตัว */
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        'inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        checked ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700',
+      )}
+    >
+      <span
+        className={cx(
+          'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform',
+          checked ? 'translate-x-[22px]' : 'translate-x-0.5',
+        )}
+      />
+    </button>
   );
 }
 
@@ -120,6 +218,17 @@ const BADGE_TONE: Record<BadgeTone, string> = {
   danger: 'bg-red-500/[0.08] text-red-600 border border-red-500/10 dark:bg-red-500/[0.15] dark:text-red-400',
   warning: 'bg-amber-500/[0.08] text-amber-600 border border-amber-500/10 dark:bg-amber-500/[0.15] dark:text-amber-400',
   info: 'bg-indigo-500/[0.08] text-indigo-600 border border-indigo-500/10 dark:bg-indigo-500/[0.15] dark:text-indigo-400',
+};
+
+/** กล่องไอคอนหน้าหัวข้อการ์ด (CardHeader prop `icon`) — ดู "แหล่งข้อมูลรายได้ภาษี" ใน tax/page.tsx */
+const ICON_BOX_TONE: Record<BadgeTone, string> = {
+  neutral: 'bg-slate-500/10 text-slate-600 dark:bg-slate-500/20 dark:text-slate-400',
+  bucketA: 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400',
+  bucketB: 'bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400',
+  success: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
+  danger: 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400',
+  warning: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400',
+  info: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400',
 };
 
 export function Badge({
