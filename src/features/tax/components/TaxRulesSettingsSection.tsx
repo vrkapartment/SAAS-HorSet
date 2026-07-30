@@ -40,7 +40,7 @@ export function TaxpayerTypeSection({
         subtitle="มีผลกับค่าลดหย่อนส่วนตัวของ ภ.ง.ด.94 และ ภ.ง.ด.90"
       />
       <CardBody className="space-y-4">
-        <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700">
+        <div className="inline-flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-700">
           {(['individual', 'partnership'] as TaxpayerType[]).map((t) => (
             <button
               key={t}
@@ -49,8 +49,8 @@ export function TaxpayerTypeSection({
               onClick={() => onChange({ taxpayerType: t })}
               className={
                 settings.taxpayerType === t
-                  ? 'bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white'
-                  : 'px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm'
+                  : 'px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
               }
             >
               {TAXPAYER_LABEL[t]}
@@ -160,18 +160,18 @@ export function ExpenseModeSection({
         title="รูปแบบการหักค่าใช้จ่าย"
         subtitle="ใช้ทั้งใน ภ.ง.ด.94 และ ภ.ง.ด.90"
       />
-      <CardBody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+      <CardBody className="divide-y divide-slate-200 dark:divide-slate-800">
         {blocks.map((b) => (
           <div key={b.bucket} className="py-3 first:pt-0 last:pb-0">
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-[180px]">
-                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                   {b.badge}
                 </span>
                 <div className="mt-0.5 text-sm font-semibold">{b.title}</div>
               </div>
 
-              <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700">
+              <div className="inline-flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-700">
                 {(['lump', 'actual'] as const).map((m) => (
                   <button
                     key={m}
@@ -180,8 +180,8 @@ export function ExpenseModeSection({
                     onClick={() => onChange({ [b.key]: { ...b.cfg, mode: m } } as Partial<TaxSettings>)}
                     className={
                       b.cfg.mode === m
-                        ? 'bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white'
-                        : 'px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm'
+                        : 'px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                     }
                   >
                     {m === 'lump' ? 'หักเหมา' : 'หักตามจริง'}
@@ -191,7 +191,7 @@ export function ExpenseModeSection({
 
               {b.cfg.mode === 'lump' ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-neutral-500">อัตรา</span>
+                  <span className="text-xs text-slate-500">อัตรา</span>
                   <input
                     type="number"
                     min={0}
@@ -209,10 +209,10 @@ export function ExpenseModeSection({
                       } as Partial<TaxSettings>)
                     }
                   />
-                  <span className="text-xs text-neutral-500">%</span>
+                  <span className="text-xs text-slate-500">%</span>
                 </div>
               ) : (
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-slate-500">
                   ใช้ยอดจากหน้า &quot;ค่าใช้จ่าย / ภาษีซื้อ&quot;
                 </span>
               )}
@@ -221,13 +221,13 @@ export function ExpenseModeSection({
           </div>
         ))}
       </CardBody>
-      <CardBody className="space-y-4 border-t border-neutral-200 dark:border-neutral-800">
+      <CardBody className="space-y-4 border-t border-slate-200 dark:border-slate-800">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               จำกัดค่าใช้จ่ายจริงไม่ให้เกินรายได้ต่อตะกร้า (โหมดระมัดระวัง)
             </div>
-            <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
               ค่าเริ่มต้น (ปิด) — เมื่อหักตามจริงเกินรายได้ของตะกร้านั้น ระบบจะปล่อยให้ส่วนเกินไปหักลบกับเงินได้
               ของอีกตะกร้าได้ ตรงกับแนวทางยื่นจริง เปิดสวิตช์นี้ถ้าต้องการให้ระบบจำกัดยอดหักของแต่ละตะกร้าไว้
               ไม่ให้เกินรายได้ของตะกร้านั้นเอง (ระมัดระวังกว่า แต่ไม่ตรงกับแนวทางปฏิบัติทั่วไปที่ยื่นกันจริง)
@@ -241,7 +241,7 @@ export function ExpenseModeSection({
             disabled={busy}
             onClick={() => onChange({ capExpensePerBucket: !settings.capExpensePerBucket })}
             className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-              settings.capExpensePerBucket ? 'bg-violet-600' : 'bg-neutral-300 dark:bg-neutral-700'
+              settings.capExpensePerBucket ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
             }`}
           >
             <span
@@ -287,10 +287,10 @@ export function MinTaxRuleSection({
       <CardBody className="space-y-4">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               ตรวจภาษีขั้นต่ำ {pct(minTaxRule.rate, 1)} ของเงินได้พึงประเมิน
             </div>
-            <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
               เมื่อเปิด ระบบจะใช้ยอดที่สูงกว่าระหว่างภาษีขั้นบันไดกับ {pct(minTaxRule.rate, 1)}{' '}
               ของเงินได้พึงประเมิน และยกเว้นให้ถ้ายอดที่คำนวณได้ต่ำกว่า{' '}
               {baht(minTaxRule.exemptBelow, 0)} บาท
@@ -304,7 +304,7 @@ export function MinTaxRuleSection({
             disabled={busy}
             onClick={() => set({ enabled: !minTaxRule.enabled })}
             className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-              minTaxRule.enabled ? 'bg-violet-600' : 'bg-neutral-300 dark:bg-neutral-700'
+              minTaxRule.enabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
             }`}
           >
             <span
@@ -380,6 +380,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const labelCls = 'text-xs font-semibold text-neutral-600 dark:text-neutral-300';
+const labelCls = 'text-xs font-semibold text-slate-600 dark:text-slate-300';
 const inputCls =
-  'w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100';
+  'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-800/80 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-900';

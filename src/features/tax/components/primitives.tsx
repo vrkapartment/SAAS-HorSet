@@ -3,9 +3,13 @@
  *
  * รองรับ dark mode ผ่าน `dark:` ของ Tailwind — ใช้ `cn()` ที่มีอยู่แล้วของโปรเจกต์ (clsx + tailwind-merge)
  * แทน `cx()` ที่โค้ดต้นฉบับ reimplement เอง
+ *
+ * โทนสี/รัศมีขอบ/ไอคอน อิงตาม convention ที่ใช้อยู่แล้วใน src/app/(admin)/tax/page.tsx (glass-card,
+ * badge โปร่งแสง, ตัวเลขหัวข้อไล่สี, ไอคอน lucide-react แทน emoji) ไม่ใช่ของที่ port มาจากแอป Electron ตรงๆ
  */
 
 import type { ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
 import { cn as cx } from '@/lib/utils';
 import { baht } from '../../../lib/tax/format';
 
@@ -30,11 +34,11 @@ export function Money({
 }) {
   const v = value ?? 0;
   if (dash && !v) {
-    return <span className={cx('text-neutral-400 dark:text-neutral-500', className)}>—</span>;
+    return <span className={cx('text-slate-400 dark:text-slate-500', className)}>—</span>;
   }
   return (
     <span className={cx('tabular-nums', className)}>
-      {sign && <span className="mr-0.5 text-neutral-500">฿</span>}
+      {sign && <span className="mr-0.5 text-slate-500">฿</span>}
       {baht(v, decimals)}
     </span>
   );
@@ -48,8 +52,8 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return (
     <section
       className={cx(
-        'overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm',
-        'dark:border-neutral-800 dark:bg-neutral-900',
+        'glass-card overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm',
+        'transition-all duration-300 hover:shadow-md dark:border-slate-900/60',
         className,
       )}
     >
@@ -68,11 +72,11 @@ export function CardHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+    <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-900">
       <div className="min-w-0">
-        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{title}</h2>
+        <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">{title}</h2>
         {subtitle && (
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{subtitle}</p>
+          <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>
         )}
       </div>
       {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
@@ -95,7 +99,7 @@ export function CardBody({
 
 export function CardFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3 text-xs dark:border-neutral-800 dark:bg-neutral-900/60">
+    <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs dark:border-slate-900 dark:bg-slate-950/40">
       {children}
     </div>
   );
@@ -107,14 +111,15 @@ export function CardFooter({ children }: { children: ReactNode }) {
 
 export type BadgeTone = 'neutral' | 'bucketA' | 'bucketB' | 'success' | 'danger' | 'warning' | 'info';
 
+/** โทนโปร่งแสง + กรอบบางสีเดียวกัน — ให้เหมือนแท็ก/ป้ายที่ใช้อยู่แล้วทั่วหน้า ภ.ง.ด./VAT */
 const BADGE_TONE: Record<BadgeTone, string> = {
-  neutral: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
-  bucketA: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300',
-  bucketB: 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
-  success: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
-  danger: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
-  warning: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-  info: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300',
+  neutral: 'bg-slate-500/[0.08] text-slate-600 border border-slate-500/10 dark:bg-slate-500/[0.15] dark:text-slate-300',
+  bucketA: 'bg-blue-500/[0.08] text-blue-600 border border-blue-500/10 dark:bg-blue-500/[0.15] dark:text-blue-400',
+  bucketB: 'bg-teal-500/[0.08] text-teal-600 border border-teal-500/10 dark:bg-teal-500/[0.15] dark:text-teal-400',
+  success: 'bg-emerald-500/[0.08] text-emerald-600 border border-emerald-500/10 dark:bg-emerald-500/[0.15] dark:text-emerald-400',
+  danger: 'bg-red-500/[0.08] text-red-600 border border-red-500/10 dark:bg-red-500/[0.15] dark:text-red-400',
+  warning: 'bg-amber-500/[0.08] text-amber-600 border border-amber-500/10 dark:bg-amber-500/[0.15] dark:text-amber-400',
+  info: 'bg-indigo-500/[0.08] text-indigo-600 border border-indigo-500/10 dark:bg-indigo-500/[0.15] dark:text-indigo-400',
 };
 
 export function Badge({
@@ -127,7 +132,7 @@ export function Badge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold',
+        'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold tracking-wide',
         BADGE_TONE[tone],
       )}
     >
@@ -150,9 +155,9 @@ export function BucketBadge({ bucket }: { bucket: 'A' | 'B' }) {
  * ------------------------------------------------------------------ */
 
 const ACCENT: Record<string, string> = {
-  bucketA: 'border-l-cyan-500',
-  bucketB: 'border-l-violet-500',
-  info: 'border-l-sky-500',
+  bucketA: 'border-l-blue-500',
+  bucketB: 'border-l-teal-500',
+  info: 'border-l-indigo-500',
   pay: 'border-l-red-500',
   ok: 'border-l-emerald-500',
   none: 'border-l-transparent',
@@ -176,26 +181,27 @@ export function StatTile({
   return (
     <div
       className={cx(
-        'flex min-w-0 flex-col gap-0.5 rounded-xl border border-l-[3px] border-neutral-200 bg-white p-4 shadow-sm',
-        'dark:border-neutral-800 dark:bg-neutral-900',
+        'glass-card flex min-w-0 flex-col gap-0.5 rounded-2xl border border-l-[3px] border-slate-200/80 p-4 shadow-sm',
+        'dark:border-slate-900/60',
         ACCENT[accent],
       )}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
         {label}
       </div>
       <div
         className={cx(
-          'break-all text-2xl font-semibold leading-tight tabular-nums',
+          'break-all text-2xl font-black leading-tight tabular-nums',
           valueTone === 'pay' && 'text-red-600 dark:text-red-400',
           valueTone === 'refund' && 'text-emerald-600 dark:text-emerald-400',
-          !valueTone && 'text-neutral-900 dark:text-neutral-100',
+          !valueTone &&
+            'bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 bg-clip-text text-transparent dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300',
         )}
       >
-        <span className="mr-0.5 text-sm font-medium text-neutral-400">฿</span>
+        <span className="mr-0.5 text-sm font-bold text-slate-400">฿</span>
         {baht(value, decimals)}
       </div>
-      {note && <div className="text-[11px] text-neutral-500 dark:text-neutral-400">{note}</div>}
+      {note && <div className="text-[11px] text-slate-500 dark:text-slate-400">{note}</div>}
     </div>
   );
 }
@@ -204,14 +210,37 @@ export function StatTile({
  * Alert
  * ------------------------------------------------------------------ */
 
-const ALERT_TONE: Record<string, string> = {
-  info: 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200',
-  success:
-    'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200',
-  warning:
-    'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200',
-  danger:
-    'border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200',
+type AlertTone = 'info' | 'success' | 'warning' | 'danger';
+
+const ALERT_STYLE: Record<AlertTone, { wrap: string; iconBox: string; title: string; body: string; Icon: typeof Info }> = {
+  info: {
+    wrap: 'border-indigo-500/20 bg-indigo-500/[0.06] dark:border-indigo-500/30 dark:bg-indigo-500/[0.08]',
+    iconBox: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400',
+    title: 'text-indigo-800 dark:text-indigo-300',
+    body: 'text-indigo-950/70 dark:text-indigo-100/80',
+    Icon: Info,
+  },
+  success: {
+    wrap: 'border-emerald-500/20 bg-emerald-500/[0.06] dark:border-emerald-500/30 dark:bg-emerald-500/[0.08]',
+    iconBox: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
+    title: 'text-emerald-800 dark:text-emerald-300',
+    body: 'text-emerald-950/70 dark:text-emerald-100/80',
+    Icon: CheckCircle2,
+  },
+  warning: {
+    wrap: 'border-amber-500/20 bg-amber-500/[0.06] dark:border-amber-500/30 dark:bg-amber-500/[0.08]',
+    iconBox: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
+    title: 'text-amber-800 dark:text-amber-300',
+    body: 'text-amber-950/70 dark:text-amber-100/80',
+    Icon: AlertTriangle,
+  },
+  danger: {
+    wrap: 'border-red-500/20 bg-red-500/[0.06] dark:border-red-500/30 dark:bg-red-500/[0.08]',
+    iconBox: 'bg-red-500/10 text-red-600 dark:bg-red-500/15 dark:text-red-400',
+    title: 'text-red-800 dark:text-red-300',
+    body: 'text-red-950/70 dark:text-red-100/80',
+    Icon: ShieldAlert,
+  },
 };
 
 export function Alert({
@@ -221,19 +250,22 @@ export function Alert({
   children,
   actions,
 }: {
-  tone?: 'info' | 'success' | 'warning' | 'danger';
+  tone?: AlertTone;
   icon?: ReactNode;
   title?: ReactNode;
   children?: ReactNode;
   actions?: ReactNode;
 }) {
-  const defaultIcon = { info: 'ℹ️', success: '✅', warning: '⚠️', danger: '🚨' }[tone];
+  const s = ALERT_STYLE[tone];
+  const DefaultIcon = s.Icon;
   return (
-    <div className={cx('mb-4 flex gap-3 rounded-lg border p-4 text-sm', ALERT_TONE[tone])}>
-      <div className="shrink-0 text-lg leading-tight">{icon ?? defaultIcon}</div>
+    <div className={cx('mb-4 flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-sm', s.wrap)}>
+      <div className={cx('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-inner', s.iconBox)}>
+        {icon ?? <DefaultIcon className="h-4 w-4" />}
+      </div>
       <div className="min-w-0 flex-1">
-        {title && <div className="font-bold">{title}</div>}
-        {children}
+        {title && <div className={cx('font-bold', s.title)}>{title}</div>}
+        <div className={s.body}>{children}</div>
         {actions && <div className="mt-3 flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </div>
@@ -254,7 +286,7 @@ export function ProgressBar({
 }) {
   const fill = { ok: 'bg-emerald-500', warn: 'bg-amber-500', over: 'bg-red-500' }[tone];
   return (
-    <div className="my-1.5 h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+    <div className="my-1.5 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
       <div
         className={cx('h-full rounded-full transition-[width] duration-300', fill)}
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
@@ -293,17 +325,17 @@ export function BreakdownRow({
 }) {
   if (result) {
     return (
-      <div className="mt-2 flex items-baseline gap-3 rounded-lg border border-neutral-300 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-        <div className="min-w-0 flex-1 font-bold text-neutral-900 dark:text-neutral-100">
+      <div className="mt-2 flex items-baseline gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="min-w-0 flex-1 font-bold text-slate-900 dark:text-slate-100">
           {label}
-          {sub && <div className="text-xs font-normal text-neutral-500">{sub}</div>}
+          {sub && <div className="text-xs font-normal text-slate-500">{sub}</div>}
         </div>
         <div
           className={cx(
             'whitespace-nowrap text-xl font-bold tabular-nums',
             tone === 'pay' && 'text-red-600 dark:text-red-400',
             tone === 'refund' && 'text-emerald-600 dark:text-emerald-400',
-            !tone && 'text-neutral-900 dark:text-neutral-100',
+            !tone && 'text-slate-900 dark:text-slate-100',
           )}
         >
           {value}
@@ -317,8 +349,8 @@ export function BreakdownRow({
       className={cx(
         'flex items-baseline gap-3 py-1.5 text-sm',
         subtotal
-          ? 'mt-0.5 border-t border-neutral-300 font-semibold dark:border-neutral-700'
-          : 'border-b border-dashed border-neutral-200 last:border-b-0 dark:border-neutral-800',
+          ? 'mt-0.5 border-t border-slate-300 font-semibold dark:border-slate-700'
+          : 'border-b border-dashed border-slate-200 last:border-b-0 dark:border-slate-800',
       )}
     >
       <div
@@ -326,17 +358,17 @@ export function BreakdownRow({
           'min-w-0 flex-1',
           indent && 'pl-4',
           subtotal
-            ? 'font-semibold text-neutral-900 dark:text-neutral-100'
-            : 'text-neutral-600 dark:text-neutral-300',
+            ? 'font-semibold text-slate-900 dark:text-slate-100'
+            : 'text-slate-600 dark:text-slate-300',
         )}
       >
         {label}
-        {sub && <div className="text-[11px] text-neutral-500 dark:text-neutral-400">{sub}</div>}
+        {sub && <div className="text-[11px] text-slate-500 dark:text-slate-400">{sub}</div>}
       </div>
       <div
         className={cx(
           'whitespace-nowrap font-semibold tabular-nums',
-          minus ? 'text-red-600 dark:text-red-400' : 'text-neutral-900 dark:text-neutral-100',
+          minus ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-slate-100',
         )}
       >
         {value}
@@ -352,19 +384,19 @@ export function BreakdownRow({
 export const tableClasses = {
   wrap: 'overflow-x-auto',
   table: 'w-full border-collapse text-sm',
-  th: 'whitespace-nowrap border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-400',
+  th: 'whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400',
   thNum:
-    'whitespace-nowrap border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-400',
-  td: 'border-b border-neutral-200 px-4 py-2 align-middle dark:border-neutral-800',
+    'whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400',
+  td: 'border-b border-slate-200 px-4 py-2 align-middle dark:border-slate-800',
   tdNum:
-    'whitespace-nowrap border-b border-neutral-200 px-4 py-2 text-right align-middle tabular-nums dark:border-neutral-800',
+    'whitespace-nowrap border-b border-slate-200 px-4 py-2 text-right align-middle tabular-nums dark:border-slate-800',
   tfootTd:
-    'border-t-2 border-neutral-300 bg-neutral-50 px-4 py-2.5 font-semibold tabular-nums dark:border-neutral-700 dark:bg-neutral-900/60',
-  row: 'hover:bg-neutral-50 dark:hover:bg-neutral-800/40',
+    'border-t-2 border-slate-300 bg-slate-50 px-4 py-2.5 font-semibold tabular-nums dark:border-slate-700 dark:bg-slate-900/60',
+  row: 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
 };
 
 export function EmptyState({
-  icon = '📭',
+  icon,
   title,
   description,
 }: {
@@ -374,10 +406,12 @@ export function EmptyState({
 }) {
   return (
     <div className="px-5 py-10 text-center">
-      <div className="mb-2 text-3xl opacity-50">{icon}</div>
-      <div className="font-semibold text-neutral-600 dark:text-neutral-300">{title}</div>
+      <div className="mb-3 flex justify-center text-slate-300 dark:text-slate-600">
+        {icon ?? <Info className="h-8 w-8" />}
+      </div>
+      <div className="font-semibold text-slate-600 dark:text-slate-300">{title}</div>
       {description && (
-        <div className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{description}</div>
+        <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</div>
       )}
     </div>
   );
@@ -386,7 +420,7 @@ export function EmptyState({
 /** ข้อความอธิบายเล็กๆ มีเส้นนำหน้า */
 export function HelpNote({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-2 border-l-2 border-neutral-300 pl-3 text-[11px] text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+    <div className="mt-2 border-l-2 border-slate-300 pl-3 text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
       {children}
     </div>
   );

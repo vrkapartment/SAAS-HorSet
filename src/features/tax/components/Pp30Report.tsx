@@ -146,7 +146,6 @@ export function Pp30Report({
 
         {rows.length === 0 ? (
           <EmptyState
-            icon="📑"
             title="ยังไม่มีแบบ ภ.พ.30 ในปีนี้"
             description="ระบบจะสร้างแบบรายเดือนให้ตั้งแต่เดือนที่การจด VAT มีผล และมีรายรับ/ค่าใช้จ่ายบันทึกไว้"
           />
@@ -184,7 +183,7 @@ export function Pp30Report({
                         >
                           <Money value={r.inputVat} />
                           {r.inputVatManual != null && (
-                            <span className="ml-1 text-[10px] text-neutral-400">✎</span>
+                            <span className="ml-1 text-[10px] text-slate-400">✎</span>
                           )}
                         </span>
                       </td>
@@ -199,7 +198,7 @@ export function Pp30Report({
                             (<Money value={r.carryForward} />)
                           </span>
                         ) : (
-                          <span className="text-neutral-400">0.00</span>
+                          <span className="text-slate-400">0.00</span>
                         )}
                       </td>
                       <td className={tc.td}>
@@ -211,7 +210,7 @@ export function Pp30Report({
                           <Badge>ไม่มียอด</Badge>
                         )}
                       </td>
-                      <td className={`${tc.td} whitespace-nowrap text-xs text-neutral-500`}>
+                      <td className={`${tc.td} whitespace-nowrap text-xs text-slate-500`}>
                         {thaiDate(due.paper)}
                         <span className="block text-[10px]">ออนไลน์ {thaiDate(due.online)}</span>
                       </td>
@@ -219,7 +218,7 @@ export function Pp30Report({
                         {r.filed ? (
                           <div className="inline-flex flex-col items-end gap-0.5">
                             <Badge tone="info">ยื่นแล้ว</Badge>
-                            <span className="text-[10px] text-neutral-500">
+                            <span className="text-[10px] text-slate-500">
                               {thaiDate(r.filedAt)}
                             </span>
                             <div className="flex gap-1">
@@ -227,7 +226,7 @@ export function Pp30Report({
                                 <button
                                   type="button"
                                   onClick={() => onOpenFiling(r)}
-                                  className="text-[11px] font-semibold text-violet-600 underline dark:text-violet-400"
+                                  className="text-[11px] font-semibold text-blue-600 underline dark:text-blue-400"
                                 >
                                   แก้ไข
                                 </button>
@@ -236,7 +235,7 @@ export function Pp30Report({
                                 <button
                                   type="button"
                                   onClick={() => onExportPdf(r)}
-                                  className="text-[11px] font-semibold text-violet-600 underline dark:text-violet-400"
+                                  className="text-[11px] font-semibold text-blue-600 underline dark:text-blue-400"
                                 >
                                   PDF
                                 </button>
@@ -275,14 +274,14 @@ export function Pp30Report({
         )}
 
         <CardFooter>
-          <span className="text-neutral-500 dark:text-neutral-400">
+          <span className="text-slate-500 dark:text-slate-400">
             ยื่นแบบ ภ.พ.30 ภายในวันที่ 15 ของเดือนถัดไป (ยื่นออนไลน์ได้ถึงวันที่ 23)
           </span>
           <a
             href={RD_EFILING_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto font-semibold text-violet-600 underline dark:text-violet-400"
+            className="ml-auto font-semibold text-blue-600 underline dark:text-blue-400"
           >
             ยื่นแบบออนไลน์ →
           </a>
@@ -298,6 +297,6 @@ export function Pp30Report({
 }
 
 const btnCls =
-  'rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800';
+  'rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
 const btnPrimaryCls =
-  'rounded-md bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-violet-700';
+  'rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:shadow-md transition-all cursor-pointer';

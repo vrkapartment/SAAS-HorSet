@@ -120,15 +120,15 @@ export function ExpenseVatFields({
         <label className="flex cursor-pointer items-start gap-2 text-sm">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4 cursor-pointer accent-violet-600"
+            className="mt-0.5 h-4 w-4 cursor-pointer accent-blue-600"
             checked={value.claimInputVat}
             onChange={(e) => onChange({ ...value, claimInputVat: e.target.checked })}
           />
           <span className="min-w-0">
-            <span className="text-neutral-800 dark:text-neutral-100">
+            <span className="text-slate-800 dark:text-slate-100">
               นำภาษีซื้อนี้ไปเครดิตใน ภ.พ.30
             </span>
-            <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">
+            <span className="block text-[11px] text-slate-500 dark:text-slate-400">
               ไม่ติ๊กสำหรับใบกำกับที่ขอเครดิตไม่ได้ เช่น ไม่ใช่ใบกำกับภาษีเต็มรูป
               หรือเป็นค่าใช้จ่ายฝั่งค่าเช่าที่ได้รับยกเว้น VAT
             </span>
@@ -137,15 +137,15 @@ export function ExpenseVatFields({
       )}
 
       {!hidePreview && (
-        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900/50">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-neutral-500">ฐานค่าใช้จ่าย</dt>
+            <dt className="text-slate-500">ฐานค่าใช้จ่าย</dt>
             <dd className="font-semibold"><Money value={computed.base} /> บาท</dd>
-            <dt className="text-neutral-500">ภาษีซื้อ {pct(rate)}</dt>
-            <dd className={computed.vat ? 'font-semibold' : 'text-neutral-400'}>
+            <dt className="text-slate-500">ภาษีซื้อ {pct(rate)}</dt>
+            <dd className={computed.vat ? 'font-semibold' : 'text-slate-400'}>
               {computed.vat ? <><Money value={computed.vat} /> บาท</> : '—'}
             </dd>
-            <dt className="text-neutral-500">รวมจ่าย</dt>
+            <dt className="text-slate-500">รวมจ่าย</dt>
             <dd className="font-semibold"><Money value={computed.total} /> บาท</dd>
           </dl>
           {computed.vat > 0 && !computed.claimInputVat && (
@@ -257,6 +257,6 @@ export function ExpenseModeMismatchNotice({
   );
 }
 
-const labelCls = 'text-xs font-semibold text-neutral-600 dark:text-neutral-300';
+const labelCls = 'text-xs font-semibold text-slate-600 dark:text-slate-300';
 const inputCls =
-  'w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100';
+  'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-800/80 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-900';

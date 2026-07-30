@@ -13,6 +13,7 @@
  *  - จดแล้ว → แสดงมาตรวัดปกติ
  */
 
+import { ExternalLink } from 'lucide-react';
 import type { ThresholdBreach, VatStatus } from '../../../types/tax';
 import { RD_URL } from '../../../lib/tax';
 import { baht, thaiMonth } from '../../../lib/tax/format';
@@ -66,15 +67,15 @@ export function VatThresholdCard({
                 href={RD_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-semibold underline"
+                className="inline-flex items-center gap-1 font-semibold underline"
               >
-                🔗 เปิดเว็บไซต์กรมสรรพากร (rd.go.th)
+                <ExternalLink className="h-3.5 w-3.5" /> เปิดเว็บไซต์กรมสรรพากร (rd.go.th)
               </a>
               {onGoToSettings && (
                 <button
                   type="button"
                   onClick={onGoToSettings}
-                  className="rounded-md border border-current px-2.5 py-1 text-xs font-semibold"
+                  className="cursor-pointer rounded-lg border border-current px-2.5 py-1 text-xs font-semibold transition-colors hover:bg-current/10"
                 >
                   บันทึกว่าจด VAT แล้ว →
                 </button>
@@ -119,17 +120,17 @@ export function VatThresholdCard({
         />
         <CardBody>
           <div className="mb-0.5 flex items-baseline justify-between">
-            <span className="font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
+            <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">
               {baht(status.rolling12)} บาท
             </span>
-            <span className="text-xs tabular-nums text-neutral-500">
+            <span className="text-xs tabular-nums text-slate-500">
               เกณฑ์ {baht(status.threshold, 0)} บาท
             </span>
           </div>
 
           <ProgressBar pct={status.usedPct} tone={tone} />
 
-          <div className="flex justify-between text-xs text-neutral-500 dark:text-neutral-400">
+          <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>ใช้ไป {status.usedPct.toFixed(1)}%</span>
             <span>
               {status.exceeded

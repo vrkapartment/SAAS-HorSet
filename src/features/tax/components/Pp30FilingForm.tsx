@@ -79,7 +79,7 @@ export function Pp30FilingForm({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
         ภ.พ.30 เดือน {thaiMonth(row.period)}
       </h2>
 
@@ -90,13 +90,13 @@ export function Pp30FilingForm({
           <label className="flex cursor-pointer items-start gap-2 text-sm">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 cursor-pointer accent-violet-600"
+              className="mt-0.5 h-4 w-4 cursor-pointer accent-blue-600"
               checked={useManual}
               onChange={(e) => setUseManual(e.target.checked)}
             />
             <span className="min-w-0">
-              <span className="text-neutral-800 dark:text-neutral-100">กรอกยอดภาษีซื้อเอง</span>
-              <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">
+              <span className="text-slate-800 dark:text-slate-100">กรอกยอดภาษีซื้อเอง</span>
+              <span className="block text-[11px] text-slate-500 dark:text-slate-400">
                 ไม่ติ๊ก = ใช้ยอดจากสมุดค่าใช้จ่าย ({baht(row.inputVatFromLedger)} บาท จาก{' '}
                 {claimable.length} ใบกำกับ)
               </span>
@@ -116,7 +116,7 @@ export function Pp30FilingForm({
                 onChange={(e) => setInputVat(e.target.value)}
                 placeholder="0.00"
               />
-              <span className="text-[11px] text-neutral-500">
+              <span className="text-[11px] text-slate-500">
                 รวมภาษีซื้อจากใบกำกับภาษีที่ได้รับในเดือนนี้
               </span>
             </div>
@@ -124,7 +124,7 @@ export function Pp30FilingForm({
 
           {claimable.length > 0 ? (
             <div className="mt-4">
-              <div className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
+              <div className="mb-1 text-xs text-slate-500 dark:text-slate-400">
                 ใบกำกับภาษีซื้อในเดือนนี้
               </div>
               <div className={tc.wrap}>
@@ -135,7 +135,7 @@ export function Pp30FilingForm({
                         <td className={tc.td}>
                           {x.description || '—'}
                           {x.vendor && (
-                            <div className="text-[11px] text-neutral-500">{x.vendor}</div>
+                            <div className="text-[11px] text-slate-500">{x.vendor}</div>
                           )}
                         </td>
                         <td className={tc.tdNum}><Money value={x.base} /></td>
@@ -254,7 +254,7 @@ export function Pp30FilingForm({
           type="button"
           disabled={busy}
           onClick={() => onSubmitFiling({ ...patch(), filedAt: filedAt || todayISO() })}
-          className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+          className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-default"
         >
           บันทึกและทำเครื่องหมายว่ายื่นแล้ว
         </button>
@@ -263,8 +263,8 @@ export function Pp30FilingForm({
   );
 }
 
-const labelCls = 'text-xs font-semibold text-neutral-600 dark:text-neutral-300';
+const labelCls = 'text-xs font-semibold text-slate-600 dark:text-slate-300';
 const inputCls =
-  'w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100';
+  'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-800/80 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-900';
 const btnCls =
-  'rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800';
+  'rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';

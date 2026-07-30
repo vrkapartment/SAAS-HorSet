@@ -88,7 +88,7 @@ export function PersonalAllowanceLockNotice({
         }
       />
       <CardBody className="py-3">
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           ค่าลดหย่อนส่วนตัวของ {info.title} = <b>{baht(amount, 0)} บาท</b> (ของ {other} คือ{' '}
           {baht(otherAmount, 0)} บาท) — ระบบล็อกตามแบบ + สถานะผู้เสียภาษี สลับกันไม่ได้
         </p>
@@ -163,11 +163,11 @@ export function ExpenseDeductionTable({
                 <td className={tc.td}>
                   <BucketBadge bucket={r.bucket} />
                   <div className="mt-0.5 text-sm">{r.title}</div>
-                  <div className="text-[11px] text-neutral-500">{r.hint}</div>
+                  <div className="text-[11px] text-slate-500">{r.hint}</div>
                 </td>
                 <td className={tc.tdNum}><Money value={r.detail.income} /></td>
                 <td className={tc.td}>
-                  <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700">
+                  <div className="inline-flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-700">
                     {(['lump', 'actual'] as const).map((m) => (
                       <button
                         key={m}
@@ -176,8 +176,8 @@ export function ExpenseDeductionTable({
                         onClick={() => onChangeMode?.(r.bucket, m)}
                         className={
                           r.detail.mode === m
-                            ? 'bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white'
-                            : 'px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100 disabled:cursor-default dark:text-neutral-300 dark:hover:bg-neutral-800'
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm'
+                            : 'px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-default dark:text-slate-300 dark:hover:bg-slate-800'
                         }
                       >
                         {m === 'lump' ? 'หักเหมา' : 'หักจริง'}
@@ -186,7 +186,7 @@ export function ExpenseDeductionTable({
                   </div>
                   {r.detail.mode === 'lump' ? (
                     <div className="mt-1.5 flex items-center gap-1.5">
-                      <span className="text-[11px] text-neutral-500">อัตรา</span>
+                      <span className="text-[11px] text-slate-500">อัตรา</span>
                       <input
                         type="number"
                         min={0}
@@ -195,12 +195,12 @@ export function ExpenseDeductionTable({
                         disabled={!onChangeRate}
                         value={Math.round((r.detail.rate ?? 0) * 100)}
                         onChange={(e) => onChangeRate?.(r.bucket, Number(e.target.value))}
-                        className="w-16 rounded border border-neutral-300 px-1.5 py-0.5 text-right text-xs tabular-nums dark:border-neutral-700 dark:bg-neutral-900"
+                        className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-right text-xs tabular-nums dark:border-slate-700 dark:bg-slate-900"
                       />
-                      <span className="text-[11px] text-neutral-500">%</span>
+                      <span className="text-[11px] text-slate-500">%</span>
                     </div>
                   ) : (
-                    <div className="mt-1.5 text-[11px] text-neutral-500">
+                    <div className="mt-1.5 text-[11px] text-slate-500">
                       จากสมุดค่าใช้จ่าย {baht(r.actual ?? r.detail.requested)} บาท
                     </div>
                   )}
@@ -356,7 +356,7 @@ export function ProgressiveBracketTable({ result }: { result: IncomeTaxResult })
       />
       {steps.length === 0 ? (
         <CardBody>
-          <p className="text-sm text-neutral-500">เงินได้สุทธิ 0 บาท — ไม่มีภาษีตามขั้นบันได</p>
+          <p className="text-sm text-slate-500">เงินได้สุทธิ 0 บาท — ไม่มีภาษีตามขั้นบันได</p>
         </CardBody>
       ) : (
         <div className={tc.wrap}>
@@ -545,7 +545,7 @@ export function PitComparisonTable({ pnd90 }: { pnd90: PeriodComputation }) {
                 key={r.label}
                 className={
                   r.total
-                    ? 'bg-neutral-50 font-semibold dark:bg-neutral-800/40'
+                    ? 'bg-slate-50 font-semibold dark:bg-slate-800/40'
                     : tc.row
                 }
               >
@@ -562,4 +562,4 @@ export function PitComparisonTable({ pnd90 }: { pnd90: PeriodComputation }) {
 }
 
 const btnCls =
-  'rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800';
+  'rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';

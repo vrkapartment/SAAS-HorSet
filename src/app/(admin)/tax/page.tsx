@@ -272,6 +272,9 @@ export default function TaxPage() {
   const [bills, setBills] = useState<BillItem[]>([])
   // true จนกว่าข้อมูลชุดแรก (รวมถึงประวัติยกเลิกสัญญา) จะโหลดครบ ป้องกันการ์ดสรุปยอดโชว์เลขที่ยังไม่ครบก่อนเด้งเป็นเลขจริง
   const [isSummaryLoading, setIsSummaryLoading] = useState(true)
+  // true เมื่อทั้งข้อมูลสรุปเดิม (รายรับ/รายจ่าย/ประวัติยกเลิกสัญญา) และ TaxDataset ของฟีเจอร์ VAT/ภ.พ.30
+  // โหลดเสร็จพร้อมกันแล้วเท่านั้น — กันไม่ให้ส่วนเดิมกับส่วนใหม่ของหน้าโชว์ข้อมูลไม่พร้อมกัน (คนละ effect คนละจังหวะโหลด)
+  const dataReady = !isSummaryLoading && taxDatasetLoaded
 
   useEffect(() => {
     async function loadInitialData() {
@@ -977,7 +980,10 @@ export default function TaxPage() {
 
   // คำนวณผลภาษี ภ.ง.ด.90/94 เต็มชุด (สำหรับ PitBreakdown) ผ่าน src/lib/thaiTax.ts เท่านั้น (ดูหมายเหตุ
   // ที่ computePitBreakdownFromThaiTax) — ต้องคำนวณ 94 ก่อนเสมอ เพราะ 90 ต้องใช้ยอดภาษีครึ่งปีมาหักกลบ
+  // ⚠️ รอให้ isSummaryLoading = false ก่อนเสมอ ไม่งั้นจะคำนวณด้วยข้อมูลที่โหลดมาไม่ครบ (bills/expenses ทยอยมาทีละก้อน)
+  // แล้วโชว์ตัวเลขชั่วคราวที่ผิดวาบขึ้นมาก่อนค่อยแก้เป็นตัวจริง
   useEffect(() => {
+    if (isSummaryLoading) return
     let cancelled = false
     async function computeBoth() {
       const expenseACfg = {
@@ -1023,6 +1029,7 @@ export default function TaxPage() {
     computeBoth().catch(err => console.error("Failed to compute PIT breakdown:", err))
     return () => { cancelled = true }
   }, [
+    isSummaryLoading,
     rent405Full, utilities408Full, other408Full,
     rent405Half, utilities408Half, other408Half,
     deductionMethod405, deductionMethod408,
@@ -1046,14 +1053,25 @@ export default function TaxPage() {
   }, [workspaceId, taxYear])
 
   // โหลด TaxDataset เต็มชุดสำหรับฟีเจอร์ VAT/ภ.พ.30 (แยกจากข้อมูล ภ.ง.ด.90/94 เดิมข้างบนโดยสิ้นเชิง)
+  // ใช้ cache ของ WorkspaceDataContext แบบเดียวกับข้อมูลชุดอื่นในหน้านี้ (ถูกล้างอัตโนมัติเมื่อบันทึกตั้งค่า VAT
+  // ผ่าน clearWorkspaceCache) เพื่อไม่ให้ effect นี้ยิง query ใหม่ 11 คำสั่งซ้ำทุกครั้ง — ซึ่งเป็นสาเหตุหลักที่ทำให้
+  // ส่วนนี้โหลดช้ากว่าข้อมูลสรุปเดิมด้านบนอย่างเป็นระบบ (isSummaryLoading จบก่อน taxDatasetLoaded เกือบทุกครั้ง)
   useEffect(() => {
     if (!workspaceId) return
+    const taxDatasetCacheKey = `tax_dataset_${taxYear}`
+    const cached = getCachedData<TaxDataset>(workspaceId, taxDatasetCacheKey)
+    if (cached) {
+      setTaxDataset(cached)
+      setTaxDatasetLoaded(true)
+      return
+    }
     let cancelled = false
     setTaxDatasetLoaded(false)
     loadTaxDataset(workspaceId, Number(taxYear)).then(res => {
       if (cancelled) return
       if (res.success && res.data) {
         setTaxDataset(res.data)
+        setCachedData(workspaceId, taxDatasetCacheKey, res.data)
       }
       setTaxDatasetLoaded(true)
     })
@@ -1215,7 +1233,7 @@ export default function TaxPage() {
       </div>
 
       {/* ภาพรวม VAT — แสดงเฉพาะเมื่อ workspace จดทะเบียน VAT แล้ว (ยกเว้นคำเตือนใกล้/เกินเกณฑ์ 1.8 ล้าน) */}
-      {taxDatasetLoaded && (
+      {dataReady && (
         <>
           <VatThresholdCard status={vatStatus} breach={vatBreach} />
           <VatGate settings={taxDataset.settings}>
@@ -1475,7 +1493,7 @@ export default function TaxPage() {
       </div>
 
       {/* ตั้งค่า VAT + กฎภาษี — ฟีเจอร์ 5 (ของใหม่ทั้งบล็อก) ดู src/features/tax/components */}
-      {taxDatasetLoaded && hasEditPermission && (
+      {dataReady && hasEditPermission && (
         <div className="space-y-6">
           <VatSettingsSection
             settings={taxDataset.settings}
@@ -2271,7 +2289,7 @@ export default function TaxPage() {
       </div>
 
       {/* ส่วนขยาย ภ.ง.ด.90/94 — คำนวณจาก src/lib/thaiTax.ts เท่านั้น (ตรงกับ PDF ด้านบนเป๊ะ) */}
-      {pitResult94 && pitResult90 && (() => {
+      {dataReady && pitResult94 && pitResult90 && (() => {
         const pnd94Computation = {
           year: Number(taxYear), form: "PND94" as const, from: "", to: "", months: 6,
           income: taxOverview.yearIncome, expense: taxOverview.yearExpense,
@@ -2302,16 +2320,18 @@ export default function TaxPage() {
         )
       })()}
 
-      {/* ภ.พ.30 — แสดงเฉพาะเมื่อจดทะเบียน VAT แล้ว */}
-      <VatGate settings={taxDataset.settings}>
-        <Pp30Report
-          year={Number(taxYear)}
-          rows={pp30.rows}
-          totals={pp30.totals}
-          enabled={pp30.enabled}
-          vat={vatStatus}
-        />
-      </VatGate>
+      {/* ภ.พ.30 — แสดงเฉพาะเมื่อจดทะเบียน VAT แล้ว และข้อมูลพร้อมครบแล้วเท่านั้น */}
+      {dataReady && (
+        <VatGate settings={taxDataset.settings}>
+          <Pp30Report
+            year={Number(taxYear)}
+            rows={pp30.rows}
+            totals={pp30.totals}
+            enabled={pp30.enabled}
+            vat={vatStatus}
+          />
+        </VatGate>
+      )}
 
       {/* Modal บันทึกค่าใช้จ่าย */}
       {expenseModalOpen && (
@@ -2446,7 +2466,8 @@ export default function TaxPage() {
                 </div>
               </div>
 
-              {/* ภาษีซื้อ — แสดงเฉพาะ workspace ที่จด VAT แล้ว (ฟีเจอร์ 2) */}
+              {/* ภาษีซื้อ — แสดงเฉพาะ workspace ที่จด VAT แล้ว และข้อมูลพร้อมครบแล้ว (ฟีเจอร์ 2) */}
+              {dataReady && (
               <VatGate settings={taxDataset.settings}>
                 <ExpenseVatFields
                   value={{ amount: expenseAmount, vatMode: expenseVatMode, claimInputVat: expenseClaimInputVat }}
@@ -2459,6 +2480,7 @@ export default function TaxPage() {
                   bucket={expenseCategory === "40_5" ? "A" : "B"}
                 />
               </VatGate>
+              )}
 
               {/* Dynamic Guidance / Recommendation Tooltip */}
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">

@@ -128,7 +128,7 @@ export function TaxOverviewDashboard({
                     {vatEnabled && (
                       <td className={tc.tdNum}>
                         {!m.pp30 ? (
-                          <span className="text-neutral-400">—</span>
+                          <span className="text-slate-400">—</span>
                         ) : m.pp30.payable > 0 ? (
                           <span className="inline-flex items-center gap-1">
                             <Money value={m.pp30.payable} />
@@ -140,7 +140,7 @@ export function TaxOverviewDashboard({
                             <Badge tone="success">เครดิต</Badge>
                           </span>
                         ) : (
-                          <span className="text-neutral-400">0.00</span>
+                          <span className="text-slate-400">0.00</span>
                         )}
                       </td>
                     )}
@@ -150,7 +150,7 @@ export function TaxOverviewDashboard({
                         className={`${tc.tdNum} ${
                           m.overThreshold
                             ? 'font-semibold text-red-600 dark:text-red-400'
-                            : 'text-neutral-400'
+                            : 'text-slate-400'
                         }`}
                       >
                         {baht(m.rolling12, 0)}
@@ -179,7 +179,6 @@ export function TaxOverviewDashboard({
           </div>
         ) : (
           <EmptyState
-            icon="📊"
             title="ยังไม่มีข้อมูลในปีนี้"
             description="เริ่มจากบันทึกรายรับและค่าใช้จ่าย — ระบบจะแยกตะกร้า A / B และแยก VAT ให้อัตโนมัติ"
           />
@@ -197,4 +196,4 @@ export function TaxOverviewDashboard({
 }
 
 const linkBtn =
-  'rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800';
+  'rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:shadow-md transition-all cursor-pointer';

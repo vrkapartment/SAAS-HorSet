@@ -12,6 +12,7 @@
  *    (ใช้เดือนที่ทะลุเกณฑ์ ถ้ามี ไม่งั้นใช้เดือนปัจจุบัน)
  */
 
+import { ExternalLink } from 'lucide-react';
 import type { ThresholdBreach, TaxSettings, VatStatus } from '../../../types/tax';
 import { RD_URL, VAT_THRESHOLD, num, thisMonthKey } from '../../../lib/tax';
 import { baht, pct, thaiMonth } from '../../../lib/tax/format';
@@ -67,9 +68,9 @@ export function VatSettingsSection({
                 href={RD_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-semibold underline"
+                className="inline-flex items-center gap-1 font-semibold underline"
               >
-                🔗 เว็บไซต์กรมสรรพากร (rd.go.th)
+                <ExternalLink className="h-3.5 w-3.5" /> เว็บไซต์กรมสรรพากร (rd.go.th)
               </a>
             }
           >
@@ -81,12 +82,12 @@ export function VatSettingsSection({
         )}
 
         {/* ---------- สวิตช์หลัก ---------- */}
-        <div className="flex items-start gap-3 border-b border-neutral-200 pb-4 dark:border-neutral-800">
+        <div className="flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               จดทะเบียน VAT แล้ว
             </div>
-            <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
               เปิดเมื่อได้รับ ภ.พ.20 แล้ว — ระบบจะเริ่มคิด VAT {pct(settings.vatRate)}{' '}
               เฉพาะรายได้ตะกร้า B, แสดงช่องภาษีซื้อในฟอร์มค่าใช้จ่าย และสร้างแบบ ภ.พ.30 รายเดือน
             </div>
@@ -99,7 +100,7 @@ export function VatSettingsSection({
             disabled={busy}
             onClick={() => toggleRegistered(!settings.vatRegistered)}
             className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-              settings.vatRegistered ? 'bg-violet-600' : 'bg-neutral-300 dark:bg-neutral-700'
+              settings.vatRegistered ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
             }`}
           >
             <span
@@ -125,7 +126,7 @@ export function VatSettingsSection({
                 value={settings.vatRegisteredFrom ?? ''}
                 onChange={(e) => onChange({ vatRegisteredFrom: e.target.value || null })}
               />
-              <span className="text-[11px] text-neutral-500">
+              <span className="text-[11px] text-slate-500">
                 ใบแจ้งหนี้และรายรับก่อนเดือนนี้จะไม่ถูกคิด VAT
               </span>
               {!settings.vatRegisteredFrom && (
@@ -149,9 +150,9 @@ export function VatSettingsSection({
                   value={Number((settings.vatRate * 100).toFixed(2))}
                   onChange={(e) => onChange({ vatRate: num(e.target.value) / 100 })}
                 />
-                <span className="text-neutral-500">%</span>
+                <span className="text-slate-500">%</span>
               </div>
-              <span className="text-[11px] text-neutral-500">ปกติ 7%</span>
+              <span className="text-[11px] text-slate-500">ปกติ 7%</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -166,7 +167,7 @@ export function VatSettingsSection({
                 value={settings.vatOpeningCredit}
                 onChange={(e) => onChange({ vatOpeningCredit: num(e.target.value) })}
               />
-              <span className="text-[11px] text-neutral-500">
+              <span className="text-[11px] text-slate-500">
                 ถ้ามีเครดิตค้างจากก่อนเริ่มใช้ระบบนี้
               </span>
             </div>
@@ -196,6 +197,6 @@ export function VatSettingsSection({
   );
 }
 
-const labelCls = 'text-xs font-semibold text-neutral-600 dark:text-neutral-300';
+const labelCls = 'text-xs font-semibold text-slate-600 dark:text-slate-300';
 const inputCls =
-  'w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100';
+  'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-800/80 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-900';
