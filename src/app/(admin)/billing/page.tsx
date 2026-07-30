@@ -80,6 +80,7 @@ interface UnifiedRoomBillingItem {
   waiveWaterMin?: boolean
   invoiceId?: string
   hasNotifiedCheckout?: boolean
+  vatAmount?: number
 }
 
 function getCookie(name: string): string | undefined {
@@ -239,6 +240,10 @@ function UnifiedBillingContent() {
   const [commonFee, setCommonFee] = useState<number>(50)
   const [elecRate, setElecRate] = useState<number>(7)
   const [waterRate, setWaterRate] = useState<number>(18)
+  // VAT — ดูฟีเจอร์ VAT ใน src/features/tax/ (คิดเพิ่มจากยอดบิลเดิม ไม่ถอดจากยอดเดิม)
+  const [vatRegistered, setVatRegistered] = useState(false)
+  const [vatRegisteredFrom, setVatRegisteredFrom] = useState<string | null>(null)
+  const [vatRate, setVatRate] = useState(0.07)
   const [electricBillingMode, setElectricBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
   const [waterBillingMode, setWaterBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
   const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
@@ -336,7 +341,14 @@ function UnifiedBillingContent() {
     : waterUnitsManual * waterRateResolved.rate
 
   const selectedManualRoomExtraExpensesSum = selectedManualRoom?.extraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
-  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual + selectedManualRoomExtraExpensesSum
+
+  // VAT บวกเพิ่มจากยอดเดิม เฉพาะเมื่อ workspace จด VAT แล้วและถึงเดือนที่มีผล (ไม่ถอดจากยอดเดิม)
+  const isVatChargingForCycle = (cycle: string) =>
+    vatRegistered && (!vatRegisteredFrom || cycle >= vatRegisteredFrom.slice(0, 7))
+  const manualVatApplies = isVatChargingForCycle(billingCycle)
+  const manualVatableBase = computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual + selectedManualRoomExtraExpensesSum
+  const computedVatAmount = manualVatApplies ? Math.round(manualVatableBase * vatRate * 100) / 100 : 0
+  const computedTotal = rentPrice + computedElecCost + computedWaterCost + commonFee + otherServiceAmountManual + selectedManualRoomExtraExpensesSum + computedVatAmount
 
   const getPreviousCycle = (cycle: string) => {
     const [year, month] = cycle.split("-").map(Number)
@@ -655,6 +667,7 @@ function UnifiedBillingContent() {
           penaltyAmount: finalPenaltyAmount,
           lateDays: finalLateDays,
           otherServiceAmount: roomBill ? Number(roomBill.otherServiceAmount || 0) : 0,
+          vatAmount: roomBill ? Number(roomBill.vatAmount || 0) : 0,
           waiveElectricMin: !!r.waive_electric_min || !!r.waiveElectricMin,
           waiveWaterMin: !!r.waive_water_min || !!r.waiveWaterMin,
           invoiceId: roomBill?.invoiceId || undefined
@@ -801,6 +814,9 @@ function UnifiedBillingContent() {
             if (financeData.electric_min_unit !== undefined) setElectricMinUnit(financeData.electric_min_unit)
             setElectricBillingMode(financeData.electric_billing_mode || "fixed_rate")
             setWaterBillingMode(financeData.water_billing_mode || "fixed_rate")
+            setVatRegistered(!!financeData.vat_registered)
+            setVatRegisteredFrom(financeData.vat_registered_from || null)
+            if (financeData.vat_rate !== undefined) setVatRate(financeData.vat_rate)
             if (financeData.late_penalty_rate !== undefined) setLatePenaltyRate(financeData.late_penalty_rate)
             if (financeData.promptpay_id) setPromptPayId(financeData.promptpay_id)
             if (financeData.promptpay_name) setPromptPayName(financeData.promptpay_name)
@@ -950,7 +966,8 @@ function UnifiedBillingContent() {
     waterUnits: Number(b.water_units),
     penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
     lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
-    otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0
+    otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
+    vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0
   })
 
   const formatDbMeterToCamelCase = (m: any) => ({
@@ -1613,6 +1630,7 @@ function UnifiedBillingContent() {
         lateDays: item.lateDays || 0,
         latePenaltyRate: latePenaltyRate,
         otherServiceAmount: item.otherServiceAmount || 0,
+        vatAmount: item.vatAmount || 0,
         invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
         elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
         elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
@@ -1699,6 +1717,7 @@ function UnifiedBillingContent() {
           lateDays: item.lateDays || 0,
           latePenaltyRate: latePenaltyRate,
           otherServiceAmount: item.otherServiceAmount || 0,
+          vatAmount: item.vatAmount || 0,
           invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
           elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
           elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
@@ -2251,6 +2270,7 @@ function UnifiedBillingContent() {
         waterMinChecked={waterMinChecked}
         waterMinUnit={waterMinUnit}
         computedTotal={computedTotal}
+        vatAmount={computedVatAmount}
         rateMissingWarning={manualBillRateMissing ? "ห้องนี้เปิดโหมด \"หารตามสัดส่วนทั้งอาคาร\" แต่ยังไม่ได้กรอกยอดบิลรวมทั้งอาคารของรอบนี้ (หรือห้องนี้ยังไม่ได้กำหนดอาคาร) กรุณากรอกที่หน้าออกบิลก่อน — ตัวเลขค่าไฟ/น้ำด้านล่างจะยังไม่ถูกต้องจนกว่าจะกรอก" : undefined}
         onClose={() => setCreateBillModalOpen(false)}
         onSubmit={handleCreateBillManual}

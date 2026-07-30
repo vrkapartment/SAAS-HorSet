@@ -16,11 +16,22 @@ export interface BillRateInput {
   electricMinChecked: boolean
   electricMinUnit: number
   penaltyAmount?: number
+  /**
+   * อัตรา VAT (เช่น 0.07) — ใส่มาพร้อม vatApplies=true เมื่อ workspace จดทะเบียน VAT แล้ว
+   * และถึงเดือนที่การจดมีผล (ดู resolveVatAmount() ใน features/billing/actions.ts)
+   */
+  vatRate?: number
+  /** false (ค่าเริ่มต้น) = ไม่คิด VAT เลย บวก VAT เพิ่มจากยอดเดิมเมื่อเป็น true เท่านั้น ไม่ถอดจากยอดเดิม */
+  vatApplies?: boolean
 }
 
 export function calculateBillTotal(input: BillRateInput): {
   elecCost: number
   waterCost: number
+  /** ฐานที่ต้องเสีย VAT (ค่าน้ำ-ไฟ-ส่วนกลาง-บริการอื่น-ค่าใช้จ่ายเพิ่มเติม) ไม่รวมค่าเช่า (40(5) ยกเว้น VAT) */
+  vatableBase: number
+  /** VAT ที่บวกเพิ่มจากยอดเดิม — 0 เมื่อ vatApplies ไม่เป็น true */
+  vatAmount: number
   total: number
 } {
   const finalElecUnits = !input.waiveElectricMin && input.electricMinChecked && input.electricUnitsUsed <= input.electricMinUnit
@@ -36,11 +47,18 @@ export function calculateBillTotal(input: BillRateInput): {
 
   const penalty = input.penaltyAmount || 0
 
-  const total = input.baseRent + elecCost + waterCost + input.commonFee + input.otherServiceAmount + penalty + input.extraExpensesSum
+  const vatableBase = elecCost + waterCost + input.commonFee + input.otherServiceAmount + input.extraExpensesSum
+  const vatAmount = input.vatApplies && input.vatRate
+    ? Math.round(vatableBase * input.vatRate * 100) / 100
+    : 0
+
+  const total = input.baseRent + elecCost + waterCost + input.commonFee + input.otherServiceAmount + penalty + input.extraExpensesSum + vatAmount
 
   return {
     elecCost,
     waterCost,
+    vatableBase,
+    vatAmount,
     total
   }
 }

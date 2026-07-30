@@ -43,6 +43,22 @@ export interface FinanceSettings {
   // สถานภาพผู้เสียภาษี (กำหนดค่าลดหย่อนส่วนตัว ข.1 ของแบบฟอร์ม ภ.ง.ด. 90/94)
   taxpayer_status?: "individual" | "partnership"
   partner_count?: number
+  // ภาษีมูลค่าเพิ่ม (VAT) — ดูฟีเจอร์ VAT + ภ.พ.30 ใน src/features/tax/
+  vat_registered?: boolean
+  vat_registered_from?: string | null
+  vat_rate?: number
+  vat_threshold?: number
+  vat_opening_credit?: number
+  expense_a_mode?: "lump" | "actual"
+  expense_a_lump_rate?: number
+  expense_b_mode?: "lump" | "actual"
+  expense_b_lump_rate?: number
+  cap_expense_per_bucket?: boolean
+  min_tax_enabled?: boolean
+  min_tax_rate?: number
+  min_tax_threshold_pnd90?: number
+  min_tax_threshold_pnd94?: number
+  min_tax_exempt_below?: number
   // ที่อยู่แยกช่องย่อยเพิ่มเติม (นอกเหนือจาก เลขที่/ถนน/ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์ ที่รวมอยู่ใน tax_address)
   // ใช้กรอกช่อง อาคาร/ห้องเลขที่/ชั้นที่/หมู่บ้าน/หมู่ที่/ตรอกซอย/แยก ของแบบฟอร์ม ภ.ง.ด. 94 โดยเฉพาะ
   tax_address_building?: string
@@ -248,6 +264,21 @@ export async function getFinanceSettings(workspaceId: string) {
       return null
     }
 
+    // 10. ตั้งค่า VAT + โหมดหักค่าใช้จ่าย + ภาษีขั้นต่ำ (แยกดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ติดตั้ง — ดู database_patch_add_vat_pp30.sql)
+    const fetchVatTaxSettings = async (): Promise<any> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("vat_registered, vat_registered_from, vat_rate, vat_threshold, vat_opening_credit, expense_a_mode, expense_a_lump_rate, expense_b_mode, expense_b_lump_rate, cap_expense_per_bucket, min_tax_enabled, min_tax_rate, min_tax_threshold_pnd90, min_tax_threshold_pnd94, min_tax_exempt_below")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) return data
+      } catch (e) {
+        console.warn("Columns vat_registered/expense_*_mode/min_tax_* not available in workspaces. Defaulting.")
+      }
+      return null
+    }
+
     const [
       coreData,
       utilityData,
@@ -258,7 +289,8 @@ export async function getFinanceSettings(workspaceId: string) {
       checkoutPolicy,
       logoUrl,
       taxpayerStatusData,
-      { electricBillingMode, waterBillingMode }
+      { electricBillingMode, waterBillingMode },
+      vatTaxData
     ] = await Promise.all([
       fetchCore(),
       fetchUtility(),
@@ -269,7 +301,8 @@ export async function getFinanceSettings(workspaceId: string) {
       fetchCheckoutPolicy(),
       fetchLogo(),
       fetchTaxpayerStatus(),
-      fetchBillingMode()
+      fetchBillingMode(),
+      fetchVatTaxSettings()
     ])
 
     const merged = {
@@ -332,7 +365,22 @@ export async function getFinanceSettings(workspaceId: string) {
         tax_address_village: taxpayerStatusData?.tax_address_village || "",
         tax_address_moo: taxpayerStatusData?.tax_address_moo || "",
         tax_address_soi: taxpayerStatusData?.tax_address_soi || "",
-        tax_address_yaek: taxpayerStatusData?.tax_address_yaek || ""
+        tax_address_yaek: taxpayerStatusData?.tax_address_yaek || "",
+        vat_registered: Boolean(vatTaxData?.vat_registered ?? false),
+        vat_registered_from: vatTaxData?.vat_registered_from ?? null,
+        vat_rate: Number(vatTaxData?.vat_rate ?? 0.07),
+        vat_threshold: Number(vatTaxData?.vat_threshold ?? 1800000),
+        vat_opening_credit: Number(vatTaxData?.vat_opening_credit ?? 0),
+        expense_a_mode: (vatTaxData?.expense_a_mode as "lump" | "actual") || "lump",
+        expense_a_lump_rate: Number(vatTaxData?.expense_a_lump_rate ?? 0.3),
+        expense_b_mode: (vatTaxData?.expense_b_mode as "lump" | "actual") || "lump",
+        expense_b_lump_rate: Number(vatTaxData?.expense_b_lump_rate ?? 0.6),
+        cap_expense_per_bucket: Boolean(vatTaxData?.cap_expense_per_bucket ?? false),
+        min_tax_enabled: Boolean(vatTaxData?.min_tax_enabled ?? true),
+        min_tax_rate: Number(vatTaxData?.min_tax_rate ?? 0.005),
+        min_tax_threshold_pnd90: Number(vatTaxData?.min_tax_threshold_pnd90 ?? 120000),
+        min_tax_threshold_pnd94: Number(vatTaxData?.min_tax_threshold_pnd94 ?? 60000),
+        min_tax_exempt_below: Number(vatTaxData?.min_tax_exempt_below ?? 5000)
       } as FinanceSettings
     }
   } catch (error) {
@@ -425,6 +473,21 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
     if (settings.tax_address_moo !== undefined) optionalPayload.tax_address_moo = settings.tax_address_moo.trim()
     if (settings.tax_address_soi !== undefined) optionalPayload.tax_address_soi = settings.tax_address_soi.trim()
     if (settings.tax_address_yaek !== undefined) optionalPayload.tax_address_yaek = settings.tax_address_yaek.trim()
+    if (settings.vat_registered !== undefined) optionalPayload.vat_registered = Boolean(settings.vat_registered)
+    if (settings.vat_registered_from !== undefined) optionalPayload.vat_registered_from = settings.vat_registered_from
+    if (settings.vat_rate !== undefined) optionalPayload.vat_rate = Number(settings.vat_rate)
+    if (settings.vat_threshold !== undefined) optionalPayload.vat_threshold = Number(settings.vat_threshold)
+    if (settings.vat_opening_credit !== undefined) optionalPayload.vat_opening_credit = Number(settings.vat_opening_credit)
+    if (settings.expense_a_mode !== undefined) optionalPayload.expense_a_mode = settings.expense_a_mode
+    if (settings.expense_a_lump_rate !== undefined) optionalPayload.expense_a_lump_rate = Number(settings.expense_a_lump_rate)
+    if (settings.expense_b_mode !== undefined) optionalPayload.expense_b_mode = settings.expense_b_mode
+    if (settings.expense_b_lump_rate !== undefined) optionalPayload.expense_b_lump_rate = Number(settings.expense_b_lump_rate)
+    if (settings.cap_expense_per_bucket !== undefined) optionalPayload.cap_expense_per_bucket = Boolean(settings.cap_expense_per_bucket)
+    if (settings.min_tax_enabled !== undefined) optionalPayload.min_tax_enabled = Boolean(settings.min_tax_enabled)
+    if (settings.min_tax_rate !== undefined) optionalPayload.min_tax_rate = Number(settings.min_tax_rate)
+    if (settings.min_tax_threshold_pnd90 !== undefined) optionalPayload.min_tax_threshold_pnd90 = Number(settings.min_tax_threshold_pnd90)
+    if (settings.min_tax_threshold_pnd94 !== undefined) optionalPayload.min_tax_threshold_pnd94 = Number(settings.min_tax_threshold_pnd94)
+    if (settings.min_tax_exempt_below !== undefined) optionalPayload.min_tax_exempt_below = Number(settings.min_tax_exempt_below)
 
     const { data: updatedRows, error: updateError } = await dbClient
       .from("workspaces")

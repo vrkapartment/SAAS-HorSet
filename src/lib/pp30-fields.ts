@@ -1,0 +1,300 @@
+/**
+ * ชั้นข้อมูลสำหรับ PDF mapping ของแบบ ภ.พ.30
+ *
+ * ไฟล์นี้เตรียม "ค่าทุกช่องที่แบบ ภ.พ.30 ต้องการ" ให้พร้อมใช้กับ generatePp30Pdf() ใน pdfHelper.ts
+ * (mapping จริงกับไฟล์ template `public/templates/PP30_Template.pdf` ดูที่ DEFAULT_PP30_MAPPING
+ * ใน pdfHelper.ts — แยกกันคนละไฟล์เหมือนที่ DEFAULT_PND90/94_MAPPING แยกจาก compute*Values)
+ *
+ * 🚫 ห้ามแตะ mapping ของ ภ.ง.ด.90 / ภ.ง.ด.94 — ไฟล์นี้ไม่ import และไม่ทับอะไรของสองแบบนั้นเลย
+ *
+ * ⚠️ เลขข้อ (formLine) ด้านล่างอ้างอิงจากแบบ ภ.พ.30 ฉบับพิมพ์ ม.ค. 2560 (pp30_300160.pdf)
+ */
+
+import type { Pp30Row } from '../types/tax';
+import { r2 } from './tax';
+
+/** ข้อมูลผู้ประกอบการ — ดึงจากโปรไฟล์หอพักใน Supabase */
+export interface Pp30TaxpayerInfo {
+  /** ชื่อผู้ประกอบการ (บุคคล/ห้างหุ้นส่วน) */
+  name: string;
+  /** เลขประจำตัวผู้เสียภาษีอากร 13 หลัก */
+  taxId: string;
+  /** เลขที่สาขา — สำนักงานใหญ่ใช้ '00000' */
+  branchNo?: string;
+  address?: string;
+  phone?: string;
+}
+
+/** ค่าที่ผู้ใช้กรอกเพิ่มตอนยื่น (ไม่ได้มาจากการคำนวณ) */
+export interface Pp30ManualEntries {
+  /** ยอดขายที่ได้รับยกเว้น VAT ในเดือนนี้ — ปกติ = ค่าเช่า 40(5) ถ้าต้องแสดง */
+  exemptSales?: number;
+  /** ยอดขายที่เสียภาษีอัตรา 0% (ส่งออก) — หอพักปกติเป็น 0 */
+  zeroRatedSales?: number;
+  /** เบี้ยปรับ (กรณียื่นเกินกำหนด) */
+  penalty?: number;
+  /** เงินเพิ่ม 1.5% ต่อเดือน (กรณียื่นเกินกำหนด) */
+  surcharge?: number;
+  /** ยื่นเพิ่มเติม (ครั้งที่) — 0 = ยื่นปกติ */
+  additionalFilingNo?: number;
+}
+
+/**
+ * 1 ช่องในแบบ
+ * ใช้โครงนี้เพื่อให้ adapter map ได้ทั้งแบบ "ชื่อ field ใน AcroForm"
+ * และแบบ "พิกัด x/y ที่วาดทับ" โดยไม่ต้องแก้ชั้นคำนวณ
+ */
+export interface Pp30Field {
+  /** คีย์ภายในที่ใช้อ้างอิงใน mapping */
+  key: string;
+  /** ป้ายกำกับตามแบบ (ภาษาไทย) */
+  label: string;
+  /** เลขข้อในแบบ */
+  formLine?: string;
+  value: number | string;
+  type: 'money' | 'text' | 'checkbox';
+}
+
+export interface Pp30FormFields {
+  period: string;
+  /** เดือนภาษี 1–12 */
+  month: number;
+  /** ปี พ.ศ. */
+  yearBE: number;
+  taxpayer: Pp30TaxpayerInfo;
+  fields: Pp30Field[];
+  /** เข้าถึงค่าด้วยคีย์แบบเร็ว */
+  byKey: Record<string, number | string>;
+}
+
+/**
+ * แปลงผลคำนวณ 1 เดือน → ชุดค่าทุกช่องของแบบ ภ.พ.30
+ *
+ * ค่าทั้งหมดมาจาก Pp30Row ที่ buildPP30Series() คำนวณไว้แล้ว
+ * (ภาษีขาย/ภาษีซื้อ/เครดิตยกมา/ยอดสุทธิ ต่อสายเครดิตถูกต้องแล้ว)
+ */
+export function buildPp30FormFields(
+  row: Pp30Row,
+  taxpayer: Pp30TaxpayerInfo,
+  manual: Pp30ManualEntries = {},
+): Pp30FormFields {
+  const [yearStr, monthStr] = row.period.split('-');
+  const month = Number(monthStr);
+  const yearBE = Number(yearStr) + 543;
+
+  const zeroRated = r2(manual.zeroRatedSales ?? 0);
+  const exempt = r2(manual.exemptSales ?? 0);
+  const taxable = row.serviceBase;
+  const totalSales = r2(taxable + zeroRated + exempt);
+
+  const penalty = r2(manual.penalty ?? 0);
+  const surcharge = r2(manual.surcharge ?? 0);
+  const grandTotal = r2(row.payable + penalty + surcharge);
+
+  const fields: Pp30Field[] = [
+    /* ---------- ส่วนหัว ---------- */
+    { key: 'taxpayerName', label: 'ชื่อผู้ประกอบการ', value: taxpayer.name, type: 'text' },
+    { key: 'taxId', label: 'เลขประจำตัวผู้เสียภาษีอากร', value: taxpayer.taxId, type: 'text' },
+    { key: 'branchNo', label: 'สาขาที่', value: taxpayer.branchNo ?? '00000', type: 'text' },
+    { key: 'address', label: 'ที่ตั้งสถานประกอบการ', value: taxpayer.address ?? '', type: 'text' },
+    { key: 'taxMonth', label: 'เดือนภาษี', value: month, type: 'text' },
+    { key: 'taxYearBE', label: 'ปี (พ.ศ.)', value: yearBE, type: 'text' },
+    {
+      key: 'additionalFilingNo',
+      label: 'ยื่นเพิ่มเติมครั้งที่',
+      value: manual.additionalFilingNo ?? 0,
+      type: 'text',
+    },
+
+    /* ---------- ยอดขาย ---------- */
+    { key: 'totalSales', label: 'ยอดขายในเดือนนี้', formLine: '1', value: totalSales, type: 'money' },
+    {
+      key: 'zeroRatedSales',
+      label: 'ยอดขายที่เสียภาษีในอัตราร้อยละ 0',
+      formLine: '2',
+      value: zeroRated,
+      type: 'money',
+    },
+    {
+      key: 'exemptSales',
+      label: 'ยอดขายที่ได้รับยกเว้นภาษีมูลค่าเพิ่ม',
+      formLine: '3',
+      value: exempt,
+      type: 'money',
+    },
+    {
+      key: 'taxableSales',
+      label: 'ยอดขายที่ต้องเสียภาษี',
+      formLine: '4',
+      value: taxable,
+      type: 'money',
+    },
+    { key: 'outputVat', label: 'ภาษีขายเดือนนี้', formLine: '5', value: row.outputVat, type: 'money' },
+
+    /* ---------- ยอดซื้อ ---------- */
+    {
+      key: 'purchasesEligible',
+      label: 'ยอดซื้อที่มีสิทธินำภาษีซื้อมาหักในการคำนวณภาษีเดือนนี้',
+      formLine: '6',
+      value: r2(row.rate > 0 ? row.inputVat / row.rate : 0),
+      type: 'money',
+    },
+    { key: 'inputVat', label: 'ภาษีซื้อเดือนนี้', formLine: '7', value: row.inputVat, type: 'money' },
+
+    /* ---------- สรุป ---------- */
+    {
+      key: 'vatPayableBeforeCredit',
+      label: 'ภาษีที่ต้องชำระ (ภาษีขาย > ภาษีซื้อ)',
+      formLine: '8',
+      value: r2(Math.max(0, row.outputVat - row.inputVat)),
+      type: 'money',
+    },
+    {
+      key: 'vatOverpaidBeforeCredit',
+      label: 'ภาษีที่ชำระเกิน (ภาษีซื้อ > ภาษีขาย)',
+      formLine: '9',
+      value: r2(Math.max(0, row.inputVat - row.outputVat)),
+      type: 'money',
+    },
+    {
+      key: 'creditBrought',
+      label: 'ภาษีที่ชำระเกินยกมา',
+      formLine: '10',
+      value: row.creditBrought,
+      type: 'money',
+    },
+    {
+      key: 'netVatPayable',
+      label: 'ภาษีสุทธิที่ต้องชำระ',
+      formLine: '11',
+      value: row.payable,
+      type: 'money',
+    },
+    {
+      key: 'netVatOverpaid',
+      label: 'ภาษีสุทธิที่ชำระเกิน (ยกไปเครดิต/ขอคืน)',
+      formLine: '12',
+      value: row.carryForward,
+      type: 'money',
+    },
+    { key: 'penalty', label: 'เบี้ยปรับ', formLine: '14', value: penalty, type: 'money' },
+    { key: 'surcharge', label: 'เงินเพิ่ม', formLine: '13', value: surcharge, type: 'money' },
+    { key: 'grandTotal', label: 'รวมภาษีที่ต้องชำระทั้งสิ้น', formLine: '15', value: grandTotal, type: 'money' },
+
+    /* ---------- ช่องเลือก ---------- */
+    {
+      key: 'requestRefund',
+      label: 'ขอคืนเป็นเงินสด',
+      value: 0,
+      type: 'checkbox',
+    },
+    {
+      key: 'carryForwardCredit',
+      label: 'ขอนำไปเครดิตภาษีเดือนถัดไป',
+      value: row.carryForward > 0 ? 1 : 0,
+      type: 'checkbox',
+    },
+  ];
+
+  const byKey = Object.fromEntries(fields.map((f) => [f.key, f.value]));
+
+  return { period: row.period, month, yearBE, taxpayer, fields, byKey };
+}
+
+/**
+ * ตรวจความสมเหตุสมผลก่อนส่งไป map PDF
+ * คืนรายการปัญหา — ว่างเปล่า = ผ่าน
+ */
+export function validatePp30Fields(f: Pp30FormFields): string[] {
+  const problems: string[] = [];
+  const v = f.byKey;
+
+  if (!String(v.taxpayerName || '').trim()) problems.push('ยังไม่มีชื่อผู้ประกอบการ');
+  if (!/^\d{13}$/.test(String(v.taxId || '').replace(/\D/g, ''))) {
+    problems.push('เลขประจำตัวผู้เสียภาษีต้องเป็นเลข 13 หลัก');
+  }
+  if (Number(v.netVatPayable) > 0 && Number(v.netVatOverpaid) > 0) {
+    problems.push('ภาษีสุทธิที่ต้องชำระและที่ชำระเกิน มีค่าพร้อมกันไม่ได้');
+  }
+  const salesSum = r2(
+    Number(v.taxableSales) + Number(v.zeroRatedSales) + Number(v.exemptSales),
+  );
+  if (salesSum !== Number(v.totalSales)) {
+    problems.push(
+      `ยอดขายรวม (${v.totalSales}) ไม่เท่ากับผลบวกของยอดขายแต่ละประเภท (${salesSum})`,
+    );
+  }
+  return problems;
+}
+
+/* ------------------------------------------------------------------ *
+ * DB-backed template override — mirror ของระบบ mapping ที่ใช้กับ ภ.ง.ด.90/94 อยู่แล้ว
+ * (ตาราง public.tax_form_templates / public.tax_form_field_mappings ใน SAAS HorSet)
+ *
+ * ภ.ง.ด.90/94 ใช้ pdf-lib โหลด AcroForm template ที่ super admin อัปโหลดได้ แล้วแปล
+ * "logical key → physical field name" ผ่านตาราง mapping ที่แก้ไขได้จากหน้า admin แทนที่จะ
+ * hardcode ชื่อ field ในโค้ด (มี DEFAULT_PND90_MAPPING/DEFAULT_PND94_MAPPING เป็น fallback
+ * เมื่อยังไม่มี override ในตาราง) — ภ.พ.30 mirror รูปแบบเดียวกันผ่านตาราง
+ * pp30_form_templates / pp30_form_field_mappings (ดู database_patch_add_vat_pp30.sql) เป็นตาราง
+ * แยกต่างหาก ไม่ไปแก้ CHECK constraint หรือข้อมูลของ tax_form_templates/tax_form_field_mappings เดิมเลย
+ */
+
+export type Pp30FieldKind = 'text' | 'radio';
+export type Pp30ValueFormat = 'raw' | 'comb' | 'plain_decimal';
+
+/** แถวของ public.pp30_form_templates */
+export interface Pp30FormTemplateRow {
+  id: string;
+  taxYear: string | null;
+  fileUrl: string;
+  fileName?: string | null;
+  isBundledDefault: boolean;
+}
+
+/** แถวของ public.pp30_form_field_mappings — physical field <-> logical key เดียวกับที่ 90/94 ใช้ */
+export interface Pp30FormFieldMappingRow {
+  id: string;
+  templateId: string;
+  logicalKey: string;
+  fieldKind: Pp30FieldKind;
+  physicalFieldName: string;
+  optionKey?: string | null;
+  widgetIndex?: number | null;
+  valueFormat: Pp30ValueFormat | null;
+}
+
+/** ค่าที่พร้อมส่งให้ตัว fill PDF จริง (pdf-lib) — คีย์คือ physicalFieldName ไม่ใช่ logical key แล้ว */
+export interface Pp30PhysicalValues {
+  text: Record<string, { format: Pp30ValueFormat; value: number | string }>;
+  radio: Record<string, string>;
+}
+
+/**
+ * แปล Pp30FormFields (logical key) → ค่าตาม physical field name จริง โดยใช้ mapping จากตาราง
+ * pp30_form_field_mappings (ถ้ามี override) — ถ้าไม่มี ผู้เรียกควร fallback ไปใช้
+ * DEFAULT_PP30_MAPPING ใน pdfHelper.ts เอง (mapping รูปแบบเดียวกันนี้)
+ *
+ * ฟังก์ชันนี้ไม่รู้จัก pdf-lib และไม่โหลดไฟล์ PDF เอง — เป็นแค่ชั้นแปลข้อมูลบริสุทธิ์
+ * เหมือนที่ pdfHelper.ts แยก compute*Values ออกจาก fillPdfFromMapping ของ 90/94
+ */
+export function resolvePp30PhysicalValues(
+  form: Pp30FormFields,
+  mapping: readonly Pp30FormFieldMappingRow[],
+): Pp30PhysicalValues {
+  const result: Pp30PhysicalValues = { text: {}, radio: {} };
+
+  for (const m of mapping) {
+    const value = form.byKey[m.logicalKey];
+    if (value === undefined) continue;
+
+    if (m.fieldKind === 'text') {
+      result.text[m.physicalFieldName] = { format: m.valueFormat ?? 'comb', value };
+    } else {
+      // radio: physical field เป็นชื่อกลุ่ม, optionKey คือค่าที่ต้องเลือกเมื่อ value ตรงเงื่อนไข
+      const checked = String(value) === '1' || String(value) === 'true';
+      if (checked && m.optionKey) result.radio[m.physicalFieldName] = m.optionKey;
+    }
+  }
+
+  return result;
+}

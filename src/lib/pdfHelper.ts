@@ -903,6 +903,205 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
   return new Blob([pdfBytes as any], { type: "application/pdf" })
 }
 
+// ============================================================================
+// ภ.พ.30 — mirror ระบบ mapping เดียวกับ ภ.ง.ด.90/94 ข้างบน (PndFieldMapping/PndComputedValues/
+// fillPdfFromMapping ใช้ร่วมกันได้เลย ไม่ใช่ PND-specific จริงๆ) ต่อกับไฟล์ template จริงที่ตรวจสอบแล้ว
+// (public/templates/PP30_Template.pdf, ต้นฉบับ pp30_300160.pdf พิมพ์ ม.ค. 2560) ด้วย pdf-lib
+//
+// ⚠️ สถานะ mapping: ตาราง "การคำนวณภาษี" (Text2.1-16) มั่นใจสูง — ตรวจสอบด้วย pdf-lib.getWidgets()
+//    แล้วว่าจำนวน field ตรงกับจำนวนบรรทัด 1-16 บนแบบฟอร์มพอดีและเรียง y ต่อเนื่องตามลำดับ
+//    ส่วนหัว (ชื่อ/ที่อยู่/เดือนภาษี) เป็น best-effort จากตำแหน่ง x/y ของแต่ละ field ยังไม่ได้ยืนยันด้วย
+//    การ render เทียบภาพจริง — ควรตรวจก่อนใช้งานจริง (ดู verification plan ในแผนที่วางไว้)
+//    ที่อยู่ผู้ประกอบการในแบบฟอร์มแยกเป็น 9+ ช่องย่อย (อาคาร/ห้อง/ชั้น/หมู่บ้าน/เลขที่/หมู่/ซอย/ถนน/ตำบล/
+//    อำเภอ/จังหวัด/รหัสไปรษณีย์) แต่ Pp30TaxpayerInfo.address เป็น string เดียว — รอบนี้ map เข้าช่องเดียว
+//    (Text1.02) เป็นการชั่วคราว การแยกช่องย่อยเต็มรูปแบบเป็นงานต่อยอด (ต้องต่อกับ workspaces.tax_address_*
+//    ที่มีอยู่แล้วสำหรับ ภ.ง.ด.94 เหมือนกัน)
+// ============================================================================
+
+export const DEFAULT_PP30_MAPPING: PndFieldMapping[] = [
+  { logicalKey: "taxId", fieldKind: "text", physicalFieldName: "Text1.0", valueFormat: "raw" },
+  { logicalKey: "branchNo", fieldKind: "text", physicalFieldName: "Text1.1", valueFormat: "raw" },
+  { logicalKey: "taxpayerName", fieldKind: "text", physicalFieldName: "Text1.01", valueFormat: "raw" },
+  { logicalKey: "address", fieldKind: "text", physicalFieldName: "Text1.02", valueFormat: "raw" },
+  { logicalKey: "taxYearBE", fieldKind: "text", physicalFieldName: "Text1.22", valueFormat: "raw" },
+  { logicalKey: "additionalFilingNo", fieldKind: "text", physicalFieldName: "Text1.21", valueFormat: "raw" },
+
+  // เดือนภาษี — เช็คบ็อกซ์ 12 ตัวใน field เดียว (Radio Button3) เรียง 4 คอลัมน์ x 3 แถวตามแบบฟอร์มจริง
+  // widgetIndex เรียงตามลำดับที่ pdf-lib คืนมาจาก getWidgets() ไม่ใช่ตามเลขเดือน — อ้างอิงจากผลตรวจสอบจริง
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "1", widgetIndex: 0 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "2", widgetIndex: 1 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "3", widgetIndex: 2 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "4", widgetIndex: 3 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "5", widgetIndex: 4 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "6", widgetIndex: 5 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "7", widgetIndex: 6 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "8", widgetIndex: 7 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "9", widgetIndex: 8 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "10", widgetIndex: 9 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "11", widgetIndex: 10 },
+  { logicalKey: "taxMonth", fieldKind: "radio", physicalFieldName: "Radio Button3", optionKey: "12", widgetIndex: 11 },
+
+  // ตาราง "การคำนวณภาษี" บรรทัด 1-16 — mapping 1:1 กับเลขบรรทัดบนแบบฟอร์มจริง (มั่นใจสูง)
+  { logicalKey: "totalSales", fieldKind: "text", physicalFieldName: "Text2.1", valueFormat: "plain_decimal" },
+  { logicalKey: "zeroRatedSales", fieldKind: "text", physicalFieldName: "Text2.2", valueFormat: "plain_decimal" },
+  { logicalKey: "exemptSales", fieldKind: "text", physicalFieldName: "Text2.3", valueFormat: "plain_decimal" },
+  { logicalKey: "taxableSales", fieldKind: "text", physicalFieldName: "Text2.4", valueFormat: "plain_decimal" },
+  { logicalKey: "outputVat", fieldKind: "text", physicalFieldName: "Text2.5", valueFormat: "plain_decimal" },
+  { logicalKey: "purchasesEligible", fieldKind: "text", physicalFieldName: "Text2.6", valueFormat: "plain_decimal" },
+  { logicalKey: "inputVat", fieldKind: "text", physicalFieldName: "Text2.7", valueFormat: "plain_decimal" },
+  { logicalKey: "vatPayableBeforeCredit", fieldKind: "text", physicalFieldName: "Text2.8", valueFormat: "plain_decimal" },
+  { logicalKey: "vatOverpaidBeforeCredit", fieldKind: "text", physicalFieldName: "Text2.9", valueFormat: "plain_decimal" },
+  { logicalKey: "creditBrought", fieldKind: "text", physicalFieldName: "Text2.10", valueFormat: "plain_decimal" },
+  { logicalKey: "netVatPayable", fieldKind: "text", physicalFieldName: "Text2.11", valueFormat: "plain_decimal" },
+  { logicalKey: "netVatOverpaid", fieldKind: "text", physicalFieldName: "Text2.12", valueFormat: "plain_decimal" },
+  { logicalKey: "surcharge", fieldKind: "text", physicalFieldName: "Text2.13", valueFormat: "plain_decimal" },
+  { logicalKey: "penalty", fieldKind: "text", physicalFieldName: "Text2.14", valueFormat: "plain_decimal" },
+  { logicalKey: "grandTotal", fieldKind: "text", physicalFieldName: "Text2.15", valueFormat: "plain_decimal" },
+  { logicalKey: "netOverpaidAfterAdjustment", fieldKind: "text", physicalFieldName: "Text2.16", valueFormat: "plain_decimal" },
+
+  // วิธีขอคืนภาษี — เงินสด/โอนธนาคาร (checkbox เดี่ยว 1 widget ต่อ field)
+  { logicalKey: "requestRefund", fieldKind: "radio", physicalFieldName: "Radio Button11", optionKey: "checked", widgetIndex: 0 },
+  { logicalKey: "carryForwardCredit", fieldKind: "radio", physicalFieldName: "Radio Button12", optionKey: "checked", widgetIndex: 0 },
+]
+
+/**
+ * แปลง Pp30FormFields (จาก src/lib/pp30-fields.ts's buildPp30FormFields()) → PndComputedValues
+ * ที่ fillPdfFromMapping() ใช้ได้ตรงๆ — เป็นชั้นแปลข้อมูลบริสุทธิ์ ไม่รู้จัก pdf-lib เลย
+ */
+export function computePp30Values(form: {
+  month: number
+  byKey: Record<string, number | string>
+}): PndComputedValues {
+  const money = (v: number | string | undefined): PndTextValue => ({ format: "plain_decimal", amount: Number(v) || 0 })
+  const raw = (v: number | string | undefined): PndTextValue => ({ format: "raw", text: v === undefined || v === null ? "" : String(v) })
+
+  const netOverpaidAfterAdjustment = Math.max(
+    0,
+    Number(form.byKey.netVatOverpaid || 0) - Number(form.byKey.surcharge || 0) - Number(form.byKey.penalty || 0)
+  )
+
+  const text: Record<string, PndTextValue | null> = {
+    taxId: raw(form.byKey.taxId),
+    branchNo: raw(form.byKey.branchNo),
+    taxpayerName: raw(form.byKey.taxpayerName),
+    address: raw(form.byKey.address),
+    taxYearBE: raw(form.byKey.taxYearBE),
+    additionalFilingNo: form.byKey.additionalFilingNo ? raw(form.byKey.additionalFilingNo) : null,
+    totalSales: money(form.byKey.totalSales),
+    zeroRatedSales: money(form.byKey.zeroRatedSales),
+    exemptSales: money(form.byKey.exemptSales),
+    taxableSales: money(form.byKey.taxableSales),
+    outputVat: money(form.byKey.outputVat),
+    purchasesEligible: money(form.byKey.purchasesEligible),
+    inputVat: money(form.byKey.inputVat),
+    vatPayableBeforeCredit: money(form.byKey.vatPayableBeforeCredit),
+    vatOverpaidBeforeCredit: money(form.byKey.vatOverpaidBeforeCredit),
+    creditBrought: money(form.byKey.creditBrought),
+    netVatPayable: money(form.byKey.netVatPayable),
+    netVatOverpaid: money(form.byKey.netVatOverpaid),
+    surcharge: money(form.byKey.surcharge),
+    penalty: money(form.byKey.penalty),
+    grandTotal: money(form.byKey.grandTotal),
+    netOverpaidAfterAdjustment: money(netOverpaidAfterAdjustment),
+  }
+
+  const radio: Record<string, string | null> = {
+    taxMonth: String(form.month),
+    requestRefund: Number(form.byKey.requestRefund) === 1 ? "checked" : null,
+    carryForwardCredit: Number(form.byKey.carryForwardCredit) === 1 ? "checked" : null,
+  }
+
+  return { text, radio }
+}
+
+/**
+ * สร้าง PDF แบบ ภ.พ.30 จากไฟล์ template จริง — reuse fillPdfFromMapping()/font-embedding เดียวกับ
+ * generatePndPdf() ทั้งหมด ต่างกันแค่ template + mapping เริ่มต้น
+ *
+ * @param form ผลลัพธ์จาก buildPp30FormFields() (src/lib/pp30-fields.ts)
+ * @param templateUrl URL ของ template ที่ super admin อัปโหลดไว้ (จาก pp30_form_templates) — ไม่ส่งมา = ใช้ไฟล์ bundled
+ * @param mapping mapping ที่ดึงจาก pp30_form_field_mappings — ไม่ส่งมา = ใช้ DEFAULT_PP30_MAPPING
+ */
+export async function generatePp30Pdf(
+  form: { month: number; byKey: Record<string, number | string> },
+  templateUrl?: string,
+  mapping?: PndFieldMapping[]
+) {
+  const resolvedTemplateUrl = templateUrl || "/templates/PP30_Template.pdf"
+
+  const response = await fetch(resolvedTemplateUrl)
+  if (!response.ok) {
+    throw new Error(`ไม่สามารถโหลดไฟล์แบบฟอร์ม ภ.พ.30 ต้นแบบจาก ${resolvedTemplateUrl} ได้`)
+  }
+  const templateBytes = await response.arrayBuffer()
+
+  const fontUrl = "https://fastly.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Regular.ttf"
+  const fontResponse = await fetch(fontUrl)
+  if (!fontResponse.ok) {
+    throw new Error("ไม่สามารถดาวน์โหลดฟอนต์ภาษาไทยสำหรับสร้าง PDF ได้")
+  }
+  const fontBytes = await fontResponse.arrayBuffer()
+
+  const pdfDoc = await PDFDocument.load(templateBytes)
+  pdfDoc.registerFontkit(fontkit)
+  const customFont = await pdfDoc.embedFont(fontBytes, { subset: false })
+
+  repairOrphanedFormFields(pdfDoc)
+  const pdfForm = pdfDoc.getForm()
+
+  const setField = (name: string, value: string) => {
+    try {
+      const field = pdfForm.getTextField(name)
+      field.setText(value)
+    } catch (e) {
+      console.warn(`ไม่สามารถกรอกฟิลด์ ภ.พ.30 ${name}:`, e)
+    }
+  }
+
+  const selectRadioWidget = (name: string, widgetIndex: number) => {
+    try {
+      const radioGroup = pdfForm.getRadioGroup(name)
+      const widgets = radioGroup.acroField.getWidgets()
+      widgets.forEach((w, i) => {
+        const onValue = w.getOnValue()
+        if (i === widgetIndex && onValue) {
+          w.dict.set(PDFName.of("AS"), onValue)
+        } else {
+          w.dict.set(PDFName.of("AS"), PDFName.of("Off"))
+        }
+      })
+      const selectedOn = widgets[widgetIndex]?.getOnValue()
+      if (selectedOn) {
+        radioGroup.acroField.dict.set(PDFName.of("V"), selectedOn)
+      }
+    } catch (e) {
+      console.warn(`ไม่สามารถเลือก radio ภ.พ.30 ${name} (widget ${widgetIndex}):`, e)
+    }
+  }
+
+  const getMaxLength = (name: string): number | undefined => {
+    try {
+      return pdfForm.getTextField(name).getMaxLength()
+    } catch {
+      return undefined
+    }
+  }
+
+  // ช่องจำนวนเงินของแบบ ภ.พ.30 ใช้ format "plain_decimal" (เลขทศนิยม 2 ตำแหน่งธรรมดา) ไม่ใช่ comb เหมือน
+  // บางช่องของ ภ.ง.ด.90/94 เพราะยังไม่ยืนยันว่า field ของแบบฟอร์มนี้ตั้ง comb flag ไว้จริง — fmtComb จึงไม่ถูกใช้
+  // แต่ต้องส่ง helper ให้ครบตาม signature ของ fillPdfFromMapping()
+  const fmtComb = (n: number, totalLen: number) => (Math.max(0, n)).toFixed(2)
+
+  const activeMapping = mapping || DEFAULT_PP30_MAPPING
+  const computed = computePp30Values(form)
+  fillPdfFromMapping(activeMapping, computed, { setField, selectRadioWidget, getMaxLength, fmtComb })
+
+  pdfForm.updateFieldAppearances(customFont)
+
+  const pdfBytes = await pdfDoc.save()
+  return new Blob([pdfBytes as any], { type: "application/pdf" })
+}
+
 export interface BillPdfData {
   roomNumber: string
   tenantName: string
@@ -945,6 +1144,9 @@ export interface BillPdfData {
   electricBuildingTotalUnits?: number | null
   waterBuildingTotalAmount?: number | null
   waterBuildingTotalUnits?: number | null
+  // ภาษีมูลค่าเพิ่ม (VAT) ที่บวกเพิ่มเข้า amount แล้วตอนออกบิล — ดูฟีเจอร์ VAT ใน src/features/tax/
+  // ไม่บังคับ, ค่า 0/undefined = ไม่แสดงบรรทัดนี้เลย (workspace ยังไม่จด VAT หรือบิลนี้ออกก่อนเดือนที่มีผล)
+  vatAmount?: number
 }
 
 // แปลงรอบบิล "YYYY-MM" เป็น "เดือน ปี" ภาษาไทย (ซ้ำกับ helper ในหน้า admin billing/manage-bills
@@ -1053,12 +1255,14 @@ export async function generateBillPdf(data: BillPdfData) {
   
   const penaltyAmount = data.penaltyAmount !== undefined ? Number(data.penaltyAmount || 0) : 0
   const otherServiceAmount = data.otherServiceAmount !== undefined ? Number(data.otherServiceAmount || 0) : 0
-  
+  const vatAmount = data.vatAmount !== undefined ? Number(data.vatAmount || 0) : 0
+
   const extraExpenses = data.extraExpenses || []
   const extraExpensesSum = extraExpenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
   // คำนวณค่าเช่าห้องพักที่หักส่วนลด (หรือรวมค่าปรับ/ค่าใช้จ่ายอื่นๆ เผื่อไว้) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
-  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount - extraExpensesSum)
+  // ต้องหัก vatAmount ออกด้วย เพราะ data.amount รวม VAT ไว้แล้วตั้งแต่ตอนออกบิล (ไม่งั้น VAT จะไปปนเข้าบรรทัดค่าเช่า)
+  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount - extraExpensesSum - vatAmount)
 
   const elecDesc = isElecMin 
     ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
@@ -1146,6 +1350,16 @@ export async function generateBillPdf(data: BillPdfData) {
     drawText(days > 0 ? `${days} วัน` : "1", 280, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(rate.toLocaleString(), 380, y, 9, rgb(0.8, 0.1, 0.1))
     drawText(penaltyAmount.toLocaleString(), 475, y, 9, rgb(0.8, 0.1, 0.1))
+    itemIndex++
+  }
+
+  // รายการ ภาษีมูลค่าเพิ่ม (แสดงต่อเมื่อ workspace จด VAT แล้วและมีการคิดจริงในบิลนี้)
+  if (vatAmount > 0) {
+    y -= 25
+    drawText(`${itemIndex}. ภาษีมูลค่าเพิ่ม (VAT)`, 50, y, 9, rgb(0.2, 0.2, 0.2))
+    drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
+    drawText(vatAmount.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+    drawText(vatAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
     itemIndex++
   }
 

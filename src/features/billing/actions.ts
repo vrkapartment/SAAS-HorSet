@@ -38,7 +38,24 @@ function resolveUtilityRate(
   return { rate: row.ratePerUnit }
 }
 
-const isSupabaseConfigured = 
+/**
+ * Resolve ว่าบิลของรอบเดือนนี้ต้องคิด VAT หรือไม่ + อัตราเท่าไร ตามกฎเดียวกับ lib/tax/vat.ts's vatStatus():
+ * charging = vatRegistered && (ไม่มี vatRegisteredFrom หรือ billingCycle >= vatRegisteredFrom)
+ * คิดเฉพาะฐาน 40(8) (ค่าน้ำ-ไฟ-ส่วนกลาง-บริการอื่น-ค่าใช้จ่ายเพิ่มเติม) — ค่าเช่า 40(5) ยกเว้น VAT เสมอ
+ * บวก VAT เพิ่มจากยอดเดิม (ผู้เช่าจ่ายเพิ่มขึ้นจริง) ไม่ถอดจากยอดเดิม
+ */
+function resolveVatCharging(
+  settings: FinanceSettings,
+  billingCycle: string
+): { applies: boolean; rate: number } {
+  const registered = Boolean(settings.vat_registered)
+  if (!registered) return { applies: false, rate: 0 }
+  const registeredFrom = settings.vat_registered_from ? settings.vat_registered_from.slice(0, 7) : null
+  const applies = !registeredFrom || billingCycle >= registeredFrom
+  return { applies, rate: applies ? Number(settings.vat_rate ?? 0.07) : 0 }
+}
+
+const isSupabaseConfigured =
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
   process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
 
@@ -71,7 +88,8 @@ export async function getBills(billingCycle?: string, year?: string) {
       penaltyAmount: b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null,
       lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
       otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
-      invoiceId: b.invoice_id
+      invoiceId: b.invoice_id,
+      vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0
     }))
 
     return { success: true, data: formatted }
@@ -213,8 +231,11 @@ export async function createBill(
     const waterResolved = resolveUtilityRate("water", settings.water_billing_mode, settings.water_rate, roomData.building_id, buildingBillsMap)
     if (waterResolved.error) return { success: false, error: waterResolved.error }
 
+    // 3.6 Resolve ว่าต้องคิด VAT กับบิลนี้หรือไม่ (workspace จด VAT แล้ว + ถึงเดือนที่มีผล)
+    const vatResolved = resolveVatCharging(settings, billingCycle)
+
     // 4. Calculate total on Server
-    const { elecCost, waterCost, total: serverCalculatedTotal } = calculateBillTotal({
+    const { elecCost, waterCost, vatAmount, total: serverCalculatedTotal } = calculateBillTotal({
       baseRent,
       electricUnitsUsed: electricUnits,
       waterUnitsUsed: waterUnits,
@@ -228,7 +249,9 @@ export async function createBill(
       waterMinUnit: settings.water_min_unit,
       waiveElectricMin,
       electricMinChecked: settings.electric_min_checked,
-      electricMinUnit: settings.electric_min_unit
+      electricMinUnit: settings.electric_min_unit,
+      vatRate: vatResolved.rate,
+      vatApplies: vatResolved.applies
     })
 
     // Log warning if client is sending different amount
@@ -264,7 +287,8 @@ export async function createBill(
           water_units: waterUnits,
           other_service_amount: otherServiceAmount,
           invoice_id: invoiceId,
-          building_id: roomData.building_id ?? null
+          building_id: roomData.building_id ?? null,
+          vat_amount: vatAmount
         })
         .eq("id", existing.id)
         .select()
@@ -283,7 +307,8 @@ export async function createBill(
           late_days: null,
           penalty_amount: null,
           invoice_id: `INV-${billingCycle.replace('-', '')}-${roomNumber}`,
-          building_id: roomData.building_id ?? null
+          building_id: roomData.building_id ?? null,
+          vat_amount: vatAmount
         }])
         .select()
     }
@@ -1017,6 +1042,9 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       }
     }
 
+    // 1.6 Resolve ว่าต้องคิด VAT กับรอบบิลนี้หรือไม่ — ค่าเดียวกันทุกห้อง (ขึ้นกับ settings+billingCycle เท่านั้น)
+    const vatResolved = resolveVatCharging(settings, billingCycle)
+
     // 2. คำนวณทุกห้องใน memory (ไม่มี await ในลูปนี้เลย)
     const meterRows: any[] = []
     const billRows: any[] = []
@@ -1055,13 +1083,14 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const extraExpensesSum = (roomData.extra_expenses || []).reduce((a: number, c: any) => a + Number(c.amount || 0), 0)
 
       // ใช้ calculateBillTotal ตัวเดียวกับที่ createBill ใช้อยู่ (ห้ามเขียนสูตรซ้ำ)
-      const { total } = calculateBillTotal({
+      const { total, vatAmount } = calculateBillTotal({
         baseRent, electricUnitsUsed: eUnits, waterUnitsUsed: wUnits,
         electricRate: electricResolved.rate, waterRate: waterResolved.rate,
         commonFee: settings.common_fee, otherServiceAmount: item.otherServiceAmount,
         extraExpensesSum,
         waiveWaterMin: !!roomData.waive_water_min, waterMinChecked: settings.water_min_checked, waterMinUnit: settings.water_min_unit,
-        waiveElectricMin: !!roomData.waive_electric_min, electricMinChecked: settings.electric_min_checked, electricMinUnit: settings.electric_min_unit
+        waiveElectricMin: !!roomData.waive_electric_min, electricMinChecked: settings.electric_min_checked, electricMinUnit: settings.electric_min_unit,
+        vatRate: vatResolved.rate, vatApplies: vatResolved.applies
       })
 
       billRows.push({
@@ -1075,7 +1104,8 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         water_units: wUnits,
         other_service_amount: item.otherServiceAmount,
         invoice_id: `INV-${billingCycle.replace(/-/g, "")}-${item.roomNumber}`,
-        building_id: roomData.building_id ?? null
+        building_id: roomData.building_id ?? null,
+        vat_amount: vatAmount
       })
     }
 

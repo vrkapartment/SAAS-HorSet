@@ -37,7 +37,7 @@ import {
   deleteExpense, 
   ExpenseItem 
 } from "@/features/expenses/actions"
-import { getFinanceSettings } from "@/features/finance/actions"
+import { getFinanceSettings, saveFinanceSettings } from "@/features/finance/actions"
 import { getRooms } from "@/features/room/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getBills } from "@/features/billing/actions"
@@ -45,6 +45,32 @@ import { getTenants, getCancelledContracts, migrateLocalStorageCancelledContract
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import {
+  loadTaxDataset,
+  filePitReturn,
+  getPitFilingSnapshot,
+  computePitBreakdownFromThaiTax,
+} from "@/features/tax/actions"
+import {
+  VatGate,
+  VatThresholdCard,
+  TaxOverviewDashboard,
+  VatSettingsSection,
+  TaxpayerTypeSection,
+  ExpenseModeSection,
+  MinTaxRuleSection,
+  PersonalAllowanceLockNotice,
+  ProgressiveBracketTable,
+  PitBalanceSummary,
+  PitComparisonTable,
+  Pp30Report,
+  ExpenseVatFields,
+  computeExpenseVat,
+  type ExpenseVatMode,
+} from "@/features/tax/components"
+import { useVatStatus, useTaxOverview, usePp30 } from "@/features/tax/hooks/useTax"
+import { firstThresholdBreach, DEFAULT_TAX_SETTINGS } from "@/lib/tax"
+import type { TaxDataset, TaxSettings } from "@/types/tax"
 
 interface BillItem {
   id: string
@@ -115,6 +141,93 @@ export default function TaxPage() {
   const [addressYaek, setAddressYaek] = useState("")
   const [loadingPdf, setLoadingPdf] = useState<"90" | "94" | null>(null)
 
+  // ============================================================================
+  // ฟีเจอร์ VAT + ภ.พ.30 + ส่วนขยาย ภ.ง.ด.90/94 — ดู src/features/tax/, src/lib/tax
+  // ============================================================================
+
+  // TaxDataset เต็มชุด (ใช้กับ VAT/ภ.พ.30 เท่านั้น) — เริ่มเป็นค่าว่างที่ถูกต้องตาม type เสมอ
+  // เพื่อให้ hooks (useVatStatus/useTaxOverview/usePp30) เรียกได้แน่นอนทุก render ไม่ต้องมีเงื่อนไข
+  const [taxDataset, setTaxDataset] = useState<TaxDataset>({
+    incomes: [],
+    expenses: [],
+    settings: DEFAULT_TAX_SETTINGS as TaxSettings,
+    deductions: [],
+    pp30Filings: [],
+    pitFilings: [],
+  })
+  const [taxDatasetLoaded, setTaxDatasetLoaded] = useState(false)
+  const [savingVatSettings, setSavingVatSettings] = useState(false)
+
+  const vatStatus = useVatStatus(taxDataset)
+  const vatBreach = firstThresholdBreach(taxDataset.incomes, taxDataset.settings)
+  const taxOverview = useTaxOverview(taxDataset, Number(taxYear))
+  const pp30 = usePp30(taxDataset, Number(taxYear))
+
+  // ⚠️ ตัวเลข ภ.ง.ด.90/94 ที่ใช้ยื่นจริง (แสดงใน PitBreakdown ด้านล่าง) คำนวณผ่าน
+  // computePitBreakdownFromThaiTax() (src/lib/thaiTax.ts เท่านั้น) — ห้ามใช้ taxDataset/lib-tax/pit.ts
+  // คำนวณตัวเลขชุดนี้ เพื่อให้ตรงกับ PDF ที่ดาวน์โหลดเป๊ะ
+  type PitBreakdownResult = Awaited<ReturnType<typeof computePitBreakdownFromThaiTax>>
+  type PitFilingSnapshot = NonNullable<Awaited<ReturnType<typeof getPitFilingSnapshot>>["data"]>
+  const [pitResult90, setPitResult90] = useState<PitBreakdownResult | null>(null)
+  const [pitResult94, setPitResult94] = useState<PitBreakdownResult | null>(null)
+  const [pitFiledSnapshot90, setPitFiledSnapshot90] = useState<PitFilingSnapshot | null>(null)
+  const [pitFiledSnapshot94, setPitFiledSnapshot94] = useState<PitFilingSnapshot | null>(null)
+  const [filingPit, setFilingPit] = useState<"90" | "94" | null>(null)
+
+  const handleVatSettingsChange = async (patch: Partial<TaxSettings>) => {
+    const nextSettings = { ...taxDataset.settings, ...patch } as TaxSettings
+    setTaxDataset(prev => ({ ...prev, settings: nextSettings }))
+    if (!workspaceId) return
+    setSavingVatSettings(true)
+    try {
+      await saveFinanceSettings(workspaceId, {
+        tax_firstname: firstName, tax_lastname: lastName, tax_id: taxId, tax_address: address, tax_phone: phone,
+        promptpay_type: "phone", promptpay_id: "", promptpay_name: "",
+        common_fee: commonFee, water_rate: waterRate, electric_rate: electricRate,
+        water_min_checked: true, water_min_unit: 3, electric_min_checked: true, electric_min_unit: 10,
+        late_penalty_rate: latePenaltyRate,
+        taxpayer_status: nextSettings.taxpayerType, partner_count: nextSettings.partnerCount,
+        vat_registered: nextSettings.vatRegistered,
+        vat_registered_from: nextSettings.vatRegisteredFrom ? `${nextSettings.vatRegisteredFrom}-01` : null,
+        vat_rate: nextSettings.vatRate,
+        vat_threshold: nextSettings.vatThreshold,
+        vat_opening_credit: nextSettings.vatOpeningCredit,
+        expense_a_mode: nextSettings.expenseA.mode, expense_a_lump_rate: nextSettings.expenseA.lumpRate,
+        expense_b_mode: nextSettings.expenseB.mode, expense_b_lump_rate: nextSettings.expenseB.lumpRate,
+        cap_expense_per_bucket: nextSettings.capExpensePerBucket,
+        min_tax_enabled: nextSettings.minTaxRule.enabled, min_tax_rate: nextSettings.minTaxRule.rate,
+        min_tax_threshold_pnd90: nextSettings.minTaxRule.incomeThresholdPND90,
+        min_tax_threshold_pnd94: nextSettings.minTaxRule.incomeThresholdPND94,
+        min_tax_exempt_below: nextSettings.minTaxRule.exemptBelow,
+      })
+      clearWorkspaceCache(workspaceId)
+    } finally {
+      setSavingVatSettings(false)
+    }
+  }
+
+  const handleFilePitReturn = async (form: "90" | "94") => {
+    if (!workspaceId) return
+    const result = form === "90" ? pitResult90 : pitResult94
+    if (!result) return
+    setFilingPit(form)
+    try {
+      const res = await filePitReturn(workspaceId, Number(taxYear), form, result)
+      if (res.success) {
+        showToast(t("tax_page.filed_success") || "บันทึกการยื่นแบบเรียบร้อยแล้ว")
+        const snap = await getPitFilingSnapshot(workspaceId, Number(taxYear), form)
+        if (snap.success) {
+          if (form === "90") setPitFiledSnapshot90(snap.data)
+          else setPitFiledSnapshot94(snap.data)
+        }
+      } else {
+        alert(res.error || "เกิดข้อผิดพลาดในการบันทึกการยื่นแบบ")
+      }
+    } finally {
+      setFilingPit(null)
+    }
+  }
+
   // แหล่งที่มาของข้อมูลการคำนวณภาษี
   const [dataSource, setDataSource] = useState<"system" | "manual">("system")
   const [manualRent405, setManualRent405] = useState(0)
@@ -152,6 +265,9 @@ export default function TaxPage() {
   const [expenseDate, setExpenseDate] = useState("")
   const [expenseSubmitting, setExpenseSubmitting] = useState(false)
   const [expenseError, setExpenseError] = useState<string | null>(null)
+  // ภาษีซื้อของค่าใช้จ่ายรายการนี้ — แสดงเฉพาะเมื่อ workspace จด VAT แล้ว (ดู VatGate ใน JSX ด้านล่าง)
+  const [expenseVatMode, setExpenseVatMode] = useState<ExpenseVatMode>("novat")
+  const [expenseClaimInputVat, setExpenseClaimInputVat] = useState(true)
 
   const [bills, setBills] = useState<BillItem[]>([])
   // true จนกว่าข้อมูลชุดแรก (รวมถึงประวัติยกเลิกสัญญา) จะโหลดครบ ป้องกันการ์ดสรุปยอดโชว์เลขที่ยังไม่ครบก่อนเด้งเป็นเลขจริง
@@ -472,6 +588,8 @@ export default function TaxPage() {
     setExpenseTitle("")
     setExpenseAmount("")
     setExpenseCategory("40_5")
+    setExpenseVatMode("novat")
+    setExpenseClaimInputVat(true)
     // ค่าเริ่มต้นวันที่: ถ้ากำลังดูปีภาษีปัจจุบันให้ใช้วันนี้ ถ้าเป็นปีอื่นให้เริ่มที่ต้นปีนั้นแทน
     const currentRealYear = new Date().getFullYear().toString()
     setExpenseDate(taxYear === currentRealYear ? new Date().toISOString().slice(0, 10) : `${taxYear}-01-01`)
@@ -486,7 +604,11 @@ export default function TaxPage() {
     }
     setEditingExpense(expense)
     setExpenseTitle(expense.title)
+    // ถ้าเคยมีภาษีซื้อบันทึกไว้ ให้กลับมาเป็นโหมด "ยังไม่รวม VAT" (base + vat แยกกันแล้วในฐานข้อมูล)
+    // แล้วแสดงยอด base ในช่องจำนวนเงิน — ไม่รวม vat กลับเข้าไปเพื่อไม่ให้กดบันทึกซ้ำแล้ว VAT ถูกคิดซ้อน
     setExpenseAmount(expense.amount)
+    setExpenseVatMode(expense.vat_amount && expense.vat_amount > 0 ? "base" : "novat")
+    setExpenseClaimInputVat(expense.claim_input_vat !== false)
     setExpenseCategory(expense.category)
     setExpenseDate(expense.created_at ? expense.created_at.slice(0, 10) : "")
     setExpenseError(null)
@@ -519,25 +641,35 @@ export default function TaxPage() {
     // ใช้เที่ยงวันตามเวลาท้องถิ่นกันปัญหาวันที่เพี้ยนข้ามเขตเวลาตอนแปลงเป็น ISO
     const expenseCreatedAt = new Date(`${expenseDate}T12:00:00`).toISOString()
 
+    // แยก base/vat จากยอดที่กรอก — ถ้ายังไม่จด VAT หรือเลือก "ไม่มี VAT" จะได้ base = amt เป๊ะ, vat = 0 เหมือนเดิมทุกจุด
+    const { base: expenseBase, vat: expenseVat, claimInputVat } = computeExpenseVat(
+      { amount: amt, vatMode: expenseVatMode, claimInputVat: expenseClaimInputVat },
+      taxDataset.settings
+    )
+
     try {
       let res
       if (editingExpense) {
         res = await updateExpense(
           editingExpense.id,
           expenseTitle.trim(),
-          amt,
+          expenseBase,
           taxYear,
           expenseCategory,
-          expenseCreatedAt
+          expenseCreatedAt,
+          expenseVat,
+          claimInputVat
         )
       } else {
         res = await createExpense(
           expenseTitle.trim(),
-          amt,
+          expenseBase,
           taxYear,
           expenseCategory,
           undefined,
-          expenseCreatedAt
+          expenseCreatedAt,
+          expenseVat,
+          claimInputVat
         )
       }
 
@@ -843,6 +975,91 @@ export default function TaxPage() {
   const halfTotalRevenue = rent405Half + utilities408Half + other408Half
   const netIncomeHalf = halfTotalRevenue - (deductionRent405Half + deductionUtilities408Half)
 
+  // คำนวณผลภาษี ภ.ง.ด.90/94 เต็มชุด (สำหรับ PitBreakdown) ผ่าน src/lib/thaiTax.ts เท่านั้น (ดูหมายเหตุ
+  // ที่ computePitBreakdownFromThaiTax) — ต้องคำนวณ 94 ก่อนเสมอ เพราะ 90 ต้องใช้ยอดภาษีครึ่งปีมาหักกลบ
+  useEffect(() => {
+    let cancelled = false
+    async function computeBoth() {
+      const expenseACfg = {
+        mode: (deductionMethod405 === "เหมา 30%" ? "lump" : "actual") as "lump" | "actual",
+        lumpRate: 0.30,
+        actualAmount: actualExpense405,
+      }
+      const expenseBCfg = {
+        mode: (deductionMethod408 === "เหมา 60%" ? "lump" : "actual") as "lump" | "actual",
+        lumpRate: 0.60,
+        actualAmount: actualExpense408,
+      }
+
+      const result94 = await computePitBreakdownFromThaiTax({
+        form: "PND94",
+        incomeA: rent405Half,
+        incomeB: utilities408Half,
+        incomeOther: other408Half,
+        expenseA: { ...expenseACfg, actualAmount: actualExpense405Half },
+        expenseB: { ...expenseBCfg, actualAmount: actualExpense408Half },
+        taxpayerType: taxpayerStatus,
+        partnerCount,
+        otherDeductions: 0,
+      })
+      if (cancelled) return
+      setPitResult94(result94)
+
+      const result90 = await computePitBreakdownFromThaiTax({
+        form: "PND90",
+        incomeA: rent405Full,
+        incomeB: utilities408Full,
+        incomeOther: other408Full,
+        expenseA: expenseACfg,
+        expenseB: expenseBCfg,
+        taxpayerType: taxpayerStatus,
+        partnerCount,
+        otherDeductions: 0,
+        pnd94Paid: result94.payable ?? 0,
+      })
+      if (cancelled) return
+      setPitResult90(result90)
+    }
+    computeBoth().catch(err => console.error("Failed to compute PIT breakdown:", err))
+    return () => { cancelled = true }
+  }, [
+    rent405Full, utilities408Full, other408Full,
+    rent405Half, utilities408Half, other408Half,
+    deductionMethod405, deductionMethod408,
+    actualExpense405, actualExpense408, actualExpense405Half, actualExpense408Half,
+    taxpayerStatus, partnerCount,
+  ])
+
+  // โหลด snapshot ของปีนี้ (ถ้าเคยกดยื่นแบบไปแล้ว) — ใช้บอกผู้ใช้ว่ายื่นไปแล้วเมื่อไร ไม่ได้ล็อกการแก้ settings
+  useEffect(() => {
+    if (!workspaceId) return
+    let cancelled = false
+    Promise.all([
+      getPitFilingSnapshot(workspaceId, Number(taxYear), "90"),
+      getPitFilingSnapshot(workspaceId, Number(taxYear), "94"),
+    ]).then(([snap90, snap94]) => {
+      if (cancelled) return
+      if (snap90.success) setPitFiledSnapshot90(snap90.data)
+      if (snap94.success) setPitFiledSnapshot94(snap94.data)
+    })
+    return () => { cancelled = true }
+  }, [workspaceId, taxYear])
+
+  // โหลด TaxDataset เต็มชุดสำหรับฟีเจอร์ VAT/ภ.พ.30 (แยกจากข้อมูล ภ.ง.ด.90/94 เดิมข้างบนโดยสิ้นเชิง)
+  useEffect(() => {
+    if (!workspaceId) return
+    let cancelled = false
+    setTaxDatasetLoaded(false)
+    loadTaxDataset(workspaceId, Number(taxYear)).then(res => {
+      if (cancelled) return
+      if (res.success && res.data) {
+        setTaxDataset(res.data)
+      }
+      setTaxDatasetLoaded(true)
+    })
+    return () => { cancelled = true }
+  }, [workspaceId, taxYear])
+
   const handleExport = () => {
     alert(t("tax_page.alert_export", { year: taxYear }))
   }
@@ -996,6 +1213,25 @@ export default function TaxPage() {
           </p>
         </div>
       </div>
+
+      {/* ภาพรวม VAT — แสดงเฉพาะเมื่อ workspace จดทะเบียน VAT แล้ว (ยกเว้นคำเตือนใกล้/เกินเกณฑ์ 1.8 ล้าน) */}
+      {taxDatasetLoaded && (
+        <>
+          <VatThresholdCard status={vatStatus} breach={vatBreach} />
+          <VatGate settings={taxDataset.settings}>
+            <TaxOverviewDashboard
+              year={Number(taxYear)}
+              vat={vatStatus}
+              vatEnabled={taxOverview.vatEnabled}
+              yearIncome={taxOverview.yearIncome}
+              yearExpense={taxOverview.yearExpense}
+              months={taxOverview.months}
+              hasData={taxOverview.hasData}
+              breach={vatBreach}
+            />
+          </VatGate>
+        </>
+      )}
 
       {/* ส่วนตั้งค่าแหล่งข้อมูลการคำนวณและลดหย่อนภาษี */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1237,6 +1473,36 @@ export default function TaxPage() {
           </div>
         </div>
       </div>
+
+      {/* ตั้งค่า VAT + กฎภาษี — ฟีเจอร์ 5 (ของใหม่ทั้งบล็อก) ดู src/features/tax/components */}
+      {taxDatasetLoaded && hasEditPermission && (
+        <div className="space-y-6">
+          <VatSettingsSection
+            settings={taxDataset.settings}
+            onChange={handleVatSettingsChange}
+            status={vatStatus}
+            breach={vatBreach}
+            busy={savingVatSettings}
+          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TaxpayerTypeSection
+              settings={taxDataset.settings}
+              onChange={handleVatSettingsChange}
+              busy={savingVatSettings}
+            />
+            <MinTaxRuleSection
+              minTaxRule={taxDataset.settings.minTaxRule}
+              onChange={handleVatSettingsChange}
+              busy={savingVatSettings}
+            />
+          </div>
+          <ExpenseModeSection
+            settings={taxDataset.settings}
+            onChange={handleVatSettingsChange}
+            busy={savingVatSettings}
+          />
+        </div>
+      )}
 
       {/* บัตรรายได้และหักลดหย่อน (The Four Income Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1948,6 +2214,15 @@ export default function TaxPage() {
               </>
             )}
           </button>
+          {hasEditPermission && (
+            <button
+              onClick={() => handleFilePitReturn("94")}
+              disabled={filingPit !== null || !pitResult94}
+              className="w-full py-2 border border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-400 font-semibold rounded-xl text-xs hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {filingPit === "94" ? "กำลังบันทึก..." : pitFiledSnapshot94 ? `ยื่นแบบแล้วเมื่อ ${pitFiledSnapshot94.filedAt} (กดเพื่ออัปเดต)` : "บันทึกว่ายื่นแบบแล้ว"}
+            </button>
+          )}
         </div>
 
         {/* เต็มปี ภ.ง.ด. 90 */}
@@ -1983,8 +2258,60 @@ export default function TaxPage() {
               </>
             )}
           </button>
+          {hasEditPermission && (
+            <button
+              onClick={() => handleFilePitReturn("90")}
+              disabled={filingPit !== null || !pitResult90}
+              className="w-full py-2 border border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-400 font-semibold rounded-xl text-xs hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {filingPit === "90" ? "กำลังบันทึก..." : pitFiledSnapshot90 ? `ยื่นแบบแล้วเมื่อ ${pitFiledSnapshot90.filedAt} (กดเพื่ออัปเดต)` : "บันทึกว่ายื่นแบบแล้ว"}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* ส่วนขยาย ภ.ง.ด.90/94 — คำนวณจาก src/lib/thaiTax.ts เท่านั้น (ตรงกับ PDF ด้านบนเป๊ะ) */}
+      {pitResult94 && pitResult90 && (() => {
+        const pnd94Computation = {
+          year: Number(taxYear), form: "PND94" as const, from: "", to: "", months: 6,
+          income: taxOverview.yearIncome, expense: taxOverview.yearExpense,
+          tax: pitResult94, filing: null, pnd94Paid: 0, pnd94IsEstimate: false, pnd94Result: null,
+        }
+        const pnd90Computation = {
+          year: Number(taxYear), form: "PND90" as const, from: "", to: "", months: 12,
+          income: taxOverview.yearIncome, expense: taxOverview.yearExpense,
+          tax: pitResult90, filing: null, pnd94Paid: pitResult94.payable ?? 0, pnd94IsEstimate: !pitFiledSnapshot94,
+          pnd94Result: pnd94Computation,
+        }
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PersonalAllowanceLockNotice form="PND94" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
+              <PersonalAllowanceLockNotice form="PND90" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ProgressiveBracketTable result={pitResult94} />
+              <ProgressiveBracketTable result={pitResult90} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PitBalanceSummary computation={pnd94Computation} />
+              <PitBalanceSummary computation={pnd90Computation} />
+            </div>
+            <PitComparisonTable pnd90={pnd90Computation} />
+          </div>
+        )
+      })()}
+
+      {/* ภ.พ.30 — แสดงเฉพาะเมื่อจดทะเบียน VAT แล้ว */}
+      <VatGate settings={taxDataset.settings}>
+        <Pp30Report
+          year={Number(taxYear)}
+          rows={pp30.rows}
+          totals={pp30.totals}
+          enabled={pp30.enabled}
+          vat={vatStatus}
+        />
+      </VatGate>
 
       {/* Modal บันทึกค่าใช้จ่าย */}
       {expenseModalOpen && (
@@ -2118,6 +2445,20 @@ export default function TaxPage() {
                   </button>
                 </div>
               </div>
+
+              {/* ภาษีซื้อ — แสดงเฉพาะ workspace ที่จด VAT แล้ว (ฟีเจอร์ 2) */}
+              <VatGate settings={taxDataset.settings}>
+                <ExpenseVatFields
+                  value={{ amount: expenseAmount, vatMode: expenseVatMode, claimInputVat: expenseClaimInputVat }}
+                  onChange={(next) => {
+                    setExpenseAmount(next.amount)
+                    setExpenseVatMode(next.vatMode)
+                    setExpenseClaimInputVat(next.claimInputVat)
+                  }}
+                  settings={taxDataset.settings}
+                  bucket={expenseCategory === "40_5" ? "A" : "B"}
+                />
+              </VatGate>
 
               {/* Dynamic Guidance / Recommendation Tooltip */}
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">

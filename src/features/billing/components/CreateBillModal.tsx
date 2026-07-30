@@ -24,6 +24,8 @@ interface CreateBillModalProps {
   waterMinChecked: boolean
   waterMinUnit: number
   computedTotal: number
+  /** VAT ที่บวกเพิ่มจากยอดเดิม — ไม่แสดงบรรทัดนี้เมื่อเป็น 0 (workspace ยังไม่จด VAT หรือยังไม่ถึงเดือนที่มีผล) */
+  vatAmount?: number
   rateMissingWarning?: string
   onClose: () => void
   onSubmit: (e: React.FormEvent) => Promise<void>
@@ -51,6 +53,7 @@ export default function CreateBillModal({
   waterMinChecked,
   waterMinUnit,
   computedTotal,
+  vatAmount = 0,
   rateMissingWarning,
   onClose,
   onSubmit
@@ -201,6 +204,14 @@ export default function CreateBillModal({
                 <span className={isDark ? "text-slate-400" : "text-slate-500"}>{t("manage_bills.cbm_other_service_summary_label")}</span>
                 <span className={`font-semibold ${isDark ? "text-violet-400" : "text-violet-600"}`}>
                   {otherServiceAmountManual.toLocaleString()} {t("daily_bills.baht_unit")}
+                </span>
+              </div>
+            )}
+            {vatAmount > 0 && (
+              <div className="flex justify-between">
+                <span className={isDark ? "text-slate-400" : "text-slate-500"}>ภาษีมูลค่าเพิ่ม (VAT)</span>
+                <span className={`font-semibold ${isDark ? "text-amber-400" : "text-amber-600"}`}>
+                  {vatAmount.toLocaleString()} {t("daily_bills.baht_unit")}
                 </span>
               </div>
             )}

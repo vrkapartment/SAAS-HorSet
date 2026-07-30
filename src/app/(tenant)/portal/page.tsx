@@ -434,6 +434,7 @@ export default function TenantPortal() {
 
   const commonAreaFee = commonFee
   const otherServiceAmount = bill ? (bill.otherServiceAmount || 0) : 0
+  const vatAmount = bill ? (bill.vatAmount || 0) : 0
 
   // ค่าเช่าห้องพักหลัก
   const rentPrice = baseRent
@@ -595,6 +596,7 @@ export default function TenantPortal() {
         lateDays,
         latePenaltyRate,
         otherServiceAmount,
+        vatAmount,
         waiveElectricMin,
         waiveWaterMin,
         invoiceId: bill ? (bill.invoiceId || bill.invoice_id) : `INV-${(bill?.billingCycle || '2026-06').replace('-', '')}-${roomNumber}`,
@@ -876,6 +878,17 @@ export default function TenantPortal() {
                   <span>{t("tenant_portal.item_other_services")}</span>
                 </div>
                 <span className="font-semibold text-slate-200">{otherServiceAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+              </div>
+            )}
+
+            {/* ภาษีมูลค่าเพิ่ม (VAT) — แสดงเฉพาะเมื่อบิลนี้มีการคิดจริง */}
+            {vatAmount > 0 && (
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>ภาษีมูลค่าเพิ่ม (VAT)</span>
+                </div>
+                <span className="font-semibold text-slate-200">{vatAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
               </div>
             )}
 
