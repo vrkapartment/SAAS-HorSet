@@ -15,6 +15,7 @@ import {
   calculateMinimumTax,
   calculatePersonalDeduction,
   calculateProgressiveTax,
+  capActualExpenseDeduction,
 } from "@/lib/thaiTax"
 
 /**
@@ -118,13 +119,28 @@ async function assertTaxAccess(workspaceId: string) {
 }
 
 /**
+ * ข้อมูลที่หน้าเรียกอยู่แล้ว (เช่น loadInitialData ใน tax/page.tsx) ส่งมาให้แทนการยิง query ซ้ำเอง —
+ * ลด round-trip ซ้ำซ้อนระหว่าง pipeline ข้อมูลสรุปเดิมกับ pipeline ของฟีเจอร์นี้ (ดูหมายเหตุที่เรียกใช้)
+ * ทุกฟิลด์เป็น "ข้อมูลปีภาษีปัจจุบัน" เท่านั้น — ปีก่อนหน้า (สำหรับเกณฑ์ VAT แบบ rolling 12 เดือน) ไม่มี
+ * ที่ไหนเคยดึงมาก่อน จึงยังต้องยิงเองเสมอ
+ */
+export interface LoadTaxDatasetPrefetch {
+  rooms?: { roomNumber: string; baseRent: number }[]
+  tenants?: Awaited<ReturnType<typeof getTenants>>["data"]
+  cancelledContracts?: Awaited<ReturnType<typeof getCancelledContracts>>["data"]
+  financeSettings?: Awaited<ReturnType<typeof getFinanceSettings>>["data"]
+  thisYearBills?: Awaited<ReturnType<typeof getBills>>["data"]
+  thisYearExpenses?: Awaited<ReturnType<typeof getExpenses>>["data"]
+}
+
+/**
  * ประกอบ TaxDataset เต็มชุดสำหรับ workspace หนึ่ง ณ ปีภาษีที่เลือก — ใช้กับฟีเจอร์ VAT/ภ.พ.30 เท่านั้น
  *
  * ⚠️ ดึงข้อมูลย้อนหลัง "2 ปี" (ปีที่เลือก + ปีก่อนหน้า) เสมอ ไม่กรองเฉพาะปีที่เลือก เพราะเกณฑ์ VAT
  *    เป็น rolling 12 เดือนที่อาจข้ามปี — ถ้ากรองปีตั้งแต่ชั้นนี้ ยอด 40(8) ของเดือน ม.ค. จะขาดข้อมูล
  *    ธ.ค. ปีก่อนไป (ดู lib/tax/vat.ts)
  */
-export async function loadTaxDataset(workspaceId: string, year: number) {
+export async function loadTaxDataset(workspaceId: string, year: number, prefetch?: LoadTaxDatasetPrefetch) {
   const access = await assertTaxAccess(workspaceId)
   if (!access.ok) return { success: false, error: access.error }
 
@@ -145,14 +161,14 @@ export async function loadTaxDataset(workspaceId: string, year: number) {
       deductionsRes,
       pitFilingsRes,
     ] = await Promise.all([
-      getBills(undefined, thisYear),
+      prefetch?.thisYearBills ? Promise.resolve({ success: true, data: prefetch.thisYearBills }) : getBills(undefined, thisYear),
       getBills(undefined, prevYear),
-      getRooms(workspaceId),
-      getTenants(),
-      getCancelledContracts(workspaceId),
-      getExpenses(thisYear, workspaceId),
+      prefetch?.rooms ? Promise.resolve({ success: true, data: null }) : getRooms(workspaceId),
+      prefetch?.tenants ? Promise.resolve({ success: true, data: prefetch.tenants }) : getTenants(),
+      prefetch?.cancelledContracts ? Promise.resolve({ success: true, data: prefetch.cancelledContracts }) : getCancelledContracts(workspaceId),
+      prefetch?.thisYearExpenses ? Promise.resolve({ success: true, data: prefetch.thisYearExpenses }) : getExpenses(thisYear, workspaceId),
       getExpenses(prevYear, workspaceId),
-      getFinanceSettings(workspaceId),
+      prefetch?.financeSettings ? Promise.resolve({ success: true, data: prefetch.financeSettings }) : getFinanceSettings(workspaceId),
       getPp30Filings(workspaceId),
       getTaxDeductions(workspaceId, year),
       getPitFilings(workspaceId),
@@ -190,7 +206,8 @@ export async function loadTaxDataset(workspaceId: string, year: number) {
       vatAmount: Number(b.vatAmount || 0),
     }))
 
-    const horsetRooms = rooms.map((r) => ({
+    // rooms มาจาก prefetch ได้เลย (หน้าเรียกอยู่แล้วในรูปแบบ {roomNumber, baseRent} สำเร็จรูป) หรือ map จาก getRooms() สด
+    const horsetRooms = prefetch?.rooms ?? rooms.map((r) => ({
       roomNumber: r.roomNumber,
       baseRent: Number(r.baseRent || 0),
     }))
@@ -546,6 +563,8 @@ export async function computePitBreakdownFromThaiTax(input: {
   incomeOther?: number
   expenseA: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }
   expenseB: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }
+  /** โหมดระมัดระวัง — จำกัดยอดหักตามจริงไม่ให้เกินรายได้ของตะกร้านั้น (ค่าเริ่มต้น false = หักข้ามตะกร้าได้ ตรงกับแนวทางยื่นจริง) */
+  capExpensePerBucket: boolean
   taxpayerType: "individual" | "partnership"
   partnerCount: number
   otherDeductions: number
@@ -563,9 +582,9 @@ export async function computePitBreakdownFromThaiTax(input: {
   const dedFor = (income: number, cfg: { mode: "lump" | "actual"; lumpRate: number; actualAmount?: number }) => {
     const requested = cfg.mode === "actual" ? clamp0(cfg.actualAmount || 0) : r2(income * cfg.lumpRate)
     const exceedsIncome = requested > income
-    // เหมาเสมอถูกจำกัดไม่เกินรายได้ — โหมดจริง ปล่อยให้หักได้เต็มจำนวน (ตรงกับ thaiTax.ts/pdfHelper.ts เดิม)
-    const deduction = cfg.mode === "lump" ? r2(Math.min(requested, income)) : requested
-    return { mode: cfg.mode, rate: cfg.mode === "lump" ? cfg.lumpRate : null, requested, deduction, capped: cfg.mode === "lump" && exceedsIncome, exceedsIncome, income, afterExpense: r2(income - deduction) }
+    const deduction = r2(capActualExpenseDeduction(cfg.mode, requested, income, input.capExpensePerBucket))
+    const capped = deduction < requested
+    return { mode: cfg.mode, rate: cfg.mode === "lump" ? cfg.lumpRate : null, requested, deduction, capped, exceedsIncome, income, afterExpense: r2(income - deduction) }
   }
 
   const dedA = dedFor(incomeA, input.expenseA)
@@ -630,7 +649,7 @@ export async function computePitBreakdownFromThaiTax(input: {
     crossBucketDeduction: {
       triggered: dedA.exceedsIncome || dedB.exceedsIncome,
       buckets: ([dedA.exceedsIncome && "A", dedB.exceedsIncome && "B"] as const).filter((b): b is Bucket => b !== false),
-      capExpensePerBucket: false,
+      capExpensePerBucket: input.capExpensePerBucket,
     },
     afterExpense,
     deductions: { personalAllowance, other: otherDeductions, requested: deductionsRequested, applied: deductionsApplied, capped: deductionsRequested > afterExpense },

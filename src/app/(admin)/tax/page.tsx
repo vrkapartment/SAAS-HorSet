@@ -9,9 +9,8 @@ import {
   FileCheck, 
   Landmark, 
   Settings, 
-  Database, 
-  Sliders, 
-  CheckCircle2, 
+  Database,
+  CheckCircle2,
   HelpCircle,
   TrendingUp,
   Plus,
@@ -26,7 +25,6 @@ import {
   Wrench,
   ChevronDown,
   ChevronUp,
-  RefreshCw,
   ShieldCheck,
   AlertCircle
 } from "lucide-react"
@@ -70,6 +68,7 @@ import {
 } from "@/features/tax/components"
 import { useVatStatus, useTaxOverview, usePp30 } from "@/features/tax/hooks/useTax"
 import { firstThresholdBreach, DEFAULT_TAX_SETTINGS } from "@/lib/tax"
+import { capActualExpenseDeduction } from "@/lib/thaiTax"
 import type { TaxDataset, TaxSettings } from "@/types/tax"
 
 interface BillItem {
@@ -129,8 +128,6 @@ export default function TaxPage() {
   const [taxId, setTaxId] = useState("")
   const [address, setAddress] = useState("")
   const [phone, setPhone] = useState("")
-  const [taxpayerStatus, setTaxpayerStatus] = useState<"individual" | "partnership">("individual")
-  const [partnerCount, setPartnerCount] = useState(1)
   // ที่อยู่ช่องย่อยเพิ่มเติมที่ไม่ได้รวมอยู่ใน address (tax_address) — ใช้กรอกแบบฟอร์ม ภ.ง.ด. 94 โดยเฉพาะ
   const [addressBuilding, setAddressBuilding] = useState("")
   const [addressRoom, setAddressRoom] = useState("")
@@ -157,6 +154,11 @@ export default function TaxPage() {
   })
   const [taxDatasetLoaded, setTaxDatasetLoaded] = useState(false)
   const [savingVatSettings, setSavingVatSettings] = useState(false)
+
+  // สถานะผู้เสียภาษี — มาจาก taxDataset.settings แหล่งเดียว (แก้ไขได้ที่หน้าตั้งค่าการเงินเท่านั้น
+  // ดู FinanceSettingsTab.tsx) ไม่มี state แยกในหน้านี้อีกต่อไป กันไม่ให้ค่าไม่ sync กันระหว่างจอ
+  const taxpayerStatus = taxDataset.settings.taxpayerType
+  const partnerCount = taxDataset.settings.partnerCount
 
   const vatStatus = useVatStatus(taxDataset)
   const vatBreach = firstThresholdBreach(taxDataset.incomes, taxDataset.settings)
@@ -241,9 +243,12 @@ export default function TaxPage() {
   const [latePenaltyRate, setLatePenaltyRate] = useState(0)
   const [rooms, setRooms] = useState<{ roomNumber: string; baseRent: number }[]>([])
 
-  // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5) และ 40(8)
-  const [deductionMethod405, setDeductionMethod405] = useState<"เหมา 30%" | "ตามจริง">("เหมา 30%")
-  const [deductionMethod408, setDeductionMethod408] = useState<"เหมา 60%" | "ตามจริง">("เหมา 60%")
+  // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5) และ 40(8) — มาจาก taxDataset.settings.expenseA/expenseB แหล่งเดียว
+  // (แก้ไขได้ผ่านการ์ด ExpenseModeSection เท่านั้น) คง string เดิมไว้เพื่อให้ทุกจุดที่เทียบ === ทำงานต่อได้
+  const deductionMethod405: "เหมา 30%" | "ตามจริง" =
+    taxDataset.settings.expenseA.mode === "lump" ? "เหมา 30%" : "ตามจริง"
+  const deductionMethod408: "เหมา 60%" | "ตามจริง" =
+    taxDataset.settings.expenseB.mode === "lump" ? "เหมา 60%" : "ตามจริง"
   const [actualExpense405, setActualExpense405] = useState(0)
   const [actualExpense408, setActualExpense408] = useState(0)
 
@@ -279,9 +284,19 @@ export default function TaxPage() {
   useEffect(() => {
     async function loadInitialData() {
       setIsSummaryLoading(true)
+      setTaxDatasetLoaded(false)
+      // เก็บข้อมูล "ดิบ" ที่ query มาแล้วระหว่างทาง (ก่อนแปลงรูปเป็น state เฉพาะของหน้านี้) ไว้ส่งต่อให้
+      // loadTaxDataset() ใช้แทนการยิง query ซ้ำเอง — ดูจุดที่เรียกท้ายฟังก์ชันนี้ (ลด query ซ้ำซ้อน 6 คำสั่ง
+      // ระหว่าง pipeline เดิมกับ pipeline ของฟีเจอร์ VAT/ภ.พ.30 ซึ่งเป็นสาเหตุหลักที่ทำให้ 2 ฝั่งโหลดไม่พร้อมกัน)
+      let prefetchRooms: { roomNumber: string; baseRent: number }[] | undefined
+      let prefetchTenants: Awaited<ReturnType<typeof getTenants>>["data"] | undefined
+      let prefetchCancelledContracts: Awaited<ReturnType<typeof getCancelledContracts>>["data"] | undefined
+      let prefetchFinanceSettings: Awaited<ReturnType<typeof getFinanceSettings>>["data"] | undefined
+      let prefetchBills: Awaited<ReturnType<typeof getBills>>["data"] | undefined
+      let prefetchExpenses: ExpenseItem[] | undefined
       try {
         const userRes = await getCurrentUserProfileClient()
-        
+
         let currentWsId: string | undefined = undefined
         
         if (userRes.success && userRes.data) {
@@ -344,6 +359,7 @@ export default function TaxPage() {
                   const res = await getCancelledContracts(currentWsId!)
                   if (res.success && res.data) {
                     setCancelledContracts(res.data)
+                    prefetchCancelledContracts = res.data
                   }
                 } else if (migrated.error === "table_not_found") {
                   setCancelledContracts(tempCancellations)
@@ -356,6 +372,7 @@ export default function TaxPage() {
               getCancelledContracts(currentWsId).then(res => {
                 if (res.success && res.data) {
                   setCancelledContracts(res.data)
+                  prefetchCancelledContracts = res.data
                 } else if (res.error === "table_not_found") {
                   console.warn("Table 'cancelled_contracts' not found in database. History list is empty.")
                   setCancelledContracts([])
@@ -368,13 +385,12 @@ export default function TaxPage() {
           const financeCacheKey = "finance_settings"
           const cachedFinance = getCachedData<any>(currentWsId, financeCacheKey)
           if (cachedFinance) {
+            prefetchFinanceSettings = cachedFinance
             setFirstName(cachedFinance.tax_firstname || "")
             setLastName(cachedFinance.tax_lastname || "")
             setTaxId(cachedFinance.tax_id || "")
             setAddress(cachedFinance.tax_address || "")
             setPhone(cachedFinance.tax_phone || "")
-            setTaxpayerStatus(cachedFinance.taxpayer_status || "individual")
-            setPartnerCount(Number(cachedFinance.partner_count || 1))
             setAddressBuilding(cachedFinance.tax_address_building || "")
             setAddressRoom(cachedFinance.tax_address_room || "")
             setAddressFloor(cachedFinance.tax_address_floor || "")
@@ -392,13 +408,12 @@ export default function TaxPage() {
             fetchPromises.push(
               getFinanceSettings(currentWsId).then(res => {
                 if (res.success && res.data) {
+                  prefetchFinanceSettings = res.data
                   setFirstName(res.data.tax_firstname || "")
                   setLastName(res.data.tax_lastname || "")
                   setTaxId(res.data.tax_id || "")
                   setAddress(res.data.tax_address || "")
                   setPhone(res.data.tax_phone || "")
-                  setTaxpayerStatus(res.data.taxpayer_status || "individual")
-                  setPartnerCount(Number(res.data.partner_count || 1))
                   setAddressBuilding(res.data.tax_address_building || "")
                   setAddressRoom(res.data.tax_address_room || "")
                   setAddressFloor(res.data.tax_address_floor || "")
@@ -423,11 +438,13 @@ export default function TaxPage() {
           const cachedTenants = getCachedData<any[]>(currentWsId, tenantsCacheKey)
           if (cachedTenants) {
             setTenants(cachedTenants)
+            prefetchTenants = cachedTenants
           } else {
             fetchPromises.push(
               getTenants().then(tenantsRes => {
                 if (tenantsRes.success && tenantsRes.data) {
                   setTenants(tenantsRes.data)
+                  prefetchTenants = tenantsRes.data
                   setCachedData(currentWsId, tenantsCacheKey, tenantsRes.data)
                 }
               })
@@ -439,6 +456,7 @@ export default function TaxPage() {
           const cachedRooms = getCachedData<any[]>(currentWsId, roomsCacheKey)
           if (cachedRooms) {
             setRooms(cachedRooms)
+            prefetchRooms = cachedRooms
           } else {
             fetchPromises.push(
               getRooms().then(roomsRes => {
@@ -448,6 +466,7 @@ export default function TaxPage() {
                     baseRent: Number(r.baseRent)
                   }))
                   setRooms(mappedRooms)
+                  prefetchRooms = mappedRooms
                   setCachedData(currentWsId, roomsCacheKey, mappedRooms)
                 }
               })
@@ -470,6 +489,7 @@ export default function TaxPage() {
               waterUnits: Number(b.waterUnits || 0)
             }))
             setBills(mappedBills)
+            prefetchBills = cachedBills
           } else {
             fetchPromises.push(
               getBills(undefined, taxYear).then(billsRes => {
@@ -486,6 +506,7 @@ export default function TaxPage() {
                     waterUnits: Number(b.waterUnits || 0)
                   }))
                   setBills(mappedBills)
+                  prefetchBills = billsRes.data
                   setCachedData(currentWsId, billsCacheKey, billsRes.data)
                 }
               })
@@ -493,12 +514,35 @@ export default function TaxPage() {
           }
 
           // 3. โหลดค่าใช้จ่าย
-          fetchPromises.push(loadExpensesData(taxYear, currentWsId))
+          fetchPromises.push(loadExpensesData(taxYear, currentWsId).then(data => { prefetchExpenses = data }))
 
           // รอให้ทุกสัญญาทำงานเสร็จสิ้นพร้อมกัน
           if (fetchPromises.length > 0) {
             await Promise.all(fetchPromises)
           }
+
+          // โหลด TaxDataset เต็มชุดสำหรับฟีเจอร์ VAT/ภ.พ.30 — ต่อท้าย pipeline เดิมแทนที่จะเป็น effect
+          // คู่ขนานแยกกัน (เดิม) ซึ่งทำให้ยิง query ซ้ำกับด้านบน 6 คำสั่งและจบช้ากว่าเสมอ ตอนนี้ส่ง prefetch
+          // ที่เพิ่งเก็บไว้เข้าไปแทน ให้ loadTaxDataset() ข้ามคำสั่งที่ซ้ำได้
+          const taxDatasetCacheKey = `tax_dataset_${taxYear}`
+          const cachedTaxDataset = getCachedData<TaxDataset>(currentWsId, taxDatasetCacheKey)
+          if (cachedTaxDataset) {
+            setTaxDataset(cachedTaxDataset)
+          } else {
+            const taxDatasetRes = await loadTaxDataset(currentWsId, Number(taxYear), {
+              rooms: prefetchRooms,
+              tenants: prefetchTenants,
+              cancelledContracts: prefetchCancelledContracts,
+              financeSettings: prefetchFinanceSettings,
+              thisYearBills: prefetchBills,
+              thisYearExpenses: prefetchExpenses,
+            })
+            if (taxDatasetRes.success && taxDatasetRes.data) {
+              setTaxDataset(taxDatasetRes.data)
+              setCachedData(currentWsId, taxDatasetCacheKey, taxDatasetRes.data)
+            }
+          }
+          setTaxDatasetLoaded(true)
         }
       } catch (err) {
         console.error("Failed to load initial data in tax page:", err)
@@ -548,37 +592,39 @@ export default function TaxPage() {
           setActualExpense405(sum405)
           setActualExpense408(sum408)
           setLoadingExpenses(false)
-          return
+          return cached
         }
       }
-      
+
       const res = await getExpenses(year, activeWsId)
       if (res.success && res.data) {
         setExpenses(res.data)
         if (activeWsId) {
           setCachedData(activeWsId, `expenses_${year}`, res.data)
         }
-        
+
         const sum405 = res.data
           .filter(e => e.category === "40_5")
           .reduce((sum, e) => sum + e.amount, 0)
-        
+
         const sum408 = res.data
           .filter(e => e.category === "40_8")
           .reduce((sum, e) => sum + e.amount, 0)
-          
+
         setDbActualExpense405(sum405)
         setDbActualExpense408(sum408)
-        
+
         // อัปเดตตัวแปรจริงที่ใช้คำนวณแบบเรียลไทม์
         setActualExpense405(sum405)
         setActualExpense408(sum408)
+        return res.data
       }
     } catch (e) {
       console.error("Failed to load expenses:", e)
     } finally {
       setLoadingExpenses(false)
     }
+    return undefined
   }
 
   // จัดการฟอร์มบันทึกค่าใช้จ่าย
@@ -748,14 +794,6 @@ export default function TaxPage() {
 
   const handleManualOtherChange = (val: number) => {
     setManualOther408(val)
-  }
-
-  const handleDeductionMethodChange = (val: "เหมา 30%" | "ตามจริง") => {
-    setDeductionMethod405(val)
-  }
-
-  const handleDeductionMethod408Change = (val: "เหมา 60%" | "ตามจริง") => {
-    setDeductionMethod408(val)
   }
 
   const handleActualExpense405Change = (val: number) => {
@@ -943,31 +981,33 @@ export default function TaxPage() {
     .filter(exp => exp.category === "40_8")
     .reduce((sum, exp) => sum + exp.amount, 0)
 
-  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5)
+  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(5) และ 40(8) — อัตราเหมา/โหมด capExpensePerBucket มาจาก
+  // taxDataset.settings (การ์ด ExpenseModeSection) ใช้ capActualExpenseDeduction() ตัวเดียวกับที่
+  // computePitBreakdownFromThaiTax ใช้ฝั่ง server เพื่อให้บัตรสรุป/PDF/PitBreakdown ตรงกันเป๊ะเสมอ
   // เต็มปี
   const getDeduction405Full = () => {
-    if (deductionMethod405 === "เหมา 30%") return rent405Full * 0.30
-    return actualExpense405
+    const requested = deductionMethod405 === "เหมา 30%" ? rent405Full * taxDataset.settings.expenseA.lumpRate : actualExpense405
+    return capActualExpenseDeduction(taxDataset.settings.expenseA.mode, requested, rent405Full, taxDataset.settings.capExpensePerBucket)
   }
   const deductionRent405Full = getDeduction405Full()
 
   // ครึ่งปี
   const getDeduction405Half = () => {
-    if (deductionMethod405 === "เหมา 30%") return rent405Half * 0.30
-    return actualExpense405Half
+    const requested = deductionMethod405 === "เหมา 30%" ? rent405Half * taxDataset.settings.expenseA.lumpRate : actualExpense405Half
+    return capActualExpenseDeduction(taxDataset.settings.expenseA.mode, requested, rent405Half, taxDataset.settings.capExpensePerBucket)
   }
   const deductionRent405Half = getDeduction405Half()
 
-  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(8) (เหมา 60% เฉพาะส่วนบริการน้ำไฟ หรือหักตามจริง)
+  // การคำนวณหักค่าใช้จ่ายสำหรับ 40(8) (เหมาเฉพาะส่วนบริการน้ำไฟ หรือหักตามจริง)
   const getDeduction408Full = () => {
-    if (deductionMethod408 === "เหมา 60%") return utilities408Full * 0.60 // รายได้อื่นๆ หักเหมาได้ 0% ตามเงื่อนไขสรรพากร
-    return actualExpense408
+    const requested = deductionMethod408 === "เหมา 60%" ? utilities408Full * taxDataset.settings.expenseB.lumpRate : actualExpense408 // รายได้อื่นๆ หักเหมาได้ 0% ตามเงื่อนไขสรรพากร
+    return capActualExpenseDeduction(taxDataset.settings.expenseB.mode, requested, utilities408Full, taxDataset.settings.capExpensePerBucket)
   }
   const deductionUtilities408Full = getDeduction408Full()
 
   const getDeduction408Half = () => {
-    if (deductionMethod408 === "เหมา 60%") return utilities408Half * 0.60
-    return actualExpense408Half
+    const requested = deductionMethod408 === "เหมา 60%" ? utilities408Half * taxDataset.settings.expenseB.lumpRate : actualExpense408Half
+    return capActualExpenseDeduction(taxDataset.settings.expenseB.mode, requested, utilities408Half, taxDataset.settings.capExpensePerBucket)
   }
   const deductionUtilities408Half = getDeduction408Half()
 
@@ -980,20 +1020,20 @@ export default function TaxPage() {
 
   // คำนวณผลภาษี ภ.ง.ด.90/94 เต็มชุด (สำหรับ PitBreakdown) ผ่าน src/lib/thaiTax.ts เท่านั้น (ดูหมายเหตุ
   // ที่ computePitBreakdownFromThaiTax) — ต้องคำนวณ 94 ก่อนเสมอ เพราะ 90 ต้องใช้ยอดภาษีครึ่งปีมาหักกลบ
-  // ⚠️ รอให้ isSummaryLoading = false ก่อนเสมอ ไม่งั้นจะคำนวณด้วยข้อมูลที่โหลดมาไม่ครบ (bills/expenses ทยอยมาทีละก้อน)
-  // แล้วโชว์ตัวเลขชั่วคราวที่ผิดวาบขึ้นมาก่อนค่อยแก้เป็นตัวจริง
+  // ⚠️ รอให้ isSummaryLoading = false และ taxDatasetLoaded = true ก่อนเสมอ ไม่งั้นจะคำนวณด้วยข้อมูลที่โหลดมาไม่ครบ
+  // (bills/expenses/taxDataset.settings ทยอยมาทีละก้อน) แล้วโชว์ตัวเลขชั่วคราวที่ผิดวาบขึ้นมาก่อนค่อยแก้เป็นตัวจริง
   useEffect(() => {
-    if (isSummaryLoading) return
+    if (isSummaryLoading || !taxDatasetLoaded) return
     let cancelled = false
     async function computeBoth() {
       const expenseACfg = {
-        mode: (deductionMethod405 === "เหมา 30%" ? "lump" : "actual") as "lump" | "actual",
-        lumpRate: 0.30,
+        mode: taxDataset.settings.expenseA.mode,
+        lumpRate: taxDataset.settings.expenseA.lumpRate,
         actualAmount: actualExpense405,
       }
       const expenseBCfg = {
-        mode: (deductionMethod408 === "เหมา 60%" ? "lump" : "actual") as "lump" | "actual",
-        lumpRate: 0.60,
+        mode: taxDataset.settings.expenseB.mode,
+        lumpRate: taxDataset.settings.expenseB.lumpRate,
         actualAmount: actualExpense408,
       }
 
@@ -1004,6 +1044,7 @@ export default function TaxPage() {
         incomeOther: other408Half,
         expenseA: { ...expenseACfg, actualAmount: actualExpense405Half },
         expenseB: { ...expenseBCfg, actualAmount: actualExpense408Half },
+        capExpensePerBucket: taxDataset.settings.capExpensePerBucket,
         taxpayerType: taxpayerStatus,
         partnerCount,
         otherDeductions: 0,
@@ -1018,6 +1059,7 @@ export default function TaxPage() {
         incomeOther: other408Full,
         expenseA: expenseACfg,
         expenseB: expenseBCfg,
+        capExpensePerBucket: taxDataset.settings.capExpensePerBucket,
         taxpayerType: taxpayerStatus,
         partnerCount,
         otherDeductions: 0,
@@ -1029,10 +1071,10 @@ export default function TaxPage() {
     computeBoth().catch(err => console.error("Failed to compute PIT breakdown:", err))
     return () => { cancelled = true }
   }, [
-    isSummaryLoading,
+    isSummaryLoading, taxDatasetLoaded,
     rent405Full, utilities408Full, other408Full,
     rent405Half, utilities408Half, other408Half,
-    deductionMethod405, deductionMethod408,
+    taxDataset.settings.expenseA, taxDataset.settings.expenseB, taxDataset.settings.capExpensePerBucket,
     actualExpense405, actualExpense408, actualExpense405Half, actualExpense408Half,
     taxpayerStatus, partnerCount,
   ])
@@ -1048,32 +1090,6 @@ export default function TaxPage() {
       if (cancelled) return
       if (snap90.success) setPitFiledSnapshot90(snap90.data)
       if (snap94.success) setPitFiledSnapshot94(snap94.data)
-    })
-    return () => { cancelled = true }
-  }, [workspaceId, taxYear])
-
-  // โหลด TaxDataset เต็มชุดสำหรับฟีเจอร์ VAT/ภ.พ.30 (แยกจากข้อมูล ภ.ง.ด.90/94 เดิมข้างบนโดยสิ้นเชิง)
-  // ใช้ cache ของ WorkspaceDataContext แบบเดียวกับข้อมูลชุดอื่นในหน้านี้ (ถูกล้างอัตโนมัติเมื่อบันทึกตั้งค่า VAT
-  // ผ่าน clearWorkspaceCache) เพื่อไม่ให้ effect นี้ยิง query ใหม่ 11 คำสั่งซ้ำทุกครั้ง — ซึ่งเป็นสาเหตุหลักที่ทำให้
-  // ส่วนนี้โหลดช้ากว่าข้อมูลสรุปเดิมด้านบนอย่างเป็นระบบ (isSummaryLoading จบก่อน taxDatasetLoaded เกือบทุกครั้ง)
-  useEffect(() => {
-    if (!workspaceId) return
-    const taxDatasetCacheKey = `tax_dataset_${taxYear}`
-    const cached = getCachedData<TaxDataset>(workspaceId, taxDatasetCacheKey)
-    if (cached) {
-      setTaxDataset(cached)
-      setTaxDatasetLoaded(true)
-      return
-    }
-    let cancelled = false
-    setTaxDatasetLoaded(false)
-    loadTaxDataset(workspaceId, Number(taxYear)).then(res => {
-      if (cancelled) return
-      if (res.success && res.data) {
-        setTaxDataset(res.data)
-        setCachedData(workspaceId, taxDatasetCacheKey, res.data)
-      }
-      setTaxDatasetLoaded(true)
     })
     return () => { cancelled = true }
   }, [workspaceId, taxYear])
@@ -1357,139 +1373,21 @@ export default function TaxPage() {
           </div>
         </div>
 
-        {/* คอนฟิกค่าใช้จ่ายและการหักค่าใช้จ่าย */}
-        <div className="relative overflow-hidden glass-card p-6 md:p-8 rounded-3xl border border-slate-200/80 dark:border-slate-900/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-teal-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-          
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-900 pb-4">
-              <div className="p-2 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-xl shadow-inner">
-                <Sliders className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("tax_page.deduction_calc_title")}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{t("tax_page.deduction_calc_subtitle")}</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              {/* 40(5) Deduction Select */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">{t("tax_page.deduction_405_label")}</label>
-                  <span className="inline-flex text-xs font-bold px-2 py-0.5 rounded-full bg-blue-500/[0.08] dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400 border border-blue-500/10">{t("tax_page.sec_405")}</span>
-                </div>
-                <div className="flex gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-900/80">
-                  {(["เหมา 30%", "ตามจริง"] as const).map(method => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => handleDeductionMethodChange(method)}
-                      className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${
-                        deductionMethod405 === method
-                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/20 dark:shadow-teal-500/10 font-bold scale-[1.01]"
-                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                      }`}
-                    >
-                      {method === "เหมา 30%" ? t("tax_page.flat_30") : t("tax_page.actual_deduction")}
-                    </button>
-                  ))}
-                </div>
-                
-                {deductionMethod405 === "ตามจริง" && (
-                  <div className="space-y-1.5 pt-1.5 animate-fade-in">
-                    <label className="text-xs text-slate-500 dark:text-slate-450 font-semibold tracking-wide">{t("tax_page.actual_405_accum_label")}</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="number"
-                        readOnly
-                        placeholder={t("tax_page.system_calc_placeholder")}
-                        className="w-full pl-4 pr-32 py-2.5 bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900/80 rounded-xl text-slate-600 dark:text-slate-350 text-xs font-mono cursor-not-allowed"
-                        value={actualExpense405}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => loadExpensesData(taxYear, undefined, true)}
-                        disabled={loadingExpenses}
-                        className="absolute right-2.5 inline-flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
-                        title={t("tax_page.auto_fetch_tooltip")}
-                      >
-                        <RefreshCw className={`w-3 h-3 ${loadingExpenses ? "animate-spin" : ""}`} />
-                        {t("tax_page.auto_fetch")}
-                      </button>
-                    </div>
-                    <p className="text-xs text-slate-400 dark:text-slate-450 leading-relaxed">
-                      {t("tax_page.actual_405_hint")}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-450 font-semibold">
-                      {t("tax_page.pnd94_actual_405_desc", { amount: formatMoney(actualExpense405Half) })}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* 40(8) Deduction Select */}
-              <div className="space-y-2 border-t border-slate-100 dark:border-slate-900/80 pt-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs text-slate-500 dark:text-slate-400 font-semibold tracking-wide">{t("tax_page.deduction_408_label")}</label>
-                  <span className="inline-flex text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-700 dark:text-amber-400 border border-amber-500/10">{t("tax_page.sec_408")}</span>
-                </div>
-                <div className="flex gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-900/80">
-                  {(["เหมา 60%", "ตามจริง"] as const).map(method => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => handleDeductionMethod408Change(method)}
-                      className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${
-                        deductionMethod408 === method
-                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/20 dark:shadow-teal-500/10 font-bold scale-[1.01]"
-                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                      }`}
-                    >
-                      {method === "เหมา 60%" ? t("tax_page.flat_60") : t("tax_page.actual_deduction")}
-                    </button>
-                  ))}
-                </div>
-                
-                {deductionMethod408 === "ตามจริง" && (
-                  <div className="space-y-1.5 pt-1.5 animate-fade-in">
-                    <label className="text-xs text-slate-500 dark:text-slate-450 font-semibold tracking-wide">{t("tax_page.actual_408_accum_label")}</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="number"
-                        readOnly
-                        placeholder={t("tax_page.system_calc_408_placeholder")}
-                        className="w-full pl-4 pr-32 py-2.5 bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900/80 rounded-xl text-slate-650 dark:text-slate-350 text-xs font-mono cursor-not-allowed"
-                        value={actualExpense408}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => loadExpensesData(taxYear, undefined, true)}
-                        disabled={loadingExpenses}
-                        className="absolute right-2.5 inline-flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 bg-teal-500/[0.08] dark:bg-teal-500/[0.12] border border-teal-500/20 hover:bg-teal-500/[0.18] px-3 py-1.5 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
-                        title={t("tax_page.auto_fetch_tooltip")}
-                      >
-                        <RefreshCw className={`w-3 h-3 ${loadingExpenses ? "animate-spin" : ""}`} />
-                        {t("tax_page.auto_fetch")}
-                      </button>
-                    </div>
-                    <p className="text-xs text-slate-400 dark:text-slate-450 leading-relaxed">
-                      {t("tax_page.actual_405_hint")}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-450 font-semibold">
-                      {t("tax_page.pnd94_actual_408_desc", { amount: formatMoney(actualExpense408Half) })}
-                    </p>
-                  </div>
-                )}
-                {deductionMethod408 === "เหมา 60%" && (
-                  <p className="text-xs text-slate-400 dark:text-slate-455 leading-relaxed">
-                    {t("tax_page.flat_60_hint")}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* รูปแบบการหักค่าใช้จ่าย — ฟีเจอร์ 5 (ของใหม่) ย้ายมาแทนที่การ์ดเดิมซึ่งไม่เคยบันทึกลง DB
+            เพื่อไม่ให้มีการตั้งค่าเดียวกัน 2 จุดที่ขัดกันเอง (ดูหมายเหตุหัวไฟล์ TaxRulesSettingsSection.tsx) */}
+        {dataReady && hasEditPermission ? (
+          <ExpenseModeSection
+            settings={taxDataset.settings}
+            onChange={handleVatSettingsChange}
+            busy={savingVatSettings}
+            actualAmountA={actualExpense405}
+            actualAmountB={actualExpense408}
+            onRefreshActual={() => loadExpensesData(taxYear, undefined, true)}
+            refreshingActual={loadingExpenses}
+          />
+        ) : (
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-900/60 dark:bg-slate-900 h-full min-h-[220px] animate-pulse" />
+        )}
       </div>
 
       {/* ตั้งค่า VAT + กฎภาษี — ฟีเจอร์ 5 (ของใหม่ทั้งบล็อก) ดู src/features/tax/components */}
@@ -1503,22 +1401,9 @@ export default function TaxPage() {
             busy={savingVatSettings}
           />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TaxpayerTypeSection
-              settings={taxDataset.settings}
-              onChange={handleVatSettingsChange}
-              busy={savingVatSettings}
-            />
-            <MinTaxRuleSection
-              minTaxRule={taxDataset.settings.minTaxRule}
-              onChange={handleVatSettingsChange}
-              busy={savingVatSettings}
-            />
+            <TaxpayerTypeSection settings={taxDataset.settings} />
+            <MinTaxRuleSection />
           </div>
-          <ExpenseModeSection
-            settings={taxDataset.settings}
-            onChange={handleVatSettingsChange}
-            busy={savingVatSettings}
-          />
         </div>
       )}
 
@@ -1542,7 +1427,7 @@ export default function TaxPage() {
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_rent_title")}</h4>
               <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_rent_subtitle")}</p>
-              {isSummaryLoading ? (
+              {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
                 <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300">
@@ -1580,7 +1465,7 @@ export default function TaxPage() {
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_util_title")}</h4>
               <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_util_subtitle")}</p>
-              {isSummaryLoading ? (
+              {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
                 <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-emerald-500 to-green-600 dark:from-teal-400 dark:via-emerald-400 dark:to-green-400">
@@ -1618,7 +1503,7 @@ export default function TaxPage() {
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_other_title")}</h4>
               <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_other_subtitle")}</p>
-              {isSummaryLoading ? (
+              {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
                 <p className="text-2xl font-black tracking-tight mt-3 bg-clip-text text-transparent bg-gradient-to-r from-amber-600 via-orange-500 to-rose-650 dark:from-amber-400 dark:via-orange-400 dark:to-rose-450">

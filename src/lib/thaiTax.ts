@@ -40,6 +40,19 @@ export function calculateFinalTaxDue(progressiveTax: number, minimumTax: number)
   return Math.max(progressiveTax, minimumTax)
 }
 
+// จำกัดยอดหักค่าใช้จ่ายไม่ให้เกินรายได้ของตะกร้านั้น — บังคับเสมอเมื่อหักเหมา (ตามกฎหมาย)
+// ส่วนหักตามจริงจะถูกจำกัดด้วยก็ต่อเมื่อเปิด capExpensePerBucket (โหมดระมัดระวัง) เท่านั้น
+// ใช้ร่วมกันทั้งฝั่งแสดงผล (บัตรสรุป/PDF) และฝั่งคำนวณ PitBreakdown เพื่อให้ตัวเลขตรงกันเป๊ะทุกจุด
+export function capActualExpenseDeduction(
+  mode: "lump" | "actual",
+  requestedDeduction: number,
+  bucketIncome: number,
+  capExpensePerBucket: boolean
+): number {
+  const shouldCap = mode === "lump" || capExpensePerBucket
+  return shouldCap ? Math.min(requestedDeduction, bucketIncome) : requestedDeduction
+}
+
 export type TaxpayerStatus = "individual" | "partnership"
 
 // ค่าลดหย่อนส่วนตัว (ข.1 ของ ภ.ง.ด. 94 / รายการผู้มีเงินได้ของ ภ.ง.ด. 90)

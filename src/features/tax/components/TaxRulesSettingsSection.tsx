@@ -4,15 +4,20 @@
  * ฟีเจอร์ 5 (ต่อ): ส่วนตั้งค่ากฎภาษี — เสียบเพิ่มในหน้าตั้งค่าที่มีอยู่
  *
  * 3 บล็อก:
- *   TaxpayerTypeSection      สถานะผู้เสียภาษี + ตารางพรีวิวค่าลดหย่อนส่วนตัว
- *   ExpenseModeSection       โหมดหักค่าใช้จ่ายรายตะกร้า (เหมา % / ตามจริง)
- *   MinTaxRuleSection        ภาษีขั้นต่ำ 0.5% (ม.48(2))
- *
- * ⚠️ ทั้งสามบล็อกนี้เปลี่ยนแล้ว "มีผลย้อนหลังกับทุกรายงานที่คำนวณสด" ของ engine ใหม่ (VAT/ภ.พ.30)
- *    — ไม่กระทบตัวเลข ภ.ง.ด.90/94 ที่ยื่นจริง เพราะ engine นั้นแยกต่างหาก (src/lib/thaiTax.ts)
+ *   TaxpayerTypeSection      สถานะผู้เสียภาษี + ตารางพรีวิวค่าลดหย่อนส่วนตัว — แสดงผลอย่างเดียว
+ *                            (แก้ไขได้ที่หน้าตั้งค่าการเงินเท่านั้น ดู FinanceSettingsTab.tsx — กันไม่ให้มี
+ *                            2 จุดแก้ค่าเดียวกันจนไม่ sync กัน)
+ *   ExpenseModeSection       โหมดหักค่าใช้จ่ายรายตะกร้า (เหมา % / ตามจริง) + จำกัดยอดหักไม่ให้เกินรายได้ต่อตะกร้า
+ *                            ⚠️ ค่านี้มีผลจริงกับตัวเลข ภ.ง.ด.90/94 ที่ยื่นจริง (บนจอ + PDF) ผ่าน
+ *                            computePitBreakdownFromThaiTax()/capActualExpenseDeduction() ใน src/lib/thaiTax.ts
+ *                            เป็นการ์ดเดียวที่ควบคุมเรื่องนี้ในทั้งระบบ — เดิมมีการ์ดซ้ำอีกจุดในหน้า /tax
+ *                            ที่ไม่เคยบันทึกลง DB เลย ถูกลบทิ้งแล้วเพื่อไม่ให้ตั้งค่าคนละที่แล้วขัดกัน
+ *   MinTaxRuleSection        ภาษีขั้นต่ำ 0.5% (ม.48(2)) — แสดงผลอย่างเดียว ค่าคงที่ตามกฎหมาย ไม่ให้ผู้ใช้
+ *                            ปิด/ปรับได้ เพราะเป็นข้อกำหนดตามกฎหมาย ไม่ใช่ทางเลือกทางธุรกิจ
  */
 
-import type { MinTaxRule, TaxSettings, TaxpayerType } from '../../../types/tax';
+import { RefreshCw } from 'lucide-react';
+import type { TaxSettings } from '../../../types/tax';
 import { PERSONAL_ALLOWANCE, TAXPAYER_LABEL, num } from '../../../lib/tax';
 import { baht, pct } from '../../../lib/tax/format';
 import { Alert, Card, CardBody, CardHeader, HelpNote, tableClasses as tc } from './primitives';
@@ -23,67 +28,30 @@ import { Alert, Card, CardBody, CardHeader, HelpNote, tableClasses as tc } from 
 
 export function TaxpayerTypeSection({
   settings,
-  onChange,
-  busy = false,
 }: {
   settings: Pick<TaxSettings, 'taxpayerType' | 'partnerCount'>;
-  onChange: (patch: Partial<TaxSettings>) => void;
-  busy?: boolean;
 }) {
-  const invalidPartners =
-    settings.taxpayerType === 'partnership' && (settings.partnerCount ?? 0) < 2;
-
   return (
     <Card>
       <CardHeader
         title="สถานะผู้เสียภาษี"
         subtitle="มีผลกับค่าลดหย่อนส่วนตัวของ ภ.ง.ด.94 และ ภ.ง.ด.90"
+        actions={
+          <a
+            href="/settings?tab=finance"
+            className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:shadow-md"
+          >
+            แก้ไขที่หน้าตั้งค่าการเงิน →
+          </a>
+        }
       />
       <CardBody className="space-y-4">
-        <div className="inline-flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-700">
-          {(['individual', 'partnership'] as TaxpayerType[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              disabled={busy}
-              onClick={() => onChange({ taxpayerType: t })}
-              className={
-                settings.taxpayerType === t
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm'
-                  : 'px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-              }
-            >
-              {TAXPAYER_LABEL[t]}
-            </button>
-          ))}
+        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {TAXPAYER_LABEL[settings.taxpayerType]}
+          {settings.taxpayerType === 'partnership' && ` (${settings.partnerCount ?? 1} หุ้นส่วน)`}
         </div>
 
-        {settings.taxpayerType === 'partnership' && (
-          <div className="max-w-[160px]">
-            <label className={labelCls} htmlFor="partner-count">จำนวนหุ้นส่วน</label>
-            <input
-              id="partner-count"
-              type="number"
-              min={2}
-              step={1}
-              disabled={busy}
-              className={`${inputCls} mt-1.5 text-right tabular-nums ${
-                invalidPartners ? 'border-red-500' : ''
-              }`}
-              value={settings.partnerCount ?? 2}
-              onChange={(e) =>
-                onChange({ partnerCount: Math.max(2, Math.round(num(e.target.value) || 2)) })
-              }
-            />
-            {invalidPartners && (
-              <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
-                ต้องมีหุ้นส่วนตั้งแต่ 2 คนขึ้นไปจึงใช้ค่าลดหย่อนของห้างหุ้นส่วนสามัญได้
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* ตารางพรีวิว — ให้ผู้ใช้เห็นตัวเลขที่จะถูกใช้ก่อนกดบันทึก */}
+        {/* ตารางพรีวิว — ให้ผู้ใช้เห็นตัวเลขที่ระบบใช้อยู่จริง */}
         <div className={tc.wrap}>
           <table className={tc.table}>
             <thead>
@@ -128,10 +96,20 @@ export function ExpenseModeSection({
   settings,
   onChange,
   busy = false,
+  actualAmountA = 0,
+  actualAmountB = 0,
+  onRefreshActual,
+  refreshingActual = false,
 }: {
   settings: Pick<TaxSettings, 'expenseA' | 'expenseB' | 'capExpensePerBucket'>;
   onChange: (patch: Partial<TaxSettings>) => void;
   busy?: boolean;
+  /** ยอดค่าใช้จ่ายตามจริงสะสม (จากรายการค่าใช้จ่ายจริงในระบบ) ต่อตะกร้า — แสดงเมื่อ mode = 'actual' */
+  actualAmountA?: number;
+  actualAmountB?: number;
+  /** ดึงยอดตามจริงล่าสุดจากหน้าค่าใช้จ่ายมาแสดง (ไม่ใช่การบันทึกอะไร) */
+  onRefreshActual?: () => void;
+  refreshingActual?: boolean;
 }) {
   const blocks = [
     {
@@ -140,6 +118,7 @@ export function ExpenseModeSection({
       title: 'ค่าเช่าห้อง',
       badge: 'A · 40(5)',
       cfg: settings.expenseA,
+      actualAmount: actualAmountA,
       note: 'ค่าเช่าโรงเรือน/สิ่งปลูกสร้างตามมาตรา 40(5) โดยทั่วไปหักเหมาได้ 30%',
     },
     {
@@ -148,6 +127,7 @@ export function ExpenseModeSection({
       title: 'ค่าบริการ/อื่นๆ',
       badge: 'B · 40(8)',
       cfg: settings.expenseB,
+      actualAmount: actualAmountB,
       note:
         'อัตราหักเหมาของเงินได้ 40(8) ขึ้นกับประเภทกิจการตามพระราชกฤษฎีกา บางกรณีหักเหมาไม่ได้เลย ' +
         '(ต้องหักตามจริง) — โปรดตรวจสอบอัตราที่ใช้ได้กับกิจการของท่านกับกรมสรรพากร',
@@ -212,9 +192,28 @@ export function ExpenseModeSection({
                   <span className="text-xs text-slate-500">%</span>
                 </div>
               ) : (
-                <span className="text-xs text-slate-500">
-                  ใช้ยอดจากหน้า &quot;ค่าใช้จ่าย / ภาษีซื้อ&quot;
-                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span className="text-xs text-slate-500 shrink-0">ยอดตามจริงสะสม</span>
+                  <div className="relative min-w-[140px] flex-1">
+                    <input
+                      type="text"
+                      readOnly
+                      className={`${inputCls} w-full cursor-not-allowed pr-9 text-right tabular-nums`}
+                      value={baht(b.actualAmount, 0)}
+                    />
+                    {onRefreshActual && (
+                      <button
+                        type="button"
+                        onClick={onRefreshActual}
+                        disabled={refreshingActual}
+                        title="ดึงยอดล่าสุดจากรายการค่าใช้จ่าย"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1 text-blue-600 hover:bg-blue-500/10 disabled:opacity-50 dark:text-blue-400"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${refreshingActual ? 'animate-spin' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             <HelpNote>{b.note}</HelpNote>
@@ -269,101 +268,30 @@ export function ExpenseModeSection({
  * ภาษีขั้นต่ำ 0.5%
  * ================================================================== */
 
-export function MinTaxRuleSection({
-  minTaxRule,
-  onChange,
-  busy = false,
-}: {
-  minTaxRule: MinTaxRule;
-  onChange: (patch: Partial<TaxSettings>) => void;
-  busy?: boolean;
-}) {
-  const set = (patch: Partial<MinTaxRule>) =>
-    onChange({ minTaxRule: { ...minTaxRule, ...patch } });
+/** ค่าคงที่ตามกฎหมาย (มาตรา 48(2)) — แสดงผลอย่างเดียว ไม่ให้ผู้ใช้ปิด/ปรับ เพราะเป็นข้อกำหนดตามกฎหมาย
+ *  ไม่ใช่ทางเลือกทางธุรกิจแบบการหักค่าใช้จ่าย (ต่างจาก ExpenseModeSection) */
+const STATUTORY_MIN_TAX_RATE = 0.005;
+const STATUTORY_MIN_TAX_THRESHOLD = 120_000;
+const STATUTORY_MIN_TAX_EXEMPT_BELOW = 5_000;
 
+export function MinTaxRuleSection() {
   return (
     <Card>
       <CardHeader title="ภาษีขั้นต่ำ 0.5% (มาตรา 48(2))" />
       <CardBody className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              ตรวจภาษีขั้นต่ำ {pct(minTaxRule.rate, 1)} ของเงินได้พึงประเมิน
-            </div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              เมื่อเปิด ระบบจะใช้ยอดที่สูงกว่าระหว่างภาษีขั้นบันไดกับ {pct(minTaxRule.rate, 1)}{' '}
-              ของเงินได้พึงประเมิน และยกเว้นให้ถ้ายอดที่คำนวณได้ต่ำกว่า{' '}
-              {baht(minTaxRule.exemptBelow, 0)} บาท
-            </div>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={minTaxRule.enabled}
-            aria-label="ตรวจภาษีขั้นต่ำ 0.5%"
-            disabled={busy}
-            onClick={() => set({ enabled: !minTaxRule.enabled })}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-              minTaxRule.enabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                minTaxRule.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          ตรวจภาษีขั้นต่ำ {pct(STATUTORY_MIN_TAX_RATE, 1)} ของเงินได้พึงประเมิน (ตั้งแต่ {baht(STATUTORY_MIN_TAX_THRESHOLD, 0)} บาทขึ้นไป)
         </div>
-
-        {minTaxRule.enabled && (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="อัตรา (%)">
-              <input
-                type="number"
-                min={0}
-                max={5}
-                step={0.1}
-                disabled={busy}
-                className={`${inputCls} text-right tabular-nums`}
-                value={Number((minTaxRule.rate * 100).toFixed(2))}
-                onChange={(e) => set({ rate: num(e.target.value) / 100 })}
-              />
-            </Field>
-            <Field label="เกณฑ์เงินได้ ภ.ง.ด.90">
-              <input
-                inputMode="decimal"
-                disabled={busy}
-                className={`${inputCls} text-right tabular-nums`}
-                value={minTaxRule.incomeThresholdPND90}
-                onChange={(e) => set({ incomeThresholdPND90: num(e.target.value) })}
-              />
-            </Field>
-            <Field label="เกณฑ์เงินได้ ภ.ง.ด.94">
-              <input
-                inputMode="decimal"
-                disabled={busy}
-                className={`${inputCls} text-right tabular-nums`}
-                value={minTaxRule.incomeThresholdPND94}
-                onChange={(e) => set({ incomeThresholdPND94: num(e.target.value) })}
-              />
-            </Field>
-            <Field label="ยกเว้นถ้าภาษีต่ำกว่า">
-              <input
-                inputMode="decimal"
-                disabled={busy}
-                className={`${inputCls} text-right tabular-nums`}
-                value={minTaxRule.exemptBelow}
-                onChange={(e) => set({ exemptBelow: num(e.target.value) })}
-              />
-            </Field>
-          </div>
-        )}
+        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+          ระบบใช้ยอดที่สูงกว่าระหว่างภาษีขั้นบันไดกับ {pct(STATUTORY_MIN_TAX_RATE, 1)} ของเงินได้พึงประเมินเสมอ
+          และยกเว้นให้ถ้ายอดที่คำนวณได้ต่ำกว่า {baht(STATUTORY_MIN_TAX_EXEMPT_BELOW, 0)} บาท — ค่าคงที่ตามกฎหมาย ปรับไม่ได้
+        </div>
 
         <Alert tone="info" title="กฎนี้ไม่ได้อยู่ในข้อกำหนดตั้งต้น">
           ใส่ไว้เพราะมีผลกับยอดภาษีจริง — เคสที่เห็นชัดคือหักค่าใช้จ่ายตามจริงเยอะจนเงินได้สุทธิเหลือ 0
           แต่รายได้รวมสูง ถ้าไม่มีกฎนี้ระบบจะบอกว่าภาษี = 0 ซึ่งต่ำกว่าความจริง
           <HelpNote>
-            ปิดได้ถ้าไม่ต้องการ และควรตรวจสอบเงื่อนไข/เกณฑ์ที่ใช้กับกรณีของท่านกับกรมสรรพากรก่อนยื่น
+            เป็นข้อกำหนดตามกฎหมาย ไม่เปิดให้ปิด/ปรับอัตราเอง — ควรตรวจสอบเงื่อนไขที่ใช้กับกรณีของท่านกับกรมสรรพากรก่อนยื่น
           </HelpNote>
         </Alert>
       </CardBody>
@@ -371,15 +299,5 @@ export function MinTaxRuleSection({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className={labelCls}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-const labelCls = 'text-xs font-semibold text-slate-600 dark:text-slate-300';
 const inputCls =
   'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-800/80 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-900';
