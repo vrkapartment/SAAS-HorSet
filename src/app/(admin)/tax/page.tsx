@@ -1161,18 +1161,25 @@ export default function TaxPage() {
   // ส่งออก CSV สรุป ภ.พ.30 ทั้งปีที่เลือก — ข้อมูลเดียวกับตารางที่แสดงบนจอ ไม่ต้องกรอกในแอปหรือของทางการ
   const handleExportPp30Csv = () => {
     const headers = [
-      "เดือนภาษี", "ฐานค่าบริการ 40(8)", "ภาษีขาย", "ภาษีซื้อ", "เครดิตยกมา",
-      "ยอดที่ต้องโอนจ่าย", "เครดิตยกไป", "สถานะการยื่น", "วันที่ยื่น",
+      t("tax_page.pp30_col_tax_month"),
+      t("tax_page.pp30_col_service_base"),
+      t("tax_page.monthly_col_output_vat"),
+      t("tax_page.monthly_col_input_vat"),
+      t("tax_page.pp30_col_credit_brought"),
+      t("tax_page.pp30_csv_col_payable"),
+      t("tax_page.pp30_csv_col_carry_forward"),
+      t("tax_page.pp30_csv_col_status"),
+      t("tax_page.pp30_csv_col_filed_date"),
     ]
     const rows = pp30.rows.map((r) => [
-      thaiMonth(r.period, true),
+      thaiMonth(r.period, true, locale),
       r.serviceBase,
       r.outputVat,
       r.inputVat,
       r.creditBrought,
       r.payable,
       r.carryForward,
-      r.filed ? "ยื่นแล้ว" : "ยังไม่ยื่น",
+      r.filed ? t("tax_page.pp30_filed_badge") : t("tax_page.pp30_not_filed_status"),
       r.filedAt || "",
     ])
     downloadCsv(`pp30_${taxYear}.csv`, toCsv(headers, rows))
@@ -1259,11 +1266,12 @@ export default function TaxPage() {
           การ์ดเกณฑ์ VAT (VatThresholdCard) render แค่ที่นี่จุดเดียว — TaxOverviewDashboard ไม่มีการ์ดนี้ซ้ำแล้ว */}
       {dataReady && (
         <>
-          <VatThresholdCard status={vatStatus} breach={vatBreach} />
+          <VatThresholdCard status={vatStatus} breach={vatBreach} t={t} locale={locale} />
           <VatGate settings={taxDataset.settings}>
             <TaxOverviewDashboard
               vatEnabled={taxOverview.vatEnabled}
               yearIncome={taxOverview.yearIncome}
+              t={t}
             />
           </VatGate>
         </>
@@ -1605,6 +1613,7 @@ export default function TaxPage() {
             actualAmountB={actualExpense408}
             onRefreshActual={() => loadExpensesData(taxYear, undefined, true)}
             refreshingActual={loadingExpenses}
+            t={t}
           />
         ) : (
           <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-900/60 dark:bg-slate-900 h-full min-h-[220px] animate-pulse" />
@@ -1624,10 +1633,12 @@ export default function TaxPage() {
             status={vatStatus}
             breach={vatBreach}
             busy={savingVatSettings}
+            t={t}
+            locale={locale}
           />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TaxpayerTypeSection loading={!dataReady} settings={taxDataset.settings} />
-            <MinTaxRuleSection />
+            <TaxpayerTypeSection loading={!dataReady} settings={taxDataset.settings} t={t} />
+            <MinTaxRuleSection t={t} />
           </div>
         </div>
       )}
@@ -1958,6 +1969,8 @@ export default function TaxPage() {
             yearExpense={taxOverview.yearExpense}
             months={taxOverview.months}
             hasData={taxOverview.hasData}
+            t={t}
+            locale={locale}
           />
         </VatGate>
       )}
@@ -1968,14 +1981,14 @@ export default function TaxPage() {
           <div className="relative w-full md:max-w-2xl bg-white dark:bg-slate-900 border-t md:border border-slate-200 dark:border-slate-800 rounded-t-3xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
             <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm tracking-tight">
-                แบบ ภ.พ.30 — {taxYear}
+                {t('tax_page.pp30_modal_title', { year: taxYear })}
               </h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleExportPp30Pdf(filingPp30Row)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 text-xs font-semibold transition-colors cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5" /> ดาวน์โหลด PDF
+                  <Download className="w-3.5 h-3.5" /> {t('tax_page.pp30_modal_download_pdf')}
                 </button>
                 <button
                   onClick={() => setFilingPp30Row(null)}
@@ -1993,6 +2006,8 @@ export default function TaxPage() {
                 onUnfile={handleUnfilePp30}
                 onCancel={() => setFilingPp30Row(null)}
                 busy={savingPp30}
+                t={t}
+                locale={locale}
               />
             </div>
           </div>
@@ -2087,6 +2102,8 @@ export default function TaxPage() {
             onMarkFiled={handleMarkPp30Filed}
             onExportCsv={handleExportPp30Csv}
             onExportPdf={handleExportPp30Pdf}
+            t={t}
+            locale={locale}
           />
         </VatGate>
       )}
@@ -2101,7 +2118,7 @@ export default function TaxPage() {
             <FileCheck className="w-4 h-4 text-blue-500" /> {t("tax_page.pnd94_title")}
           </h3>
 
-          <PersonalAllowanceLockNotice hideHeader form="PND94" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
+          <PersonalAllowanceLockNotice hideHeader form="PND94" taxpayerType={taxpayerStatus} partnerCount={partnerCount} t={t} />
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.revenue_first_half_label")}</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(halfTotalRevenue)} {t("tax_page.baht")}</span></div>
@@ -2119,11 +2136,11 @@ export default function TaxPage() {
           {pitResult94 && (
             <>
               <div className="h-px bg-slate-200 dark:bg-slate-900" />
-              <ProgressiveBracketTable bare result={pitResult94} />
+              <ProgressiveBracketTable bare result={pitResult94} t={t} />
               {pnd94Computation && (
                 <>
                   <div className="h-px bg-slate-200 dark:bg-slate-900" />
-                  <PitBalanceSummary bare computation={pnd94Computation} />
+                  <PitBalanceSummary bare computation={pnd94Computation} t={t} />
                 </>
               )}
             </>
@@ -2161,7 +2178,7 @@ export default function TaxPage() {
             <FileCheck className="w-4 h-4 text-teal-500" /> {t("tax_page.pnd90_title")}
           </h3>
 
-          <PersonalAllowanceLockNotice hideHeader form="PND90" taxpayerType={taxpayerStatus} partnerCount={partnerCount} />
+          <PersonalAllowanceLockNotice hideHeader form="PND90" taxpayerType={taxpayerStatus} partnerCount={partnerCount} t={t} />
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-550 dark:text-slate-400"><span>{t("tax_page.revenue_full_year_label")}</span><span className="font-semibold text-slate-800 dark:text-slate-200">{formatMoney(fullTotalRevenue)} {t("tax_page.baht")}</span></div>
@@ -2179,11 +2196,11 @@ export default function TaxPage() {
           {pitResult90 && (
             <>
               <div className="h-px bg-slate-200 dark:bg-slate-900" />
-              <ProgressiveBracketTable bare result={pitResult90} />
+              <ProgressiveBracketTable bare result={pitResult90} t={t} />
               {pnd90Computation && (
                 <>
                   <div className="h-px bg-slate-200 dark:bg-slate-900" />
-                  <PitBalanceSummary bare computation={pnd90Computation} />
+                  <PitBalanceSummary bare computation={pnd90Computation} t={t} />
                 </>
               )}
             </>
@@ -2217,7 +2234,7 @@ export default function TaxPage() {
       </div>
 
       {/* ตารางเทียบครึ่งปี vs สิ้นปี — คำนวณจาก src/lib/thaiTax.ts เท่านั้น (ตรงกับ PDF ด้านบนเป๊ะ) */}
-      {dataReady && pnd90Computation && <PitComparisonTable pnd90={pnd90Computation} />}
+      {dataReady && pnd90Computation && <PitComparisonTable pnd90={pnd90Computation} t={t} />}
 
     </div>
   )

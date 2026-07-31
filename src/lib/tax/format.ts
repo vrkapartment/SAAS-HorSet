@@ -25,6 +25,20 @@ export const TH_MONTHS_FULL = [
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ] as const;
 
+// ⚠️ thaiMonth()/thaiDate() รับ locale เป็นพารามิเตอร์ตัวสุดท้าย (ดีฟอลต์ 'th' เพื่อไม่ต้องแก้จุดเรียกเดิมที่มี
+// อยู่แล้วทั่วฟีเจอร์ภาษี) — locale='en' ใช้ชื่อเดือนอังกฤษ + ปี ค.ศ. แทนชื่อเดือนไทย + ปี พ.ศ.
+export const EN_MONTHS_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+] as const;
+
+export const EN_MONTHS_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+] as const;
+
+export type DateLocale = 'th' | 'en';
+
 /** 1234567.5 → "1,234,567.50" */
 export function baht(n: number | null | undefined, decimals: 0 | 2 = 2): string {
   const v = Number.isFinite(n) ? (n as number) : 0;
@@ -40,18 +54,25 @@ export function pct(rate: number, decimals = 0): string {
   return `${(rate * 100).toFixed(decimals)}%`;
 }
 
-/** '2026-03-15' → '15 มี.ค. 2569' (แปลงเป็น พ.ศ. ให้) */
-export function thaiDate(iso: string | null | undefined): string {
+/** '2026-03-15' → '15 มี.ค. 2569' (locale='th', ค่าเริ่มต้น) หรือ '15 Mar 2026' (locale='en') */
+export function thaiDate(iso: string | null | undefined, locale: DateLocale = 'th'): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
   if (!m) return String(iso ?? '');
   const [, y, mo, d] = m;
+  if (locale === 'en') {
+    return `${Number(d)} ${EN_MONTHS_SHORT[Number(mo) - 1]} ${Number(y)}`;
+  }
   return `${Number(d)} ${TH_MONTHS_SHORT[Number(mo) - 1]} ${Number(y) + 543}`;
 }
 
-/** '2026-03' → 'มีนาคม 2569' หรือ 'มี.ค. 2569' */
-export function thaiMonth(key: string | null | undefined, short = false): string {
+/** '2026-03' → 'มีนาคม 2569' หรือ 'มี.ค. 2569' (locale='th', ค่าเริ่มต้น) — locale='en' ได้ 'March 2026'/'Mar 2026' */
+export function thaiMonth(key: string | null | undefined, short = false, locale: DateLocale = 'th'): string {
   const m = /^(\d{4})-(\d{2})$/.exec(String(key ?? ''));
   if (!m) return String(key ?? '');
+  if (locale === 'en') {
+    const namesEn = short ? EN_MONTHS_SHORT : EN_MONTHS_FULL;
+    return `${namesEn[Number(m[2]) - 1]} ${Number(m[1])}`;
+  }
   const names = short ? TH_MONTHS_SHORT : TH_MONTHS_FULL;
   return `${names[Number(m[2]) - 1]} ${Number(m[1]) + 543}`;
 }

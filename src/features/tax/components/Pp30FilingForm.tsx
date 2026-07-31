@@ -8,6 +8,9 @@
  *   ขั้นที่ 2 — ผลการคำนวณ แล้วจึงกดยื่น
  *
  * เป็น component เปล่าๆ ไม่ผูกกับ modal library ตัวไหน — เอาไปวางใน Dialog ได้เลย
+ *
+ * ⚠️ i18n: รับ prop `t` (จาก useLanguage() ของหน้าที่เรียก) แทนการ hardcode ข้อความภาษาไทยไว้ตรงๆ
+ *    คีย์ทั้งหมดอยู่ใต้ namespace "tax_page" ร่วมกับข้อความอื่นของหน้า /tax
  */
 
 import { useMemo, useState } from 'react';
@@ -41,6 +44,9 @@ export interface Pp30FilingFormProps {
   onUnfile?: (period: string) => void | Promise<void>;
   onCancel?: () => void;
   busy?: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  /** ใช้ format ชื่อเดือน/ปีของ thaiMonth() ให้ตรงภาษา — ไม่ระบุ = ไทย (พ.ศ.) เหมือนเดิม */
+  locale?: 'th' | 'en';
 }
 
 export function Pp30FilingForm({
@@ -51,6 +57,8 @@ export function Pp30FilingForm({
   onUnfile,
   onCancel,
   busy = false,
+  t,
+  locale = 'th',
 }: Pp30FilingFormProps) {
   const [useManualOutput, setUseManualOutput] = useState(row.outputVatManual != null);
   const [outputVat, setOutputVat] = useState(
@@ -87,12 +95,12 @@ export function Pp30FilingForm({
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-        ภ.พ.30 เดือน {thaiMonth(row.period)}
+        {t('tax_page.pp30_filing_form_title', { month: thaiMonth(row.period, false, locale) })}
       </h2>
 
       {/* ---------- ขั้นที่ 1 ---------- */}
       <Card>
-        <CardHeader title="ขั้นที่ 1 — ระบุภาษีขาย/ภาษีซื้อ" />
+        <CardHeader title={t('tax_page.pp30_filing_step1_title')} />
         <CardBody>
           <label className="flex cursor-pointer items-start gap-2 text-sm">
             <input
@@ -102,9 +110,9 @@ export function Pp30FilingForm({
               onChange={(e) => setUseManualOutput(e.target.checked)}
             />
             <span className="min-w-0">
-              <span className="text-slate-800 dark:text-slate-100">กรอกยอดภาษีขายเอง</span>
+              <span className="text-slate-800 dark:text-slate-100">{t('tax_page.pp30_filing_manual_output_checkbox')}</span>
               <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                ไม่ติ๊ก = ใช้ยอดที่คำนวณจากบิลจริง ({baht(row.outputVatFromLedger)} บาท)
+                {t('tax_page.pp30_filing_manual_output_help', { amount: baht(row.outputVatFromLedger) })}
               </span>
             </span>
           </label>
@@ -112,7 +120,7 @@ export function Pp30FilingForm({
           {useManualOutput && (
             <div className="mt-3 flex max-w-xs flex-col gap-1.5">
               <label className={labelCls} htmlFor="pp30-output-vat">
-                ภาษีขายที่เก็บจากผู้เช่า (บาท)
+                {t('tax_page.pp30_filing_output_vat_label')}
               </label>
               <input
                 id="pp30-output-vat"
@@ -135,10 +143,9 @@ export function Pp30FilingForm({
               onChange={(e) => setUseManual(e.target.checked)}
             />
             <span className="min-w-0">
-              <span className="text-slate-800 dark:text-slate-100">กรอกยอดภาษีซื้อเอง</span>
+              <span className="text-slate-800 dark:text-slate-100">{t('tax_page.pp30_filing_manual_input_checkbox')}</span>
               <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                ไม่ติ๊ก = ใช้ยอดจากสมุดค่าใช้จ่าย ({baht(row.inputVatFromLedger)} บาท จาก{' '}
-                {claimable.length} ใบกำกับ)
+                {t('tax_page.pp30_filing_manual_input_help', { amount: baht(row.inputVatFromLedger), count: claimable.length })}
               </span>
             </span>
           </label>
@@ -146,7 +153,7 @@ export function Pp30FilingForm({
           {useManual && (
             <div className="mt-3 flex max-w-xs flex-col gap-1.5">
               <label className={labelCls} htmlFor="pp30-input-vat">
-                ภาษีซื้อที่ขอเครดิต (บาท)
+                {t('tax_page.pp30_filing_input_vat_label')}
               </label>
               <input
                 id="pp30-input-vat"
@@ -157,7 +164,7 @@ export function Pp30FilingForm({
                 placeholder="0.00"
               />
               <span className="text-[11px] text-slate-500">
-                รวมภาษีซื้อจากใบกำกับภาษีที่ได้รับในเดือนนี้
+                {t('tax_page.pp30_filing_input_vat_help')}
               </span>
             </div>
           )}
@@ -165,7 +172,7 @@ export function Pp30FilingForm({
           {claimable.length > 0 ? (
             <div className="mt-4">
               <div className="mb-1 text-xs text-slate-500 dark:text-slate-400">
-                ใบกำกับภาษีซื้อในเดือนนี้
+                {t('tax_page.pp30_filing_invoices_this_month')}
               </div>
               <div className={tc.wrap}>
                 <table className={tc.table}>
@@ -187,52 +194,49 @@ export function Pp30FilingForm({
               </div>
             </div>
           ) : (
-            <HelpNote>
-              ยังไม่มีใบกำกับภาษีซื้อบันทึกในเดือนนี้ — บันทึกได้ในหน้า &quot;ค่าใช้จ่าย /
-              ภาษีซื้อ&quot;
-            </HelpNote>
+            <HelpNote>{t('tax_page.pp30_filing_no_invoices')}</HelpNote>
           )}
         </CardBody>
       </Card>
 
       {/* ---------- ขั้นที่ 2 ---------- */}
       <Card>
-        <CardHeader title="ขั้นที่ 2 — ผลการคำนวณ" />
+        <CardHeader title={t('tax_page.pp30_filing_step2_title')} />
         <CardBody>
           <Breakdown>
             <BreakdownRow
-              label={`ภาษีขาย (${pct(row.rate)} ที่เก็บจากผู้เช่า)`}
-              sub={`ฐานค่าบริการ 40(8) ${baht(row.serviceBase)} บาท`}
+              label={t('tax_page.pp30_filing_output_vat_row', { rate: pct(row.rate) })}
+              sub={t('tax_page.pp30_filing_output_vat_sub', { amount: baht(row.serviceBase) })}
               value={<Money value={result.outputVat} />}
             />
             <BreakdownRow
-              label={`ภาษีซื้อ (${pct(row.rate)} ที่จ่ายซัพพลายเออร์)`}
+              label={t('tax_page.pp30_filing_input_vat_row', { rate: pct(row.rate) })}
               value={<>−<Money value={result.inputVat} /></>}
               minus
             />
             {result.creditBrought > 0 && (
               <BreakdownRow
-                label="เครดิตภาษีซื้อยกมาจากเดือนก่อน"
+                label={t('tax_page.pp30_filing_credit_brought_row')}
                 value={<>−<Money value={result.creditBrought} /></>}
                 minus
               />
             )}
             {result.status === 'pay' ? (
               <BreakdownRow
-                label="ยอดที่ต้องโอนจ่ายสรรพากร"
+                label={t('tax_page.pp30_filing_payable_row')}
                 value={<Money value={result.payable} sign />}
                 result
                 tone="pay"
               />
             ) : result.status === 'credit' ? (
               <BreakdownRow
-                label="ภาษีซื้อยกไปเครดิตเดือนถัดไป / ขอคืน"
+                label={t('tax_page.pp30_filing_carry_forward_row')}
                 value={<Money value={result.carryForward} sign />}
                 result
                 tone="refund"
               />
             ) : (
-              <BreakdownRow label="ไม่มียอดต้องชำระ" value="฿0.00" result />
+              <BreakdownRow label={t('tax_page.pp30_filing_zero_row')} value="฿0.00" result />
             )}
           </Breakdown>
         </CardBody>
@@ -240,13 +244,13 @@ export function Pp30FilingForm({
 
       {/* ---------- หมายเหตุ ---------- */}
       <div className="flex flex-col gap-1.5">
-        <label className={labelCls} htmlFor="pp30-note">หมายเหตุ</label>
+        <label className={labelCls} htmlFor="pp30-note">{t('tax_page.pp30_filing_note_label')}</label>
         <input
           id="pp30-note"
           className={inputCls}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="เลขที่อ้างอิงการยื่น / ช่องทางชำระ"
+          placeholder={t('tax_page.pp30_filing_note_placeholder')}
         />
       </div>
 
@@ -259,13 +263,13 @@ export function Pp30FilingForm({
             onClick={() => onUnfile(row.period)}
             className="rounded-md border border-red-400 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/40"
           >
-            ยกเลิกการยื่น
+            {t('tax_page.pp30_filing_unfile_btn')}
           </button>
         )}
         <div className="flex-1" />
         {onCancel && (
           <button type="button" onClick={onCancel} disabled={busy} className={btnCls}>
-            ยกเลิก
+            {t('tax_page.pp30_filing_cancel_btn')}
           </button>
         )}
         {onSaveDraft && (
@@ -275,7 +279,7 @@ export function Pp30FilingForm({
             onClick={() => onSaveDraft(patch())}
             className={btnCls}
           >
-            บันทึกร่าง
+            {t('tax_page.pp30_filing_save_draft_btn')}
           </button>
         )}
         <button
@@ -284,7 +288,7 @@ export function Pp30FilingForm({
           onClick={() => onSubmitFiling(patch())}
           className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-default"
         >
-          บันทึก
+          {t('tax_page.pp30_filing_save_btn')}
         </button>
       </div>
     </div>

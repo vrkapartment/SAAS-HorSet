@@ -1146,6 +1146,7 @@ export default function DailyBillsPage() {
                 }}
                 settings={vatSettings}
                 bucket={formCategory === "40_5" ? "A" : "B"}
+                t={t}
               />
 
               {/* ข้อแนะนำไดนามิก */}

@@ -14,13 +14,18 @@
  *                            ที่ไม่เคยบันทึกลง DB เลย ถูกลบทิ้งแล้วเพื่อไม่ให้ตั้งค่าคนละที่แล้วขัดกัน
  *   MinTaxRuleSection        ภาษีขั้นต่ำ 0.5% (ม.48(2)) — แสดงผลอย่างเดียว ค่าคงที่ตามกฎหมาย ไม่ให้ผู้ใช้
  *                            ปิด/ปรับได้ เพราะเป็นข้อกำหนดตามกฎหมาย ไม่ใช่ทางเลือกทางธุรกิจ
+ *
+ * ⚠️ i18n: ทุก component ในไฟล์นี้รับ prop `t` (จาก useLanguage() ของหน้าที่เรียก) แทนการ hardcode
+ *    ข้อความภาษาไทยไว้ตรงๆ — คีย์ทั้งหมดอยู่ใต้ namespace "tax_page" ร่วมกับข้อความอื่นของหน้า /tax
  */
 
 import { Percent, RefreshCw } from 'lucide-react';
 import type { TaxSettings } from '../../../types/tax';
-import { PERSONAL_ALLOWANCE, TAXPAYER_LABEL, num } from '../../../lib/tax';
+import { PERSONAL_ALLOWANCE, num } from '../../../lib/tax';
 import { baht, pct } from '../../../lib/tax/format';
 import { Alert, Card, CardBody, CardHeader, HelpNote, Switch, tableClasses as tc } from './primitives';
+
+type T = (key: string, params?: Record<string, string | number>) => string;
 
 /* ================================================================== *
  * สถานะผู้เสียภาษี
@@ -29,15 +34,17 @@ import { Alert, Card, CardBody, CardHeader, HelpNote, Switch, tableClasses as tc
 export function TaxpayerTypeSection({
   settings,
   loading = false,
+  t,
 }: {
   settings: Pick<TaxSettings, 'taxpayerType' | 'partnerCount'>;
   /** ยังโหลด settings จริงไม่เสร็จ — โชว์หัวข้อการ์ดตามปกติ แต่สลับตารางเป็น skeleton ไปก่อน */
   loading?: boolean;
+  t: T;
 }) {
   if (loading) {
     return (
       <Card>
-        <CardHeader title="สถานะผู้เสียภาษี" subtitle="มีผลกับค่าลดหย่อนส่วนตัวของ ภ.ง.ด.94 และ ภ.ง.ด.90" />
+        <CardHeader title={t('tax_page.taxpayer_type_title')} subtitle={t('tax_page.taxpayer_type_subtitle')} />
         <CardBody className="space-y-4">
           <div className="h-4 w-40 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
           <div className="h-24 w-full rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
@@ -46,24 +53,29 @@ export function TaxpayerTypeSection({
     );
   }
 
+  const taxpayerLabel = t(
+    settings.taxpayerType === 'partnership' ? 'tax_page.taxpayer_partnership' : 'tax_page.taxpayer_individual',
+  );
+
   return (
     <Card>
       <CardHeader
-        title="สถานะผู้เสียภาษี"
-        subtitle="มีผลกับค่าลดหย่อนส่วนตัวของ ภ.ง.ด.94 และ ภ.ง.ด.90"
+        title={t('tax_page.taxpayer_type_title')}
+        subtitle={t('tax_page.taxpayer_type_subtitle')}
         actions={
           <a
             href="/settings?tab=finance"
             className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:shadow-md"
           >
-            แก้ไขที่หน้าตั้งค่าการเงิน →
+            {t('tax_page.taxpayer_type_edit_link')}
           </a>
         }
       />
       <CardBody className="space-y-4">
         <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-          {TAXPAYER_LABEL[settings.taxpayerType]}
-          {settings.taxpayerType === 'partnership' && ` (${settings.partnerCount ?? 1} หุ้นส่วน)`}
+          {taxpayerLabel}
+          {settings.taxpayerType === 'partnership' &&
+            ` (${t('tax_page.taxpayer_partner_count', { count: settings.partnerCount ?? 1 })})`}
         </div>
 
         {/* ตารางพรีวิว — ให้ผู้ใช้เห็นตัวเลขที่ระบบใช้อยู่จริง */}
@@ -71,33 +83,31 @@ export function TaxpayerTypeSection({
           <table className={tc.table}>
             <thead>
               <tr>
-                <th className={tc.th}>แบบแสดงรายการ</th>
-                <th className={tc.th}>รอบภาษี</th>
-                <th className={tc.thNum}>ค่าลดหย่อนส่วนตัวที่ใช้</th>
+                <th className={tc.th}>{t('tax_page.taxpayer_type_col_form')}</th>
+                <th className={tc.th}>{t('tax_page.taxpayer_type_col_period')}</th>
+                <th className={tc.thNum}>{t('tax_page.taxpayer_type_col_allowance')}</th>
               </tr>
             </thead>
             <tbody>
               <tr className={tc.row}>
-                <td className={tc.td}>ภ.ง.ด.94 (ครึ่งปี)</td>
-                <td className={tc.td}>1 ม.ค. – 30 มิ.ย.</td>
+                <td className={tc.td}>{t('tax_page.taxpayer_type_pnd94_form')}</td>
+                <td className={tc.td}>{t('tax_page.taxpayer_type_pnd94_period')}</td>
                 <td className={`${tc.tdNum} font-bold`}>
-                  {baht(PERSONAL_ALLOWANCE.PND94[settings.taxpayerType], 0)} บาท
+                  {baht(PERSONAL_ALLOWANCE.PND94[settings.taxpayerType], 0)} {t('tax_page.baht')}
                 </td>
               </tr>
               <tr className={tc.row}>
-                <td className={tc.td}>ภ.ง.ด.90 (สิ้นปี)</td>
-                <td className={tc.td}>1 ม.ค. – 31 ธ.ค.</td>
+                <td className={tc.td}>{t('tax_page.taxpayer_type_pnd90_form')}</td>
+                <td className={tc.td}>{t('tax_page.taxpayer_type_pnd90_period')}</td>
                 <td className={`${tc.tdNum} font-bold`}>
-                  {baht(PERSONAL_ALLOWANCE.PND90[settings.taxpayerType], 0)} บาท
+                  {baht(PERSONAL_ALLOWANCE.PND90[settings.taxpayerType], 0)} {t('tax_page.baht')}
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <HelpNote>
-          ค่าลดหย่อนส่วนตัวถูกล็อกตามแบบและสถานะ — ระบบไม่มีทางนำตัวเลขของครึ่งปีไปใช้กับสิ้นปีสลับกันได้
-        </HelpNote>
+        <HelpNote>{t('tax_page.taxpayer_type_help')}</HelpNote>
       </CardBody>
     </Card>
   );
@@ -116,6 +126,7 @@ export function ExpenseModeSection({
   onRefreshActual,
   refreshingActual = false,
   loading = false,
+  t,
 }: {
   settings: Pick<TaxSettings, 'expenseA' | 'expenseB' | 'capExpensePerBucket'>;
   onChange: (patch: Partial<TaxSettings>) => void;
@@ -129,11 +140,16 @@ export function ExpenseModeSection({
   /** ยังโหลด settings จริงไม่เสร็จ — โชว์หัวข้อการ์ดตามปกติ แต่สลับแถวควบคุมเป็น skeleton ไปก่อน
    *  (กันไม่ให้โชว์ค่า default ชั่วคราวก่อนสลับเป็นค่าจริงตอนโหลดเสร็จ) */
   loading?: boolean;
+  t: T;
 }) {
   if (loading) {
     return (
       <Card glow="bucketA" className="rounded-3xl">
-        <CardHeader icon={<Percent className="h-4 w-4" />} title="รูปแบบการหักค่าใช้จ่าย" subtitle="ใช้ทั้งใน ภ.ง.ด.94 และ ภ.ง.ด.90" />
+        <CardHeader
+          icon={<Percent className="h-4 w-4" />}
+          title={t('tax_page.expense_mode_title')}
+          subtitle={t('tax_page.expense_mode_subtitle')}
+        />
         <CardBody className="divide-y divide-slate-200 dark:divide-slate-800">
           {(['A', 'B'] as const).map((bucket) => (
             <div key={bucket} className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
@@ -160,22 +176,20 @@ export function ExpenseModeSection({
     {
       bucket: 'A' as const,
       key: 'expenseA' as const,
-      title: 'ค่าเช่าห้อง',
+      title: t('tax_page.expense_mode_rent_title'),
       badge: 'A · 40(5)',
       cfg: settings.expenseA,
       actualAmount: actualAmountA,
-      note: 'ค่าเช่าโรงเรือน/สิ่งปลูกสร้างตามมาตรา 40(5) โดยทั่วไปหักเหมาได้ 30%',
+      note: t('tax_page.expense_mode_rent_note'),
     },
     {
       bucket: 'B' as const,
       key: 'expenseB' as const,
-      title: 'ค่าบริการ/อื่นๆ',
+      title: t('tax_page.expense_mode_service_title'),
       badge: 'B · 40(8)',
       cfg: settings.expenseB,
       actualAmount: actualAmountB,
-      note:
-        'อัตราหักเหมาของเงินได้ 40(8) ขึ้นกับประเภทกิจการตามพระราชกฤษฎีกา บางกรณีหักเหมาไม่ได้เลย ' +
-        '(ต้องหักตามจริง) — โปรดตรวจสอบอัตราที่ใช้ได้กับกิจการของท่านกับกรมสรรพากร',
+      note: t('tax_page.expense_mode_service_note'),
     },
   ];
 
@@ -183,8 +197,8 @@ export function ExpenseModeSection({
     <Card glow="bucketA" className="rounded-3xl">
       <CardHeader
         icon={<Percent className="h-4 w-4" />}
-        title="รูปแบบการหักค่าใช้จ่าย"
-        subtitle="ใช้ทั้งใน ภ.ง.ด.94 และ ภ.ง.ด.90"
+        title={t('tax_page.expense_mode_title')}
+        subtitle={t('tax_page.expense_mode_subtitle')}
       />
       <CardBody className="divide-y divide-slate-200 dark:divide-slate-800">
         {blocks.map((b) => (
@@ -210,14 +224,14 @@ export function ExpenseModeSection({
                         : 'rounded-xl px-4 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
                     }
                   >
-                    {m === 'lump' ? 'หักเหมา' : 'หักตามจริง'}
+                    {m === 'lump' ? t('tax_page.expense_mode_lump') : t('tax_page.expense_mode_actual')}
                   </button>
                 ))}
               </div>
 
               {b.cfg.mode === 'lump' ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-slate-500">อัตรา</span>
+                  <span className="text-xs text-slate-500">{t('tax_page.expense_mode_rate_label')}</span>
                   <input
                     type="number"
                     min={0}
@@ -239,7 +253,7 @@ export function ExpenseModeSection({
                 </div>
               ) : (
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="text-xs text-slate-500 shrink-0">ยอดตามจริงสะสม</span>
+                  <span className="text-xs text-slate-500 shrink-0">{t('tax_page.expense_mode_actual_label')}</span>
                   <div className="relative min-w-[140px] flex-1">
                     <input
                       type="text"
@@ -252,7 +266,7 @@ export function ExpenseModeSection({
                         type="button"
                         onClick={onRefreshActual}
                         disabled={refreshingActual}
-                        title="ดึงยอดล่าสุดจากรายการค่าใช้จ่าย"
+                        title={t('tax_page.expense_mode_refresh_tooltip')}
                         className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1 text-blue-600 hover:bg-blue-500/10 disabled:opacity-50 dark:text-blue-400"
                       >
                         <RefreshCw className={`h-3.5 w-3.5 ${refreshingActual ? 'animate-spin' : ''}`} />
@@ -270,19 +284,17 @@ export function ExpenseModeSection({
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              จำกัดค่าใช้จ่ายจริงไม่ให้เกินรายได้ต่อตะกร้า (โหมดระมัดระวัง)
+              {t('tax_page.expense_mode_cap_title')}
             </div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              ค่าเริ่มต้น (ปิด) — เมื่อหักตามจริงเกินรายได้ของตะกร้านั้น ระบบจะปล่อยให้ส่วนเกินไปหักลบกับเงินได้
-              ของอีกตะกร้าได้ ตรงกับแนวทางยื่นจริง เปิดสวิตช์นี้ถ้าต้องการให้ระบบจำกัดยอดหักของแต่ละตะกร้าไว้
-              ไม่ให้เกินรายได้ของตะกร้านั้นเอง (ระมัดระวังกว่า แต่ไม่ตรงกับแนวทางปฏิบัติทั่วไปที่ยื่นกันจริง)
+              {t('tax_page.expense_mode_cap_desc')}
             </div>
           </div>
           <Switch
             checked={settings.capExpensePerBucket}
             onChange={(next) => onChange({ capExpensePerBucket: next })}
             disabled={busy}
-            label="จำกัดค่าใช้จ่ายจริงไม่ให้เกินรายได้ต่อตะกร้า"
+            label={t('tax_page.expense_mode_cap_title')}
           />
         </div>
       </CardBody>
@@ -300,25 +312,27 @@ const STATUTORY_MIN_TAX_RATE = 0.005;
 const STATUTORY_MIN_TAX_THRESHOLD = 120_000;
 const STATUTORY_MIN_TAX_EXEMPT_BELOW = 5_000;
 
-export function MinTaxRuleSection() {
+export function MinTaxRuleSection({ t }: { t: T }) {
   return (
     <Card>
-      <CardHeader title="ภาษีขั้นต่ำ 0.5% (มาตรา 48(2))" />
+      <CardHeader title={t('tax_page.min_tax_title')} />
       <CardBody className="space-y-4">
         <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-          ตรวจภาษีขั้นต่ำ {pct(STATUTORY_MIN_TAX_RATE, 1)} ของเงินได้พึงประเมิน (ตั้งแต่ {baht(STATUTORY_MIN_TAX_THRESHOLD, 0)} บาทขึ้นไป)
+          {t('tax_page.min_tax_summary', {
+            rate: pct(STATUTORY_MIN_TAX_RATE, 1),
+            threshold: baht(STATUTORY_MIN_TAX_THRESHOLD, 0),
+          })}
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400">
-          ระบบใช้ยอดที่สูงกว่าระหว่างภาษีขั้นบันไดกับ {pct(STATUTORY_MIN_TAX_RATE, 1)} ของเงินได้พึงประเมินเสมอ
-          และยกเว้นให้ถ้ายอดที่คำนวณได้ต่ำกว่า {baht(STATUTORY_MIN_TAX_EXEMPT_BELOW, 0)} บาท — ค่าคงที่ตามกฎหมาย ปรับไม่ได้
+          {t('tax_page.min_tax_desc', {
+            rate: pct(STATUTORY_MIN_TAX_RATE, 1),
+            exempt: baht(STATUTORY_MIN_TAX_EXEMPT_BELOW, 0),
+          })}
         </div>
 
-        <Alert tone="info" title="กฎนี้ไม่ได้อยู่ในข้อกำหนดตั้งต้น">
-          ใส่ไว้เพราะมีผลกับยอดภาษีจริง — เคสที่เห็นชัดคือหักค่าใช้จ่ายตามจริงเยอะจนเงินได้สุทธิเหลือ 0
-          แต่รายได้รวมสูง ถ้าไม่มีกฎนี้ระบบจะบอกว่าภาษี = 0 ซึ่งต่ำกว่าความจริง
-          <HelpNote>
-            เป็นข้อกำหนดตามกฎหมาย ไม่เปิดให้ปิด/ปรับอัตราเอง — ควรตรวจสอบเงื่อนไขที่ใช้กับกรณีของท่านกับกรมสรรพากรก่อนยื่น
-          </HelpNote>
+        <Alert tone="info" title={t('tax_page.min_tax_alert_title')}>
+          {t('tax_page.min_tax_alert_body')}
+          <HelpNote>{t('tax_page.min_tax_alert_help')}</HelpNote>
         </Alert>
       </CardBody>
     </Card>

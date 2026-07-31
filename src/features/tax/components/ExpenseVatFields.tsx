@@ -10,6 +10,10 @@
  * เมื่อยังไม่จด: ยอดที่ผู้ใช้กรอกคือ base ตรงๆ, vat = 0 — ฟอร์มเดิมทำงานเหมือนเดิมเป๊ะ
  *
  * รูปแบบ controlled component: ถือ state ไว้เอง แล้วรับค่าที่คำนวณแล้วผ่าน onChange
+ *
+ * ⚠️ i18n: ทุก component ในไฟล์นี้รับ prop `t` (จาก useLanguage() ของหน้าที่เรียก) แทนการ hardcode
+ *    ข้อความภาษาไทยไว้ตรงๆ — คีย์ทั้งหมดอยู่ใต้ namespace "tax_page" ร่วมกับข้อความอื่นของหน้า /tax
+ *    (component นี้ใช้ทั้งในหน้า /tax และหน้าบันทึกค่าใช้จ่าย daily-bills)
  */
 
 import { useMemo } from 'react';
@@ -18,6 +22,8 @@ import type { Bucket, ExpenseSummary, TaxSettings } from '../../../types/tax';
 import { addVat, isVatEnabled, num, r2, splitVatFromGross } from '../../../lib/tax';
 import { baht, pct } from '../../../lib/tax/format';
 import { Alert, HelpNote, Money, StatTile, cx } from './primitives';
+
+type T = (key: string, params?: Record<string, string | number>) => string;
 
 /** โหมดการกรอกยอด */
 export type ExpenseVatMode =
@@ -79,6 +85,7 @@ export interface ExpenseVatFieldsProps {
   /** ซ่อนพรีวิว (ถ้าฟอร์มมีพรีวิวของตัวเองอยู่แล้ว) */
   hidePreview?: boolean;
   className?: string;
+  t: T;
 }
 
 export function ExpenseVatFields({
@@ -88,6 +95,7 @@ export function ExpenseVatFields({
   bucket,
   hidePreview = false,
   className,
+  t,
 }: ExpenseVatFieldsProps) {
   const enabled = isVatEnabled(settings);
   const computed = useMemo(() => computeExpenseVat(value, settings), [value, settings]);
@@ -102,7 +110,7 @@ export function ExpenseVatFields({
     <div className={cx('space-y-3', className)}>
       <div className="flex flex-col gap-1.5">
         <label className={labelCls} htmlFor="expense-vat-mode">
-          รูปแบบ VAT ของใบนี้
+          {t('tax_page.expense_vat_mode_label')}
         </label>
         <select
           id="expense-vat-mode"
@@ -110,9 +118,9 @@ export function ExpenseVatFields({
           value={value.vatMode}
           onChange={(e) => onChange({ ...value, vatMode: e.target.value as ExpenseVatMode })}
         >
-          <option value="novat">ไม่มี VAT</option>
-          <option value="gross">ยอดที่กรอกรวม VAT แล้ว (ถอด {pct(rate)} ออก)</option>
-          <option value="base">ยอดที่กรอกยังไม่รวม VAT (บวก {pct(rate)})</option>
+          <option value="novat">{t('tax_page.expense_vat_mode_none')}</option>
+          <option value="gross">{t('tax_page.expense_vat_mode_gross', { rate: pct(rate) })}</option>
+          <option value="base">{t('tax_page.expense_vat_mode_base', { rate: pct(rate) })}</option>
         </select>
       </div>
 
@@ -126,11 +134,10 @@ export function ExpenseVatFields({
           />
           <span className="min-w-0">
             <span className="text-slate-800 dark:text-slate-100">
-              นำภาษีซื้อนี้ไปเครดิตใน ภ.พ.30
+              {t('tax_page.expense_vat_claim_checkbox')}
             </span>
             <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-              ไม่ติ๊กสำหรับใบกำกับที่ขอเครดิตไม่ได้ เช่น ไม่ใช่ใบกำกับภาษีเต็มรูป
-              หรือเป็นค่าใช้จ่ายฝั่งค่าเช่าที่ได้รับยกเว้น VAT
+              {t('tax_page.expense_vat_claim_help')}
             </span>
           </span>
         </label>
@@ -139,23 +146,20 @@ export function ExpenseVatFields({
       {!hidePreview && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-slate-500">ฐานค่าใช้จ่าย</dt>
-            <dd className="font-semibold"><Money value={computed.base} /> บาท</dd>
-            <dt className="text-slate-500">ภาษีซื้อ {pct(rate)}</dt>
+            <dt className="text-slate-500">{t('tax_page.expense_vat_base_label')}</dt>
+            <dd className="font-semibold"><Money value={computed.base} /> {t('tax_page.baht')}</dd>
+            <dt className="text-slate-500">{t('tax_page.expense_vat_input_vat_label', { rate: pct(rate) })}</dt>
             <dd className={computed.vat ? 'font-semibold' : 'text-slate-400'}>
-              {computed.vat ? <><Money value={computed.vat} /> บาท</> : '—'}
+              {computed.vat ? <><Money value={computed.vat} /> {t('tax_page.baht')}</> : '—'}
             </dd>
-            <dt className="text-slate-500">รวมจ่าย</dt>
-            <dd className="font-semibold"><Money value={computed.total} /> บาท</dd>
+            <dt className="text-slate-500">{t('tax_page.expense_vat_total_paid_label')}</dt>
+            <dd className="font-semibold"><Money value={computed.total} /> {t('tax_page.baht')}</dd>
           </dl>
           {computed.vat > 0 && !computed.claimInputVat && (
-            <HelpNote>ภาษีซื้อนี้จะไม่ถูกนำไปหักใน ภ.พ.30</HelpNote>
+            <HelpNote>{t('tax_page.expense_vat_not_claimed_help')}</HelpNote>
           )}
           {bucket === 'A' && computed.vat > 0 && (
-            <HelpNote>
-              ค่าใช้จ่ายฝั่งค่าเช่า 40(5) มักขอเครดิตภาษีซื้อไม่ได้ เพราะกิจการให้เช่าอสังหาริมทรัพย์
-              ได้รับยกเว้น VAT — ตรวจกับผู้ทำบัญชีก่อนติ๊กขอเครดิต
-            </HelpNote>
+            <HelpNote>{t('tax_page.expense_vat_rent_side_warning')}</HelpNote>
           )}
         </div>
       )}
@@ -172,12 +176,14 @@ export interface ExpenseSummaryTilesProps {
   settings: Pick<TaxSettings, 'vatRegistered' | 'expenseA' | 'expenseB'>;
   /** ภาษีซื้อทั้งหมดรวมที่ขอเครดิตไม่ได้ — จาก totalInputVatIncludingUnclaimable() */
   inputVatAll?: number;
+  t: T;
 }
 
 export function ExpenseSummaryTiles({
   summary,
   settings,
   inputVatAll,
+  t,
 }: ExpenseSummaryTilesProps) {
   const vatEnabled = isVatEnabled(settings);
   const usingActualA = settings.expenseA?.mode === 'actual';
@@ -186,34 +192,34 @@ export function ExpenseSummaryTiles({
   return (
     <div className={cx('grid gap-4', vatEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
       <StatTile
-        label="ค่าใช้จ่ายฝั่ง A · ค่าเช่า"
+        label={t('tax_page.expense_summary_bucket_a')}
         value={summary.expenseA}
         accent="bucketA"
         note={
           usingActualA
-            ? '✓ ใช้เป็นค่าใช้จ่ายจริงใน ภ.ง.ด.'
-            : 'ตั้งค่าเป็น "หักเหมา" — ยอดนี้ยังไม่ถูกใช้คำนวณภาษี'
+            ? t('tax_page.expense_summary_used_actual')
+            : t('tax_page.expense_summary_lump_not_used')
         }
       />
       <StatTile
-        label="ค่าใช้จ่ายฝั่ง B · บริการ"
+        label={t('tax_page.expense_summary_bucket_b')}
         value={summary.expenseB}
         accent="bucketB"
         note={
           usingActualB
-            ? '✓ ใช้เป็นค่าใช้จ่ายจริงใน ภ.ง.ด.'
-            : 'ตั้งค่าเป็น "หักเหมา" — ยอดนี้ยังไม่ถูกใช้คำนวณภาษี'
+            ? t('tax_page.expense_summary_used_actual')
+            : t('tax_page.expense_summary_lump_not_used')
         }
       />
       {vatEnabled && (
         <StatTile
-          label="ภาษีซื้อที่ขอเครดิตได้"
+          label={t('tax_page.expense_summary_input_vat_label')}
           value={summary.inputVat}
           accent="info"
           note={
             inputVatAll != null && inputVatAll > summary.inputVat
-              ? `จากภาษีซื้อทั้งหมด ${baht(inputVatAll)}`
-              : 'นำไปใช้ในแบบ ภ.พ.30'
+              ? t('tax_page.expense_summary_input_vat_all_note', { amount: baht(inputVatAll) })
+              : t('tax_page.expense_summary_input_vat_note')
           }
         />
       )}
@@ -229,30 +235,30 @@ export function ExpenseModeMismatchNotice({
   summary,
   settings,
   onGoToSettings,
+  t,
 }: {
   summary: ExpenseSummary;
   settings: Pick<TaxSettings, 'expenseA' | 'expenseB'>;
   onGoToSettings?: () => void;
+  t: T;
 }) {
   const bothLump =
     settings.expenseA?.mode === 'lump' && settings.expenseB?.mode === 'lump';
   if (!bothLump || summary.total <= 0) return null;
 
   return (
-    <Alert tone="info" title="ค่าใช้จ่ายที่บันทึกไว้ยังไม่ถูกใช้คำนวณ ภ.ง.ด.">
-      ตอนนี้ตั้งค่าเป็น <b>หักเหมา</b> ทั้งสองตะกร้า ระบบจึงหักตามอัตรา % ไม่ได้ใช้ยอดจริง{' '}
-      {baht(summary.total)} บาทที่บันทึกไว้
+    <Alert tone="info" title={t('tax_page.expense_mismatch_title')}>
+      {t('tax_page.expense_mismatch_body_prefix')} <b>{t('tax_page.expense_mode_lump')}</b>{' '}
+      {t('tax_page.expense_mismatch_body_suffix', { amount: baht(summary.total) })}
       {onGoToSettings && (
         <>
           {' — '}
           <button type="button" onClick={onGoToSettings} className="font-semibold underline">
-            เปลี่ยนเป็นหักตามจริงได้ที่หน้าตั้งค่า
+            {t('tax_page.expense_mismatch_change_link')}
           </button>
         </>
       )}
-      <HelpNote>
-        ยอดภาษีซื้อยังถูกนำไปใช้ใน ภ.พ.30 ตามปกติ — โหมดหักค่าใช้จ่ายมีผลกับ ภ.ง.ด. เท่านั้น
-      </HelpNote>
+      <HelpNote>{t('tax_page.expense_mismatch_help')}</HelpNote>
     </Alert>
   );
 }

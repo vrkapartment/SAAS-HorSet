@@ -10,6 +10,9 @@
  *
  *    component นี้จึงเติม vatRegisteredFrom ให้อัตโนมัติเมื่อเปิดสวิตช์
  *    (ใช้เดือนที่ทะลุเกณฑ์ ถ้ามี ไม่งั้นใช้เดือนปัจจุบัน)
+ *
+ * ⚠️ i18n: รับ prop `t` (จาก useLanguage() ของหน้าที่เรียก) แทนการ hardcode ข้อความภาษาไทยไว้ตรงๆ
+ *    คีย์ทั้งหมดอยู่ใต้ namespace "tax_page" ร่วมกับข้อความอื่นของหน้า /tax
  */
 
 import { AlertTriangle, CheckCircle2, ExternalLink, Receipt } from 'lucide-react';
@@ -27,6 +30,9 @@ export interface VatSettingsSectionProps {
   busy?: boolean;
   /** ยังโหลด settings/status จริงไม่เสร็จ — โชว์หัวข้อการ์ดตามปกติ แต่สลับตัวควบคุมเป็น skeleton ไปก่อน */
   loading?: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  /** ใช้ format เดือน/ปีของ thaiMonth() ให้ตรงภาษา — ไม่ระบุ = ไทย (พ.ศ.) เหมือนเดิม */
+  locale?: 'th' | 'en';
 }
 
 export function VatSettingsSection({
@@ -36,14 +42,16 @@ export function VatSettingsSection({
   breach = null,
   busy = false,
   loading = false,
+  t,
+  locale = 'th',
 }: VatSettingsSectionProps) {
   if (loading) {
     return (
       <Card glow="success" className="rounded-3xl">
         <CardHeader
           icon={<Receipt className="h-4 w-4" />}
-          title="ภาษีมูลค่าเพิ่ม (VAT)"
-          subtitle="มีผลกับใบแจ้งหนี้ ช่องภาษีซื้อ และแบบ ภ.พ.30"
+          title={t('tax_page.vat_settings_title')}
+          subtitle={t('tax_page.vat_settings_subtitle')}
         />
         <CardBody className="space-y-4">
           <div className="grid grid-cols-1 gap-6 border-b border-slate-200 pb-4 sm:grid-cols-2 dark:border-slate-800">
@@ -83,8 +91,8 @@ export function VatSettingsSection({
       <CardHeader
         icon={<Receipt className="h-4 w-4" />}
         iconTone={status.exceeded ? 'danger' : 'success'}
-        title="ภาษีมูลค่าเพิ่ม (VAT)"
-        subtitle="มีผลกับใบแจ้งหนี้ ช่องภาษีซื้อ และแบบ ภ.พ.30"
+        title={t('tax_page.vat_settings_title')}
+        subtitle={t('tax_page.vat_settings_subtitle')}
         actions={
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${
@@ -94,7 +102,7 @@ export function VatSettingsSection({
             }`}
           >
             {status.exceeded ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-            {status.exceeded ? 'รายได้ 40(8) เกินเกณฑ์แล้ว' : 'ยังไม่เกินเกณฑ์'}
+            {status.exceeded ? t('tax_page.vat_exceeded_badge') : t('tax_page.vat_not_exceeded_badge')}
           </span>
         }
       />
@@ -102,7 +110,7 @@ export function VatSettingsSection({
         {status.mustRegisterWarning && (
           <Alert
             tone="danger"
-            title="รายได้ 40(8) เกิน 1.8 ล้านบาทต่อปี จำเป็นต้องจด VAT"
+            title={t('tax_page.vat_must_register_title')}
             actions={
               <a
                 href={RD_URL}
@@ -110,13 +118,13 @@ export function VatSettingsSection({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 font-semibold underline"
               >
-                <ExternalLink className="h-3.5 w-3.5" /> เว็บไซต์กรมสรรพากร (rd.go.th)
+                <ExternalLink className="h-3.5 w-3.5" /> {t('tax_page.vat_rd_website_link')}
               </a>
             }
           >
-            ย้อนหลัง 12 เดือนล่าสุด = {baht(status.rolling12)} บาท
+            {t('tax_page.vat_rolling12_summary', { amount: baht(status.rolling12) })}
             {breach && (
-              <div className="text-xs">เดือนแรกที่ทะลุเกณฑ์: {thaiMonth(breach.month)}</div>
+              <div className="text-xs">{t('tax_page.vat_first_breach_month', { month: thaiMonth(breach.month, false, locale) })}</div>
             )}
           </Alert>
         )}
@@ -126,7 +134,7 @@ export function VatSettingsSection({
           {/* ซ้าย — เกณฑ์รายได้ที่ต้องจด VAT + progress bar */}
           <div>
             <label className="text-sm font-semibold text-slate-900 dark:text-slate-100" htmlFor="vat-threshold">
-              เกณฑ์รายได้ที่ต้องจด VAT (บาท / 12 เดือนเคลื่อนที่)
+              {t('tax_page.vat_threshold_label')}
             </label>
             <input
               id="vat-threshold"
@@ -140,41 +148,40 @@ export function VatSettingsSection({
             <div className="mt-3">
               <div className="mb-0.5 flex items-baseline justify-between text-xs">
                 <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-300">
-                  {baht(status.rolling12)} บาท
+                  {baht(status.rolling12)} {t('tax_page.baht')}
                 </span>
                 <span className="tabular-nums text-slate-500">{status.usedPct.toFixed(1)}%</span>
               </div>
               <ProgressBar pct={status.usedPct} tone={status.exceeded ? 'over' : status.usedPct >= 80 ? 'warn' : 'ok'} />
               <div className="mt-0.5 text-[11px] text-slate-500">
-                ย้อนหลัง 12 เดือน ({thaiMonth(status.windowStart, true)} – {thaiMonth(status.windowEnd, true)}) —{' '}
-                {status.exceeded
-                  ? `เกินเกณฑ์ ${baht(status.rolling12 - status.threshold)} บาท`
-                  : `เหลืออีก ${baht(status.remaining)} บาท ถึงเกณฑ์`}
+                {t('tax_page.vat_rolling12_window', {
+                  start: thaiMonth(status.windowStart, true, locale),
+                  end: thaiMonth(status.windowEnd, true, locale),
+                  status: status.exceeded
+                    ? t('tax_page.vat_exceeded_by', { amount: baht(status.rolling12 - status.threshold) })
+                    : t('tax_page.vat_remaining_to_threshold', { amount: baht(status.remaining) }),
+                })}
               </div>
             </div>
 
-            <HelpNote>
-              ค่ามาตรฐาน 1,800,000 บาท — เก็บเป็นค่าตั้งได้เพราะกฎหมายเปลี่ยนได้
-              นับเฉพาะรายได้ 40(8) เท่านั้น ค่าเช่าห้อง 40(5) ได้รับยกเว้น VAT จึงไม่ถูกนับ
-            </HelpNote>
+            <HelpNote>{t('tax_page.vat_threshold_help')}</HelpNote>
           </div>
 
           {/* ขวา — สวิตช์จดทะเบียน VAT แล้ว */}
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                จดทะเบียน VAT แล้ว
+                {t('tax_page.vat_registered_label')}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                เปิดเมื่อได้รับ ภ.พ.20 แล้ว — ระบบจะเริ่มคิด VAT {pct(settings.vatRate)}{' '}
-                เฉพาะรายได้ตะกร้า B, แสดงช่องภาษีซื้อในฟอร์มค่าใช้จ่าย และสร้างแบบ ภ.พ.30 รายเดือน
+                {t('tax_page.vat_registered_desc', { rate: pct(settings.vatRate) })}
               </div>
             </div>
             <Switch
               checked={settings.vatRegistered}
               onChange={toggleRegistered}
               disabled={busy}
-              label="จดทะเบียน VAT แล้ว"
+              label={t('tax_page.vat_registered_label')}
             />
           </div>
         </div>
@@ -184,7 +191,7 @@ export function VatSettingsSection({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <label className={labelCls} htmlFor="vat-from">
-                การจด VAT มีผลตั้งแต่เดือน <span className="text-red-500">*</span>
+                {t('tax_page.vat_from_label')} <span className="text-red-500">*</span>
               </label>
               <input
                 id="vat-from"
@@ -195,17 +202,17 @@ export function VatSettingsSection({
                 onChange={(e) => onChange({ vatRegisteredFrom: e.target.value || null })}
               />
               <span className="text-[11px] text-slate-500">
-                ใบแจ้งหนี้และรายรับก่อนเดือนนี้จะไม่ถูกคิด VAT
+                {t('tax_page.vat_from_help')}
               </span>
               {!settings.vatRegisteredFrom && (
                 <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">
-                  ต้องระบุ ไม่งั้นระบบจะคิด VAT ย้อนหลังทั้งหมด
+                  {t('tax_page.vat_from_required')}
                 </span>
               )}
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className={labelCls} htmlFor="vat-rate">อัตรา VAT</label>
+              <label className={labelCls} htmlFor="vat-rate">{t('tax_page.vat_rate_label')}</label>
               <div className="flex items-center gap-1.5">
                 <input
                   id="vat-rate"
@@ -220,12 +227,12 @@ export function VatSettingsSection({
                 />
                 <span className="text-slate-500">%</span>
               </div>
-              <span className="text-[11px] text-slate-500">ปกติ 7%</span>
+              <span className="text-[11px] text-slate-500">{t('tax_page.vat_rate_default')}</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className={labelCls} htmlFor="vat-opening-credit">
-                เครดิตภาษีซื้อยกมาตั้งต้น
+                {t('tax_page.vat_opening_credit_label')}
               </label>
               <input
                 id="vat-opening-credit"
@@ -236,7 +243,7 @@ export function VatSettingsSection({
                 onChange={(e) => onChange({ vatOpeningCredit: num(e.target.value) })}
               />
               <span className="text-[11px] text-slate-500">
-                ถ้ามีเครดิตค้างจากก่อนเริ่มใช้ระบบนี้
+                {t('tax_page.vat_opening_credit_help')}
               </span>
             </div>
           </div>

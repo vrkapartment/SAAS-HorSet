@@ -11,6 +11,9 @@
  *  - ยังไม่จด + ใกล้เกณฑ์ (>= 80%) → เตือนล่วงหน้าสีเหลือง
  *  - ยังไม่จด + ยังห่าง → ซ่อนทั้งการ์ด (ยังไม่ต้องกวนใจเจ้าของหอ)
  *  - จดแล้ว → แสดงมาตรวัดปกติ
+ *
+ * ⚠️ i18n: รับ prop `t` (จาก useLanguage() ของหน้าที่เรียก) แทนการ hardcode ข้อความภาษาไทยไว้ตรงๆ
+ *    คีย์ทั้งหมดอยู่ใต้ namespace "tax_page" ร่วมกับข้อความอื่นของหน้า /tax
  */
 
 import { ExternalLink } from 'lucide-react';
@@ -37,6 +40,9 @@ export interface VatThresholdCardProps {
   warnAtPct?: number;
   /** true = แสดงการ์ดตลอด แม้ยังห่างเกณฑ์มาก */
   alwaysShow?: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  /** ใช้ format เดือน/ปีของ thaiMonth() ให้ตรงภาษา — ไม่ระบุ = ไทย (พ.ศ.) เหมือนเดิม */
+  locale?: 'th' | 'en';
 }
 
 export function VatThresholdCard({
@@ -45,6 +51,8 @@ export function VatThresholdCard({
   onGoToSettings,
   warnAtPct = 80,
   alwaysShow = false,
+  t,
+  locale = 'th',
 }: VatThresholdCardProps) {
   const nearThreshold = status.usedPct >= warnAtPct;
 
@@ -60,7 +68,7 @@ export function VatThresholdCard({
       {status.mustRegisterWarning && (
         <Alert
           tone="danger"
-          title="รายได้ 40(8) เกิน 1.8 ล้านบาทต่อปี จำเป็นต้องจด VAT"
+          title={t('tax_page.vat_must_register_title')}
           actions={
             <>
               <a
@@ -69,7 +77,7 @@ export function VatThresholdCard({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 font-semibold underline"
               >
-                <ExternalLink className="h-3.5 w-3.5" /> เปิดเว็บไซต์กรมสรรพากร (rd.go.th)
+                <ExternalLink className="h-3.5 w-3.5" /> {t('tax_page.vat_threshold_open_rd_link')}
               </a>
               {onGoToSettings && (
                 <button
@@ -77,43 +85,48 @@ export function VatThresholdCard({
                   onClick={onGoToSettings}
                   className="cursor-pointer rounded-lg border border-current px-2.5 py-1 text-xs font-semibold transition-colors hover:bg-current/10"
                 >
-                  บันทึกว่าจด VAT แล้ว →
+                  {t('tax_page.vat_threshold_mark_registered_btn')}
                 </button>
               )}
             </>
           }
         >
           <div>
-            รายได้ค่าบริการ 40(8) ย้อนหลัง 12 เดือน (
-            {thaiMonth(status.windowStart, true)} – {thaiMonth(status.windowEnd, true)}){' '}
-            <b>{baht(status.rolling12)} บาท</b> เกินเกณฑ์ {baht(status.threshold, 0)} บาท
+            {t('tax_page.vat_threshold_rolling12_prefix', {
+              start: thaiMonth(status.windowStart, true, locale),
+              end: thaiMonth(status.windowEnd, true, locale),
+            })}{' '}
+            <b>{baht(status.rolling12)} {t('tax_page.baht')}</b>{' '}
+            {t('tax_page.vat_threshold_rolling12_suffix', { threshold: baht(status.threshold, 0) })}
           </div>
           {breach && (
             <div className="mt-1 text-xs">
-              เดือนแรกที่ทะลุเกณฑ์: {thaiMonth(breach.month)} — ตามกฎหมายต้องยื่นคำขอจดทะเบียน VAT
-              ภายใน 30 วันนับแต่วันที่รายได้เกินเกณฑ์
+              {t('tax_page.vat_threshold_breach_detail', { month: thaiMonth(breach.month, false, locale) })}
             </div>
           )}
         </Alert>
       )}
 
       {!status.registered && !status.exceeded && nearThreshold && (
-        <Alert tone="warning" title={`ใกล้ถึงเกณฑ์ VAT แล้ว (${status.usedPct.toFixed(1)}% ของ 1.8 ล้านบาท)`}>
-          เหลืออีก {baht(status.remaining)} บาท ก่อนถึงเกณฑ์จดทะเบียน VAT — วางแผนล่วงหน้าได้เลย
+        <Alert tone="warning" title={t('tax_page.vat_threshold_near_title', { pct: status.usedPct.toFixed(1) })}>
+          {t('tax_page.vat_threshold_near_body', { amount: baht(status.remaining) })}
         </Alert>
       )}
 
       <Card>
         <CardHeader
-          title="เกณฑ์ VAT — รายได้ 40(8) ย้อนหลัง 12 เดือนเคลื่อนที่"
-          subtitle={`หน้าต่างล่าสุด ${thaiMonth(status.windowStart, true)} – ${thaiMonth(status.windowEnd, true)}`}
+          title={t('tax_page.vat_threshold_card_title')}
+          subtitle={t('tax_page.vat_threshold_card_subtitle', {
+            start: thaiMonth(status.windowStart, true, locale),
+            end: thaiMonth(status.windowEnd, true, locale),
+          })}
           actions={
             <>
               <Badge tone={status.exceeded ? 'danger' : 'success'}>
-                {status.exceeded ? 'เกินเกณฑ์' : 'ยังไม่เกินเกณฑ์'}
+                {status.exceeded ? t('tax_page.vat_threshold_exceeded_badge') : t('tax_page.vat_not_exceeded_badge')}
               </Badge>
               <Badge tone={status.registered ? 'info' : 'warning'}>
-                {status.registered ? 'จด VAT แล้ว' : 'ยังไม่จด VAT'}
+                {status.registered ? t('tax_page.vat_threshold_registered_badge') : t('tax_page.vat_threshold_not_registered_badge')}
               </Badge>
             </>
           }
@@ -121,28 +134,25 @@ export function VatThresholdCard({
         <CardBody>
           <div className="mb-0.5 flex items-baseline justify-between">
             <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-              {baht(status.rolling12)} บาท
+              {baht(status.rolling12)} {t('tax_page.baht')}
             </span>
             <span className="text-xs tabular-nums text-slate-500">
-              เกณฑ์ {baht(status.threshold, 0)} บาท
+              {t('tax_page.vat_threshold_threshold_label', { amount: baht(status.threshold, 0) })}
             </span>
           </div>
 
           <ProgressBar pct={status.usedPct} tone={tone} />
 
           <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>ใช้ไป {status.usedPct.toFixed(1)}%</span>
+            <span>{t('tax_page.vat_threshold_used_pct', { pct: status.usedPct.toFixed(1) })}</span>
             <span>
               {status.exceeded
-                ? `เกินเกณฑ์ ${baht(status.rolling12 - status.threshold)} บาท`
-                : `เหลือ ${baht(status.remaining)} บาท`}
+                ? t('tax_page.vat_exceeded_by', { amount: baht(status.rolling12 - status.threshold) })
+                : t('tax_page.vat_threshold_remaining', { amount: baht(status.remaining) })}
             </span>
           </div>
 
-          <HelpNote>
-            นับเฉพาะรายได้ตะกร้า B (40(8)) ที่ถอด VAT ออกแล้ว — ค่าเช่าห้อง 40(5) ได้รับยกเว้น VAT
-            จึงไม่ถูกนับรวมในเกณฑ์นี้ ไม่ว่าจะมีรายได้ค่าเช่าสูงเท่าไร
-          </HelpNote>
+          <HelpNote>{t('tax_page.vat_threshold_help')}</HelpNote>
         </CardBody>
       </Card>
     </div>
