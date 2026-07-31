@@ -22,12 +22,27 @@ import {
   Users,
   Plus,
   Trash2,
-  X
+  X,
+  Lock
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
-import { getLineProfilesAction, generateAdminConnectionCodeAction } from "@/features/notification/actions"
+import {
+  getLineProfilesAction,
+  generateAdminConnectionCodeAction,
+  getLineSettingsAction,
+  saveLineSettingsAction,
+  toggleLineAdminNotificationAction,
+  toggleIndividualLineAdminNotificationAction,
+  deleteLineSettingsAction,
+  clearLineAdminGroupIdAction,
+  listActiveLineConnectionCodesAction,
+  deleteLineConnectionCodeAction,
+  pollLineConnectionCodeStatusAction,
+  getLineQuotaAction
+} from "@/features/notification/actions"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
+import PricingModal from "@/features/subscription/components/PricingModal"
 
 export default function LineSettingsTab() {
   const { t, locale } = useLanguage()
@@ -105,6 +120,12 @@ export default function LineSettingsTab() {
 
   const isDemo = !process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL.includes("localhost") && !process.env.NEXT_PUBLIC_SUPABASE_URL
 
+  // เช็คสิทธิ์ตามแผนปัจจุบัน (saas_plans.features.line_notify) — fail-open เมื่อยังไม่ผูกแผน
+  // ให้ตรงกับ logic ฝั่ง server ใน assertWorkspaceFeatureEnabled/isWorkspaceFeatureEnabled
+  const { subscription: featureSubscription } = useWorkspaceSubscription(isDemo ? "" : (workspaceId || ""))
+  const featureEnabled = isDemo || !featureSubscription?.plan || !!featureSubscription.plan.features?.line_notify
+  const [showPricingModal, setShowPricingModal] = useState(false)
+
   const [activeCodesList, setActiveCodesList] = useState<Array<{ code: string; expires_at: string }>>([])
   const [isLoadingActiveCodes, setIsLoadingActiveCodes] = useState(false)
   const [ticker, setTicker] = useState(0)
@@ -113,30 +134,17 @@ export default function LineSettingsTab() {
     if (!wsId || isDemo) return
     setIsLoadingActiveCodes(true)
     try {
-      const supabase = createClient()
-      
-      // 1. Delete expired or used ones first (และทำให้ Code ไหนหมดอายุหรือใช้แล้วลบออกจาก supabase เลย)
-      await supabase
-        .from("admin_connection_codes")
-        .delete()
-        .eq("workspace_id", wsId)
-        .or(`expires_at.lt.${new Date().toISOString()},is_used.eq.true`)
+      const res = await listActiveLineConnectionCodesAction(wsId)
+      if (!res.success || !res.data) {
+        console.warn("Error loading active connection codes:", res.error)
+        return
+      }
 
-      // 2. Fetch the remaining unused, non-expired ones
-      const { data, error } = await supabase
-        .from("admin_connection_codes")
-        .select("code, expires_at")
-        .eq("workspace_id", wsId)
-        .eq("is_used", false)
-        .gt("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
+      const data = res.data
+      setActiveCodesList(data)
 
-      if (error) throw error
-
-      setActiveCodesList(data || [])
-      
       // Set the main active connectionCode to the most recent one if available
-      if (data && data.length > 0) {
+      if (data.length > 0) {
         setConnectionCode(data[0].code)
         setCodeExpiresAt(data[0].expires_at)
       } else {
@@ -176,16 +184,12 @@ export default function LineSettingsTab() {
           }
 
           // Fetch settings from workspace_line_settings table
-          const supabase = createClient()
-          const { data, error } = await supabase
-            .from("workspace_line_settings")
-            .select("*")
-            .eq("workspace_id", wsId)
-            .maybeSingle()
+          const settingsRes = await getLineSettingsAction(wsId)
 
-          if (error) {
-            console.warn("Could not query workspace_line_settings, it may need creation:", error.message)
-          } else if (data) {
+          if (!settingsRes.success) {
+            console.warn("Could not query workspace_line_settings, it may need creation:", settingsRes.error)
+          } else if (settingsRes.data) {
+            const data = settingsRes.data
             setTokenInput(data.channel_access_token || "")
             setLiffInput(data.liff_id || "")
             setSecretInput(data.channel_secret || "")
@@ -350,31 +354,17 @@ export default function LineSettingsTab() {
       if (!workspaceId) return
 
       try {
-        const supabase = createClient()
-        const { data: codeData } = await supabase
-          .from("admin_connection_codes")
-          .select("is_used")
-          .eq("code", connectionCode)
-          .maybeSingle()
+        const res = await pollLineConnectionCodeStatusAction(workspaceId, connectionCode)
 
-        if (codeData && codeData.is_used && isSubscribed) {
+        if (res.success && res.used && isSubscribed) {
           clearInterval(interval)
-          
-          // Re-fetch workspace settings to load newly added admin profiles
-          const { data: wsSettings } = await supabase
-            .from("workspace_line_settings")
-            .select("admin_line_user_id, disabled_admin_line_user_ids")
-            .eq("workspace_id", workspaceId)
-            .maybeSingle()
 
-          if (wsSettings) {
-            setAdminUserIdInput(wsSettings.admin_line_user_id || "")
-            setSavedAdminUserId(wsSettings.admin_line_user_id || "")
-            setDisabledAdminUserIdsInput(wsSettings.disabled_admin_line_user_ids || "")
-            setSavedDisabledAdminUserIds(wsSettings.disabled_admin_line_user_ids || "")
-            await loadAdminProfiles(wsSettings.admin_line_user_id || "", workspaceId)
-            await loadActiveCodesList(workspaceId)
-          }
+          setAdminUserIdInput(res.adminLineUserId || "")
+          setSavedAdminUserId(res.adminLineUserId || "")
+          setDisabledAdminUserIdsInput(res.disabledAdminLineUserIds || "")
+          setSavedDisabledAdminUserIds(res.disabledAdminLineUserIds || "")
+          await loadAdminProfiles(res.adminLineUserId || "", workspaceId)
+          await loadActiveCodesList(workspaceId)
 
           setSettingsSuccess(t("line_settings.success_auto_pairing"))
           setConnectionCode(null)
@@ -522,14 +512,8 @@ export default function LineSettingsTab() {
         return
       }
 
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("admin_connection_codes")
-        .delete()
-        .eq("code", codeToDelete)
-        .eq("workspace_id", workspaceId)
-
-      if (error) throw error
+      const res = await deleteLineConnectionCodeAction(workspaceId, codeToDelete)
+      if (!res.success) throw new Error(res.error)
 
       setSettingsSuccess(t("line_settings.success_cancel_code").replace("{code}", codeToDelete))
       
@@ -575,21 +559,14 @@ export default function LineSettingsTab() {
         return
       }
 
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("workspace_line_settings")
-        .update({
-          disabled_admin_line_user_ids: newDisabledStr || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq("workspace_id", workspaceId)
-
-      if (error) throw error
+      const res = await toggleIndividualLineAdminNotificationAction(workspaceId, newDisabledStr)
+      if (!res.success) throw new Error(res.error)
 
       setSettingsSuccess(t("line_settings.success_toggle_individual"))
     } catch (err: any) {
       console.error("Error toggling individual admin notification:", err)
       setDisabledAdminUserIdsInput(savedDisabledAdminUserIds)
+      setSettingsError(err.message || t("line_settings.err_tech"))
     } finally {
       setSavingSettings(false)
     }
@@ -620,17 +597,10 @@ export default function LineSettingsTab() {
     }
 
     try {
-      const supabase = createClient()
-      const { data, error: funcErr } = await supabase.functions.invoke(
-        `get-line-quota?workspace_id=${activeWsId}${forceRefresh ? "&bypass_cache=true" : ""}`,
-        {
-          method: "GET"
-        }
-      )
+      const res = await getLineQuotaAction(activeWsId, forceRefresh)
 
-      if (funcErr) throw funcErr
-
-      if (data && data.success) {
+      if (res.success && res.data) {
+        const data = res.data
         setQuotaData({
           limit: data.limit,
           consumed: data.consumed,
@@ -643,7 +613,7 @@ export default function LineSettingsTab() {
           updated_at: data.updated_at
         })
       } else {
-        throw new Error(data?.error || t("line_settings.err_quota_api"))
+        throw new Error(res.error || t("line_settings.err_quota_api"))
       }
     } catch (err: any) {
       console.error("Error fetching LINE quota:", err)
@@ -679,42 +649,8 @@ export default function LineSettingsTab() {
     }
 
     try {
-      const supabase = createClient()
-      
-      const { data: existingRow, error: checkErr } = await supabase
-        .from("workspace_line_settings")
-        .select("workspace_id")
-        .eq("workspace_id", workspaceId)
-        .maybeSingle()
-
-      if (checkErr) throw checkErr
-
-      let dbError = null
-      if (existingRow) {
-        const { error: updateErr } = await supabase
-          .from("workspace_line_settings")
-          .update({
-            admin_notification_active: nextState,
-            updated_at: new Date().toISOString()
-          })
-          .eq("workspace_id", workspaceId)
-        dbError = updateErr
-      } else {
-        const { error: insertErr } = await supabase
-          .from("workspace_line_settings")
-          .insert({
-            workspace_id: workspaceId,
-            admin_notification_active: nextState,
-            limit_count: 1000,
-            consumed_count: 0,
-            remaining_count: 1000,
-            percentage_used: 0,
-            updated_at: new Date().toISOString()
-          })
-        dbError = insertErr
-      }
-
-      if (dbError) throw dbError
+      const res = await toggleLineAdminNotificationAction(workspaceId, nextState)
+      if (!res.success) throw new Error(res.error)
 
       setSavedAdminNotificationActive(nextState)
       setSettingsSuccess(t("line_settings.success_toggle_admin").replace("{state}", nextState ? (locale === "th" ? "เปิด" : "Enabled") : (locale === "th" ? "ปิด" : "Disabled")))
@@ -771,55 +707,17 @@ export default function LineSettingsTab() {
     }
 
     try {
-      const supabase = createClient()
-      
-      // Select first to determine if we insert or update
-      const { data: existingRow, error: checkErr } = await supabase
-        .from("workspace_line_settings")
-        .select("workspace_id")
-        .eq("workspace_id", workspaceId)
-        .maybeSingle()
+      const res = await saveLineSettingsAction(workspaceId, {
+        channelAccessToken: trimmedToken,
+        liffId: trimmedLiff,
+        channelSecret: trimmedSecret,
+        adminLineUserId: trimmedAdminUserId,
+        adminLineGroupId: trimmedAdminGroupId,
+        adminNotificationActive,
+        disabledAdminLineUserIds: disabledAdminUserIdsInput
+      })
 
-      if (checkErr) throw checkErr
-
-      let error = null
-      if (existingRow) {
-        const { error: updateErr } = await supabase
-          .from("workspace_line_settings")
-          .update({
-            channel_access_token: trimmedToken || null,
-            liff_id: trimmedLiff || null,
-            channel_secret: trimmedSecret || null,
-            admin_line_user_id: trimmedAdminUserId || null,
-            admin_line_group_id: trimmedAdminGroupId || null,
-            admin_notification_active: adminNotificationActive,
-            disabled_admin_line_user_ids: disabledAdminUserIdsInput || null,
-            updated_at: new Date().toISOString()
-          })
-          .eq("workspace_id", workspaceId)
-        error = updateErr
-      } else {
-        const { error: insertErr } = await supabase
-          .from("workspace_line_settings")
-          .insert({
-            workspace_id: workspaceId,
-            channel_access_token: trimmedToken || null,
-            liff_id: trimmedLiff || null,
-            channel_secret: trimmedSecret || null,
-            admin_line_user_id: trimmedAdminUserId || null,
-            admin_line_group_id: trimmedAdminGroupId || null,
-            admin_notification_active: adminNotificationActive,
-            disabled_admin_line_user_ids: disabledAdminUserIdsInput || null,
-            limit_count: 1000,
-            consumed_count: 0,
-            remaining_count: 1000,
-            percentage_used: 0,
-            updated_at: new Date().toISOString()
-          })
-        error = insertErr
-      }
-
-      if (error) throw error
+      if (!res.success) throw new Error(res.error)
 
       setIsConfigured(!!trimmedToken)
       setSavedToken(trimmedToken)
@@ -908,21 +806,8 @@ export default function LineSettingsTab() {
     }
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("workspace_line_settings")
-        .update({
-          channel_access_token: null,
-          liff_id: null,
-          channel_secret: null,
-          admin_line_user_id: null,
-          admin_line_group_id: null,
-          admin_notification_active: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq("workspace_id", workspaceId)
-
-      if (error) throw error
+      const res = await deleteLineSettingsAction(workspaceId)
+      if (!res.success) throw new Error(res.error)
 
       setTokenInput("")
       setLiffInput("")
@@ -966,16 +851,8 @@ export default function LineSettingsTab() {
     }
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("workspace_line_settings")
-        .update({
-          admin_line_group_id: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq("workspace_id", workspaceId)
-
-      if (error) throw error
+      const res = await clearLineAdminGroupIdAction(workspaceId)
+      if (!res.success) throw new Error(res.error)
 
       setAdminGroupIdInput("")
       setSavedAdminGroupId("")
@@ -1058,9 +935,32 @@ export default function LineSettingsTab() {
         </button>
       </div>
 
+      {!featureEnabled && (
+        <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border-2 border-rose-400 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/30 shadow-md shadow-rose-500/10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-rose-600/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+              <Lock className="w-4 h-4" />
+            </div>
+            <p className="text-xs sm:text-sm font-black text-rose-900 dark:text-rose-200 leading-relaxed">
+              แผนการใช้งานปัจจุบันไม่รองรับฟีเจอร์แจ้งเตือนผ่าน LINE (line_notify)
+              <span className="block sm:inline font-bold text-rose-700 dark:text-rose-300 sm:ml-1">
+                กรุณาอัปเกรดแผนเพื่อเชื่อมต่อและใช้งานได้ตามปกติ
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowPricingModal(true)}
+            className="shrink-0 h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition-all cursor-pointer whitespace-nowrap"
+          >
+            อัปเกรดแผน
+          </button>
+        </div>
+      )}
+
       {/* 2. Main Content Grid */}
       <div className={`grid grid-cols-1 ${showManual ? "lg:grid-cols-2" : "max-w-3xl mx-auto"} gap-6`}>
-        
+
         {/* Left side: Configuration Column */}
         <div className="space-y-6">
 
@@ -1241,7 +1141,7 @@ export default function LineSettingsTab() {
                       value={tokenInput}
                       onChange={(e) => setTokenInput(e.target.value)}
                       required
-                      disabled={isConfigured && !isEditing}
+                      disabled={(isConfigured && !isEditing) || !featureEnabled}
                     />
                     <button
                       type="button"
@@ -1270,7 +1170,7 @@ export default function LineSettingsTab() {
                     value={liffInput}
                     onChange={(e) => setLiffInput(e.target.value)}
                     required
-                    disabled={isConfigured && !isEditing}
+                    disabled={(isConfigured && !isEditing) || !featureEnabled}
                   />
                 </div>
               </div>
@@ -1312,12 +1212,12 @@ export default function LineSettingsTab() {
                   <button
                     type="button"
                     onClick={handleToggleAdminNotification}
-                    disabled={savingSettings}
+                    disabled={savingSettings || !featureEnabled}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
-                      adminNotificationActive 
-                        ? "bg-emerald-500" 
+                      adminNotificationActive
+                        ? "bg-emerald-500"
                         : "bg-slate-200 dark:bg-slate-800"
-                    } ${savingSettings ? "opacity-60 cursor-not-allowed" : ""}`}
+                    } ${savingSettings || !featureEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
@@ -1366,7 +1266,7 @@ export default function LineSettingsTab() {
                       className="w-full pl-3 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-mono transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       value={secretInput}
                       onChange={(e) => setSecretInput(e.target.value)}
-                      disabled={isConfigured && !isEditing}
+                      disabled={(isConfigured && !isEditing) || !featureEnabled}
                     />
                     <button
                       type="button"
@@ -1611,7 +1511,8 @@ export default function LineSettingsTab() {
                     <button
                       type="button"
                       onClick={handleOpenAddModal}
-                      className="w-full py-4 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-500/5 dark:hover:border-blue-500/30 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-slate-500 hover:text-blue-600 cursor-pointer shadow-sm group"
+                      disabled={!featureEnabled}
+                      className="w-full py-4 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-500/5 dark:hover:border-blue-500/30 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-slate-500 hover:text-blue-600 cursor-pointer shadow-sm group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="p-2 bg-slate-100 dark:bg-slate-950 text-slate-400 group-hover:text-blue-500 group-hover:bg-blue-500/10 rounded-full transition-all">
                         <Plus className="w-5 h-5 shrink-0" />
@@ -1753,7 +1654,7 @@ export default function LineSettingsTab() {
                   <button
                     key="submit-api-btn"
                     type="submit"
-                    disabled={savingSettings}
+                    disabled={savingSettings || !featureEnabled}
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-md shadow-blue-500/10"
                   >
                     {savingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -2466,6 +2367,14 @@ export default function LineSettingsTab() {
         )}
 
       </div>
+
+      {showPricingModal && workspaceId && (
+        <PricingModal
+          isOpen={showPricingModal}
+          workspaceId={workspaceId}
+          onClose={() => setShowPricingModal(false)}
+        />
+      )}
 
     </div>
   )

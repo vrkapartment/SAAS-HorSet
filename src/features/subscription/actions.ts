@@ -236,6 +236,62 @@ export async function checkWorkspaceQuota(workspaceId: string, resource: "rooms"
   }
 }
 
+const FEATURE_LABELS: Record<keyof SaasPlan["features"], string> = {
+  tax_export: "ส่งออกรายงานภาษี (PDF/CSV)",
+  line_notify: "แจ้งเตือนผ่าน LINE",
+  slipok_auto_verify: "ตรวจสอบสลิปอัตโนมัติ (SlipOK)"
+}
+
+/**
+ * อ่าน saas_plans.features ของแผนปัจจุบันของ workspace (jsonb ที่ Super Admin ตั้งค่าไว้จริงในหน้าจัดการแผน
+ * ไม่ hardcode รายชื่อแผน) — fail-open (ถือว่าเปิดใช้ได้) เมื่อยังไม่มี migration/แถว subscription/ยังไม่ผูกแผน
+ * เพื่อไม่ให้ระบบเดิมพังก่อนตั้งค่า เช่นเดียวกับ pattern ของ checkWorkspaceQuota/assertSubscriptionActive ด้านบน
+ */
+async function getWorkspacePlanFeatureState(
+  workspaceId: string,
+  feature: keyof SaasPlan["features"]
+): Promise<{ enabled: boolean; planName: string | null }> {
+  if (!workspaceId) return { enabled: true, planName: null }
+
+  const supabase = await getServiceRoleOrSessionClient()
+  const { data: sub, error } = await supabase
+    .from("workspace_subscriptions")
+    .select("saas_plans (features, name)")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()
+
+  if (error?.code === RELATION_MISSING_CODE || !sub) return { enabled: true, planName: null }
+
+  const planRow = Array.isArray(sub.saas_plans) ? sub.saas_plans[0] : sub.saas_plans
+  if (!planRow) return { enabled: true, planName: null }
+
+  const features = (planRow as Record<string, unknown>).features as SaasPlan["features"] | null | undefined
+  const planName = (planRow as Record<string, unknown>).name as string
+  return { enabled: !!features?.[feature], planName }
+}
+
+/**
+ * ใช้เช็คแบบ boolean เมื่อ Server Action ต้องการ "ทางเลือกสำรอง" แทนที่จะบล็อกด้วย error
+ * (เช่น isSlipOkReadyForAutoVerify ที่ใช้ตัดสินใจว่าจะลองตรวจสลิปอัตโนมัติหรือข้ามไปเฉยๆ)
+ */
+export async function isWorkspaceFeatureEnabled(workspaceId: string, feature: keyof SaasPlan["features"]): Promise<boolean> {
+  const { enabled } = await getWorkspacePlanFeatureState(workspaceId, feature)
+  return enabled
+}
+
+/**
+ * บล็อกการใช้ฟีเจอร์ที่แผนปัจจุบันของ workspace ไม่รองรับ ให้ Server Action ที่ทำงานเฉพาะฟีเจอร์นั้น
+ * (ส่งออกรายงานภาษี, แจ้งเตือน LINE, ตรวจสลิปอัตโนมัติ) เรียกก่อนเริ่มทำงานเสมอ
+ */
+export async function assertWorkspaceFeatureEnabled(workspaceId: string, feature: keyof SaasPlan["features"]): Promise<void> {
+  const { enabled, planName } = await getWorkspacePlanFeatureState(workspaceId, feature)
+  if (enabled) return
+
+  throw new Error(
+    `แผน${planName ? ` "${planName}"` : ""}ของคุณไม่รองรับฟีเจอร์${FEATURE_LABELS[feature]} กรุณาอัปเกรดแผนเพื่อใช้งานฟีเจอร์นี้`
+  )
+}
+
 // ---------------------------------------------------------------------------
 // HorSet's own SlipOK/PromptPay credentials (เก็บใน system_settings แยกจากของแต่ละ workspace)
 // ---------------------------------------------------------------------------

@@ -22,12 +22,15 @@ import {
   Package,
   HelpCircle,
   ChevronDown,
-  BookOpen
+  BookOpen,
+  Lock
 } from "lucide-react"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getSlipOkSettings, saveSlipOkSettings, getSlipOkQuota, type SlipOkQuota } from "@/features/slipok/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
+import PricingModal from "@/features/subscription/components/PricingModal"
 
 export default function SlipOkSettingsTab() {
   const { t, locale } = useLanguage()
@@ -36,6 +39,12 @@ export default function SlipOkSettingsTab() {
   const [workspaceId, setWorkspaceId] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+
+  // เช็คสิทธิ์ตามแผนปัจจุบัน (saas_plans.features.slipok_auto_verify) — fail-open เมื่อยังไม่ผูกแผน
+  // ให้ตรงกับ logic ฝั่ง server ใน assertWorkspaceFeatureEnabled/isWorkspaceFeatureEnabled
+  const { subscription: featureSubscription } = useWorkspaceSubscription(isDemo ? "" : workspaceId)
+  const featureEnabled = isDemo || !featureSubscription?.plan || !!featureSubscription.plan.features?.slipok_auto_verify
+  const [showPricingModal, setShowPricingModal] = useState(false)
 
   const [branchId, setBranchId] = useState("")
   const [apiKeyInput, setApiKeyInput] = useState("")
@@ -285,6 +294,29 @@ export default function SlipOkSettingsTab() {
             </div>
           )}
 
+          {!featureEnabled && (
+            <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border-2 border-rose-400 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/30 shadow-md shadow-rose-500/10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-rose-600/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <p className="text-xs sm:text-sm font-black text-rose-900 dark:text-rose-200 leading-relaxed">
+                  แผนการใช้งานปัจจุบันไม่รองรับฟีเจอร์ตรวจสอบสลิปอัตโนมัติ (SlipOK)
+                  <span className="block sm:inline font-bold text-rose-700 dark:text-rose-300 sm:ml-1">
+                    กรุณาอัปเกรดแผนเพื่อเชื่อมต่อและใช้งานได้ตามปกติ
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPricingModal(true)}
+                className="shrink-0 h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition-all cursor-pointer whitespace-nowrap"
+              >
+                อัปเกรดแผน
+              </button>
+            </div>
+          )}
+
           {/* Card: Quota */}
           <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-6 space-y-6 shadow-xl">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-900 pb-3">
@@ -294,7 +326,7 @@ export default function SlipOkSettingsTab() {
               <button
                 type="button"
                 onClick={() => handleCheckQuota()}
-                disabled={quotaLoading}
+                disabled={quotaLoading || !featureEnabled}
                 className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw className={`w-4 h-4 ${quotaLoading ? "animate-spin" : ""}`} />
@@ -400,7 +432,8 @@ export default function SlipOkSettingsTab() {
                 value={monthlyPackageQuota || ""}
                 onChange={(e) => setMonthlyPackageQuota(Number(e.target.value) || 0)}
                 placeholder={t("slipok_settings.package_limit_placeholder")}
-                className="w-full sm:w-56 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
+                disabled={!featureEnabled}
+                className="w-full sm:w-56 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               />
               <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold">
                 {t("slipok_settings.package_limit_desc")}
@@ -425,10 +458,10 @@ export default function SlipOkSettingsTab() {
               <button
                 type="button"
                 onClick={() => setEnabled((prev) => !prev)}
-                disabled={saving}
+                disabled={saving || !featureEnabled}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
                   enabled ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
-                } ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
+                } ${saving || !featureEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
               >
                 <span
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
@@ -447,7 +480,8 @@ export default function SlipOkSettingsTab() {
                 value={branchId}
                 onChange={(e) => setBranchId(e.target.value)}
                 placeholder={t("slipok_settings.branch_id_placeholder")}
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
+                disabled={!featureEnabled}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -466,7 +500,8 @@ export default function SlipOkSettingsTab() {
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   placeholder={hasApiKey ? t("slipok_settings.api_key_placeholder_exists") : t("slipok_settings.api_key_placeholder_empty")}
-                  className="w-full px-3.5 py-2.5 pr-11 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all"
+                  disabled={!featureEnabled}
+                  className="w-full px-3.5 py-2.5 pr-11 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 font-mono text-sm sm:text-base font-bold tracking-wide transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <button
                   type="button"
@@ -494,10 +529,10 @@ export default function SlipOkSettingsTab() {
                 <button
                   type="button"
                   onClick={() => setCheckAmount((prev) => !prev)}
-                  disabled={saving}
+                  disabled={saving || !featureEnabled}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
                     checkAmount ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
-                  } ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
+                  } ${saving || !featureEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <span
                     className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
@@ -517,10 +552,10 @@ export default function SlipOkSettingsTab() {
                 <button
                   type="button"
                   onClick={() => setCheckReceiver((prev) => !prev)}
-                  disabled={saving}
+                  disabled={saving || !featureEnabled}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
                     checkReceiver ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
-                  } ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
+                  } ${saving || !featureEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <span
                     className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
@@ -560,10 +595,10 @@ export default function SlipOkSettingsTab() {
                 <button
                   type="button"
                   onClick={() => setAutoDisableOnQuotaExceeded((prev) => !prev)}
-                  disabled={saving}
+                  disabled={saving || !featureEnabled}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
                     autoDisableOnQuotaExceeded ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
-                  } ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
+                  } ${saving || !featureEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <span
                     className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
@@ -590,7 +625,7 @@ export default function SlipOkSettingsTab() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !featureEnabled}
               className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-black flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shadow-md"
             >
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -749,6 +784,14 @@ export default function SlipOkSettingsTab() {
           </div>
         )}
       </div>
+
+      {showPricingModal && (
+        <PricingModal
+          isOpen={showPricingModal}
+          workspaceId={workspaceId}
+          onClose={() => setShowPricingModal(false)}
+        />
+      )}
     </div>
   )
 }

@@ -43,6 +43,7 @@ import {
   getTaxDeductions,
   getPitFilings,
 } from "@/features/tax/actions"
+import { assertWorkspaceFeatureEnabled } from "@/features/subscription/actions"
 import {
   VatGate,
   VatNotRegisteredOnly,
@@ -1052,6 +1053,8 @@ export default function TaxPage() {
     }
     setLoadingPdf(type)
     try {
+      await assertWorkspaceFeatureEnabled(workspaceId, "tax_export")
+
       const { generatePndPdf } = await import("@/lib/pdfHelper")
       const { parseAddress } = await import("@/lib/thaiAddress")
 
@@ -1112,7 +1115,7 @@ export default function TaxPage() {
       document.body.removeChild(link)
     } catch (e) {
       console.error(e)
-      alert(t("tax_page.alert_pdf_error"))
+      alert(e instanceof Error && e.message ? e.message : t("tax_page.alert_pdf_error"))
     } finally {
       setLoadingPdf(null)
     }
@@ -1126,6 +1129,8 @@ export default function TaxPage() {
       return
     }
     try {
+      await assertWorkspaceFeatureEnabled(workspaceId, "tax_export")
+
       const { generatePp30Pdf } = await import("@/lib/pdfHelper")
       const { buildPp30FormFields } = await import("@/lib/pp30-fields")
       const { parseAddress } = await import("@/lib/thaiAddress")
@@ -1154,12 +1159,18 @@ export default function TaxPage() {
       document.body.removeChild(link)
     } catch (e) {
       console.error(e)
-      alert(t("tax_page.alert_pdf_error"))
+      alert(e instanceof Error && e.message ? e.message : t("tax_page.alert_pdf_error"))
     }
   }
 
   // ส่งออก CSV สรุป ภ.พ.30 ทั้งปีที่เลือก — ข้อมูลเดียวกับตารางที่แสดงบนจอ ไม่ต้องกรอกในแอปหรือของทางการ
-  const handleExportPp30Csv = () => {
+  const handleExportPp30Csv = async () => {
+    try {
+      await assertWorkspaceFeatureEnabled(workspaceId, "tax_export")
+    } catch (e) {
+      alert(e instanceof Error && e.message ? e.message : t("tax_page.alert_pdf_error"))
+      return
+    }
     const headers = [
       t("tax_page.pp30_col_tax_month"),
       t("tax_page.pp30_col_service_base"),

@@ -127,6 +127,7 @@ export default function TenantsPage() {
   const [editContractEnd, setEditContractEnd] = useState("")
   const [editLineUserId, setEditLineUserId] = useState("")
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editFormError, setEditFormError] = useState<string | null>(null)
 
   // Room Transfer (ย้ายห้อง) States
   const [transferModalOpen, setTransferModalOpen] = useState(false)
@@ -540,6 +541,7 @@ export default function TenantsPage() {
     setEditContractStart(formatDateForInput(tenant.contractStart))
     setEditContractEnd(formatDateForInput(tenant.contractEnd))
     setEditLineUserId(tenant.lineUserId || "")
+    setEditFormError(null)
     setIsEditModalOpen(true)
   }
 
@@ -561,32 +563,33 @@ export default function TenantsPage() {
     if (!selectedTenant) return
 
     if (!editFullName.trim()) {
-      showToast(t("tenants.err_name_required"), "error")
+      setEditFormError(t("tenants.err_name_required"))
       return
     }
     if (!editPhone.trim()) {
-      showToast(t("tenants.err_phone_required"), "error")
+      setEditFormError(t("tenants.err_phone_required"))
       return
     }
     if (!editRoomNumber.trim()) {
-      showToast(t("tenants.err_room_required"), "error")
+      setEditFormError(t("tenants.err_room_required"))
       return
     }
     if (!editContractStart) {
-      showToast(t("tenants.err_start_date_required"), "error")
+      setEditFormError(t("tenants.err_start_date_required"))
       return
     }
     if (!editContractEnd) {
-      showToast(t("tenants.err_end_date_required"), "error")
+      setEditFormError(t("tenants.err_end_date_required"))
       return
     }
 
     if (new Date(editContractEnd) < new Date(editContractStart)) {
-      showToast(t("tenants.err_end_before_start"), "error")
+      setEditFormError(t("tenants.err_end_before_start"))
       return
     }
 
     setEditSubmitting(true)
+    setEditFormError(null)
     try {
       const res = await updateTenant(
         selectedTenant.id,
@@ -604,10 +607,10 @@ export default function TenantsPage() {
         setSelectedTenant(null)
         loadData(true)
       } else {
-        showToast(res.error || t("tenants.err_save_generic"), "error")
+        setEditFormError(res.error || t("tenants.err_save_generic"))
       }
     } catch (err) {
-      showToast(t("tenants.err_server_connection"), "error")
+      setEditFormError(t("tenants.err_server_connection"))
     } finally {
       setEditSubmitting(false)
     }
@@ -1769,6 +1772,13 @@ export default function TenantsPage() {
 
             {/* Form */}
             <form onSubmit={handleEditSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+              {editFormError && (
+                <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2 animate-pulse">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-500" />
+                  <span>{editFormError}</span>
+                </div>
+              )}
+
               {/* Full Name */}
               <div className="space-y-1.5">
                 <label className="text-xs md:text-sm font-semibold text-slate-750 dark:text-slate-300 block">

@@ -237,6 +237,7 @@ function RoomsContent() {
   const [newRoomBuildingId, setNewRoomBuildingId] = useState("")
   const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
   const [formSubmitting, setFormSubmitting] = useState(false)
+  const [roomFormError, setRoomFormError] = useState<string | null>(null)
 
   // Room Type Form State (inside Manage Types modal)
   const [newTypeName, setNewTypeName] = useState("")
@@ -287,6 +288,7 @@ function RoomsContent() {
   const [editLeaseStart, setEditLeaseStart] = useState("")
   const [editLeaseEnd, setEditLeaseEnd] = useState("")
   const [editTenantSubmitting, setEditTenantSubmitting] = useState(false)
+  const [editTenantError, setEditTenantError] = useState<string | null>(null)
 
 
 
@@ -762,6 +764,7 @@ function RoomsContent() {
       setSelectedRoomTypeId(roomTypes[0].id)
       setNewBaseRent(roomTypes[0].default_rent)
     }
+    setRoomFormError(null)
     setModalOpen(true)
   }
 
@@ -776,6 +779,7 @@ function RoomsContent() {
     setWaiveWaterMin(!!room.waiveWaterMin)
     setExtraExpenses(room.extraExpenses || [])
     setNewRoomBuildingId(room.buildingId || (buildings.length > 0 ? buildings[0].id : ""))
+    setRoomFormError(null)
     setModalOpen(true)
   }
 
@@ -851,6 +855,7 @@ function RoomsContent() {
     }
     if (!newRoomNumber) return
     setFormSubmitting(true)
+    setRoomFormError(null)
 
     if (editingRoom) {
       // แก้ไขห้องพักเดิม
@@ -871,7 +876,7 @@ function RoomsContent() {
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
-        showToast(res.error || t("rooms.toasts.update_room_error"), "error")
+        setRoomFormError(res.error || t("rooms.toasts.update_room_error"))
       }
     } else {
       // เพิ่มห้องพักใหม่
@@ -881,7 +886,7 @@ function RoomsContent() {
         await loadData(true) // เคลียร์แคชและดึงข้อมูลใหม่
         setModalOpen(false)
       } else {
-        showToast(res.error || t("rooms.toasts.create_room_error"), "error")
+        setRoomFormError(res.error || t("rooms.toasts.create_room_error"))
       }
     }
     setFormSubmitting(false)
@@ -1080,6 +1085,7 @@ function RoomsContent() {
   const handleOpenDetailModal = (room: RoomItem) => {
     setSelectedRoom(room)
     setIsEditingTenant(false)
+    setEditTenantError(null)
     setEditTenantName(room.tenantName || "")
     setEditTenantPhone(room.tenantPhone || "")
     
@@ -1107,15 +1113,16 @@ function RoomsContent() {
     }
     if (!selectedRoom || !selectedRoom.tenantId) return
     if (!editTenantName.trim()) {
-      showToast(t("rooms.toasts.fill_tenant_name"), "error")
+      setEditTenantError(t("rooms.toasts.fill_tenant_name"))
       return
     }
     if (!editTenantPhone.trim()) {
-      showToast(t("rooms.toasts.fill_tenant_phone"), "error")
+      setEditTenantError(t("rooms.toasts.fill_tenant_phone"))
       return
     }
 
     setEditTenantSubmitting(true)
+    setEditTenantError(null)
     try {
       const res = await updateTenant(
         selectedRoom.tenantId,
@@ -1131,7 +1138,7 @@ function RoomsContent() {
         showToast(t("rooms.toasts.update_tenant_success"), "success")
         setIsEditingTenant(false)
         await loadData(true)
-        
+
         // อัปเดต selectedRoom ใน state เพื่อให้ UI แสดงผลข้อมูลใหม่ทันทีโดยไม่ต้องปิดโมดอล
         setSelectedRoom(prev => prev ? {
           ...prev,
@@ -1141,10 +1148,10 @@ function RoomsContent() {
           leaseEnd: editLeaseEnd || null
         } : null)
       } else {
-        showToast(res.error || t("rooms.toasts.update_tenant_error"), "error")
+        setEditTenantError(res.error || t("rooms.toasts.update_tenant_error"))
       }
     } catch (err) {
-      showToast(t("rooms.toasts.save_error"), "error")
+      setEditTenantError(t("rooms.toasts.save_error"))
     } finally {
       setEditTenantSubmitting(false)
     }
@@ -2899,6 +2906,13 @@ function RoomsContent() {
               </div>
               
               <form onSubmit={handleSubmitRoomForm} className="space-y-4 relative z-10 overflow-y-auto flex-1 pr-1 pb-1">
+                {roomFormError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2 animate-pulse">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-500" />
+                    <span>{roomFormError}</span>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">หมายเลขห้องพัก (Room Number)</label>
                   <input
@@ -3688,6 +3702,12 @@ function RoomsContent() {
                 <div className="divide-y divide-slate-150 dark:divide-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-900/40 px-4 py-2 text-xs text-slate-600 dark:text-slate-300">
                   {isEditingTenant ? (
                     <div className="space-y-4 py-2 text-left">
+                      {editTenantError && (
+                        <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2 animate-pulse">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-500" />
+                          <span>{editTenantError}</span>
+                        </div>
+                      )}
                       {/* Name input */}
                       <div className="flex flex-col gap-1.5">
                         <label className="text-slate-450 dark:text-slate-400 font-extrabold">ชื่อผู้เช่า:</label>
@@ -3786,7 +3806,7 @@ function RoomsContent() {
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
                         type="button"
-                        onClick={() => setIsEditingTenant(false)}
+                        onClick={() => { setIsEditingTenant(false); setEditTenantError(null) }}
                         disabled={editTenantSubmitting}
                         className="order-2 sm:order-1 w-full sm:flex-1 h-11 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-50"
                       >

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { generatePortalToken } from "@/features/tenant/actions"
 import { calculateLateDays } from "@/features/billing/utils"
+import { assertWorkspaceFeatureEnabled } from "@/features/subscription/actions"
 
 /**
  * ฟังก์ชันจำลองสำหรับระบบส่งข้อความแจ้งเตือนผ่าน LINE Messaging API (เก็บไว้เพื่อความเสถียรของระบบเก่า)
@@ -55,6 +56,8 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
       workspaceId,
       extraExpenses = [],
     } = payload
+
+    if (workspaceId) await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
 
     const supabase = await createClient()
     let channelAccessToken = ""
@@ -677,6 +680,8 @@ export async function sendLineSlipNotificationAction(
 ) {
   const variantConfig = SLIP_NOTIFICATION_VARIANTS[variant]
   try {
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     let supabase = await createClient()
@@ -1457,6 +1462,8 @@ export async function getLineProfilesAction(userIdsStr: string, workspaceId: str
       return { success: true, data: [] }
     }
 
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
     const supabase = await createClient()
 
     // ดึงค่าคอนฟิก LINE
@@ -1541,6 +1548,8 @@ export async function generateAdminConnectionCodeAction(workspaceId: string) {
       return { success: false, error: "ไม่พบรหัสหอพัก (Workspace ID)" }
     }
 
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
     const supabase = await createClient()
 
     // 0. ลบรหัสเชื่อมต่อที่หมดอายุแล้วทั้งหมดออกจากระบบ
@@ -1580,6 +1589,379 @@ export async function generateAdminConnectionCodeAction(workspaceId: string) {
   }
 }
 
+export interface LineSettingsRow {
+  channel_access_token: string | null
+  liff_id: string | null
+  channel_secret: string | null
+  admin_line_user_id: string | null
+  admin_line_group_id: string | null
+  disabled_admin_line_user_ids: string | null
+  admin_notification_active: boolean
+  limit_count: number | null
+  consumed_count: number | null
+  remaining_count: number | null
+  percentage_used: number | null
+  bot_name: string | null
+  bot_basic_id: string | null
+  updated_at: string
+}
+
+/**
+ * ดึงค่าตั้งค่า LINE OA ของ workspace ปัจจุบัน — read-only ไม่เช็ค feature flag
+ * (ดูข้อมูลที่เคยตั้งค่าไว้ได้เสมอ แม้แผนปัจจุบันจะไม่รองรับ line_notify แล้วก็ตาม)
+ */
+export async function getLineSettingsAction(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("workspace_line_settings")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (error) throw error
+
+    return { success: true, data: (data as LineSettingsRow | null) }
+  } catch (error) {
+    console.error("getLineSettingsAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลการตั้งค่า LINE OA" }
+  }
+}
+
+export interface SaveLineSettingsInput {
+  channelAccessToken: string
+  liffId: string
+  channelSecret: string
+  adminLineUserId: string
+  adminLineGroupId: string
+  adminNotificationActive: boolean
+  disabledAdminLineUserIds: string
+}
+
+/**
+ * บันทึกการตั้งค่าเชื่อมต่อ LINE OA ทั้งหมด (Channel Token/Secret, LIFF, แอดมินที่รับแจ้งเตือน)
+ * เช็คสิทธิ์ตามแผน (features.line_notify) ก่อนเสมอ — เป็นจุดเดียวที่ "เปิดใช้งาน" การเชื่อมต่อจริง
+ */
+export async function saveLineSettingsAction(workspaceId: string, input: SaveLineSettingsInput) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const supabase = await createClient()
+
+    const { data: existingRow, error: checkErr } = await supabase
+      .from("workspace_line_settings")
+      .select("workspace_id")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+    if (checkErr) throw checkErr
+
+    const payload = {
+      channel_access_token: input.channelAccessToken.trim() || null,
+      liff_id: input.liffId.trim() || null,
+      channel_secret: input.channelSecret.trim() || null,
+      admin_line_user_id: input.adminLineUserId.trim() || null,
+      admin_line_group_id: input.adminLineGroupId.trim() || null,
+      admin_notification_active: input.adminNotificationActive,
+      disabled_admin_line_user_ids: input.disabledAdminLineUserIds || null,
+      updated_at: new Date().toISOString()
+    }
+
+    let error
+    if (existingRow) {
+      const { error: updateErr } = await supabase
+        .from("workspace_line_settings")
+        .update(payload)
+        .eq("workspace_id", workspaceId)
+      error = updateErr
+    } else {
+      const { error: insertErr } = await supabase
+        .from("workspace_line_settings")
+        .insert({
+          workspace_id: workspaceId,
+          ...payload,
+          limit_count: 1000,
+          consumed_count: 0,
+          remaining_count: 1000,
+          percentage_used: 0
+        })
+      error = insertErr
+    }
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error("saveLineSettingsAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า LINE OA" }
+  }
+}
+
+/**
+ * เปิด/ปิดการแจ้งเตือนแอดมินทั้งระบบของ workspace นี้ (toggle เดี่ยวๆ ไม่ผ่านฟอร์มหลัก)
+ */
+export async function toggleLineAdminNotificationAction(workspaceId: string, active: boolean) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const supabase = await createClient()
+    const { data: existingRow, error: checkErr } = await supabase
+      .from("workspace_line_settings")
+      .select("workspace_id")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+    if (checkErr) throw checkErr
+
+    let error
+    if (existingRow) {
+      const { error: updateErr } = await supabase
+        .from("workspace_line_settings")
+        .update({ admin_notification_active: active, updated_at: new Date().toISOString() })
+        .eq("workspace_id", workspaceId)
+      error = updateErr
+    } else {
+      const { error: insertErr } = await supabase
+        .from("workspace_line_settings")
+        .insert({
+          workspace_id: workspaceId,
+          admin_notification_active: active,
+          limit_count: 1000,
+          consumed_count: 0,
+          remaining_count: 1000,
+          percentage_used: 0,
+          updated_at: new Date().toISOString()
+        })
+      error = insertErr
+    }
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error("toggleLineAdminNotificationAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเปลี่ยนสถานะแจ้งเตือน" }
+  }
+}
+
+/**
+ * เปิด/ปิดการแจ้งเตือนของแอดมินแต่ละคน (mute รายบุคคล) — แก้เฉพาะ disabled_admin_line_user_ids
+ */
+export async function toggleIndividualLineAdminNotificationAction(workspaceId: string, disabledAdminLineUserIds: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from("workspace_line_settings")
+      .update({
+        disabled_admin_line_user_ids: disabledAdminLineUserIds || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("workspace_id", workspaceId)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error("toggleIndividualLineAdminNotificationAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเปลี่ยนสถานะแจ้งเตือนรายบุคคล" }
+  }
+}
+
+/**
+ * ลบการเชื่อมต่อ LINE OA ทั้งหมดของ workspace นี้ (ล้าง token/secret/แอดมิน) — เป็นการ "รื้อถอน" ไม่ใช่ "ใช้งาน"
+ * จึงไม่เช็ค feature flag เพื่อให้ workspace ที่แผนไม่รองรับแล้วยังล้างค่าที่ค้างอยู่เองได้เสมอ
+ */
+export async function deleteLineSettingsAction(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from("workspace_line_settings")
+      .update({
+        channel_access_token: null,
+        liff_id: null,
+        channel_secret: null,
+        admin_line_user_id: null,
+        admin_line_group_id: null,
+        admin_notification_active: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq("workspace_id", workspaceId)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error("deleteLineSettingsAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบการเชื่อมต่อ LINE OA" }
+  }
+}
+
+/** ล้างเฉพาะรหัสกลุ่ม LINE ของแอดมิน — เป็นการรื้อถอน ไม่เช็ค feature flag เช่นเดียวกับ deleteLineSettingsAction */
+export async function clearLineAdminGroupIdAction(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from("workspace_line_settings")
+      .update({ admin_line_group_id: null, updated_at: new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error("clearLineAdminGroupIdAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการล้างรหัสกลุ่ม LINE" }
+  }
+}
+
+export interface ActiveLineConnectionCode {
+  code: string
+  expires_at: string
+}
+
+/**
+ * ดึงรายการรหัสเชื่อมต่อแอดมินที่ยังไม่หมดอายุ/ยังไม่ถูกใช้ — ลบรหัสหมดอายุ/ใช้แล้วทิ้งก่อนเสมอ (housekeeping)
+ * ไม่เช็ค feature flag เพราะเป็นแค่การดูสถานะ/ทำความสะอาดตาราง ไม่ได้สร้างความสามารถใหม่
+ */
+export async function listActiveLineConnectionCodesAction(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    const supabase = await createClient()
+
+    await supabase
+      .from("admin_connection_codes")
+      .delete()
+      .eq("workspace_id", workspaceId)
+      .or(`expires_at.lt.${new Date().toISOString()},is_used.eq.true`)
+
+    const { data, error } = await supabase
+      .from("admin_connection_codes")
+      .select("code, expires_at")
+      .eq("workspace_id", workspaceId)
+      .eq("is_used", false)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return { success: true, data: (data || []) as ActiveLineConnectionCode[] }
+  } catch (error) {
+    console.error("listActiveLineConnectionCodesAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงรายการรหัสเชื่อมต่อ" }
+  }
+}
+
+/** ยกเลิกรหัสเชื่อมต่อหนึ่งรายการด้วยตนเอง — เป็นการรื้อถอน ไม่เช็ค feature flag */
+export async function deleteLineConnectionCodeAction(workspaceId: string, code: string) {
+  try {
+    if (!workspaceId || !code) {
+      return { success: false, error: "ข้อมูลไม่ครบถ้วน" }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from("admin_connection_codes")
+      .delete()
+      .eq("code", code)
+      .eq("workspace_id", workspaceId)
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error("deleteLineConnectionCodeAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการยกเลิกรหัสเชื่อมต่อ" }
+  }
+}
+
+/** ตรวจสอบว่ารหัสเชื่อมต่อถูกใช้แล้วหรือยัง (สำหรับ polling ระหว่างรอผูกบัญชีแบบอัตโนมัติ) — read-only */
+export async function pollLineConnectionCodeStatusAction(workspaceId: string, code: string) {
+  try {
+    if (!workspaceId || !code) {
+      return { success: false, error: "ข้อมูลไม่ครบถ้วน" }
+    }
+
+    const supabase = await createClient()
+    const { data: codeData, error: codeErr } = await supabase
+      .from("admin_connection_codes")
+      .select("is_used")
+      .eq("code", code)
+      .maybeSingle()
+    if (codeErr) throw codeErr
+
+    if (!codeData?.is_used) {
+      return { success: true, used: false as const }
+    }
+
+    const { data: wsSettings, error: wsErr } = await supabase
+      .from("workspace_line_settings")
+      .select("admin_line_user_id, disabled_admin_line_user_ids")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+    if (wsErr) throw wsErr
+
+    return {
+      success: true,
+      used: true as const,
+      adminLineUserId: wsSettings?.admin_line_user_id || "",
+      disabledAdminLineUserIds: wsSettings?.disabled_admin_line_user_ids || ""
+    }
+  } catch (error) {
+    console.error("pollLineConnectionCodeStatusAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบสถานะรหัสเชื่อมต่อ" }
+  }
+}
+
+/**
+ * ดึงโควต้าการส่งข้อความ LINE OA ปัจจุบัน (เรียก Edge Function get-line-quota ฝั่ง server)
+ * เช็คสิทธิ์ตามแผนก่อนเสมอ เพราะเป็นการยิงเรียก API จริงด้วย credential ของ workspace
+ */
+export async function getLineQuotaAction(workspaceId: string, forceRefresh: boolean) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.functions.invoke(
+      `get-line-quota?workspace_id=${workspaceId}${forceRefresh ? "&bypass_cache=true" : ""}`,
+      { method: "GET" }
+    )
+
+    if (error) throw error
+    if (!data || !data.success) {
+      throw new Error(data?.error || "ไม่สามารถดึงข้อมูลโควต้า LINE ได้")
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error("getLineQuotaAction Exception:", error)
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลโควต้า LINE" }
+  }
+}
 
 
 

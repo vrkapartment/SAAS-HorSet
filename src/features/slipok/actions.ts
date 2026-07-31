@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { encryptText, decryptText } from "@/lib/encryption"
 import { SLIPOK_ERROR_MESSAGES } from "@/features/slipok/constants"
+import { isWorkspaceFeatureEnabled, assertWorkspaceFeatureEnabled } from "@/features/subscription/actions"
 
 interface SlipOkErrorPayload {
   code?: number
@@ -115,6 +116,8 @@ export async function saveSlipOkSettings(
       return { success: false, error: "กรุณากรอก Branch ID ของ SlipOK" }
     }
 
+    await assertWorkspaceFeatureEnabled(workspaceId, "slipok_auto_verify")
+
     const supabase = await createClient()
 
     const updatePayload: {
@@ -187,6 +190,11 @@ async function getDecryptedCredentials(workspaceId: string) {
 // ทำให้ระบบเข้าใจผิดว่ายังไม่ได้ตั้งค่า แล้วข้ามการตรวจสอบอัตโนมัติไปเงียบๆ ทุกครั้ง
 export async function isSlipOkReadyForAutoVerify(workspaceId: string): Promise<boolean> {
   try {
+    // เช็คสิทธิ์ตามแผน (saas_plans.features.slipok_auto_verify) ก่อนเสมอ ไม่ให้ workspace ที่แผนไม่รองรับ
+    // ใช้ auto-verify ได้แม้จะตั้งค่า Branch ID/API Key ของตัวเองไว้ครบแล้วก็ตาม
+    const featureEnabled = await isWorkspaceFeatureEnabled(workspaceId, "slipok_auto_verify")
+    if (!featureEnabled) return false
+
     const supabase = await getServiceRoleOrSessionClient()
     const { data, error } = await supabase
       .from("workspace_slipok_settings")
@@ -257,6 +265,8 @@ const QUOTA_EXCEEDED_MESSAGE_STILL_ON =
 
 export async function getSlipOkQuota(workspaceId: string) {
   try {
+    await assertWorkspaceFeatureEnabled(workspaceId, "slipok_auto_verify")
+
     const { branchId, apiKey, autoDisableOnQuotaExceeded } = await getDecryptedCredentials(workspaceId)
     const result = await fetchQuotaFromSlipOk(branchId, apiKey)
 
@@ -279,6 +289,13 @@ export async function getSlipOkQuota(workspaceId: string) {
 
 export async function verifySlipWithSlipOk(workspaceId: string, imageUrl: string, amount?: number) {
   try {
+    // เช็คสิทธิ์ตามแผนก่อนเสมอ ครอบคลุมทั้งเส้นทางอัตโนมัติ (ตอนอัปโหลดสลิป) และเส้นทางที่ staff กดตรวจสอบเอง
+    // (SlipVerificationModal) เพราะทั้งสองเส้นทางเรียกฟังก์ชันนี้เป็นจุดยิง API ตรวจสลิปจริงจุดเดียวกัน
+    const featureEnabled = await isWorkspaceFeatureEnabled(workspaceId, "slipok_auto_verify")
+    if (!featureEnabled) {
+      return { success: false as const, error: "แผนการใช้งานปัจจุบันไม่รองรับการตรวจสอบสลิปผ่าน SlipOK กรุณาอัปเกรดแผนเพื่อใช้งานฟีเจอร์นี้", code: undefined as number | undefined }
+    }
+
     const { branchId, apiKey, checkAmount, checkReceiver, autoDisableOnQuotaExceeded } = await getDecryptedCredentials(workspaceId)
 
     // เช็คโควต้าคงเหลือก่อนตรวจสลิปทุกครั้ง ถ้าหมดแล้วปิดการใช้งานอัตโนมัติทันทีและไม่ยิง API ตรวจสลิปต่อ
