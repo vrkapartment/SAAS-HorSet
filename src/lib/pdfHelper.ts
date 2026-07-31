@@ -790,8 +790,6 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
   // 3. โหลดและสร้างเอกสาร PDF
   const pdfDoc = await PDFDocument.load(templateBytes)
   pdfDoc.registerFontkit(fontkit)
-  const pages = pdfDoc.getPages()
-  const firstPage = pages[0]
 
   // 4. ฝังฟอนต์ไทยลงใน PDF (กำหนด subset: false เพื่อคงตารางตระกูลอักษร GSUB/GPOS ให้สมบูรณ์ ป้องกันวรรณยุกต์เพี้ยนบน iOS)
   const customFont = await pdfDoc.embedFont(fontBytes, { subset: false })
@@ -810,11 +808,6 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
     } catch (e) {
       console.warn(`ไม่สามารถกรอกฟิลด์ ${name}:`, e)
     }
-  }
-
-  // ฟังก์ชันช่วยเขียนข้อความเพิ่มเติมลงบน PDF (สไตล์จัดสระภาษาไทยถูกต้อง)
-  const drawText = (text: string, x: number, y: number, size = 10) => {
-    drawThaiText(firstPage, text, x, y, { font: customFont, size, color: rgb(0, 0, 0) })
   }
 
   const cleanTaxId = data.taxId.replace(/[^0-9]/g, "")
@@ -873,27 +866,6 @@ export async function generatePndPdf(type: "90" | "94", data: PndData, templateU
   const activeMapping = mapping || (type === "90" ? DEFAULT_PND90_MAPPING : DEFAULT_PND94_MAPPING)
   const computed = type === "90" ? computePnd90Values(data, formattedTaxId) : computePnd94Values(data, formattedTaxId)
   fillPdfFromMapping(activeMapping, computed, { setField, selectRadioWidget, getMaxLength, fmtComb })
-
-  // บันทึกหมายเหตุลายน้ำการคำนวณภาษีจากระบบ HorSet ไว้ที่ด้านล่าง (ไม่ใช่ form field ไม่ผ่านระบบ mapping)
-  if (type === "90") {
-    const other408 = data.other408 || 0
-    drawText(
-      `* คำนวณโดยระบบ HorSet: รายได้ 40(5) = ${data.rent405.toLocaleString()} บ. | รายได้ 40(8) = ${(data.utilities408 + other408).toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
-      45,
-      25,
-      8
-    )
-  } else {
-    const rentGrossHalf = data.rent405 / 2
-    const utilGrossHalf = data.utilities408 / 2
-    const otherGrossHalf = (data.other408 || 0) / 2
-    drawText(
-      `* คำนวณโดยระบบ HorSet: รายได้ 40(5) ครึ่งปี = ${rentGrossHalf.toLocaleString()} บ. | รายได้ 40(8) ครึ่งปี = ${(utilGrossHalf + otherGrossHalf).toLocaleString()} บ. | ปีภาษี ${data.taxYear}`,
-      45,
-      25,
-      8
-    )
-  }
 
   // 6. อัปเดตการแสดงผลของฟิลด์ทั้งหมดด้วยฟอนต์ไทย Sarabun
   form.updateFieldAppearances(customFont)

@@ -116,10 +116,18 @@ export function buildPp30FormFields(
 
   const addr = taxpayer.addressParts;
 
+  // ช่องเลขประจำตัวผู้เสียภาษีของแบบนี้ (Text1.0) เป็น PDF comb field ยาว 17 ตัวอักษร นับรวมขีดคั่นด้วย
+  // (รูปแบบ X-XXXX-XXXXX-XX-X) เหมือนช่องเดียวกันในแบบ ภ.ง.ด.90/94 (ดู generatePndPdf() ใน pdfHelper.ts)
+  // จึงต้องพิมพ์ขีดคั่นลงไปเองให้ครบ 17 ตัวอักษร ไม่ใช่ส่งแค่ 13 หลักเปล่าๆ ไม่งั้นตัวเลขจะเรียงชิดซ้ายไม่ตรงช่อง
+  const cleanTaxId = taxpayer.taxId.replace(/[^0-9]/g, '');
+  const formattedTaxId = cleanTaxId.length === 13
+    ? `${cleanTaxId.slice(0, 1)}-${cleanTaxId.slice(1, 5)}-${cleanTaxId.slice(5, 10)}-${cleanTaxId.slice(10, 12)}-${cleanTaxId.slice(12, 13)}`
+    : cleanTaxId;
+
   const fields: Pp30Field[] = [
     /* ---------- ส่วนหัว ---------- */
     { key: 'taxpayerName', label: 'ชื่อผู้ประกอบการ', value: taxpayer.name, type: 'text' },
-    { key: 'taxId', label: 'เลขประจำตัวผู้เสียภาษีอากร', value: taxpayer.taxId, type: 'text' },
+    { key: 'taxId', label: 'เลขประจำตัวผู้เสียภาษีอากร', value: formattedTaxId, type: 'text' },
     { key: 'branchNo', label: 'สาขาที่', value: taxpayer.branchNo ?? '00000', type: 'text' },
     { key: 'taxMonth', label: 'เดือนภาษี', value: month, type: 'text' },
     { key: 'taxYearBE', label: 'ปี (พ.ศ.)', value: yearBE, type: 'text' },
