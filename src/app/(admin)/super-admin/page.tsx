@@ -30,6 +30,7 @@ import {
   Send,
   Gauge
 } from "lucide-react"
+import { FacebookIcon, InstagramIcon, YoutubeIcon } from "@/components/ui/BrandIcons"
 import { createClient } from "@/lib/supabase/client"
 import Skeleton from "@/components/ui/Skeleton"
 import {
@@ -52,6 +53,7 @@ import {
   getSuperAdminLineProfilesAction,
   getSuperAdminLineBootstrapAction
 } from "@/features/super-admin/actions"
+import { getContactChannelsAction, updateContactChannelsAction } from "@/features/contact/actions"
 
 interface Workspace {
   id: string
@@ -125,6 +127,14 @@ export default function SuperAdminPage() {
   const [googleProjectId, setGoogleProjectId] = useState("")
   const [googleServiceKey, setGoogleServiceKey] = useState("")
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+
+  // ช่องทางการติดต่อ — แสดงในหน้า Landing (สาธารณะ) และการ์ด Support Access ของหน้าแพ็กเกจ
+  const [contactFacebookUrl, setContactFacebookUrl] = useState("")
+  const [contactLineUrl, setContactLineUrl] = useState("")
+  const [contactPhone, setContactPhone] = useState("")
+  const [contactInstagramUrl, setContactInstagramUrl] = useState("")
+  const [contactYoutubeUrl, setContactYoutubeUrl] = useState("")
+  const [isSavingContactChannels, setIsSavingContactChannels] = useState(false)
 
   // LINE (แจ้งเตือน Super Admin เอง) — คนละตารางกับ workspace_line_settings ของแต่ละหอพัก
   const [lineChannelAccessToken, setLineChannelAccessToken] = useState("")
@@ -275,6 +285,27 @@ export default function SuperAdminPage() {
       setError(err.message || "เกิดข้อผิดพลาดในการบันทึกชื่อโฟลเดอร์")
     } finally {
       setIsSavingDriveFolderName(false)
+    }
+  }
+
+  const handleSaveContactChannels = async () => {
+    setIsSavingContactChannels(true)
+    setError(null)
+    setResultSuccess(null)
+    try {
+      const res = await updateContactChannelsAction({
+        facebookUrl: contactFacebookUrl,
+        lineUrl: contactLineUrl,
+        phone: contactPhone,
+        instagramUrl: contactInstagramUrl,
+        youtubeUrl: contactYoutubeUrl,
+      })
+      if (!res.success) throw new Error(res.error)
+      setResultSuccess("บันทึกช่องทางการติดต่อเรียบร้อยแล้ว")
+    } catch (err: any) {
+      setError(err.message || "เกิดข้อผิดพลาดในการบันทึกช่องทางการติดต่อ")
+    } finally {
+      setIsSavingContactChannels(false)
     }
   }
 
@@ -452,12 +483,13 @@ export default function SuperAdminPage() {
 
     if (!isDemo) {
       try {
-        // ยิง 3 คำขอพร้อมกันแทนการ await ทีละตัวตามลำดับ — ลด wall-clock ของการโหลดหน้าแรกลงเหลือเท่าคำขอที่ช้าที่สุด
-        // แทนที่จะเป็นผลรวมของทั้งสามคำขอ (แต่ละคำขอยังเช็ค role ของตัวเองอยู่ เพราะเป็น server action คนละตัว)
-        const [res, settingsRes, lineBootstrapRes] = await Promise.all([
+        // ยิง 4 คำขอพร้อมกันแทนการ await ทีละตัวตามลำดับ — ลด wall-clock ของการโหลดหน้าแรกลงเหลือเท่าคำขอที่ช้าที่สุด
+        // แทนที่จะเป็นผลรวมของทั้งสี่คำขอ (แต่ละคำขอยังเช็ค role ของตัวเองอยู่ เพราะเป็น server action คนละตัว)
+        const [res, settingsRes, lineBootstrapRes, contactRes] = await Promise.all([
           getSuperAdminDataAction(),
           getSystemSettingsAction(),
-          getSuperAdminLineBootstrapAction()
+          getSuperAdminLineBootstrapAction(),
+          getContactChannelsAction()
         ])
 
         if (!res.success) throw new Error(res.error)
@@ -503,6 +535,14 @@ export default function SuperAdminPage() {
           if (driveFolderIdSetting) setGoogleDriveFolderId(driveFolderIdSetting.value)
           setGoogleDriveFolderName(driveFolderNameSetting?.value || "HorSet Subscription Slips Archive")
           setGoogleDriveConnected(!!driveRefreshTokenSetting?.value)
+        }
+
+        if (contactRes.success && contactRes.data) {
+          setContactFacebookUrl(contactRes.data.facebookUrl)
+          setContactLineUrl(contactRes.data.lineUrl)
+          setContactPhone(contactRes.data.phone)
+          setContactInstagramUrl(contactRes.data.instagramUrl)
+          setContactYoutubeUrl(contactRes.data.youtubeUrl)
         }
 
         // การตั้งค่า LINE ของ Super Admin เอง (คนละตารางกับ workspace_line_settings) — ดึงมาพร้อมโควต้าและ
@@ -1997,6 +2037,111 @@ export default function SuperAdminPage() {
                     >
                       {googleDriveConnected ? "เชื่อมต่อใหม่อีกครั้ง" : "เชื่อมต่อ Google Drive"}
                     </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* กล่องตั้งค่าช่องทางการติดต่อ — แสดงในหน้า Landing (สาธารณะ) และการ์ด Support Access ของหน้าแพ็กเกจ */}
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-transparent pointer-events-none" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center border border-sky-500/30">
+                    <Send className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-extrabold text-slate-100">ช่องทางการติดต่อ</h3>
+                    <p className="text-sm text-slate-400 mt-1">
+                      แสดงในหน้า Landing (สาธารณะ) และการ์ด &quot;ให้ทีม support เข้าดูช่วยแก้ปัญหา&quot; ในหน้าแพ็กเกจ — เว้นว่างช่องไหนไว้ ช่องทางนั้นจะไม่แสดงผล
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                      <FacebookIcon className="w-4 h-4 text-sky-400" /> ลิงก์ Facebook Page
+                    </label>
+                    <input
+                      type="text"
+                      value={contactFacebookUrl}
+                      onChange={(e) => setContactFacebookUrl(e.target.value)}
+                      placeholder="https://facebook.com/horset"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                      <MessageCircle className="w-4 h-4 text-sky-400" /> ลิงก์ LINE (Add Friend)
+                    </label>
+                    <input
+                      type="text"
+                      value={contactLineUrl}
+                      onChange={(e) => setContactLineUrl(e.target.value)}
+                      placeholder="https://line.me/R/ti/p/@horset"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                      <Phone className="w-4 h-4 text-sky-400" /> เบอร์โทรศัพท์
+                    </label>
+                    <input
+                      type="text"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      placeholder="02-123-4567"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                      <InstagramIcon className="w-4 h-4 text-sky-400" /> ลิงก์ Instagram
+                    </label>
+                    <input
+                      type="text"
+                      value={contactInstagramUrl}
+                      onChange={(e) => setContactInstagramUrl(e.target.value)}
+                      placeholder="https://instagram.com/horset"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                      <YoutubeIcon className="w-4 h-4 text-sky-400" /> ลิงก์ YouTube
+                    </label>
+                    <input
+                      type="text"
+                      value={contactYoutubeUrl}
+                      onChange={(e) => setContactYoutubeUrl(e.target.value)}
+                      placeholder="https://youtube.com/@horset"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800/50 flex justify-end">
+                    <button
+                      onClick={handleSaveContactChannels}
+                      disabled={isSavingContactChannels}
+                      className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all ${
+                        isSavingContactChannels
+                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-sky-600 hover:bg-sky-500 text-white shadow-sky-500/20"
+                      }`}
+                    >
+                      {isSavingContactChannels ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          กำลังบันทึก...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          บันทึกการตั้งค่า
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

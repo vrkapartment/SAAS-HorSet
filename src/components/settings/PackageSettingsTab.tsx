@@ -11,7 +11,9 @@ import {
   ShieldCheck,
   Trash2,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Phone,
+  MessageCircleMore
 } from "lucide-react"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
@@ -19,6 +21,8 @@ import { cancelWorkspaceSubscription, type SaasPlan } from "@/features/subscript
 import { useSupportAccessContext } from "@/context/SupportAccessContext"
 import PricingModal from "@/features/subscription/components/PricingModal"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { getContactChannelsAction, type ContactChannels } from "@/features/contact/actions"
+import { FacebookIcon, InstagramIcon, YoutubeIcon } from "@/components/ui/BrandIcons"
 
 type FeatureKey = keyof NonNullable<SaasPlan["features"]>
 
@@ -48,6 +52,15 @@ export default function PackageSettingsTab() {
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [cancelSuccess, setCancelSuccess] = useState(false)
+
+  // ช่องทางการติดต่อ — โชว์ในการ์ด "ให้ทีม support เข้าดูช่วยแก้ปัญหา" เพื่อให้ admin รู้ว่าจะติดต่อ support ทางไหนได้บ้าง
+  // ก่อนกดเปิดสิทธิ์ (ดู src/features/contact/actions.ts — action นี้ public ไม่เช็คสิทธิ์)
+  const [contactChannels, setContactChannels] = useState<ContactChannels | null>(null)
+  useEffect(() => {
+    getContactChannelsAction().then((res) => {
+      if (res.success && res.data) setContactChannels(res.data)
+    })
+  }, [])
 
   // จับเวลา ณ ตอนเปิดหน้าไว้ใน state (แทนที่จะเรียก Date.now() ตรงๆ ระหว่าง render ซึ่งเป็น impure call)
   const [nowMs, setNowMs] = useState<number | null>(null)
@@ -274,6 +287,38 @@ export default function PackageSettingsTab() {
           <p className="text-xs text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
             {t("package_settings.support_desc")}
           </p>
+          {contactChannels && (
+            (() => {
+              const links = [
+                { key: "facebook", url: contactChannels.facebookUrl, icon: FacebookIcon, label: "Facebook" },
+                { key: "line", url: contactChannels.lineUrl, icon: MessageCircleMore, label: "LINE" },
+                {
+                  key: "phone",
+                  url: contactChannels.phone ? `tel:${contactChannels.phone.replace(/[^0-9+]/g, "")}` : "",
+                  icon: Phone,
+                  label: contactChannels.phone,
+                },
+                { key: "instagram", url: contactChannels.instagramUrl, icon: InstagramIcon, label: "Instagram" },
+                { key: "youtube", url: contactChannels.youtubeUrl, icon: YoutubeIcon, label: "YouTube" },
+              ].filter((c) => c.url)
+              if (links.length === 0) return null
+              return (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {links.map((c) => (
+                    <a
+                      key={c.key}
+                      href={c.url}
+                      target={c.key === "phone" ? undefined : "_blank"}
+                      rel={c.key === "phone" ? undefined : "noopener noreferrer"}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      <c.icon className="w-3.5 h-3.5" /> {c.label}
+                    </a>
+                  ))}
+                </div>
+              )
+            })()
+          )}
           {supportStatus === "approved" ? (
             <button
               type="button"

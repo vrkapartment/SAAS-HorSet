@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Script from "next/script"
-import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight, User, Phone, Sparkles, AlertCircle, Building2, Rocket, RefreshCw } from "lucide-react"
+import { Shield, Key, Mail, CheckCircle2, Lock, ArrowRight, User, Phone, AlertCircle, Building2, Rocket, RefreshCw } from "lucide-react"
 import { registerWithSecretCodeAction, registerNewWorkspaceAction, resendConfirmationEmailAction } from "@/features/auth/actions"
 import { signInWithGoogle } from "@/features/auth/client"
 
@@ -433,15 +433,15 @@ function RegisterPageContent() {
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* โลโก้และหัวข้อโปรเจกต์ */}
-      <div className="text-center z-10 mb-6">
-        <div className="inline-flex items-center justify-center p-3 bg-gradient-to-tr from-indigo-600 to-purple-500 rounded-2xl shadow-lg shadow-indigo-500/20 mb-3 animate-pulse">
-          <Sparkles className="w-8 h-8 text-white" />
+      <div className="text-center z-10 mb-8 flex flex-col items-center">
+        <div className="inline-flex items-center justify-center p-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl shadow-xl shadow-blue-500/10 mb-3 w-16 h-16 transition-transform duration-300 hover:scale-105">
+          <img src="/icon-512x512.png" className="w-12 h-12 object-contain" alt="HorSet Logo" />
         </div>
-        <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-100 to-indigo-400">
-          HorSet
+        <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-400">
+          HorSet <span className="text-blue-500 font-semibold">(หอเสร็จ)</span>
         </h1>
         <p className="text-slate-400 mt-2 text-sm max-w-xs mx-auto">
-          ระบบ SaaS บริหารจัดการหอพักและอพาร์ทเมนต์ครบวงจร
+          ระบบจัดการหอพักและอพาร์ทเมนต์ครบวงจร
         </p>
       </div>
 
@@ -696,14 +696,9 @@ function RegisterPageContent() {
             </div>
 
             {/* บาจแสดงสถานะระบบ */}
-            {isDemo ? (
+            {isDemo && (
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-[11px] flex items-center gap-2">
                 <span>⚠️ โหมดจำลอง (ตรวจสอบรหัสผ่าน Cookies)</span>
-              </div>
-            ) : (
-              <div className="p-3 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl text-[11px] flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-ping" />
-                <span>สมัครสมาชิกและยืนยันผ่านระบบ Supabase Core</span>
               </div>
             )}
 

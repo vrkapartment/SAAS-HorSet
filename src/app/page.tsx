@@ -30,11 +30,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Building,
-  Menu
+  Menu,
+  Phone
 } from "lucide-react"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { LanguageToggle } from "@/components/LanguageToggle"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { getContactChannelsAction, type ContactChannels } from "@/features/contact/actions"
+import { FacebookIcon, InstagramIcon, YoutubeIcon } from "@/components/ui/BrandIcons"
 
 type BillingCycle = "monthly" | "yearly"
 
@@ -244,6 +247,15 @@ export default function LandingPage() {
   const { t, locale, setLocale } = useLanguage()
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [contactChannels, setContactChannels] = useState<ContactChannels | null>(null)
+
+  // ช่องทางการติดต่อ — Super Admin ตั้งค่าไว้ที่หน้า /super-admin (ดู src/features/contact/actions.ts)
+  // action นี้เป็น public (ไม่เช็คสิทธิ์) เพราะหน้านี้เป็นหน้าสาธารณะ ดึงเฉพาะ 5 ช่องทางนี้เท่านั้น
+  useEffect(() => {
+    getContactChannelsAction().then((res) => {
+      if (res.success && res.data) setContactChannels(res.data)
+    })
+  }, [])
 
   // รองรับลิงก์ตรง ?lang=en เพื่อให้เปิดหน้าแรกเป็นภาษาอังกฤษได้ทันที (เช่น ส่งให้ทีมตรวจสอบของ Google อ่าน
   // โดยไม่ต้องกดปุ่มสลับภาษาเอง) — ค่านี้ยังคง fallback เป็นภาษาไทยตอน SSR เหมือนเดิม แค่สลับให้ทันทีหลัง mount
@@ -256,6 +268,22 @@ export default function LandingPage() {
   }, [setLocale])
 
   const goToRegister = () => router.push("/register?tab=new")
+
+  // แปลงเป็น list เดียวกันทั้งไอคอน/ลิงก์ให้ map render ได้ตรงๆ — กรองช่องที่ Super Admin ยังไม่ได้ตั้งค่าออก
+  const contactLinks = contactChannels
+    ? [
+        { key: "facebook", url: contactChannels.facebookUrl, icon: FacebookIcon, label: "Facebook" },
+        { key: "line", url: contactChannels.lineUrl, icon: MessageCircleMore, label: "LINE" },
+        {
+          key: "phone",
+          url: contactChannels.phone ? `tel:${contactChannels.phone.replace(/[^0-9+]/g, "")}` : "",
+          icon: Phone,
+          label: contactChannels.phone,
+        },
+        { key: "instagram", url: contactChannels.instagramUrl, icon: InstagramIcon, label: "Instagram" },
+        { key: "youtube", url: contactChannels.youtubeUrl, icon: YoutubeIcon, label: "YouTube" },
+      ].filter((c) => c.url)
+    : []
 
   const navLinks = [
     { key: "nav_features", href: "#features" },
@@ -1084,6 +1112,34 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ช่องทางการติดต่อ — ตั้งค่าโดย Super Admin (ดู src/features/contact/actions.ts) ซ่อนทั้ง section
+          ถ้ายังไม่ได้ตั้งค่าช่องทางใดเลย กันโชว์ block ว่างเปล่า */}
+      {contactLinks.length > 0 && (
+        <section id="contact" className="max-w-5xl mx-auto px-6 pb-20 relative z-10">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-50">
+              {t("landing.contact_title")}
+            </h2>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-3">
+              {t("landing.contact_subtitle")}
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-4">
+            {contactLinks.map((c) => (
+              <a
+                key={c.key}
+                href={c.url}
+                target={c.key === "phone" ? undefined : "_blank"}
+                rel={c.key === "phone" ? undefined : "noopener noreferrer"}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
+              >
+                <c.icon className="w-4 h-4" /> {c.label}
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Footer */}
       <footer className="border-t border-slate-200 dark:border-slate-900 py-12 text-center text-xs text-slate-500 dark:text-slate-600 relative z-10 bg-slate-50/50 dark:bg-transparent">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -1093,7 +1149,7 @@ export default function LandingPage() {
             <span>•</span>
             <a href="/terms-of-service" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_terms")}</a>
             <span>•</span>
-            <a href="#" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_contact")}</a>
+            <a href="#contact" className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors">{t("landing.footer_contact")}</a>
           </div>
         </div>
       </footer>
