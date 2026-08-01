@@ -348,6 +348,25 @@ export async function getSuperAdminDataAction() {
 
     if (profError) throw profError
 
+    // 2.1 ดึงสถานะยืนยันอีเมล (email_confirmed_at) จาก Supabase Auth มา merge เข้ากับแต่ละ profile
+    // ต้อง query แยกจากตาราง public.profiles เพราะ email_confirmed_at อยู่ใน auth.users เท่านั้น เข้าถึงได้ผ่าน
+    // Admin API (listUsers) แบบข้าม RLS เท่านั้น ไม่มีใน public schema ให้ .from() ปกติดึงได้
+    const emailConfirmedMap = new Map<string, string | null>()
+    const perPage = 1000
+    for (let page = 1; ; page++) {
+      const { data: authUsersPage, error: authListError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+      if (authListError) throw authListError
+      for (const authUser of authUsersPage.users) {
+        emailConfirmedMap.set(authUser.id, authUser.email_confirmed_at ?? null)
+      }
+      if (authUsersPage.users.length < perPage) break
+    }
+
+    const profilesWithEmailStatus = (profiles || []).map((p) => ({
+      ...p,
+      email_confirmed_at: emailConfirmedMap.get(p.id) ?? null
+    }))
+
     // 3. โหลดข้อมูลการช่วยเหลือ (Support Access Grants)
     const { data: grants, error: grantError } = await supabaseAdmin
       .from("support_access_grants")
@@ -368,7 +387,7 @@ export async function getSuperAdminDataAction() {
       isDemo: false,
       data: {
         workspaces: workspaces || [],
-        profiles: profiles || [],
+        profiles: profilesWithEmailStatus,
         supportGrants: grants || [],
         registrationCodes: codes || []
       }

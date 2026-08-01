@@ -71,6 +71,7 @@ interface ProfileItem {
   workspace_id: string | null
   workspace_name?: string
   created_at: string
+  email_confirmed_at: string | null
 }
 
 interface RegistrationCode {
@@ -646,7 +647,8 @@ export default function SuperAdminPage() {
         phone: "0812345678",
         role: "admin",
         workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        email_confirmed_at: new Date().toISOString()
       },
       {
         id: "u2",
@@ -655,7 +657,8 @@ export default function SuperAdminPage() {
         phone: "0898765432",
         role: "staff",
         workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        email_confirmed_at: new Date().toISOString()
       },
       {
         id: "u3",
@@ -664,7 +667,8 @@ export default function SuperAdminPage() {
         phone: "0855555555",
         role: "tenant",
         workspace_id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        email_confirmed_at: null
       }
     ]
     setProfiles(mockProfs)
@@ -770,7 +774,9 @@ export default function SuperAdminPage() {
       phone: newUserPhone.trim() || null,
       role: newUserRole,
       workspace_id: selectedWorkspaceId,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      // createWorkspaceUserAction ใช้ email_confirm: true เสมอ (Auto-confirm) จึงถือว่ายืนยันอีเมลแล้วทันที
+      email_confirmed_at: new Date().toISOString()
     }
 
     if (!isDemo) {
@@ -1202,6 +1208,10 @@ export default function SuperAdminPage() {
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
                   {!(loading && workspaces.length === 0) && filteredWorkspaces.map((ws) => {
                     const status = supportGrants[ws.id] || "none"
+                    // สถานะยืนยันอีเมลของ Workspace อ้างอิงจากบัญชี Admin (เจ้าของหอ) ของ workspace นั้น —
+                    // ถ้ามี admin คนใดคนหนึ่งยืนยันอีเมลแล้ว ถือว่า workspace นี้ยืนยันแล้ว
+                    const wsAdmins = profiles.filter((p) => p.workspace_id === ws.id && p.role === "admin")
+                    const wsEmailConfirmed = wsAdmins.some((p) => p.email_confirmed_at)
                     return (
                       <div
                         key={ws.id}
@@ -1232,6 +1242,19 @@ export default function SuperAdminPage() {
                             <span className="text-[11px] md:text-[10px] bg-red-500/10 border border-red-500/25 text-red-400 font-semibold px-2.5 py-1 md:py-0.5 rounded-lg">
                               ✕ ไม่มีสิทธิ์
                             </span>
+                          )}
+
+                          {/* ป้ายแสดงสถานะยืนยันอีเมลของ Admin เจ้าของหอ */}
+                          {wsAdmins.length > 0 && (
+                            wsEmailConfirmed ? (
+                              <span className="text-[11px] md:text-[10px] bg-teal-500/10 border border-teal-500/25 text-teal-400 font-semibold px-2.5 py-1 md:py-0.5 rounded-lg flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> อีเมลยืนยันแล้ว
+                              </span>
+                            ) : (
+                              <span className="text-[11px] md:text-[10px] bg-amber-500/10 border border-amber-500/25 text-amber-400 font-semibold px-2.5 py-1 md:py-0.5 rounded-lg flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> รอยืนยันอีเมล
+                              </span>
+                            )
                           )}
 
                           <button
@@ -1370,17 +1393,28 @@ export default function SuperAdminPage() {
                           </div>
                           <p className="text-xs text-slate-400">{p.full_name || "-"}</p>
                         </div>
-                        <span className={`shrink-0 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          p.role === "super_admin"
-                            ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/10"
-                            : p.role === "admin"
-                            ? "bg-red-500/20 text-red-400 border border-red-500/10"
-                            : p.role === "staff"
-                            ? "bg-teal-500/20 text-teal-400 border border-teal-500/10"
-                            : "bg-blue-500/20 text-blue-400 border border-blue-500/10"
-                        }`}>
-                          {p.role.toUpperCase()}
-                        </span>
+                        <div className="shrink-0 flex flex-col items-end gap-1.5">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            p.role === "super_admin"
+                              ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/10"
+                              : p.role === "admin"
+                              ? "bg-red-500/20 text-red-400 border border-red-500/10"
+                              : p.role === "staff"
+                              ? "bg-teal-500/20 text-teal-400 border border-teal-500/10"
+                              : "bg-blue-500/20 text-blue-400 border border-blue-500/10"
+                          }`}>
+                            {p.role.toUpperCase()}
+                          </span>
+                          {p.email_confirmed_at ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-400 border border-teal-500/10">
+                              <CheckCircle2 className="w-3 h-3" /> ยืนยันแล้ว
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/10">
+                              <Clock className="w-3 h-3" /> รอยืนยัน
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center justify-between gap-3 text-xs">
                         <div className="space-y-0.5 min-w-0">
@@ -1437,6 +1471,7 @@ export default function SuperAdminPage() {
                     <th className="p-4">ชื่อผู้เช่า/ผู้ช่วย</th>
                     <th className="p-4">เบอร์โทร</th>
                     <th className="p-4">สิทธิ์การเข้าถึง</th>
+                    <th className="p-4">อีเมล</th>
                     <th className="p-4">สังกัดตึก (Workspace)</th>
                     <th className="p-4 text-center">จัดการ</th>
                   </tr>
@@ -1480,6 +1515,17 @@ export default function SuperAdminPage() {
                             {p.role.toUpperCase()}
                           </span>
                         </td>
+                        <td className="p-4">
+                          {p.email_confirmed_at ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-400 border border-teal-500/10">
+                              <CheckCircle2 className="w-3 h-3" /> ยืนยันแล้ว
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/10">
+                              <Clock className="w-3 h-3" /> รอยืนยัน
+                            </span>
+                          )}
+                        </td>
                         <td className={`p-4 font-medium ${isOrphanedWorkspace ? "text-amber-400 font-bold" : "text-slate-300"}`}>
                           {wsName}
                         </td>
@@ -1515,7 +1561,7 @@ export default function SuperAdminPage() {
 
                   {filteredProfiles.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center p-8 text-slate-500 text-sm md:text-xs">
+                      <td colSpan={7} className="text-center p-8 text-slate-500 text-sm md:text-xs">
                         ไม่พบข้อมูลรายชื่อบัญชีผู้ใช้ในระบบ
                       </td>
                     </tr>
