@@ -125,6 +125,20 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
 
     if (error) throw error
 
+    // ดึงสิทธิ์อาคารของ staff ทุกคนที่พบมาในครั้งเดียว (ไม่มีแถว = ไม่จำกัด เห็นทุกอาคาร)
+    const profileIds = (profiles || []).map(p => p.id)
+    const buildingAccessByProfile: Record<string, string[]> = {}
+    if (profileIds.length > 0) {
+      const { data: accessRows } = await supabaseAdmin
+        .from("staff_building_access")
+        .select("profile_id, building_id")
+        .in("profile_id", profileIds)
+      for (const row of accessRows || []) {
+        if (!buildingAccessByProfile[row.profile_id]) buildingAccessByProfile[row.profile_id] = []
+        buildingAccessByProfile[row.profile_id].push(row.building_id)
+      }
+    }
+
     // ทำการแปลงค่า permissions ให้อยู่ในรูปแบบที่ถูกต้อง เผื่อมีบางคนใน DB เป็น null
     const sanitizedStaffs = (profiles || []).map(p => {
       let perms = DEFAULT_STAFF_PERMISSIONS
@@ -144,7 +158,9 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
         permissions: {
           ...DEFAULT_STAFF_PERMISSIONS,
           ...perms
-        }
+        },
+        // รายชื่ออาคารที่ถูกจำกัดสิทธิ์ไว้ — array ว่าง = ไม่จำกัด เห็นทุกอาคาร
+        allowedBuildingIds: buildingAccessByProfile[p.id] || []
       }
     })
 
@@ -164,6 +180,8 @@ export async function createWorkspaceStaffAction(data: {
   phone: string
   permissions: StaffPermissions
   workspaceId?: string
+  // รายชื่ออาคารที่จำกัดสิทธิ์ให้ staff คนนี้ — array ว่าง = ไม่จำกัด เห็นทุกอาคาร
+  allowedBuildingIds?: string[]
 }) {
   try {
     const isDemo = isDemoMode()
@@ -232,6 +250,20 @@ export async function createWorkspaceStaffAction(data: {
       console.warn("ไม่สามารถบันทึกสิทธิ์ลงคอลัมน์ permissions ได้: ตรวจสอบว่าได้รันสคริปต์ SQL patch หรือยัง", updateError.message)
     }
 
+    // 3. บันทึกสิทธิ์อาคารที่จำกัดไว้ (ถ้ามีการระบุ) — ไม่ระบุหรือ array ว่าง = ไม่จำกัด ไม่ต้อง insert อะไร
+    if (data.allowedBuildingIds && data.allowedBuildingIds.length > 0) {
+      const { error: buildingAccessError } = await supabaseAdmin
+        .from("staff_building_access")
+        .insert(data.allowedBuildingIds.map(buildingId => ({
+          profile_id: authUser.user.id,
+          building_id: buildingId,
+          workspace_id: targetWorkspaceId
+        })))
+      if (buildingAccessError) {
+        console.warn("ไม่สามารถบันทึกสิทธิ์อาคารได้: ตรวจสอบว่าได้รันสคริปต์ SQL patch add_staff_building_access หรือยัง", buildingAccessError.message)
+      }
+    }
+
     return { success: true, data: { id: authUser.user.id, email: authUser.user.email } }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างบัญชี Staff" }
@@ -247,6 +279,8 @@ export async function updateStaffPermissionsAction(
     fullName: string
     phone: string
     permissions: StaffPermissions
+    // รายชื่ออาคารที่จำกัดสิทธิ์ให้ staff คนนี้ — array ว่าง = ไม่จำกัด เห็นทุกอาคาร (undefined = ไม่แตะต้องค่าเดิม)
+    allowedBuildingIds?: string[]
   }
 ) {
   try {
@@ -313,6 +347,29 @@ export async function updateStaffPermissionsAction(
       })
     } catch (authMetaErr) {
       console.error("Failed to sync updated auth metadata for staff user", authMetaErr)
+    }
+
+    // 4. ซิงค์สิทธิ์อาคาร (ถ้ามีการส่งค่ามา) — ลบของเดิมทั้งหมดแล้วเซ็ตใหม่ตามที่ระบุเสมอ
+    // (allowedBuildingIds เป็น undefined = ไม่แตะต้องค่าเดิม, array ว่าง = ล้างเป็นไม่จำกัด)
+    if (data.allowedBuildingIds !== undefined) {
+      const { error: deleteAccessError } = await supabaseAdmin
+        .from("staff_building_access")
+        .delete()
+        .eq("profile_id", staffId)
+      if (deleteAccessError) {
+        console.warn("ไม่สามารถล้างสิทธิ์อาคารเดิมได้: ตรวจสอบว่าได้รันสคริปต์ SQL patch add_staff_building_access หรือยัง", deleteAccessError.message)
+      } else if (data.allowedBuildingIds.length > 0) {
+        const { error: insertAccessError } = await supabaseAdmin
+          .from("staff_building_access")
+          .insert(data.allowedBuildingIds.map(buildingId => ({
+            profile_id: staffId,
+            building_id: buildingId,
+            workspace_id: targetProfile.workspace_id
+          })))
+        if (insertAccessError) {
+          console.warn("ไม่สามารถบันทึกสิทธิ์อาคารใหม่ได้", insertAccessError.message)
+        }
+      }
     }
 
     return { success: true }

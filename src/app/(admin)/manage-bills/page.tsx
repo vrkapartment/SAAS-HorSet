@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
+import { getBuildings } from "@/features/building/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings } from "@/features/finance/actions"
@@ -48,6 +49,7 @@ interface UnifiedRoomBillingItem {
   tenantName: string | null
   baseRent: number
   status: "occupied" | "available"
+  buildingId?: string | null
   
   // Meter Record fields for current cycle
   meterRecordId?: string
@@ -185,6 +187,8 @@ function ManageBillsContent() {
       ? initialFilter
       : "all"
   )
+  const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
+  const [buildingFilter, setBuildingFilter] = useState<string>("all")
 
   useEffect(() => {
     const f = searchParams.get("filter")
@@ -658,6 +662,7 @@ function ManageBillsContent() {
           tenantName: resolvedTenantName,
           baseRent: Number(r.baseRent) || 4500,
           status: isOccupiedInCycle ? "occupied" : "available",
+          buildingId: r.buildingId ?? null,
           hasNotifiedCheckout: !!hasNotifiedCheckout,
           
           meterRecordId: roomMeter?.id || undefined,
@@ -843,6 +848,11 @@ function ManageBillsContent() {
             if (financeData.tax_address) setWorkspaceAddress(financeData.tax_address)
             if (financeData.tax_phone) setWorkspacePhone(financeData.tax_phone)
             if (financeData.tax_id) setWorkspaceTaxId(financeData.tax_id)
+          }
+
+          const buildingsRes = await getBuildings(wsId)
+          if (buildingsRes.success && buildingsRes.data) {
+            setBuildings(buildingsRes.data.map(b => ({ id: b.id, name: b.name })))
           }
         }
       } catch (err) {
@@ -1726,6 +1736,8 @@ function ManageBillsContent() {
   const unpaidCount = unifiedItems.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length
 
   const filteredUnifiedItems = unifiedItems.filter(item => {
+    if (buildingFilter !== "all" && item.buildingId !== buildingFilter) return false
+
     if (statusFilter === "all") return true
     if (statusFilter === "unpaid") {
       return item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")
@@ -1863,6 +1875,22 @@ function ManageBillsContent() {
             </button>
           ))}
         </div>
+
+        {/* ตัวกรองอาคาร — แสดงเฉพาะเมื่อหอมีมากกว่า 1 อาคาร */}
+        {buildings.length > 1 && (
+          <select
+            value={buildingFilter}
+            onChange={(e) => setBuildingFilter(e.target.value)}
+            className={`h-9 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 ${
+              isDark ? "bg-slate-900/30 border border-slate-800/80 text-slate-300" : "bg-white border border-slate-200 text-slate-650"
+            }`}
+          >
+            <option value="all">ทุกอาคาร</option>
+            {buildings.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Main Billing Table */}

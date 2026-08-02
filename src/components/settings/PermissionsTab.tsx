@@ -40,6 +40,7 @@ import {
   updateStaffPermissionsAction,
   deleteStaffAction
 } from "@/features/permissions/actions"
+import { getBuildings } from "@/features/building/actions"
 import {
   type StaffPermissions,
   DEFAULT_STAFF_PERMISSIONS,
@@ -58,6 +59,7 @@ interface StaffMember {
   workspace_id: string | null
   created_at: string
   permissions: StaffPermissions
+  allowedBuildingIds: string[]
 }
 
 export default function PermissionsTab() {
@@ -89,6 +91,13 @@ export default function PermissionsTab() {
   const [editFullName, setEditFullName] = useState("")
   const [editPhone, setEditPhone] = useState("")
   const [editPermissions, setEditPermissions] = useState<StaffPermissions>({ ...DEFAULT_STAFF_PERMISSIONS })
+
+  // สิทธิ์ตามอาคาร — แสดงเฉพาะเมื่อหอมีมากกว่า 1 อาคาร (ไม่จำกัด = restrict ปิด, ไม่ส่ง allowedBuildingIds)
+  const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
+  const [addRestrictBuildings, setAddRestrictBuildings] = useState(false)
+  const [addAllowedBuildingIds, setAddAllowedBuildingIds] = useState<string[]>([])
+  const [editRestrictBuildings, setEditRestrictBuildings] = useState(false)
+  const [editAllowedBuildingIds, setEditAllowedBuildingIds] = useState<string[]>([])
 
   // DB SQL Script Text for manual run
   const [sqlCopied, setSqlCopied] = useState(false)
@@ -124,6 +133,13 @@ WHERE role IN ('admin', 'super_admin');`
 
         setCurrentUser(profile)
         await loadStaffData()
+
+        if (profile.workspace_id) {
+          const buildingsRes = await getBuildings(profile.workspace_id)
+          if (buildingsRes.success && buildingsRes.data) {
+            setBuildings(buildingsRes.data.map(b => ({ id: b.id, name: b.name })))
+          }
+        }
       } catch (err: any) {
         console.error("Initialization error:", err)
         setError(t("permissions_tab.err_load_permissions_prefix") + (err?.message || String(err)))
@@ -157,6 +173,10 @@ WHERE role IN ('admin', 'super_admin');`
       setError(t("permissions_tab.err_password_required"))
       return
     }
+    if (addRestrictBuildings && addAllowedBuildingIds.length === 0) {
+      setError("กรุณาเลือกอย่างน้อย 1 อาคาร หรือปิดสวิตช์ \"จำกัดตามอาคาร\" เพื่อให้เห็นทุกอาคาร")
+      return
+    }
 
     setFormLoading(true)
     setError(null)
@@ -167,7 +187,8 @@ WHERE role IN ('admin', 'super_admin');`
       password: addPassword,
       fullName: addFullName.trim(),
       phone: addPhone.trim(),
-      permissions: addPermissions
+      permissions: addPermissions,
+      allowedBuildingIds: addRestrictBuildings ? addAllowedBuildingIds : []
     })
 
     if (result.success) {
@@ -179,6 +200,8 @@ WHERE role IN ('admin', 'super_admin');`
       setAddFullName("")
       setAddPhone("")
       setAddPermissions({ ...DEFAULT_STAFF_PERMISSIONS })
+      setAddRestrictBuildings(false)
+      setAddAllowedBuildingIds([])
       // Refresh Data
       await loadStaffData()
     } else {
@@ -193,6 +216,8 @@ WHERE role IN ('admin', 'super_admin');`
     setEditFullName(staff.full_name || "")
     setEditPhone(staff.phone || "")
     setEditPermissions({ ...staff.permissions })
+    setEditRestrictBuildings((staff.allowedBuildingIds?.length ?? 0) > 0)
+    setEditAllowedBuildingIds(staff.allowedBuildingIds || [])
     setShowEditModal(true)
   }
 
@@ -201,6 +226,11 @@ WHERE role IN ('admin', 'super_admin');`
     e.preventDefault()
     if (!selectedStaff) return
 
+    if (editRestrictBuildings && editAllowedBuildingIds.length === 0) {
+      setError("กรุณาเลือกอย่างน้อย 1 อาคาร หรือปิดสวิตช์ \"จำกัดตามอาคาร\" เพื่อให้เห็นทุกอาคาร")
+      return
+    }
+
     setFormLoading(true)
     setError(null)
     setSuccess(null)
@@ -208,7 +238,8 @@ WHERE role IN ('admin', 'super_admin');`
     const result = await updateStaffPermissionsAction(selectedStaff.id, {
       fullName: editFullName.trim(),
       phone: editPhone.trim(),
-      permissions: editPermissions
+      permissions: editPermissions,
+      allowedBuildingIds: editRestrictBuildings ? editAllowedBuildingIds : []
     })
 
     if (result.success) {
@@ -286,6 +317,10 @@ WHERE role IN ('admin', 'super_admin');`
   const renderPermissionsSettings = (type: "add" | "edit") => {
     const permissions = type === "add" ? addPermissions : editPermissions
     const setPerms = type === "add" ? setAddPermissions : setEditPermissions
+    const restrictBuildings = type === "add" ? addRestrictBuildings : editRestrictBuildings
+    const setRestrictBuildings = type === "add" ? setAddRestrictBuildings : setEditRestrictBuildings
+    const allowedBuildingIds = type === "add" ? addAllowedBuildingIds : editAllowedBuildingIds
+    const setAllowedBuildingIds = type === "add" ? setAddAllowedBuildingIds : setEditAllowedBuildingIds
 
     // List of modules that support separate View vs Edit permissions
     const modules = [
@@ -493,6 +528,63 @@ WHERE role IN ('admin', 'super_admin');`
             })}
           </div>
         </div>
+
+        {/* Section 1.5: สิทธิ์ตามอาคาร — แสดงเฉพาะเมื่อหอมีมากกว่า 1 อาคาร */}
+        {buildings.length > 1 && (
+          <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-4">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 dark:border-slate-850">
+              <span className="text-xs sm:text-sm font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-2">
+                <Building className="w-5 h-5 text-teal-500" />
+                <span>สิทธิ์ตามอาคาร</span>
+              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500">จำกัดตามอาคาร</span>
+                <button
+                  type="button"
+                  onClick={() => setRestrictBuildings(!restrictBuildings)}
+                  className={`w-14 h-7 rounded-full p-1 transition-colors cursor-pointer focus:outline-none ${
+                    restrictBuildings ? "bg-teal-600" : "bg-slate-250 dark:bg-slate-800"
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                    restrictBuildings ? "translate-x-7" : "translate-x-0"
+                  }`} />
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-450 dark:text-slate-500">
+              {restrictBuildings
+                ? "เลือกอาคารที่พนักงานคนนี้เห็น/จัดการได้เท่านั้น — ห้อง ผู้เช่า มิเตอร์ และบิลของอาคารอื่นจะถูกซ่อนไว้ทั้งหมด"
+                : "ค่าเริ่มต้น: เห็นและจัดการได้ทุกอาคารในหอ"}
+            </p>
+
+            {restrictBuildings && (
+              <div className="flex flex-wrap gap-2">
+                {buildings.map((b) => {
+                  const checked = allowedBuildingIds.includes(b.id)
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setAllowedBuildingIds(prev =>
+                        checked ? prev.filter(id => id !== b.id) : [...prev, b.id]
+                      )}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        checked
+                          ? "bg-teal-600 border-teal-600 text-white"
+                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-teal-500/50"
+                      }`}
+                    >
+                      {checked && <Check className="w-3.5 h-3.5" />}
+                      {b.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Section 2: Special Actions (Send Line, PDF download, Copy summary) */}
         <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-3xl border border-slate-150 dark:border-slate-850 space-y-4">
@@ -793,6 +885,20 @@ WHERE role IN ('admin', 'super_admin');`
                     })()}
                   </div>
                 </div>
+
+                {/* Building Access Badge — แสดงเฉพาะเมื่อหอมีมากกว่า 1 อาคาร */}
+                {buildings.length > 1 && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    {staff.allowedBuildingIds && staff.allowedBuildingIds.length > 0 ? (
+                      <span className="text-teal-600 dark:text-teal-400 font-bold">
+                        เฉพาะ: {staff.allowedBuildingIds.map(id => buildings.find(b => b.id === id)?.name || id).join(", ")}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-500 font-semibold">ทุกอาคาร</span>
+                    )}
+                  </div>
+                )}
 
                 {/* Staff Actions */}
                 <div className="flex justify-end gap-2.5 pt-3.5 border-t border-slate-200 dark:border-slate-850">

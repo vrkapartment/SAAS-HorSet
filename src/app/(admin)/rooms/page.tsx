@@ -55,7 +55,7 @@ import {
   importRoomsFromCSV,
   createRoomsBatch
 } from "@/features/room/actions"
-import { getBuildings } from "@/features/building/actions"
+import { getBuildings, createBuilding, updateBuilding, deleteBuilding } from "@/features/building/actions"
 import { 
   createTenant, 
   deleteTenant, 
@@ -235,9 +235,20 @@ function RoomsContent() {
   const [waiveWaterMin, setWaiveWaterMin] = useState(false)
   const [extraExpenses, setExtraExpenses] = useState<{ name: string; amount: number }[]>([])
   const [newRoomBuildingId, setNewRoomBuildingId] = useState("")
-  const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
+  const [buildings, setBuildings] = useState<{ id: string; name: string; address?: string | null }[]>([])
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [roomFormError, setRoomFormError] = useState<string | null>(null)
+
+  // จัดการอาคาร (ย้ายมาจากหน้าตั้งค่าคุณสมบัติ — ผูกกับหน้าจัดการห้องพักโดยตรงเพราะเป็นข้อมูลที่ใช้กำหนดห้องพักในหน้านี้)
+  const [buildingsModalOpen, setBuildingsModalOpen] = useState(false)
+  const [buildingsLoading, setBuildingsLoading] = useState(false)
+  const [buildingFilter, setBuildingFilter] = useState<string>("all")
+  const [newBuildingName, setNewBuildingName] = useState("")
+  const [newBuildingAddress, setNewBuildingAddress] = useState("")
+  const [buildingSubmitting, setBuildingSubmitting] = useState(false)
+  const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null)
+  const [editingBuildingName, setEditingBuildingName] = useState("")
+  const [editingBuildingAddress, setEditingBuildingAddress] = useState("")
 
   // Room Type Form State (inside Manage Types modal)
   const [newTypeName, setNewTypeName] = useState("")
@@ -617,11 +628,11 @@ function RoomsContent() {
         }
       })
 
-      // ดึงรายชื่ออาคาร (ใช้กับดรอปดาวน์เลือกอาคารในฟอร์มห้องพัก กรณีมีมากกว่า 1 อาคาร)
+      // ดึงรายชื่ออาคาร (ใช้กับดรอปดาวน์เลือกอาคารในฟอร์มห้องพัก และหน้าจัดการอาคารในโมดอลนี้)
       getBuildings(wsId).then(res => {
         if (currentFetchId !== fetchCounterRef.current) return
         if (res.success && res.data) {
-          setBuildings(res.data.map(b => ({ id: b.id, name: b.name })))
+          setBuildings(res.data.map(b => ({ id: b.id, name: b.name, address: b.address })))
         }
       })
 
@@ -940,6 +951,71 @@ function RoomsContent() {
       }
     }
     setTypeSubmitting(false)
+  }
+
+  // ---------------------------------------------------------
+  // จัดการอาคาร (Buildings CRUD) — เปิดผ่านปุ่ม "จัดการอาคาร" เป็น pop-up ในหน้านี้
+  // ---------------------------------------------------------
+  const handleAddBuilding = async () => {
+    if (!hasEditPermission) {
+      showToast(t("rooms.toasts.permission_denied"), "error")
+      return
+    }
+    if (!newBuildingName.trim()) return
+    setBuildingSubmitting(true)
+    try {
+      const res = await createBuilding(newBuildingName, newBuildingAddress)
+      if (res.success && res.data) {
+        setBuildings(prev => [...prev, { id: res.data!.id, name: res.data!.name, address: res.data!.address }].sort((a, b) => a.name.localeCompare(b.name)))
+        setNewBuildingName("")
+        setNewBuildingAddress("")
+        showToast("เพิ่มอาคารสำเร็จ", "success")
+      } else {
+        showToast(res.error || "เกิดข้อผิดพลาดในการเพิ่มอาคาร", "error")
+      }
+    } finally {
+      setBuildingSubmitting(false)
+    }
+  }
+
+  const handleStartEditBuilding = (b: { id: string; name: string; address?: string | null }) => {
+    setEditingBuildingId(b.id)
+    setEditingBuildingName(b.name)
+    setEditingBuildingAddress(b.address || "")
+  }
+
+  const handleSaveEditBuilding = async (id: string) => {
+    if (!editingBuildingName.trim()) return
+    setBuildingSubmitting(true)
+    try {
+      const res = await updateBuilding(id, editingBuildingName, editingBuildingAddress)
+      if (res.success && res.data) {
+        setBuildings(prev => prev.map(b => b.id === id ? { id: res.data!.id, name: res.data!.name, address: res.data!.address } : b).sort((a, b) => a.name.localeCompare(b.name)))
+        setEditingBuildingId(null)
+        showToast("แก้ไขอาคารสำเร็จ", "success")
+      } else {
+        showToast(res.error || "เกิดข้อผิดพลาดในการแก้ไขอาคาร", "error")
+      }
+    } finally {
+      setBuildingSubmitting(false)
+    }
+  }
+
+  const handleDeleteBuilding = async (id: string) => {
+    if (!confirm("ต้องการลบอาคารนี้ใช่หรือไม่?")) return
+    setBuildingSubmitting(true)
+    try {
+      const res = await deleteBuilding(id)
+      if (res.success) {
+        setBuildings(prev => prev.filter(b => b.id !== id))
+        if (buildingFilter === id) setBuildingFilter("all")
+        showToast("ลบอาคารสำเร็จ", "success")
+      } else {
+        showToast(res.error || "เกิดข้อผิดพลาดในการลบอาคาร", "error")
+      }
+    } finally {
+      setBuildingSubmitting(false)
+    }
   }
 
   // ---------------------------------------------------------
@@ -1732,8 +1808,10 @@ function RoomsContent() {
     } else {
       matchesFilter = details.code === filter
     }
-    
-    return matchesSearch && matchesFilter
+
+    const matchesBuilding = buildingFilter === "all" || room.buildingId === buildingFilter
+
+    return matchesSearch && matchesFilter && matchesBuilding
   })
 
   // คำนวณสถิติหลักของห้องพัก
@@ -1903,6 +1981,15 @@ function RoomsContent() {
             >
               <Settings className="w-4 h-4 text-indigo-500 animate-spin-hover" />
               {hasEditPermission ? (t("rooms.config_types") || "ตั้งค่าประเภทห้องพัก") : (t("rooms.view_types") || "ดูประเภทห้องพัก")}
+            </button>
+
+            {/* Manage Buildings */}
+            <button
+              onClick={() => setBuildingsModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 font-bold text-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+            >
+              <Building className="w-4 h-4 text-teal-500" />
+              {hasEditPermission ? "จัดการอาคาร" : "ดูรายชื่ออาคาร"}
             </button>
 
             {/* CSV Actions Group */}
@@ -2093,6 +2180,20 @@ function RoomsContent() {
                 </button>
               ))}
             </div>
+
+            {/* Building Filter — แสดงเฉพาะเมื่อหอมีมากกว่า 1 อาคาร */}
+            {buildings.length > 1 && (
+              <select
+                value={buildingFilter}
+                onChange={(e) => setBuildingFilter(e.target.value)}
+                className="h-9 px-3 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-950 border border-slate-200/40 dark:border-slate-800/40 text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 cursor-pointer shrink-0"
+              >
+                <option value="all">ทุกอาคาร</option>
+                {buildings.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            )}
 
             {/* View Mode Toggle (Hidden on Mobile) */}
             <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/40 shrink-0">
@@ -2868,14 +2969,23 @@ function RoomsContent() {
             <>
               <button
                 onClick={() => setTypesModalOpen(true)}
-                className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 active:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 dark:active:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm transition-all duration-200 active:scale-95 cursor-pointer"
+                title="ตั้งค่าประเภทห้องพัก"
+                className="shrink-0 w-12 h-12 bg-slate-100 hover:bg-slate-200 active:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 dark:active:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer"
               >
-                <Settings className="w-5 h-5 text-indigo-500" /> ตั้งค่าประเภท
+                <Settings className="w-5 h-5 text-indigo-500" />
               </button>
-              
+
+              <button
+                onClick={() => setBuildingsModalOpen(true)}
+                title="จัดการอาคาร"
+                className="shrink-0 w-12 h-12 bg-slate-100 hover:bg-slate-200 active:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 dark:active:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer"
+              >
+                <Building className="w-5 h-5 text-teal-500" />
+              </button>
+
               <button
                 onClick={handleAddClick}
-                className="flex-[2] h-12 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-500/20 transition-all duration-200 active:scale-95 cursor-pointer"
+                className="flex-1 h-12 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-500/20 transition-all duration-200 active:scale-95 cursor-pointer"
               >
                 <Plus className="w-5 h-5" /> เพิ่มห้องพักใหม่
               </button>
@@ -3254,6 +3364,135 @@ function RoomsContent() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: จัดการอาคาร (ย้ายมาจากหน้าตั้งค่าคุณสมบัติ) */}
+        {/* ========================================================= */}
+        {buildingsModalOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+            <div className="w-full md:max-w-lg bg-white dark:bg-slate-800 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-700 shadow-2xl p-6 relative max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-none md:zoom-in-95 duration-300 md:duration-200 pb-safe-bottom">
+              <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-teal-500/10 rounded-full blur-[50px] pointer-events-none" />
+
+              <div className="flex justify-between items-center mb-4 shrink-0 relative z-10">
+                <h3 className="text-base md:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Building className="w-5 h-5 text-teal-500" /> จัดการอาคาร
+                </h3>
+                <button
+                  onClick={() => setBuildingsModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs md:text-sm text-slate-450 dark:text-slate-400 mb-4 shrink-0 relative z-10">
+                ถ้าหอของคุณมีหลายอาคาร แต่ละอาคารมีมิเตอร์หลัก/บิลไฟฟ้า-น้ำประปาแยกกันคนละใบ ให้เพิ่มอาคารที่นี่ แล้วเลือกอาคารให้แต่ละห้องพักตอนเพิ่ม/แก้ไขห้อง — เลือกดูเฉพาะห้องของอาคารใดอาคารหนึ่งได้จากตัวกรอง "อาคาร" ในหน้ารายการห้องพัก
+              </p>
+
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 relative z-10">
+                {buildingsLoading ? (
+                  <p className="text-xs text-slate-400">กำลังโหลดรายชื่ออาคาร...</p>
+                ) : buildings.length > 0 ? (
+                  <div className="divide-y divide-slate-150 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/60 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+                    {buildings.map((b) => (
+                      <div key={b.id} className="p-3.5">
+                        {editingBuildingId === b.id ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={editingBuildingName}
+                              onChange={(e) => setEditingBuildingName(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold outline-none focus:border-teal-500"
+                            />
+                            <input
+                              type="text"
+                              value={editingBuildingAddress}
+                              onChange={(e) => setEditingBuildingAddress(e.target.value)}
+                              placeholder="ที่อยู่ (ไม่บังคับ)"
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-teal-500"
+                            />
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button type="button" onClick={() => setEditingBuildingId(null)} className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg cursor-pointer">
+                                ยกเลิก
+                              </button>
+                              <button type="button" onClick={() => handleSaveEditBuilding(b.id)} disabled={buildingSubmitting} className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg cursor-pointer disabled:opacity-50">
+                                บันทึก
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{b.name}</p>
+                              {b.address && <p className="text-xs text-slate-450 truncate">{b.address}</p>}
+                            </div>
+                            {hasEditPermission && (
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  onClick={() => handleStartEditBuilding(b)}
+                                  className="p-2.5 md:p-1.5 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 rounded-xl border border-slate-200/50 dark:border-slate-800 transition-colors cursor-pointer active:scale-95 duration-150"
+                                  title="แก้ไขอาคาร"
+                                >
+                                  <Edit className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteBuilding(b.id)}
+                                  disabled={buildingSubmitting}
+                                  className="p-2.5 md:p-1.5 text-red-500 hover:text-red-400 bg-white hover:bg-red-50 dark:bg-slate-900 dark:hover:bg-red-950/20 rounded-xl border border-slate-200/50 dark:border-slate-800 transition-colors cursor-pointer active:scale-95 duration-150 disabled:opacity-50"
+                                  title="ลบอาคาร"
+                                >
+                                  <Trash2 className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 bg-slate-50/50 dark:bg-slate-900/20 rounded-xl border border-slate-200/50 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 text-xs">
+                    ยังไม่มีข้อมูลอาคาร กรุณาเพิ่มอาคารแรกด้านล่าง
+                  </div>
+                )}
+
+                {hasEditPermission && (
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/80 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/50 dark:border-slate-800/55 pb-2">
+                      <Plus className="w-3.5 h-3.5 text-teal-500" /> เพิ่มอาคารใหม่
+                    </h4>
+                    <input
+                      type="text"
+                      placeholder="ชื่ออาคาร เช่น ตึก A, อาคาร 2..."
+                      value={newBuildingName}
+                      onChange={(e) => setNewBuildingName(e.target.value)}
+                      className="w-full h-11 px-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-800 dark:text-slate-100 text-sm transition-colors placeholder-slate-400 font-medium"
+                    />
+                    <input
+                      type="text"
+                      placeholder="ที่อยู่ (ไม่บังคับ)"
+                      value={newBuildingAddress}
+                      onChange={(e) => setNewBuildingAddress(e.target.value)}
+                      className="w-full h-11 px-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-800 dark:text-slate-100 text-sm transition-colors placeholder-slate-400"
+                    />
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleAddBuilding}
+                        disabled={buildingSubmitting || !newBuildingName.trim()}
+                        className="px-5 h-10 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {buildingSubmitting ? (
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : "+ เพิ่มอาคาร"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

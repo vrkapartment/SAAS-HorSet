@@ -53,6 +53,7 @@ interface UnifiedRoomBillingItem {
   tenantName: string | null
   baseRent: number
   status: "occupied" | "available"
+  buildingId?: string | null
   
   // Meter Record fields for current cycle
   meterRecordId?: string
@@ -247,6 +248,7 @@ function UnifiedBillingContent() {
   const [electricBillingMode, setElectricBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
   const [waterBillingMode, setWaterBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
   const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
+  const [buildingFilter, setBuildingFilter] = useState<string>("all")
   const [buildingUtilityBills, setBuildingUtilityBills] = useState<BuildingUtilityBill[]>([])
   const [waterMinChecked, setWaterMinChecked] = useState<boolean>(true)
   const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
@@ -647,6 +649,7 @@ function UnifiedBillingContent() {
           tenantName: resolvedTenantName,
           baseRent: Number(r.baseRent) || 4500,
           status: isOccupiedInCycle ? "occupied" : "available",
+          buildingId: r.buildingId ?? null,
           hasNotifiedCheckout: !!hasNotifiedCheckout,
           
           meterRecordId: roomMeter?.id || undefined,
@@ -1804,6 +1807,11 @@ function UnifiedBillingContent() {
     setCreateBillModalOpen(false)
   }
 
+  // รายการห้องที่กรองตามอาคารที่เลือก (ใช้แสดงผลในตารางเท่านั้น สถิติด้านบนยังคงนับรวมทั้งหมดของหอ)
+  const filteredUnifiedItems = buildingFilter === "all"
+    ? unifiedItems
+    : unifiedItems.filter(item => item.buildingId === buildingFilter)
+
   // คำนวณสรุปสถิติด้านบนของแดชบอร์ด (ปรับเปลี่ยนให้เหมาะสมกับห้องว่าง/ไม่มีผู้เช่า)
   const totalOccupied = unifiedItems.filter(item => item.tenantName).length
   const billedCount = unifiedItems.filter(item => item.tenantName && item.isMeterSaved).length
@@ -1861,6 +1869,22 @@ function UnifiedBillingContent() {
               <option key={opt.value} value={opt.value} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{opt.label}</option>
             ))}
           </select>
+
+          {/* ตัวกรองอาคาร — แสดงเฉพาะเมื่อหอมีมากกว่า 1 อาคาร */}
+          {buildings.length > 1 && (
+            <select
+              value={buildingFilter}
+              onChange={(e) => setBuildingFilter(e.target.value)}
+              className={`w-full md:w-auto h-11 px-4 xl:h-12 xl:px-5 2xl:h-14 2xl:px-6 border rounded-xl focus:outline-none focus:border-teal-500 text-sm xl:text-base 2xl:text-lg font-bold transition-all cursor-pointer ${
+                isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-850" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-50"
+              }`}
+            >
+              <option value="all">ทุกอาคาร</option>
+              {buildings.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -1883,6 +1907,7 @@ function UnifiedBillingContent() {
           electricBillingMode={electricBillingMode}
           waterBillingMode={waterBillingMode}
           buildings={buildings}
+          externalBuildingId={buildingFilter !== "all" ? buildingFilter : undefined}
           onSaved={(row) => {
             setBuildingUtilityBills(prev => [
               ...prev.filter(b => !(b.buildingId === row.buildingId && b.utilityType === row.utilityType)),
@@ -1926,7 +1951,7 @@ function UnifiedBillingContent() {
           savingRows={savingRows}
           userPermissions={userPermissions}
           hasEditPermission={userPermissions.manage_meters_bills_edit}
-          unifiedItems={unifiedItems}
+          unifiedItems={filteredUnifiedItems}
           commonFee={commonFee}
           electricMinChecked={electricMinChecked}
           electricMinUnit={electricMinUnit}
@@ -1992,8 +2017,8 @@ function UnifiedBillingContent() {
                       </div>
                     </td>
                   </tr>
-                ) : unifiedItems.length > 0 ? (
-                  unifiedItems.map((item) => {
+                ) : filteredUnifiedItems.length > 0 ? (
+                  filteredUnifiedItems.map((item) => {
                     const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
                     const elecUnitsUsed = hasElecCurr ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
                     const elecCost = hasElecCurr && elecUnitsUsed >= 0
@@ -2103,8 +2128,8 @@ function UnifiedBillingContent() {
                 <RefreshCw className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
                 <span>{t("billing.loading")}</span>
               </div>
-            ) : unifiedItems.length > 0 ? (
-              unifiedItems.map((item) => {
+            ) : filteredUnifiedItems.length > 0 ? (
+              filteredUnifiedItems.map((item) => {
                 const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
                 const elecUnitsUsed = hasElecCurr ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
                 const elecCost = hasElecCurr && elecUnitsUsed >= 0

@@ -14,6 +14,9 @@ interface BuildingUtilityBillPanelProps {
    *  เพราะ panel นี้เก็บ existingBills แยกต่างหากจากหน้าเรียก — ถ้าไม่มี callback นี้ หน้าเรียกจะยังใช้ค่าเก่า
    *  (พรีวิว/รายการห้องที่ยังไม่ครบ) จนกว่าจะโหลดหน้าใหม่ */
   onSaved?: (row: BuildingUtilityBill) => void
+  /** อาคารที่ผู้ใช้เลือกไว้แล้วจากตัวกรองด้านบนของหน้า (ไม่ใช่ "all") — ถ้าส่งมา panel นี้จะใช้ตามนั้นทันที
+   *  ไม่ต้องกดเลือกอาคารซ้ำอีกรอบ และซ่อน dropdown เลือกอาคารภายในไปเลยเพราะซ้ำซ้อนกับตัวกรองด้านบน */
+  externalBuildingId?: string
 }
 
 /**
@@ -27,7 +30,8 @@ export default function BuildingUtilityBillPanel({
   electricBillingMode,
   waterBillingMode,
   buildings,
-  onSaved
+  onSaved,
+  externalBuildingId
 }: BuildingUtilityBillPanelProps) {
   const [selectedBuildingId, setSelectedBuildingId] = useState("")
   const [existingBills, setExistingBills] = useState<BuildingUtilityBill[]>([])
@@ -35,7 +39,7 @@ export default function BuildingUtilityBillPanel({
 
   const showElectric = electricBillingMode === "building_total"
   const showWater = waterBillingMode === "building_total"
-  const effectiveBuildingId = selectedBuildingId || buildings[0]?.id || ""
+  const effectiveBuildingId = externalBuildingId || selectedBuildingId || buildings[0]?.id || ""
 
   useEffect(() => {
     let cancelled = false
@@ -70,7 +74,7 @@ export default function BuildingUtilityBillPanel({
         กรอกยอดบิลจริง + จำนวนหน่วยรวมทั้งอาคารของรอบนี้ก่อนออกบิลให้ผู้เช่า ระบบจะคำนวณอัตรา/หน่วยให้อัตโนมัติ
       </p>
 
-      {buildings.length > 1 && (
+      {!externalBuildingId && buildings.length > 1 && (
         <div className="max-w-xs">
           <label className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold block mb-1">อาคาร</label>
           <select
@@ -83,6 +87,11 @@ export default function BuildingUtilityBillPanel({
             ))}
           </select>
         </div>
+      )}
+      {externalBuildingId && buildings.length > 1 && (
+        <p className="text-xs sm:text-sm font-bold text-amber-600 dark:text-amber-400">
+          อาคาร: {buildings.find(b => b.id === externalBuildingId)?.name || externalBuildingId}
+        </p>
       )}
 
       {loading ? (
