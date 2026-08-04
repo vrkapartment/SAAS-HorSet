@@ -26,7 +26,7 @@ import {
   X
 } from "lucide-react"
 import { getExpenses, ExpenseItem } from "@/features/expenses/actions"
-import { getFinanceSettings, saveFinanceSettings } from "@/features/finance/actions"
+import { getFinanceSettings, saveTaxSettings } from "@/features/finance/actions"
 import { getRooms } from "@/features/room/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getBills } from "@/features/billing/actions"
@@ -180,12 +180,7 @@ export default function TaxPage() {
     if (!workspaceId) return
     setSavingVatSettings(true)
     try {
-      const res = await saveFinanceSettings(workspaceId, {
-        tax_firstname: firstName, tax_lastname: lastName, tax_id: taxId, tax_address: address, tax_phone: phone,
-        promptpay_type: "phone", promptpay_id: "", promptpay_name: "",
-        common_fee: commonFee, water_rate: waterRate, electric_rate: electricRate,
-        water_min_checked: true, water_min_unit: 3, electric_min_checked: true, electric_min_unit: 10,
-        late_penalty_rate: latePenaltyRate,
+      const res = await saveTaxSettings(workspaceId, {
         taxpayer_status: nextSettings.taxpayerType, partner_count: nextSettings.partnerCount,
         vat_registered: nextSettings.vatRegistered,
         vat_registered_from: nextSettings.vatRegisteredFrom ? `${nextSettings.vatRegisteredFrom}-01` : null,
@@ -340,7 +335,6 @@ export default function TaxPage() {
   const [electricRate, setElectricRate] = useState(7)
   const [waterRate, setWaterRate] = useState(18)
   const [commonFee, setCommonFee] = useState(50)
-  const [latePenaltyRate, setLatePenaltyRate] = useState(0)
   const [rooms, setRooms] = useState<{ roomNumber: string; baseRent: number }[]>([])
 
   // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5) และ 40(8) — มาจาก taxDataset.settings.expenseA/expenseB แหล่งเดียว
@@ -505,7 +499,6 @@ export default function TaxPage() {
             setElectricRate(Number(cachedFinance.electric_rate !== null && cachedFinance.electric_rate !== undefined ? cachedFinance.electric_rate : 7))
             setWaterRate(Number(cachedFinance.water_rate !== null && cachedFinance.water_rate !== undefined ? cachedFinance.water_rate : 18))
             setCommonFee(Number(cachedFinance.common_fee !== null && cachedFinance.common_fee !== undefined ? cachedFinance.common_fee : 50))
-            setLatePenaltyRate(Number(cachedFinance.late_penalty_rate !== null && cachedFinance.late_penalty_rate !== undefined ? cachedFinance.late_penalty_rate : 0))
             setDefaultDepositAmount(Number(cachedFinance.deposit_amount !== null && cachedFinance.deposit_amount !== undefined ? cachedFinance.deposit_amount : 0))
             setDefaultAdvanceRent(Number(cachedFinance.advance_rent !== null && cachedFinance.advance_rent !== undefined ? cachedFinance.advance_rent : 0))
           } else {
@@ -528,7 +521,6 @@ export default function TaxPage() {
                   setElectricRate(res.data.electric_rate)
                   setWaterRate(res.data.water_rate)
                   setCommonFee(res.data.common_fee)
-                  setLatePenaltyRate(res.data.late_penalty_rate)
                   setDefaultDepositAmount(res.data.deposit_amount !== undefined ? Number(res.data.deposit_amount) : 0)
                   setDefaultAdvanceRent(res.data.advance_rent !== undefined ? Number(res.data.advance_rent) : 0)
                   setCachedData(currentWsId, financeCacheKey, res.data)

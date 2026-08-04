@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js"
 import { DEFAULT_STAFF_PERMISSIONS, type StaffPermissions } from "@/features/permissions/types"
+import { buildTaxSettingsPayload, type TaxSettingsUpdate } from "./tax-settings-payload"
 
 // เพจที่เรียก saveFinanceSettings ใช้กันคนละสิทธิ์ staff แยกย่อย (ตั้งค่าการเงิน/ตั้งค่าหอพัก/ภาษี) —
 // staff ที่ admin มอบสิทธิ์แก้ไขให้ในสามหน้านี้หน้าใดหน้าหนึ่งต้อง save ผ่านได้ ไม่ใช่แค่ role "admin" เท่านั้น
@@ -587,6 +588,74 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูลการเงิน"
     return { success: false, error: errorMessage }
+  }
+}
+
+/**
+ * Save only settings owned by the tax page.
+ *
+ * Do not route this through saveFinanceSettings: that action intentionally
+ * updates the finance form's required fields, including PromptPay details.
+ */
+export async function saveTaxSettings(workspaceId: string, settings: TaxSettingsUpdate) {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, workspace_id, permissions")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return { success: false, error: "ไม่พบข้อมูลสิทธิ์ผู้ใช้งาน" }
+    }
+
+    let rawPermissions = profile.permissions
+    if (typeof rawPermissions === "string") {
+      try { rawPermissions = JSON.parse(rawPermissions) } catch { rawPermissions = null }
+    }
+    const permissions: StaffPermissions = {
+      ...DEFAULT_STAFF_PERMISSIONS,
+      ...(rawPermissions as Partial<StaffPermissions> | null),
+    }
+    const canEditTax = profile.role === "admin"
+      || profile.role === "super_admin"
+      || (profile.role === "staff" && permissions.access_tax_edit)
+    const isSameWorkspace = profile.workspace_id === workspaceId || profile.role === "super_admin"
+
+    if (!canEditTax || !isSameWorkspace) {
+      return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์แก้ไขการตั้งค่าภาษีของ workspace นี้" }
+    }
+
+    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const dbClient = (serviceUrl && serviceKey && !serviceKey.includes("placeholder"))
+      ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : supabase
+
+    const taxPayload = buildTaxSettingsPayload(settings)
+    const { data: updatedRows, error: updateError } = await dbClient
+      .from("workspaces")
+      .update(taxPayload)
+      .eq("id", workspaceId)
+      .select("id")
+
+    if (updateError) throw updateError
+    if (!updatedRows || updatedRows.length === 0) {
+      return { success: false, error: "ไม่สามารถบันทึกการตั้งค่าภาษีของ workspace นี้ได้" }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกการตั้งค่าภาษี",
+    }
   }
 }
 
