@@ -12,12 +12,9 @@ import {
   Copy, 
   Check, 
   ExternalLink, 
-  Code2, 
   Network, 
   Cpu, 
   Laptop, 
-  ChevronDown, 
-  ChevronUp, 
   AlertCircle,
   Eye,
   EyeOff
@@ -47,7 +44,6 @@ export default function TestConnectionTab() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<TestResult | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const [showSql, setShowSql] = useState(false)
   const [showKeys, setShowKeys] = useState(false)
   const [activeStep, setActiveStep] = useState<number>(1)
   
@@ -98,28 +94,6 @@ export default function TestConnectionTab() {
   useEffect(() => {
     checkConnection()
   }, [])
-
-  // สคริปต์ SQL ของโครงสร้างหลักในหน้าจอช่วยสร้าง
-  const sqlSchemaSnippet = `-- 1. สร้างตาราง Profiles สำหรับข้อมูลส่วนตัวผู้ใช้งาน
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  updated_at TIMESTAMP WITH TIME ZONE,
-  username TEXT UNIQUE,
-  full_name TEXT,
-  avatar_url TEXT,
-  website TEXT,
-  role TEXT DEFAULT 'staff'::text
-);
-
--- 2. เปิดใช้งานระบบรักษาความปลอดภัย Row Level Security (RLS)
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-
--- 3. สร้างนโยบายความปลอดภัยการเข้าถึงข้อมูล
-CREATE POLICY "อนุญาตให้ทุกคนเข้าถึงข้อมูลแบบสาธารณะ" 
-  ON public.profiles FOR SELECT USING (true);
-
-CREATE POLICY "อนุญาตให้เจ้าของแก้ไขโปรไฟล์ตัวเอง" 
-  ON public.profiles FOR UPDATE USING (auth.uid() = id);`
 
   return (
     <div className="space-y-6 relative font-sans">
@@ -402,53 +376,6 @@ CREATE POLICY "อนุญาตให้เจ้าของแก้ไข�
             )}
           </div>
 
-          {/* กล่องตัวอย่างโค้ด SQL ที่สามารถกางและกดคัดลอกได้อย่างหรูหรา */}
-          <div className="glass-card rounded-2xl border border-slate-200 dark:border-slate-900/60 p-5 space-y-4 bg-white dark:bg-slate-900">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Code2 className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm md:text-xs font-bold text-slate-800 dark:text-slate-200">{t("test_connection.sql_helper_title")}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSql(!showSql)}
-                className="text-sm md:text-xs text-blue-500 hover:text-blue-400 font-bold flex items-center gap-1 py-2 px-3 md:py-0 md:px-0 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 md:border-none rounded-xl md:rounded-none transition-all"
-              >
-                {showSql ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                {showSql ? t("test_connection.collapse_script") : t("test_connection.expand_script")}
-              </button>
-            </div>
-            
-            <p className="text-[11px] md:text-[10px] text-slate-500 leading-relaxed">
-              {t("test_connection.sql_helper_desc")}
-            </p>
-
-            {showSql && (
-              <div className="space-y-2 animate-fade-in">
-                <div className="relative">
-                  <pre className="text-xs md:text-[10px] text-slate-350 font-mono bg-slate-950 p-4 rounded-xl border border-slate-900 overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-inner max-h-[250px]">
-                    {sqlSchemaSnippet}
-                  </pre>
-                  <button
-                    onClick={() => copyToClipboard(sqlSchemaSnippet, "schema_sql")}
-                    className="absolute top-3.5 right-3.5 md:top-2.5 md:right-2.5 p-3 md:p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 rounded-xl md:rounded-lg transition-all"
-                    title="คัดลอกสคริปต์ SQL"
-                  >
-                    {copiedKey === "schema_sql" ? (
-                      <Check className="w-4.5 h-4.5 md:w-4 md:h-4 text-emerald-400" />
-                    ) : (
-                      <Copy className="w-4.5 h-4.5 md:w-4 md:h-4" />
-                    )}
-                  </button>
-                </div>
-                {copiedKey === "schema_sql" && (
-                  <div className="text-xs md:text-[10px] text-emerald-650 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/5 border border-emerald-500/10 p-2.5 rounded-lg justify-center animate-scale-up">
-                    <CheckCircle2 className="w-4 h-4 md:w-3.5 md:h-3.5" /> {t("test_connection.copied_success")}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* คอลัมน์ขวา: คู่มือการติดตั้งทีละสเต็ป */}

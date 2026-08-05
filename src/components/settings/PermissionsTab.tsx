@@ -17,7 +17,6 @@ import {
   Eye, 
   EyeOff, 
   RefreshCw, 
-  Database, 
   Copy, 
   AlertCircle, 
   CheckCircle2,
@@ -98,20 +97,6 @@ export default function PermissionsTab() {
   const [addAllowedBuildingIds, setAddAllowedBuildingIds] = useState<string[]>([])
   const [editRestrictBuildings, setEditRestrictBuildings] = useState(false)
   const [editAllowedBuildingIds, setEditAllowedBuildingIds] = useState<string[]>([])
-
-  // DB SQL Script Text for manual run
-  const [sqlCopied, setSqlCopied] = useState(false)
-  const sqlScript = `-- Database Patch: Add staff permissions to profiles table
-ALTER TABLE public.profiles 
-ADD COLUMN IF NOT EXISTS permissions JSONB 
-DEFAULT '{"view_dashboard_stats": false, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_bills": true, "manage_finance_expenses": false, "access_tax": false, "manage_finance_settings": false, "manage_property_settings": false, "manage_staff_permissions": false, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb;
-
-UPDATE public.profiles
-SET permissions = '{"view_dashboard_stats": true, "manage_rooms_tenants": true, "manage_meters_bills": true, "manage_bills": true, "manage_finance_expenses": true, "access_tax": true, "manage_finance_settings": true, "manage_property_settings": true, "manage_staff_permissions": true, "billing_send_line": true, "billing_download_pdf": true, "billing_copy_summary": true}'::jsonb
-WHERE role IN ('admin', 'super_admin');`
-
-  // Check demo mode
-  const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
 
   // 1. Authenticate user & load roles
   useEffect(() => {
@@ -276,12 +261,6 @@ WHERE role IN ('admin', 'super_admin');`
       setShowDeleteConfirm(false)
     }
     setFormLoading(false)
-  }
-
-  const copySqlToClipboard = () => {
-    navigator.clipboard.writeText(sqlScript)
-    setSqlCopied(true)
-    setTimeout(() => setSqlCopied(false), 3000)
   }
 
   const handlePermissionChange = (type: "add" | "edit", field: keyof StaffPermissions, value?: boolean) => {
@@ -931,35 +910,7 @@ WHERE role IN ('admin', 'super_admin');`
         )}
       </div>
 
-      {/* 5. SQL Patch Information Card */}
-      {!isDemo && (
-        <div className="bg-gradient-to-r from-amber-500/5 to-yellow-500/5 border border-amber-500/20 rounded-3xl p-6 space-y-4">
-          <div className="flex gap-3.5">
-            <Database className="w-7 h-7 text-amber-500 shrink-0" />
-            <div>
-              <h4 className="text-base font-black text-slate-800 dark:text-slate-200">{t("permissions_tab.sql_guide_title")}</h4>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                {t("permissions_tab.sql_guide_desc")}
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 bg-slate-950 text-slate-300 font-mono text-xs sm:text-sm rounded-xl relative border border-slate-800 overflow-x-auto select-all max-h-[180px]">
-            <pre>{sqlScript}</pre>
-            <button
-              onClick={copySqlToClipboard}
-              className="absolute top-3 right-3 p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white cursor-pointer transition-colors"
-            >
-              {sqlCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-            </button>
-          </div>
-          {sqlCopied && (
-            <span className="text-xs sm:text-sm font-bold text-emerald-500 block">{t("permissions_tab.sql_copied_msg")}</span>
-          )}
-        </div>
-      )}
-
-      {/* 6. Modal: Add Staff */}
+      {/* 5. Modal: Add Staff */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
           <form 
@@ -1083,7 +1034,7 @@ WHERE role IN ('admin', 'super_admin');`
         </div>
       )}
 
-      {/* 7. Modal: Edit Staff */}
+      {/* 6. Modal: Edit Staff */}
       {showEditModal && selectedStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
           <form 
@@ -1175,7 +1126,7 @@ WHERE role IN ('admin', 'super_admin');`
         </div>
       )}
 
-      {/* 8. Modal: Delete Confirm */}
+      {/* 7. Modal: Delete Confirm */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
           <div className="w-full max-w-sm p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl relative shadow-2xl text-center space-y-4">

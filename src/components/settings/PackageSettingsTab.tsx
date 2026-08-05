@@ -159,7 +159,7 @@ export default function PackageSettingsTab() {
     { key: "slipok_auto_verify", label: t("package_settings.feature_slipok") }
   ]
 
-  const statusLabel = t(`package_settings.status_${status}`)
+  const statusLabel = t(`package_settings.${status}`)
 
   return (
     <div className="space-y-6 font-sans">

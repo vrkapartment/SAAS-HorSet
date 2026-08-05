@@ -2098,6 +2098,121 @@
     "guide_step4_title": "➡️ Configure receiver accounts in SlipOK",
     "guide_step4_desc": "If \"Verify receiver account\" is enabled, you must add your property's receiving bank account/PromptPay in SlipOK portal to prevent fraud."
   },
+  "settings_hub": {
+    "loading": "Preparing system settings...",
+    "opening": "Opening system settings...",
+    "error_title": "Unable to Load Data",
+    "err_permissions": "Unable to load your access permissions. Please log in again.",
+    "err_staff_permissions": "An error occurred while loading staff permissions.",
+    "select_label": "Choose a setting",
+    "nav_aria_label": "System settings navigation",
+    "groups": {
+      "account": {
+        "name": "My Account",
+        "description": "Personal details and subscription"
+      },
+      "business": {
+        "name": "Business & Payments",
+        "description": "Property, billing, PromptPay, and slip verification"
+      },
+      "automation": {
+        "name": "Integrations",
+        "description": "LINE OA and data storage"
+      },
+      "team": {
+        "name": "Team",
+        "description": "Members and access permissions"
+      },
+      "advanced": {
+        "name": "Advanced",
+        "description": "System health and diagnostics"
+      }
+    },
+    "tabs": {
+      "profile": {
+        "name": "Profile & Password",
+        "description": "Update your personal details and password securely"
+      },
+      "package": {
+        "name": "Subscription & Usage",
+        "description": "View the current plan, upgrade, and manage this property's subscription"
+      },
+      "property": {
+        "name": "Property & Billing",
+        "description": "Water and electricity rates, recurring fees, lease terms, and more"
+      },
+      "finance": {
+        "name": "Payment Accounts, PromptPay & Tax",
+        "description": "Receiving bank accounts, PromptPay QR codes, and taxpayer information"
+      },
+      "slipok": {
+        "name": "Automatic Slip Verification",
+        "description": "Configure the Branch ID and API key for automatic transfer-slip verification and view the remaining quota"
+      },
+      "line_oa": {
+        "name": "LINE OA & Notifications",
+        "description": "Configure the LINE Channel Access Token and LINE LIFF ID for your property"
+      },
+      "google_drive": {
+        "name": "Slip Storage & Backup",
+        "description": "Set the slip retention period and archive old files to Google Drive"
+      },
+      "permissions": {
+        "name": "Team & Access",
+        "description": "Create staff accounts and configure detailed access permissions"
+      },
+      "supabase": {
+        "name": "Supabase Database Status",
+        "description": "Check stability, review the environment, and access SQL database scripts"
+      }
+    }
+  },
+  "google_drive_settings": {
+    "loading": "Loading...",
+    "title": "Slip Storage & Backup",
+    "subtitle": "Set how long slips remain in the system and connect Google Drive to archive them before automatic deletion.",
+    "err_status": "Unable to load Google Drive status.",
+    "err_workspace": "No property was found for the current user.",
+    "err_load": "An error occurred while loading the data.",
+    "connect_success": "Google Drive connected successfully.",
+    "connect_error": "Unable to connect Google Drive: {error}",
+    "save_success": "Folder name saved successfully.",
+    "err_save": "An error occurred while saving the folder name.",
+    "not_configured": "This feature is not available yet. Please contact the system administrator.",
+    "folder_label": "Google Drive archive folder name",
+    "save_name": "Save Name",
+    "folder_hint": "* The system will automatically create this folder in the connected Drive account on the first upload.",
+    "connected": "Google Drive is connected",
+    "open_folder": "Open Folder",
+    "not_connected": "Google Drive is not connected for this property.",
+    "reconnect": "Reconnect",
+    "connect": "Connect Google Drive",
+    "retention_title": "Payment Slip Retention Period",
+    "retention_label": "How long to keep slip files in the system",
+    "retention_1_month": "Keep for 1 month",
+    "retention_3_months": "Keep for 3 months",
+    "retention_6_months": "Keep for 6 months",
+    "retention_12_months": "Keep for 12 months / 1 year",
+    "retention_desc": "At the end of each month, the system removes slips older than this period from Supabase Storage while preserving all bill details and payment totals.",
+    "retention_with_drive": "Google Drive is connected: during automatic cleanup, slips are archived to Drive first, and the originals are kept if the backup fails.",
+    "retention_without_drive": "Google Drive is not connected: slips will be permanently deleted without a backup when the retention period expires.",
+    "retention_records_preserved": "Removing slip files does not affect bills, transaction records, or payment statistics.",
+    "retention_save": "Save Retention",
+    "retention_saving": "Saving...",
+    "retention_save_success": "Slip retention period saved successfully.",
+    "retention_save_error": "Unable to save the slip retention period.",
+    "retention_load_error": "Unable to load the slip retention period.",
+    "cleanup_button": "Delete Expired Slips Now",
+    "cleanup_running": "Deleting expired slips...",
+    "cleanup_confirm": "Process expired slip files now? If Google Drive is connected, each file must be backed up successfully before deletion; originals are kept when a backup fails.",
+    "cleanup_success": "Deleted {count} expired slip files successfully.",
+    "cleanup_success_with_drive": "Backed up and deleted {count} expired slip files successfully.",
+    "cleanup_partial": "Processed {deleted} files successfully and kept {failed} originals because their backups failed.",
+    "cleanup_none": "There are no expired slip files to process right now.",
+    "cleanup_error": "An error occurred while deleting expired slip files.",
+    "drive_section_title": "Google Drive Backup",
+    "drive_section_desc": "Connect the property's Drive account to archive slips before the automatic cleanup process."
+  },
   "package_settings": {
     "loading": "Loading package details...",
     "err_workspace": "Could not identify workspace ID. Please log in again.",

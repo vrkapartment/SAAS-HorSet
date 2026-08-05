@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js"
 import { DEFAULT_STAFF_PERMISSIONS, type StaffPermissions } from "@/features/permissions/types"
 import { buildTaxSettingsPayload, type TaxSettingsUpdate } from "./tax-settings-payload"
+import { uploadFileToGoogleDriveAction } from "@/lib/googleDrive"
 
 // เพจที่เรียก saveFinanceSettings ใช้กันคนละสิทธิ์ staff แยกย่อย (ตั้งค่าการเงิน/ตั้งค่าหอพัก/ภาษี) —
 // staff ที่ admin มอบสิทธิ์แก้ไขให้ในสามหน้านี้หน้าใดหน้าหนึ่งต้อง save ผ่านได้ ไม่ใช่แค่ role "admin" เท่านั้น
@@ -591,6 +592,91 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
   }
 }
 
+async function getWorkspaceAdminClient(workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false as const, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role, workspace_id")
+    .eq("id", user.id)
+    .single()
+
+  if (profileError || !profile) {
+    return { success: false as const, error: "ไม่พบข้อมูลสิทธิ์ผู้ใช้งาน" }
+  }
+
+  const isAdmin = profile.role === "admin" || profile.role === "super_admin"
+  const isSameWorkspace = profile.workspace_id === workspaceId || profile.role === "super_admin"
+  if (!isAdmin || !isSameWorkspace) {
+    return { success: false as const, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
+  }
+
+  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const client = serviceUrl && serviceKey && !serviceKey.includes("placeholder")
+    ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : supabase
+
+  return { success: true as const, client }
+}
+
+export async function getSlipRetentionMonthsAction(workspaceId: string) {
+  try {
+    const access = await getWorkspaceAdminClient(workspaceId)
+    if (!access.success) return access
+
+    const { data, error } = await access.client
+      .from("workspaces")
+      .select("slip_retention_months")
+      .eq("id", workspaceId)
+      .single()
+
+    if (error || !data) {
+      return { success: false as const, error: error?.message || "ไม่พบข้อมูลการตั้งค่าการเก็บสลิป" }
+    }
+
+    return {
+      success: true as const,
+      months: clampSlipRetentionMonths(data.slip_retention_months)
+    }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการโหลดการตั้งค่าการเก็บสลิป"
+    }
+  }
+}
+
+export async function saveSlipRetentionMonthsAction(workspaceId: string, months: number) {
+  try {
+    const access = await getWorkspaceAdminClient(workspaceId)
+    if (!access.success) return access
+
+    const normalizedMonths = clampSlipRetentionMonths(months)
+    const { data, error } = await access.client
+      .from("workspaces")
+      .update({ slip_retention_months: normalizedMonths })
+      .eq("id", workspaceId)
+      .select("id")
+      .single()
+
+    if (error || !data) {
+      return { success: false as const, error: error?.message || "ไม่สามารถบันทึกระยะเวลาการเก็บสลิปได้" }
+    }
+
+    return { success: true as const, months: normalizedMonths }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกระยะเวลาการเก็บสลิป"
+    }
+  }
+}
+
 /**
  * Save only settings owned by the tax page.
  *
@@ -664,6 +750,9 @@ export async function saveTaxSettings(workspaceId: string, settings: TaxSettings
  */
 export async function cleanupExpiredSlipsAction(workspaceId: string) {
   try {
+    const access = await getWorkspaceAdminClient(workspaceId)
+    if (!access.success) return access
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -679,7 +768,7 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
       }
     })
 
-    // 1. ดึงค่า slip_retention_months ของ Workspace นี้
+    // 1. ดึงค่า retention และตรวจว่า workspace เชื่อมต่อ Google Drive หรือไม่
     const { data: wsData, error: wsError } = await supabaseAdmin
       .from("workspaces")
       .select("slip_retention_months")
@@ -692,8 +781,20 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
 
     const retentionMonths = Number(wsData.slip_retention_months || 0)
     if (retentionMonths <= 0) {
-      return { success: true, count: 0, message: "ไม่ได้เปิดใช้งานการลบรูปสลิปอัตโนมัติ (ตั้งค่าเป็นเก็บไว้ตลอดไป)" }
+      return { success: true, count: 0, archiveFailedCount: 0, googleDriveConnected: false }
     }
+
+    const { data: driveSettings, error: driveSettingsError } = await supabaseAdmin
+      .from("workspace_google_drive_settings")
+      .select("refresh_token")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (driveSettingsError) {
+      throw driveSettingsError
+    }
+
+    const googleDriveConnected = !!driveSettings?.refresh_token
 
     // 2. ค้นหารายการบิลที่มี slip_url และอายุเกินกว่าระยะเวลาที่กำหนด
     const cutoffDate = new Date()
@@ -702,7 +803,7 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
 
     const { data: expiredBills, error: billsError } = await supabaseAdmin
       .from("bills")
-      .select("id, slip_url")
+      .select("id, slip_url, created_at")
       .eq("workspace_id", workspaceId)
       .not("slip_url", "is", null)
       .lt("created_at", cutoffIso)
@@ -712,30 +813,73 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
     }
 
     if (!expiredBills || expiredBills.length === 0) {
-      return { success: true, count: 0, message: "ไม่มีรูปภาพสลิปที่หมดอายุให้ต้องทำความสะอาดในขณะนี้" }
+      return { success: true, count: 0, archiveFailedCount: 0, googleDriveConnected }
     }
 
-    // 3. กรองและสกัด Storage Paths ของสลิปทั้งหมด
+    // 3. ถ้าเชื่อมต่อ Drive ต้อง archive สำเร็จก่อนจึงจะนำไฟล์นั้นเข้าคิวลบ
     const pathsToDelete: string[] = []
     const billIdsToUpdate: string[] = []
+    let archiveFailedCount = 0
 
-    for (const bill of expiredBills) {
-      if (bill.slip_url) {
-        const marker = "/payment-slips/";
-        const idx = bill.slip_url.indexOf(marker);
-        if (idx !== -1) {
-          const path = bill.slip_url.substring(idx + marker.length);
-          if (path) {
-            pathsToDelete.push(path)
-            billIdsToUpdate.push(bill.id)
+    async function prepareExpiredBill(bill: { id: string; slip_url: string | null; created_at: string }) {
+      if (!bill.slip_url) return null
+
+      if (googleDriveConnected) {
+        try {
+          const fileRes = await fetch(bill.slip_url)
+          if (!fileRes.ok) {
+            archiveFailedCount++
+            return null
           }
+
+          const fileBuffer = Buffer.from(await fileRes.arrayBuffer())
+          const contentType = fileRes.headers.get("content-type") || "image/jpeg"
+          const urlPath = new URL(bill.slip_url).pathname
+          const extMatch = urlPath.match(/\.[a-zA-Z0-9]+$/)
+          const extension = extMatch ? extMatch[0] : contentType.includes("png") ? ".png" : ".jpg"
+          const billDate = new Date(bill.created_at)
+          const monthFolder = `${billDate.getFullYear()}-${String(billDate.getMonth() + 1).padStart(2, "0")}`
+          const uploadResult = await uploadFileToGoogleDriveAction(
+            fileBuffer,
+            `rent-slip-${bill.id}${extension}`,
+            contentType,
+            monthFolder,
+            workspaceId
+          )
+
+          if (!uploadResult.success) {
+            archiveFailedCount++
+            return null
+          }
+        } catch (archiveError) {
+          console.error(`Manual cleanup could not archive bill ${bill.id}:`, archiveError)
+          archiveFailedCount++
+          return null
+        }
+      }
+
+      const marker = "/payment-slips/"
+      const markerIndex = bill.slip_url.indexOf(marker)
+      if (markerIndex === -1) return null
+      const path = bill.slip_url.substring(markerIndex + marker.length)
+      return path ? { path, billId: bill.id } : null
+    }
+
+    const archiveConcurrency = 3
+    for (let index = 0; index < expiredBills.length; index += archiveConcurrency) {
+      const chunk = expiredBills.slice(index, index + archiveConcurrency)
+      const prepared = await Promise.all(chunk.map(prepareExpiredBill))
+      for (const item of prepared) {
+        if (item) {
+          pathsToDelete.push(item.path)
+          billIdsToUpdate.push(item.billId)
         }
       }
     }
 
     let deletedCount = 0
 
-    // 4. สั่งลบไฟล์จาก Supabase Storage (ลบเป็นแบบ Batch)
+    // 4. ลบเฉพาะไฟล์ที่ archive สำเร็จแล้ว หรือไฟล์ของ workspace ที่ไม่ได้เชื่อมต่อ Drive
     if (pathsToDelete.length > 0) {
       const { data: deleteData, error: deleteStorageError } = await supabaseAdmin
         .storage
@@ -743,12 +887,11 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
         .remove(pathsToDelete)
 
       if (deleteStorageError) {
-        console.error("Error deleting slips from storage:", deleteStorageError)
-      } else if (deleteData) {
-        deletedCount = deleteData.length
+        throw deleteStorageError
       }
+      deletedCount = deleteData?.length || 0
 
-      // 5. สั่งอัปเดตลบ slip_url ออกจากฐานข้อมูลตาราง bills
+      // 5. ล้าง URL หลัง Storage ยืนยันว่าการลบสำเร็จเท่านั้น
       const { error: dbUpdateError } = await supabaseAdmin
         .from("bills")
         .update({ slip_url: null })
@@ -761,8 +904,9 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
 
     return { 
       success: true, 
-      count: deletedCount, 
-      message: `ทำความสะอาดสลิปที่หมดอายุเรียบร้อย! ลบรูปภาพสำเร็จ ${deletedCount} รูปภาพ ช่วยเพิ่มพื้นที่จัดเก็บข้อมูล` 
+      count: deletedCount,
+      archiveFailedCount,
+      googleDriveConnected
     }
   } catch (err: unknown) {
     console.error("Cleanup expired slips error:", err)
