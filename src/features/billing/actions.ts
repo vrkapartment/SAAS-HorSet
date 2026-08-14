@@ -1033,6 +1033,16 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
     if (roomsError) throw roomsError
     const roomsMap = new Map(roomsData.map(r => [r.room_number, r]))
 
+    // 1.7 ดึงบิลที่มีอยู่แล้วของรอบนี้มาก่อน "ครั้งเดียว" — กันไม่ให้การออกบิลซ้ำ (เช่น แก้เลขมิเตอร์แล้วกดออกบิลใหม่)
+    // ไปเขียนทับค่าปรับล่าช้า/จำนวนวันที่บันทึกไว้แล้วของห้องที่มีอยู่ก่อน (ตรงกับ logic ป้องกันเดียวกับ createBill)
+    const { data: existingBillsData, error: existingBillsError } = await supabase
+      .from("bills")
+      .select("room_number, penalty_amount, late_days")
+      .eq("workspace_id", workspaceId)
+      .eq("billing_cycle", billingCycle)
+    if (existingBillsError) throw existingBillsError
+    const existingBillsMap = new Map(existingBillsData.map(b => [b.room_number, b]))
+
     // 1.5 ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของรอบนี้มาครั้งเดียว
     let buildingBillsMap = new Map<string, BuildingUtilityBill>()
     if (settings.electric_billing_mode === "building_total" || settings.water_billing_mode === "building_total") {
@@ -1093,11 +1103,15 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         vatRate: vatResolved.rate, vatApplies: vatResolved.applies
       })
 
+      // ป้องกันยอดเงินรวม/ค่าปรับล่าช้าโดนทับ หากห้องนี้มีบิลของรอบนี้อยู่แล้ว (ตรงกับ logic เดียวกับ createBill)
+      const existingBill = existingBillsMap.get(item.roomNumber)
+      const existingPenalty = Number(existingBill?.penalty_amount || 0)
+
       billRows.push({
         workspace_id: workspaceId,
         room_number: item.roomNumber,
         tenant_name: item.tenantName,
-        amount: total,
+        amount: total + existingPenalty,
         status: item.status,
         billing_cycle: billingCycle,
         electric_units: eUnits,
@@ -1105,7 +1119,12 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         other_service_amount: item.otherServiceAmount,
         invoice_id: `INV-${billingCycle.replace(/-/g, "")}-${item.roomNumber}`,
         building_id: roomData.building_id ?? null,
-        vat_amount: vatAmount
+        vat_amount: vatAmount,
+        // บิลใหม่ (ไม่เคยมีมาก่อน) ต้องเป็น null เสมอ เพื่อให้หน้าจัดการใบแจ้งหนี้คำนวณวันล่าช้าสดจากวันที่ปัจจุบัน
+        // ได้ทุกครั้งที่เปิดหน้า จนกว่าจะมีเหตุการณ์จริง (ผู้เช่าส่งสลิป/admin กดรับเงิน) มาเขียนค่าจริงทับ —
+        // บิลที่มีอยู่แล้วต้องคงค่าเดิมไว้เป๊ะ ห้ามให้การออกบิลซ้ำมารีเซ็ตค่าที่บันทึกไปแล้วทิ้ง
+        late_days: existingBill ? (existingBill.late_days ?? null) : null,
+        penalty_amount: existingBill ? (existingBill.penalty_amount ?? null) : null,
       })
     }
 

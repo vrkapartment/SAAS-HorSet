@@ -1301,7 +1301,7 @@ export default function TaxPage() {
 
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_rent_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_rent_subtitle")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-none">{t("tax_page.card_rent_subtitle")}</p>
               {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
@@ -1348,7 +1348,7 @@ export default function TaxPage() {
 
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_util_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_util_subtitle")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-none">{t("tax_page.card_util_subtitle")}</p>
               {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
@@ -1395,7 +1395,7 @@ export default function TaxPage() {
 
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.card_other_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.card_other_subtitle")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-none">{t("tax_page.card_other_subtitle")}</p>
               {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
@@ -1407,7 +1407,7 @@ export default function TaxPage() {
           </div>
 
           <div className="relative z-10 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/85">
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
+            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t("tax_page.selected_deduction")}</p>
             <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850/80 rounded-xl p-3 flex flex-col gap-0.5">
               {!dataReady ? (
                 <>
@@ -1446,7 +1446,7 @@ export default function TaxPage() {
 
             <div className="space-y-1 relative z-10">
               <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("tax_page.total_deduction_title")}</h4>
-              <p className="text-xs text-slate-400 leading-none">{t("tax_page.total_deduction_subtitle")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-none">{t("tax_page.total_deduction_subtitle")}</p>
               {!dataReady ? (
                 <div className="h-8 w-32 mt-3 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
@@ -1497,7 +1497,7 @@ export default function TaxPage() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("tax_page.data_source_title")}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{t("tax_page.data_source_subtitle")}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t("tax_page.data_source_subtitle")}</p>
               </div>
             </div>
             
@@ -2085,7 +2085,7 @@ export default function TaxPage() {
           ) : (
             <div className="py-12 text-center rounded-2xl bg-slate-50/40 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800/80 text-slate-500 text-xs">
               <p className="font-semibold text-slate-700 dark:text-slate-300">{t("tax_page.no_new_contracts", { year: taxYear })}</p>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">{t("tax_page.no_new_contracts_desc")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">{t("tax_page.no_new_contracts_desc")}</p>
             </div>
           )}
         </div>

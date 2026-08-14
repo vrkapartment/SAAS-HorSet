@@ -29,33 +29,33 @@ export default function SupportModal({
             <Lock className="w-8 h-8" />
           </div>
           
-          <h3 className="text-xl font-bold text-slate-100">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
             🔔 คำขอช่วยเหลือระบบ (Support Request)
           </h3>
-          
-          <p className="text-sm text-slate-400 leading-relaxed">
-            เจ้าหน้าที่บริการลูกค้า <span className="text-blue-400 font-semibold">(Super Admin)</span> ร้องขอเชื่อมต่อสิทธิ์เพื่อตรวจสอบข้อมูลในหอพัก <span className="text-white font-medium">"{workspaceName}"</span> ของคุณชั่วคราว เพื่อความปลอดภัยสูงสุด โปรดยืนยันการให้สิทธิ์เข้าถึงนี้
+
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            เจ้าหน้าที่บริการลูกค้า <span className="text-blue-600 dark:text-blue-400 font-semibold">(Super Admin)</span> ร้องขอเชื่อมต่อสิทธิ์เพื่อตรวจสอบข้อมูลในหอพัก <span className="text-slate-900 dark:text-white font-medium">"{workspaceName}"</span> ของคุณชั่วคราว เพื่อความปลอดภัยสูงสุด โปรดยืนยันการให้สิทธิ์เข้าถึงนี้
           </p>
 
-          <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 text-left w-full space-y-2 text-xs text-slate-400">
+          <div className="p-4 bg-slate-100/60 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-left w-full space-y-2 text-xs text-slate-600 dark:text-slate-400">
             <div className="flex justify-between">
               <span>ผู้ร้องขอ:</span>
-              <span className="text-slate-200 font-medium">HorSet Support Team (Super Admin)</span>
+              <span className="text-slate-800 dark:text-slate-200 font-medium">HorSet Support Team (Super Admin)</span>
             </div>
             <div className="flex justify-between">
               <span>ขอบเขตข้อมูล:</span>
-              <span className="text-slate-200 font-medium">อ่านและแก้ไขห้องพัก, สัญญา, มิเตอร์ และบิล</span>
+              <span className="text-slate-800 dark:text-slate-200 font-medium">อ่านและแก้ไขห้องพัก, สัญญา, มิเตอร์ และบิล</span>
             </div>
             <div className="flex justify-between">
               <span>ความปลอดภัย:</span>
-              <span className="text-teal-400 font-semibold">คุณสามารถเพิกถอนสิทธิ์การเข้าถึงได้ตลอดเวลา</span>
+              <span className="text-teal-600 dark:text-teal-400 font-semibold">คุณสามารถเพิกถอนสิทธิ์การเข้าถึงได้ตลอดเวลา</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 w-full mt-4">
             <button
               onClick={() => onDecide(false)}
-              className="py-3 px-4 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-semibold rounded-xl text-sm transition-colors cursor-pointer"
+              className="py-3 px-4 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-sm transition-colors cursor-pointer"
             >
               ปฏิเสธ (Deny)
             </button>

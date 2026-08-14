@@ -86,7 +86,7 @@ export default function Sidebar({
             <img src="/icon-192x192.png" className="w-8 h-8 object-contain" alt="HorSet Logo" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl md:text-2xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
+            <h2 className="text-xl md:text-2xl font-black tracking-tight text-blue-600 dark:text-blue-400 truncate whitespace-nowrap">
               {t("common.app_name") || "HorSet"}
             </h2>
           </div>
@@ -94,7 +94,7 @@ export default function Sidebar({
 
         {userRole === "super_admin" && (
           <div className="mb-6 p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-900/35 border border-slate-200/50 dark:border-slate-800/50 relative shadow-sm backdrop-blur-md">
-            <label className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
+            <label className="text-xs text-slate-500 dark:text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
             
             <button
               onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
@@ -133,21 +133,21 @@ export default function Sidebar({
             )}
 
             {/* แสดงสถานะ Support Permission ของ Workspace ปัจจุบัน */}
-            <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-col gap-2 text-[11px]">
+            <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-col gap-2 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 dark:text-slate-500 font-medium">{t("dashboard.support_access")}</span>
+                <span className="text-slate-500 dark:text-slate-400 font-medium">{t("dashboard.support_access")}</span>
                 {supportStatus === "approved" && (
-                  <span className="text-teal-600 dark:text-teal-400 font-bold flex items-center gap-1 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-md text-[10px]">
+                  <span className="text-teal-600 dark:text-teal-400 font-bold flex items-center gap-1 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-md text-xs">
                     <Check className="w-3 h-3" /> {t("dashboard.approved")}
                   </span>
                 )}
                 {supportStatus === "pending" && (
-                  <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md text-[10px]">
+                  <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md text-xs">
                     <RefreshCw className="w-3 h-3 animate-spin" /> {t("dashboard.pending")}
                   </span>
                 )}
                 {(supportStatus === "revoked" || supportStatus === "none") && (
-                  <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-md text-[10px]">
+                  <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-md text-xs">
                     <AlertCircle className="w-3 h-3" /> {t("dashboard.no_access")}
                   </span>
                 )}
@@ -156,14 +156,14 @@ export default function Sidebar({
               {(supportStatus === "none" || supportStatus === "revoked") && (
                 <button
                   onClick={handleRequestSupport}
-                  className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl text-[10px] text-center transition-all shadow-md shadow-blue-500/15 hover:shadow-blue-500/25 active:translate-y-0 hover:-translate-y-0.5 cursor-pointer"
+                  className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs text-center transition-all shadow-md shadow-blue-500/15 hover:shadow-blue-500/25 active:translate-y-0 hover:-translate-y-0.5 cursor-pointer"
                 >
                   {t("dashboard.request_support")}
                 </button>
               )}
 
               {supportStatus === "pending" && (
-                <div className="text-[9px] text-slate-500 text-left px-1 mt-0.5 font-medium animate-pulse">
+                <div className="text-xs text-slate-500 text-left px-1 mt-0.5 font-medium animate-pulse">
                   {t("dashboard.awaiting_admin_approval")}
                 </div>
               )}
@@ -171,7 +171,7 @@ export default function Sidebar({
               {supportStatus === "approved" && (
                 <button
                   onClick={handleExitSupport}
-                  className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-[10px] transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
+                  className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
                 >
                   <span className="truncate whitespace-nowrap mr-2">ออกจาก Workspace นี้</span>
                   <LogOut className="w-3.5 h-3.5 shrink-0" />
@@ -263,7 +263,7 @@ export default function Sidebar({
                     fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
                   )}
                 </h4>
-                <span className={`inline-block text-[9px] px-2.5 py-0.5 rounded-full font-bold mt-1.5 truncate whitespace-nowrap max-w-full ${
+                <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-bold mt-1.5 truncate whitespace-nowrap max-w-full ${
                   userRole === "super_admin"
                     ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
                     : userRole === "admin"
@@ -298,7 +298,7 @@ export default function Sidebar({
                   <img src="/icon-192x192.png" className="w-7 h-7 object-contain" alt="HorSet Logo" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-lg md:text-xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent truncate whitespace-nowrap">
+                  <h2 className="text-lg md:text-xl font-black tracking-tight text-blue-600 dark:text-blue-400 truncate whitespace-nowrap">
                     {t("common.app_name") || "HorSet"}
                   </h2>
                 </div>
@@ -310,7 +310,7 @@ export default function Sidebar({
 
             {userRole === "super_admin" && (
               <div className="mb-6 p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-900/35 border border-slate-200/50 dark:border-slate-800/50 relative shadow-sm backdrop-blur-md">
-                <label className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
+                <label className="text-xs text-slate-500 dark:text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">{t("dashboard.select_workspace")}</label>
                 <button
                   onClick={() => !workspaceLoading && setShowDropdown(!showDropdown)}
                   disabled={workspaceLoading}
@@ -345,21 +345,21 @@ export default function Sidebar({
                 )}
 
                 {/* แสดงสถานะ Support Permission ของ Workspace ปัจจุบัน ในมือถือ */}
-                <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-col gap-2 text-[11px]">
+                <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-col gap-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 dark:text-slate-500 font-medium">{t("dashboard.support_access") || "สิทธิ์การช่วยเหลือ"}</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">{t("dashboard.support_access") || "สิทธิ์การช่วยเหลือ"}</span>
                     {supportStatus === "approved" && (
-                      <span className="text-teal-600 dark:text-teal-400 font-bold flex items-center gap-1 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-md text-[10px]">
+                      <span className="text-teal-600 dark:text-teal-400 font-bold flex items-center gap-1 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-md text-xs">
                         <Check className="w-3 h-3" /> {t("dashboard.approved") || "ได้รับสิทธิ์"}
                       </span>
                     )}
                     {supportStatus === "pending" && (
-                      <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md text-[10px]">
+                      <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md text-xs">
                         <RefreshCw className="w-3 h-3 animate-spin" /> {t("dashboard.pending") || "กำลังรอ"}
                       </span>
                     )}
                     {(supportStatus === "revoked" || supportStatus === "none") && (
-                      <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-md text-[10px]">
+                      <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-md text-xs">
                         <AlertCircle className="w-3 h-3" /> {t("dashboard.no_access") || "ไม่มีสิทธิ์"}
                       </span>
                     )}
@@ -368,14 +368,14 @@ export default function Sidebar({
                   {(supportStatus === "none" || supportStatus === "revoked") && (
                     <button
                       onClick={handleRequestSupport}
-                      className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl text-[10px] text-center transition-all shadow-md shadow-blue-500/15 hover:shadow-blue-500/25 active:translate-y-0 hover:-translate-y-0.5 cursor-pointer"
+                      className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs text-center transition-all shadow-md shadow-blue-500/15 hover:shadow-blue-500/25 active:translate-y-0 hover:-translate-y-0.5 cursor-pointer"
                     >
                       {t("dashboard.request_support") || "ส่งคำขอเข้าช่วยเหลือระบบ"}
                     </button>
                   )}
 
                   {supportStatus === "pending" && (
-                    <div className="text-[9px] text-slate-500 text-left px-1 mt-0.5 font-medium animate-pulse">
+                    <div className="text-xs text-slate-500 text-left px-1 mt-0.5 font-medium animate-pulse">
                       {t("dashboard.awaiting_admin_approval") || "รอดำเนินการอนุมัติสิทธิ์"}
                     </div>
                   )}
@@ -383,7 +383,7 @@ export default function Sidebar({
                   {supportStatus === "approved" && (
                     <button
                       onClick={handleExitSupport}
-                      className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-[10px] transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
+                      className="w-full mt-1 py-2.5 px-4 bg-gradient-to-r from-red-600/90 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 flex items-center justify-between hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
                     >
                       <span className="truncate whitespace-nowrap mr-2">ออกจาก Workspace นี้</span>
                       <LogOut className="w-3.5 h-3.5 shrink-0" />
@@ -475,7 +475,7 @@ export default function Sidebar({
                         fullName || (userRole === "super_admin" ? "ฝ่ายดูแลลูกค้า" : userRole === "admin" ? "คุณสมเจตน์" : "สมชาย")
                       )}
                     </h4>
-                    <span className={`inline-block text-[9px] px-2.5 py-0.5 rounded-full font-bold mt-1 truncate whitespace-nowrap max-w-full ${
+                    <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-bold mt-1 truncate whitespace-nowrap max-w-full ${
                       userRole === "super_admin"
                         ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
                         : userRole === "admin"

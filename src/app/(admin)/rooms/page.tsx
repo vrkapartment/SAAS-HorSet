@@ -3546,27 +3546,27 @@ function RoomsContent() {
                   {/* Tenant Details Preview */}
                   <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/60 px-4 py-1.5 text-xs text-slate-600 dark:text-slate-300">
                     <div className="flex justify-between py-2">
-                      <span className="text-slate-400">ชื่อผู้เช่า:</span> 
+                      <span className="text-slate-550 dark:text-slate-400">ชื่อผู้เช่า:</span> 
                       <span className="font-extrabold text-slate-850 dark:text-slate-200">
                         {selectedRoom.tenantName || tenantNameInput}
                       </span>
                     </div>
                     <div className="flex justify-between py-2">
-                      <span className="text-slate-400">เบอร์โทรศัพท์:</span> 
+                      <span className="text-slate-550 dark:text-slate-400">เบอร์โทรศัพท์:</span> 
                       <span className="font-mono font-bold text-slate-850 dark:text-slate-200">
                         {selectedRoom.tenantPhone || tenantPhoneInput}
                       </span>
                     </div>
                     <div className="flex justify-between py-2">
-                      <span className="text-slate-400">หมายเลขห้อง:</span> 
+                      <span className="text-slate-550 dark:text-slate-400">หมายเลขห้อง:</span> 
                       <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span>
                     </div>
                     <div className="flex justify-between py-2 border-t border-slate-100/50 dark:border-slate-800/50">
-                      <span className="text-slate-400">อัตราค่าเช่าห้อง:</span> 
+                      <span className="text-slate-550 dark:text-slate-400">อัตราค่าเช่าห้อง:</span> 
                       <span className="font-bold text-slate-850 dark:text-slate-200">{(selectedRoom.baseRent || 0).toLocaleString()} บาท/เดือน</span>
                     </div>
                     <div className="flex justify-between py-2">
-                      <span className="text-slate-400">เงินประกัน (มัดจำ):</span> 
+                      <span className="text-slate-550 dark:text-slate-400">เงินประกัน (มัดจำ):</span> 
                       <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
                         {financeSettings ? (
                           financeSettings.deposit_type === "fixed" ? (
@@ -3582,7 +3582,7 @@ function RoomsContent() {
                       </span>
                     </div>
                     <div className="flex justify-between py-2">
-                      <span className="text-slate-400">ค่าเช่าล่วงหน้า:</span> 
+                      <span className="text-slate-550 dark:text-slate-400">ค่าเช่าล่วงหน้า:</span> 
                       <span className="font-extrabold text-blue-600 dark:text-blue-400">
                         {financeSettings ? `${financeSettings.advance_rent || 0} เดือน` : "กำลังโหลด..."}{" "}
                         {financeSettings && `(${((selectedRoom.baseRent || 0) * (financeSettings.advance_rent || 0)).toLocaleString()} บาท)`}
@@ -3775,27 +3775,27 @@ function RoomsContent() {
                 {/* Tenant Details Preview */}
                 <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/60 px-4 py-1.5 text-xs text-slate-600 dark:text-slate-300">
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-400">ชื่อผู้เช่า:</span> 
+                    <span className="text-slate-550 dark:text-slate-400">ชื่อผู้เช่า:</span> 
                     <span className={selectedRoom.tenantName ? "font-extrabold text-slate-850 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 italic font-semibold"}>
                       <DynamicText>{selectedRoom.tenantName || "(รอผู้เช่าลงทะเบียนกรอกข้อมูล)"}</DynamicText>
                     </span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-400">เบอร์โทรศัพท์:</span> 
+                    <span className="text-slate-550 dark:text-slate-400">เบอร์โทรศัพท์:</span> 
                     <span className={selectedRoom.tenantPhone ? "font-mono font-bold text-slate-850 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 italic font-semibold"}>
                       {selectedRoom.tenantPhone || "(รอผู้เช่าลงทะเบียนกรอกข้อมูล)"}
                     </span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-400">หมายเลขห้อง:</span> 
+                    <span className="text-slate-550 dark:text-slate-400">หมายเลขห้อง:</span> 
                     <span className="font-bold text-slate-850 dark:text-slate-200">ห้อง {selectedRoom.roomNumber}</span>
                   </div>
                   <div className="flex justify-between py-2 border-t border-slate-100/50 dark:border-slate-800/50">
-                    <span className="text-slate-400">อัตราค่าเช่าห้อง:</span> 
+                    <span className="text-slate-550 dark:text-slate-400">อัตราค่าเช่าห้อง:</span> 
                     <span className="font-bold text-slate-850 dark:text-slate-200">{(selectedRoom.baseRent || 0).toLocaleString()} บาท/เดือน</span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-400">เงินประกัน (มัดจำ):</span> 
+                    <span className="text-slate-550 dark:text-slate-400">เงินประกัน (มัดจำ):</span> 
                     <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
                       {financeSettings ? (
                         financeSettings.deposit_type === "fixed" ? (
@@ -3811,7 +3811,7 @@ function RoomsContent() {
                     </span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-400">ค่าเช่าล่วงหน้า:</span> 
+                    <span className="text-slate-550 dark:text-slate-400">ค่าเช่าล่วงหน้า:</span> 
                     <span className="font-extrabold text-blue-600 dark:text-blue-400">
                       {financeSettings ? `${financeSettings.advance_rent || 0} เดือน` : "กำลังโหลด..."}{" "}
                       {financeSettings && `(${((selectedRoom.baseRent || 0) * (financeSettings.advance_rent || 0)).toLocaleString()} บาท)`}

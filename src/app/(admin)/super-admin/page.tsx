@@ -1101,10 +1101,10 @@ export default function SuperAdminPage() {
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold rounded-full text-xs uppercase tracking-wider">
                 <ShieldCheck className="w-3.5 h-3.5" /> แผงควบคุมระบบสูงสุด
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                 Super Admin Console
               </h1>
-              <p className="text-slate-400 text-sm max-w-xl">
+              <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xl">
                 ระบบจัดการผู้ใช้แบบรวมศูนย์กลาง มอบหมายพื้นที่ทำงาน (Workspace) ตั้งค่าบทบาท และสลับสิทธิ์การเข้าตรวจสอบข้อมูลเพื่อบริการช่วยเหลือลูกค้า
               </p>
             </div>
@@ -1112,7 +1112,7 @@ export default function SuperAdminPage() {
             <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
               <button
                 onClick={loadData}
-                className="px-5 py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg"
+                className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-400" : ""}`} />
                 รีเฟรชข้อมูลระบบ
@@ -1122,7 +1122,7 @@ export default function SuperAdminPage() {
         </div>
 
         {/* แถบเลือกแท็บแบบพรีเมียม (Premium Tab Selector) */}
-        <div className="flex p-1 bg-slate-900/80 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-lg relative z-10 overflow-x-auto">
+        <div className="flex p-1 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-lg relative z-10 overflow-x-auto">
           {[
             { id: "workspaces", label: "พื้นที่ทำงาน", icon: Building },
             { id: "users", label: "บัญชีผู้ใช้งาน", icon: Users },
@@ -1139,7 +1139,7 @@ export default function SuperAdminPage() {
                 className={`flex-1 flex items-center justify-center gap-2 py-3.5 md:py-2.5 rounded-xl text-sm md:text-xs font-bold transition-all duration-300 relative cursor-pointer ${
                   isTabActive
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-100"
-                    : "text-slate-400 hover:text-slate-200"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
               >
                 <TabIcon className="w-4.5 h-4.5 md:w-4 md:h-4" />
@@ -1151,14 +1151,14 @@ export default function SuperAdminPage() {
 
         {/* แสดงผลแจ้งเตือนสถานะสำเร็จ / ข้อผิดพลาด */}
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/25 text-red-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
-            <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
+          <div className="p-4 bg-red-500/10 border border-red-500/25 text-red-600 dark:text-red-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
+            <ShieldAlert className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0" />
             <span>{error}</span>
           </div>
         )}
         {success && (
-          <div className="p-4 bg-teal-500/10 border border-teal-500/25 text-teal-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
-            <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0" />
+          <div className="p-4 bg-teal-500/10 border border-teal-500/25 text-teal-600 dark:text-teal-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
+            <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0" />
             <span>{success}</span>
           </div>
         )}
@@ -1170,14 +1170,14 @@ export default function SuperAdminPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* คอลัมน์ซ้าย: จัดการพื้นที่ทำงาน (Workspace Management) */}
             <div className="lg:col-span-7 space-y-8">
-              <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+              <div className="glass-panel p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="p-2.5 bg-blue-600/10 text-blue-400 rounded-xl border border-blue-500/20">
                       <Building className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-slate-200">พื้นที่ทำงานทั้งหมด (Workspaces)</h2>
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-200">พื้นที่ทำงานทั้งหมด (Workspaces)</h2>
                       <p className="text-[11px] text-slate-500">จำลองสิทธิ์การเข้าตรวจสอบดูแลข้อมูลแยกแต่ละตึก</p>
                     </div>
                   </div>
@@ -1191,7 +1191,7 @@ export default function SuperAdminPage() {
                   <input
                     type="text"
                     placeholder="ค้นหาชื่อหอพัก/Workspace..."
-                    className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
+                    className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                     value={searchWorkspace}
                     onChange={(e) => setSearchWorkspace(e.target.value)}
                   />
@@ -1215,10 +1215,10 @@ export default function SuperAdminPage() {
                     return (
                       <div
                         key={ws.id}
-                        className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/60 hover:border-slate-700/80 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700/80 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                       >
                         <div className="space-y-1.5 min-w-0">
-                          <h4 className="text-sm md:text-sm font-semibold text-slate-200 truncate">{ws.name}</h4>
+                          <h4 className="text-sm md:text-sm font-semibold text-slate-900 dark:text-slate-200 truncate">{ws.name}</h4>
                           <div className="flex items-center gap-4 text-[11px] md:text-[10px] text-slate-500">
                             <span className="font-mono">ID: {ws.id.substring(0, 8)}...</span>
                             <span className="flex items-center gap-1">
@@ -1262,7 +1262,7 @@ export default function SuperAdminPage() {
                               setEditingWorkspace(ws)
                               setEditingWorkspaceName(ws.name)
                             }}
-                            className="p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-blue-400 hover:text-blue-300 rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all flex-1 md:flex-none"
+                            className="p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all flex-1 md:flex-none"
                             aria-label="แก้ไขชื่อ Workspace" title="แก้ไขชื่อ Workspace"
                           >
                             <Edit className="w-3.5 h-3.5" /> <span className="md:inline">แก้ไข</span>
@@ -1270,7 +1270,7 @@ export default function SuperAdminPage() {
 
                           <button
                             onClick={() => handleDeleteWorkspace(ws.id, ws.name)}
-                            className="p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold bg-slate-950 border border-slate-800 hover:bg-slate-800 text-red-400 hover:text-red-300 rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all flex-1 md:flex-none"
+                            className="p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all flex-1 md:flex-none"
                             aria-label="ลบ Workspace" title="ลบ Workspace"
                           >
                             <Trash2 className="w-3.5 h-3.5" /> <span className="md:inline">ลบ</span>
@@ -1281,7 +1281,7 @@ export default function SuperAdminPage() {
                             className={`p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all w-full md:w-auto ${
                               status === "approved"
                                 ? "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/10"
-                                : "bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                                : "bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                             }`}
                           >
                             สลับหอ <ArrowRight className="w-3.5 h-3.5" />
@@ -1302,11 +1302,11 @@ export default function SuperAdminPage() {
 
             {/* คอลัมน์ขวา: ฟอร์มเพิ่ม Workspace */}
             <div className="lg:col-span-5 space-y-8">
-              <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl">
+              <div className="glass-panel p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl">
                 <form onSubmit={handleAddWorkspace} className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Plus className="w-4 h-4 text-blue-400" />
-                    <h3 className="text-sm font-semibold text-slate-200">สร้างพื้นที่ทำงานหอพักใหม่ (Add Workspace)</h3>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-200">สร้างพื้นที่ทำงานหอพักใหม่ (Add Workspace)</h3>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -1314,7 +1314,7 @@ export default function SuperAdminPage() {
                       type="text"
                       required
                       placeholder="เช่น ตึก บานเย็น คอร์ท, แสนสบาย เพลส..."
-                      className="w-full px-4 py-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                       value={newWorkspaceName}
                       onChange={(e) => setNewWorkspaceName(e.target.value)}
                     />
@@ -1340,14 +1340,14 @@ export default function SuperAdminPage() {
         )}
 
         {activeTab === "users" && (
-          <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="glass-panel p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-200">บัญชีรายชื่อสิทธิ์ผู้ใช้งานทั้งหมด</h2>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-200">บัญชีรายชื่อสิทธิ์ผู้ใช้งานทั้งหมด</h2>
                   <p className="text-[11px] text-slate-500">สแกนบทบาททั้งหมด แยกแต่ละตึก และจัดการถอนสิทธิ์ระบบหลัก</p>
                 </div>
               </div>
@@ -1360,7 +1360,7 @@ export default function SuperAdminPage() {
                 <input
                   type="text"
                   placeholder="ค้นหาด้วย อีเมล, ชื่อ-นามสกุล, หรือสิทธิ์..."
-                  className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                  className="w-full pl-11 pr-4 py-3.5 md:pl-10 md:pr-4 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                   value={searchProfile}
                   onChange={(e) => setSearchProfile(e.target.value)}
                 />
@@ -1384,14 +1384,14 @@ export default function SuperAdminPage() {
                   const isOrphanedWorkspace = !workspaceEntry && p.role !== "super_admin"
                   const wsName = workspaceEntry?.name || (p.role === "super_admin" ? "Global / Super Admin" : "⚠️ ไม่มี Workspace (ผิดปกติ)")
                   return (
-                    <div key={p.id} className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/60 space-y-3">
+                    <div key={p.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800/60 space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 space-y-1">
-                          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-sm truncate">
+                          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-200 text-sm truncate">
                             <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                             <span className="truncate">{p.email}</span>
                           </div>
-                          <p className="text-xs text-slate-400">{p.full_name || "-"}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{p.full_name || "-"}</p>
                         </div>
                         <div className="shrink-0 flex flex-col items-end gap-1.5">
                           <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1419,11 +1419,11 @@ export default function SuperAdminPage() {
                       <div className="flex items-center justify-between gap-3 text-xs">
                         <div className="space-y-0.5 min-w-0">
                           {p.phone && (
-                            <div className="flex items-center gap-1 text-slate-400">
+                            <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
                               <Phone className="w-3 h-3 text-slate-500" /> {p.phone}
                             </div>
                           )}
-                          <p className={`truncate ${isOrphanedWorkspace ? "text-amber-400 font-bold" : "text-slate-400"}`}>{wsName}</p>
+                          <p className={`truncate ${isOrphanedWorkspace ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-500 dark:text-slate-400"}`}>{wsName}</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <button
@@ -1455,7 +1455,7 @@ export default function SuperAdminPage() {
                 })}
 
                 {filteredProfiles.length === 0 && (
-                  <div className="text-center p-8 text-slate-500 text-sm rounded-2xl border border-slate-900 bg-slate-950/20">
+                  <div className="text-center p-8 text-slate-500 text-sm rounded-2xl border border-slate-200 dark:border-slate-900 bg-slate-50 dark:bg-slate-950/20">
                     ไม่พบข้อมูลรายชื่อบัญชีผู้ใช้ในระบบ
                   </div>
                 )}
@@ -1463,10 +1463,10 @@ export default function SuperAdminPage() {
             )}
 
             {/* ตารางโปรไฟล์ (เดสก์ท็อป) */}
-            <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-900">
+            <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-900">
               <table className="w-full text-left text-sm md:text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-900">
+                  <tr className="bg-slate-100/80 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-900">
                     <th className="p-4">อีเมลผู้ใช้งาน</th>
                     <th className="p-4">ชื่อผู้เช่า/ผู้ช่วย</th>
                     <th className="p-4">เบอร์โทร</th>
@@ -1476,24 +1476,24 @@ export default function SuperAdminPage() {
                     <th className="p-4 text-center">จัดการ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-900/60 bg-slate-950/20">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-900/60 bg-white dark:bg-slate-950/20">
                   {filteredProfiles.map((p) => {
                     const workspaceEntry = workspaces.find((w) => w.id === p.workspace_id)
                     // แยกกรณี super_admin (ไม่มี workspace ปกติอยู่แล้ว) ออกจากกรณีอื่นที่ไม่มี workspace (ผิดปกติ ต้องรีบแก้)
                     const isOrphanedWorkspace = !workspaceEntry && p.role !== "super_admin"
                     const wsName = workspaceEntry?.name || (p.role === "super_admin" ? "Global / Super Admin" : "⚠️ ไม่มี Workspace (ผิดปกติ)")
                     return (
-                      <tr key={p.id} className="hover:bg-slate-900/25 transition-colors">
-                        <td className="p-4 font-semibold text-slate-200">
+                      <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/25 transition-colors">
+                        <td className="p-4 font-semibold text-slate-900 dark:text-slate-200">
                           <div className="flex items-center gap-1.5">
                             <Mail className="w-3.5 h-3.5 text-slate-500" />
                             {p.email}
                           </div>
                         </td>
-                        <td className="p-4 text-slate-300">
+                        <td className="p-4 text-slate-600 dark:text-slate-300">
                           {p.full_name || "-"}
                         </td>
-                        <td className="p-4 text-slate-400 font-mono">
+                        <td className="p-4 text-slate-500 dark:text-slate-400 font-mono">
                           {p.phone ? (
                             <div className="flex items-center gap-1">
                               <Phone className="w-3 h-3 text-slate-500" /> {p.phone}
@@ -1526,7 +1526,7 @@ export default function SuperAdminPage() {
                             </span>
                           )}
                         </td>
-                        <td className={`p-4 font-medium ${isOrphanedWorkspace ? "text-amber-400 font-bold" : "text-slate-300"}`}>
+                        <td className={`p-4 font-medium ${isOrphanedWorkspace ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-600 dark:text-slate-300"}`}>
                           {wsName}
                         </td>
                         <td className="p-4 text-center">
@@ -1576,22 +1576,22 @@ export default function SuperAdminPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
             {/* คอลัมน์ซ้าย: จัดการบัญชีและบทบาทผู้ใช้งาน (User & Role Provisioning) */}
             <div className="lg:col-span-6 space-y-8">
-              <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+              <div className="glass-panel p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl space-y-6">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
                     <UserPlus className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-200">มอบบทบาท/สิทธิ์ (Add User Role)</h2>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-200">มอบบทบาท/สิทธิ์ (Add User Role)</h2>
                     <p className="text-[11px] text-slate-500">กำหนดบัญชีผู้ใช้งานระบุ Workspace และระดับสิทธิ์</p>
                   </div>
                 </div>
 
                 <form onSubmit={handleAddUser} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">สังกัดหอพัก (Workspace)</label>
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">สังกัดหอพัก (Workspace)</label>
                     <select
-                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
                       value={selectedWorkspaceId}
                       onChange={(e) => {
                         const val = e.target.value
@@ -1609,19 +1609,19 @@ export default function SuperAdminPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[11px] text-slate-400 font-medium">อีเมลใช้งานสำหรับเข้าสู่ระบบ</label>
+                      <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">อีเมลใช้งานสำหรับเข้าสู่ระบบ</label>
                       <input
                         type="email"
                         required
                         placeholder="name@horset.com"
-                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                         value={newUserEmail}
                         onChange={(e) => setNewUserEmail(e.target.value)}
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] text-slate-400 font-medium">รหัสผ่านสำหรับเข้าสู่ระบบ</label>
+                      <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">รหัสผ่านสำหรับเข้าสู่ระบบ</label>
                       <div className="relative">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-4 md:pl-3.5 pointer-events-none text-slate-500">
                           <Lock className="w-3.5 h-3.5" />
@@ -1630,7 +1630,7 @@ export default function SuperAdminPage() {
                           type="password"
                           minLength={6}
                           placeholder="เว้นว่างเพื่อให้ระบบสุ่มรหัสผ่านให้อัตโนมัติ"
-                          className="w-full pl-11 pr-4 py-3.5 md:pl-9 md:pr-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                          className="w-full pl-11 pr-4 py-3.5 md:pl-9 md:pr-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                           value={newUserPassword}
                           onChange={(e) => setNewUserPassword(e.target.value)}
                         />
@@ -1640,22 +1640,22 @@ export default function SuperAdminPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[11px] text-slate-400 font-medium">ชื่อ-นามสกุล</label>
+                      <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">ชื่อ-นามสกุล</label>
                       <input
                         type="text"
                         placeholder="เช่น สมใจ รักษ์ดี"
-                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                         value={newUserFullName}
                         onChange={(e) => setNewUserFullName(e.target.value)}
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] text-slate-400 font-medium">เบอร์โทรศัพท์</label>
+                      <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">เบอร์โทรศัพท์</label>
                       <input
                         type="text"
                         placeholder="08xxxxxxxx"
-                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                        className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                         value={newUserPhone}
                         onChange={(e) => setNewUserPhone(e.target.value)}
                       />
@@ -1663,7 +1663,7 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์ในระบบ (Role)</label>
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">ระดับสิทธิ์ในระบบ (Role)</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { role: "admin", label: "แอดมิน (เจ้าของ)" },
@@ -1677,7 +1677,7 @@ export default function SuperAdminPage() {
                           className={`py-3 px-2 md:py-2 md:px-1 text-center rounded-xl text-sm md:text-[10px] font-bold md:font-semibold border transition-all ${
                             newUserRole === item.role
                               ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10"
-                              : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                              : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                           }`}
                         >
                           {item.label}
@@ -1707,10 +1707,10 @@ export default function SuperAdminPage() {
                     <p className="text-[11px] text-amber-400 font-semibold">
                       บันทึกรหัสผ่านนี้ไว้ให้ผู้ใช้ทันที ระบบจะไม่แสดงซ้ำอีก
                     </p>
-                    <div className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2">
+                    <div className="flex items-center justify-between gap-2 bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2">
                       <div className="min-w-0">
                         <p className="text-[10px] text-slate-500 truncate">{createdCredential.email}</p>
-                        <p className="text-sm font-mono font-bold text-slate-200 tracking-wide">{createdCredential.password}</p>
+                        <p className="text-sm font-mono font-bold text-slate-900 dark:text-slate-200 tracking-wide">{createdCredential.password}</p>
                       </div>
                       <button
                         type="button"
@@ -1719,7 +1719,7 @@ export default function SuperAdminPage() {
                           setCredentialCopied(true)
                           setTimeout(() => setCredentialCopied(false), 2000)
                         }}
-                        className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
                       >
                         {credentialCopied ? <Check className="w-3.5 h-3.5 text-teal-400" /> : <Copy className="w-3.5 h-3.5" />}
                         {credentialCopied ? "คัดลอกแล้ว" : "คัดลอก"}
@@ -1732,22 +1732,22 @@ export default function SuperAdminPage() {
 
             {/* คอลัมน์ขวา: ส่วนควบคุมสร้าง Secret Code สำหรับสมัครสมาชิก */}
             <div className="lg:col-span-6 space-y-8">
-              <div className="glass-panel p-6 rounded-3xl border border-slate-800/80 shadow-xl space-y-6">
+              <div className="glass-panel p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl space-y-6">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2.5 bg-indigo-600/10 text-indigo-400 rounded-xl border border-indigo-500/20">
                     <Key className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-200">สร้างรหัสเชิญชวน (Secret Invite Code)</h2>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-200">สร้างรหัสเชิญชวน (Secret Invite Code)</h2>
                     <p className="text-[11px] text-slate-500">รหัสลงทะเบียนล็อคสังกัดตึก มีอายุจำกัด 2 ชม.</p>
                   </div>
                 </div>
 
                 <form onSubmit={handleGenerateCode} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">สังกัดตึกที่กำหนด (Locked Workspace)</label>
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">สังกัดตึกที่กำหนด (Locked Workspace)</label>
                     <select
-                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
                       value={genWorkspaceId}
                       onChange={(e) => {
                         const val = e.target.value
@@ -1764,7 +1764,7 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์เมื่อสมัครสำเร็จ (Designated Role)</label>
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">ระดับสิทธิ์เมื่อสมัครสำเร็จ (Designated Role)</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { role: "admin", label: "แอดมิน (เจ้าของ)" },
@@ -1778,7 +1778,7 @@ export default function SuperAdminPage() {
                           className={`py-3 px-2 md:py-2 md:px-1 text-center rounded-xl text-sm md:text-[10px] font-bold md:font-semibold border transition-all ${
                             genRole === item.role
                               ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10"
-                              : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                              : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                           }`}
                         >
                           {item.label}
@@ -1804,7 +1804,7 @@ export default function SuperAdminPage() {
 
                 {/* รายการรหัสเชิญชวน */}
                 <div className="space-y-3 pt-2">
-                  <h3 className="text-xs font-semibold text-slate-300">รายการรหัสเชิญชวนทั้งหมด</h3>
+                  <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-300">รายการรหัสเชิญชวนทั้งหมด</h3>
                   <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                     {registrationCodes.map((item) => {
                       const wsName = workspaces.find((w) => w.id === item.workspace_id)?.name || "ตึกที่ถูกลบ"
@@ -1812,18 +1812,18 @@ export default function SuperAdminPage() {
                       return (
                         <div
                           key={item.code}
-                          className="p-4 md:p-3 rounded-xl bg-slate-950/60 border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm md:text-xs"
+                          className="p-4 md:p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm md:text-xs"
                         >
                           <div className="space-y-1.5 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded text-sm md:text-xs select-all">
                                 {item.code}
                               </span>
-                              <span className="text-[11px] md:text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded border border-slate-800 font-bold">
+                              <span className="text-[11px] md:text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800 font-bold">
                                 {item.role.toUpperCase()}
                               </span>
                             </div>
-                            <p className="text-xs md:text-[10px] text-slate-400 truncate">
+                            <p className="text-xs md:text-[10px] text-slate-500 dark:text-slate-400 truncate">
                               ตึก: {wsName}
                             </p>
                             <p className="text-[11px] md:text-[9px] text-slate-500 flex items-center gap-1">
@@ -1876,7 +1876,7 @@ export default function SuperAdminPage() {
         {activeTab === "settings" && (
           <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
             {/* กล่องตั้งค่า Google Translation API */}
-            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+            <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent pointer-events-none" />
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-6">
@@ -1885,23 +1885,23 @@ export default function SuperAdminPage() {
                   </div>
                   <div>
                     <h3 className="text-xl font-extrabold text-slate-100">Google Translation API</h3>
-                    <p className="text-sm text-slate-400 mt-1">ตั้งค่าการเชื่อมต่อเพื่อใช้ระบบแปลภาษาอัตโนมัติ (Real-time i18n)</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">ตั้งค่าการเชื่อมต่อเพื่อใช้ระบบแปลภาษาอัตโนมัติ (Real-time i18n)</p>
                   </div>
                 </div>
 
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300">Google Project ID</label>
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Google Project ID</label>
                     <input
                       type="text"
                       value={googleProjectId}
                       onChange={(e) => setGoogleProjectId(e.target.value)}
                       placeholder="เช่น my-translation-project-1234"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex justify-between">
                       <span>Service Account Key (JSON)</span>
                       <span className="text-xs text-indigo-400">ถูกเข้ารหัส (AES-256) ก่อนบันทึกลงฐานข้อมูล</span>
                     </label>
@@ -1910,29 +1910,29 @@ export default function SuperAdminPage() {
                       onChange={(e) => setGoogleServiceKey(e.target.value)}
                       placeholder='{"type": "service_account", "project_id": "...", ...}'
                       rows={5}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm resize-none"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-mono text-sm resize-none"
                     />
                     <p className="text-xs text-slate-500">
                       * หากมีคีย์เดิมบันทึกไว้อยู่แล้ว จะแสดงเป็น ••••••• เพื่อความปลอดภัย หากต้องการเปลี่ยนให้ลบแล้ววางคีย์ใหม่
                     </p>
                     {googleKeyInfo && (
-                      <div className="mt-4 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-slate-300 space-y-2">
+                      <div className="mt-4 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-2">
                         <div className="text-teal-400 font-bold flex items-center gap-1.5 mb-1 text-sm">
                           <CheckCircle2 className="w-4 h-4 text-teal-400 animate-pulse" /> เชื่อมต่อ Google Translation API สำเร็จ
                         </div>
-                        <p><span className="text-slate-400">ชื่อโปรเจกต์ (Google Project ID):</span> <span className="font-mono font-bold text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 select-all">{googleKeyInfo.projectId}</span></p>
-                        <p><span className="text-slate-400">อีเมลบริการ (Client Email):</span> <span className="font-mono font-bold text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-xs select-all">{googleKeyInfo.clientEmail}</span></p>
+                        <p><span className="text-slate-500 dark:text-slate-400">ชื่อโปรเจกต์ (Google Project ID):</span> <span className="font-mono font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-800 select-all">{googleKeyInfo.projectId}</span></p>
+                        <p><span className="text-slate-500 dark:text-slate-400">อีเมลบริการ (Client Email):</span> <span className="font-mono font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-950 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-800 text-xs select-all">{googleKeyInfo.clientEmail}</span></p>
                       </div>
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800/50 flex justify-end">
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800/50 flex justify-end">
                     <button
                       onClick={handleSaveSettings}
                       disabled={isUpdatingSettings}
                       className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all ${
                         isUpdatingSettings
-                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
                           : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20"
                       }`}
                     >
@@ -1954,7 +1954,7 @@ export default function SuperAdminPage() {
             </div>
 
             {/* กล่องตั้งค่า Google Drive (บัญชีสำรองส่วนตัว ผ่าน OAuth2) — คนละกลไก auth กับ Google Translate ด้านบน */}
-            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+            <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-transparent pointer-events-none" />
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-6">
@@ -1963,23 +1963,23 @@ export default function SuperAdminPage() {
                   </div>
                   <div>
                     <h3 className="text-xl font-extrabold text-slate-100">Google Drive (บัญชีสำรองส่วนตัว)</h3>
-                    <p className="text-sm text-slate-400 mt-1">เชื่อมต่อบัญชี Gmail ส่วนตัวเพื่อ archive สลิป subscription ที่หมดอายุ — ไม่ต้องใช้ Shared Drive/Google Workspace</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">เชื่อมต่อบัญชี Gmail ส่วนตัวเพื่อ archive สลิป subscription ที่หมดอายุ — ไม่ต้องใช้ Shared Drive/Google Workspace</p>
                   </div>
                 </div>
 
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300">OAuth Client ID</label>
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">OAuth Client ID</label>
                     <input
                       type="text"
                       value={googleDriveOAuthClientId}
                       onChange={(e) => setGoogleDriveOAuthClientId(e.target.value)}
                       placeholder="เช่น 123456-abc.apps.googleusercontent.com"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex justify-between">
                       <span>OAuth Client Secret</span>
                       <span className="text-xs text-teal-400">ถูกเข้ารหัส (AES-256) ก่อนบันทึกลงฐานข้อมูล</span>
                     </label>
@@ -1988,7 +1988,7 @@ export default function SuperAdminPage() {
                       value={googleDriveOAuthClientSecret}
                       onChange={(e) => setGoogleDriveOAuthClientSecret(e.target.value)}
                       placeholder="GOCSPX-..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all font-mono text-sm"
                     />
                     <p className="text-xs text-slate-500">
                       * สร้างได้ที่ GCP Console → APIs &amp; Services → Credentials → OAuth client ID (ประเภท Web application) — Redirect URI ต้องเป็น <span className="font-mono">{process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app"}/api/google-drive/oauth-callback</span>
@@ -2001,7 +2001,7 @@ export default function SuperAdminPage() {
                       disabled={isSavingDriveOAuthSettings}
                       className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all ${
                         isSavingDriveOAuthSettings
-                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
                           : "bg-teal-600 hover:bg-teal-500 text-white shadow-teal-500/20"
                       }`}
                     >
@@ -2019,23 +2019,23 @@ export default function SuperAdminPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-1.5 pt-4 border-t border-slate-800/50">
-                    <label className="text-sm font-bold text-slate-300">ชื่อโฟลเดอร์ Archive ใน Google Drive</label>
+                  <div className="space-y-1.5 pt-4 border-t border-slate-200 dark:border-slate-800/50">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">ชื่อโฟลเดอร์ Archive ใน Google Drive</label>
                     <div className="flex flex-col sm:flex-row gap-3">
                       <input
                         type="text"
                         value={googleDriveFolderName}
                         onChange={(e) => setGoogleDriveFolderName(e.target.value)}
                         placeholder="HorSet Subscription Slips Archive"
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all text-sm"
+                        className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 outline-none transition-all text-sm"
                       />
                       <button
                         onClick={handleSaveDriveFolderName}
                         disabled={isSavingDriveFolderName}
                         className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all shrink-0 ${
                           isSavingDriveFolderName
-                            ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                            : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                            ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
+                            : "bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700"
                         }`}
                       >
                         {isSavingDriveFolderName ? (
@@ -2050,7 +2050,7 @@ export default function SuperAdminPage() {
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     {googleDriveConnected ? (
                       <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-sm text-teal-400 font-bold flex items-center gap-2 flex-1">
                         <CheckCircle2 className="w-4 h-4 animate-pulse" />
@@ -2060,7 +2060,7 @@ export default function SuperAdminPage() {
                             href={`https://drive.google.com/drive/folders/${googleDriveFolderId}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="ml-auto text-xs text-slate-300 hover:text-white underline font-normal"
+                            className="ml-auto text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white underline font-normal"
                           >
                             เปิดโฟลเดอร์ archive
                           </a>
@@ -2078,7 +2078,7 @@ export default function SuperAdminPage() {
                       className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all shrink-0 text-center ${
                         googleDriveOAuthClientId
                           ? "bg-teal-600 hover:bg-teal-500 text-white shadow-teal-500/20"
-                          : "bg-slate-800 text-slate-500 cursor-not-allowed pointer-events-none"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed pointer-events-none"
                       }`}
                     >
                       {googleDriveConnected ? "เชื่อมต่อใหม่อีกครั้ง" : "เชื่อมต่อ Google Drive"}
@@ -2089,7 +2089,7 @@ export default function SuperAdminPage() {
             </div>
 
             {/* กล่องตั้งค่าช่องทางการติดต่อ — แสดงในหน้า Landing (สาธารณะ) และการ์ด Support Access ของหน้าแพ็กเกจ */}
-            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+            <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-transparent pointer-events-none" />
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-6">
@@ -2098,7 +2098,7 @@ export default function SuperAdminPage() {
                   </div>
                   <div>
                     <h3 className="text-xl font-extrabold text-slate-100">ช่องทางการติดต่อ</h3>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                       แสดงในหน้า Landing (สาธารณะ) และการ์ด &quot;ให้ทีม support เข้าดูช่วยแก้ปัญหา&quot; ในหน้าแพ็กเกจ — เว้นว่างช่องไหนไว้ ช่องทางนั้นจะไม่แสดงผล
                     </p>
                   </div>
@@ -2106,7 +2106,7 @@ export default function SuperAdminPage() {
 
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                       <FacebookIcon className="w-4 h-4 text-sky-400" /> ลิงก์ Facebook Page
                     </label>
                     <input
@@ -2114,11 +2114,11 @@ export default function SuperAdminPage() {
                       value={contactFacebookUrl}
                       onChange={(e) => setContactFacebookUrl(e.target.value)}
                       placeholder="https://facebook.com/horset"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                       <MessageCircle className="w-4 h-4 text-sky-400" /> ลิงก์ LINE (Add Friend)
                     </label>
                     <input
@@ -2126,11 +2126,11 @@ export default function SuperAdminPage() {
                       value={contactLineUrl}
                       onChange={(e) => setContactLineUrl(e.target.value)}
                       placeholder="https://line.me/R/ti/p/@horset"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                       <Phone className="w-4 h-4 text-sky-400" /> เบอร์โทรศัพท์
                     </label>
                     <input
@@ -2138,11 +2138,11 @@ export default function SuperAdminPage() {
                       value={contactPhone}
                       onChange={(e) => setContactPhone(e.target.value)}
                       placeholder="02-123-4567"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                       <InstagramIcon className="w-4 h-4 text-sky-400" /> ลิงก์ Instagram
                     </label>
                     <input
@@ -2150,11 +2150,11 @@ export default function SuperAdminPage() {
                       value={contactInstagramUrl}
                       onChange={(e) => setContactInstagramUrl(e.target.value)}
                       placeholder="https://instagram.com/horset"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                       <YoutubeIcon className="w-4 h-4 text-sky-400" /> ลิงก์ YouTube
                     </label>
                     <input
@@ -2162,17 +2162,17 @@ export default function SuperAdminPage() {
                       value={contactYoutubeUrl}
                       onChange={(e) => setContactYoutubeUrl(e.target.value)}
                       placeholder="https://youtube.com/@horset"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800/50 flex justify-end">
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800/50 flex justify-end">
                     <button
                       onClick={handleSaveContactChannels}
                       disabled={isSavingContactChannels}
                       className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all ${
                         isSavingContactChannels
-                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
                           : "bg-sky-600 hover:bg-sky-500 text-white shadow-sky-500/20"
                       }`}
                     >
@@ -2197,7 +2197,7 @@ export default function SuperAdminPage() {
 
         {activeTab === "line" && (
           <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden group">
+            <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent pointer-events-none" />
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-6">
@@ -2206,22 +2206,22 @@ export default function SuperAdminPage() {
                   </div>
                   <div>
                     <h3 className="text-xl font-extrabold text-slate-100">LINE OA สำหรับ Super Admin</h3>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                       รับแจ้งเตือนระดับระบบผ่าน LINE ของทีมงาน HorSet เอง — คนละบัญชีจาก LINE OA ของแต่ละหอพัก
                     </p>
                   </div>
                 </div>
 
-                <div className="mb-6 p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1.5">
-                  <p className="font-bold text-slate-300 mb-1">ระบบจะส่งแจ้งเตือนอัตโนมัติเมื่อ:</p>
+                <div className="mb-6 p-4 rounded-xl bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-1.5">
+                  <p className="font-bold text-slate-700 dark:text-slate-300 mb-1">ระบบจะส่งแจ้งเตือนอัตโนมัติเมื่อ:</p>
                   <p>• มีหอพักสมัครสมาชิกใหม่ (self-serve signup)</p>
                   <p>• หอพักไหนถูกล็อกสิทธิ์ (ทดลองใช้งานหมดอายุ / ค้างชำระ / ยกเลิกแพ็กเกจครบวันหมดอายุ)</p>
                   <p>• สลิปจ่ายเงิน subscription ตรวจสอบไม่ผ่าน (ทั้งตรวจครั้งแรกและครบจำนวนครั้ง retry แล้ว)</p>
                 </div>
 
                 <div className="mb-6 space-y-2">
-                  <label className="text-sm font-bold text-slate-300">เมื่อโควต้าข้อความ LINE หมด</label>
-                  <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-xl w-full">
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300">เมื่อโควต้าข้อความ LINE หมด</label>
+                  <div className="flex p-1 bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl w-full">
                     {[
                       { id: "skip", label: "ข้ามการส่ง (ปลอดภัย)" },
                       { id: "send_anyway", label: "ส่งต่อแม้เกินโควต้าฟรี" }
@@ -2235,7 +2235,7 @@ export default function SuperAdminPage() {
                             ? opt.id === "skip"
                               ? "bg-blue-600 text-white shadow-md"
                               : "bg-amber-600 text-white shadow-md"
-                            : "text-slate-400 hover:text-slate-200"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                         }`}
                       >
                         {opt.label}
@@ -2250,14 +2250,14 @@ export default function SuperAdminPage() {
                 </div>
 
                 {/* โควต้าข้อความ LINE คงเหลือ — ดึงสดจาก LINE Messaging API เท่านั้น ไม่มี cache table */}
-                <div className="mb-6 p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+                <div className="mb-6 p-5 rounded-2xl bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
                         <Gauge className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-200">โควต้าข้อความ LINE คงเหลือเดือนนี้</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-slate-200">โควต้าข้อความ LINE คงเหลือเดือนนี้</p>
                         {lineQuota?.botName && (
                           <p className="text-[11px] text-slate-500">
                             {lineQuota.botName} {lineQuota.botBasicId ? `(${lineQuota.botBasicId})` : ""}
@@ -2269,7 +2269,7 @@ export default function SuperAdminPage() {
                       type="button"
                       onClick={loadLineQuota}
                       disabled={lineQuotaLoading}
-                      className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all disabled:opacity-50 shrink-0"
+                      className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all disabled:opacity-50 shrink-0"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${lineQuotaLoading ? "animate-spin text-blue-400" : ""}`} />
                     </button>
@@ -2293,15 +2293,15 @@ export default function SuperAdminPage() {
                         </div>
                       )}
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                        <div className="p-3 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-center">
                           <p className="text-[10px] text-slate-500 font-bold mb-1">เพดานรายเดือน</p>
-                          <p className="text-lg font-black text-slate-200">{lineQuota.limit === null ? "ไม่จำกัด" : lineQuota.limit.toLocaleString()}</p>
+                          <p className="text-lg font-black text-slate-900 dark:text-slate-200">{lineQuota.limit === null ? "ไม่จำกัด" : lineQuota.limit.toLocaleString()}</p>
                         </div>
-                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                        <div className="p-3 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-center">
                           <p className="text-[10px] text-slate-500 font-bold mb-1">ใช้ไปแล้ว</p>
                           <p className="text-lg font-black text-amber-400">{lineQuota.consumed.toLocaleString()}</p>
                         </div>
-                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                        <div className="p-3 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-center">
                           <p className="text-[10px] text-slate-500 font-bold mb-1">คงเหลือ</p>
                           <p className={`text-lg font-black ${lineQuotaExhausted ? "text-rose-400" : "text-emerald-400"}`}>
                             {lineQuota.remaining === null ? "ไม่จำกัด" : lineQuota.remaining.toLocaleString()}
@@ -2318,7 +2318,7 @@ export default function SuperAdminPage() {
 
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex justify-between">
                       <span>LINE Channel Access Token</span>
                       <span className="text-xs text-blue-400">ถูกส่งเป็น Bearer token ตอนเรียก LINE Messaging API</span>
                     </label>
@@ -2327,7 +2327,7 @@ export default function SuperAdminPage() {
                       value={lineChannelAccessToken}
                       onChange={(e) => setLineChannelAccessToken(e.target.value)}
                       placeholder="Channel Access Token จาก LINE Developers Console"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                     />
                     <p className="text-xs text-slate-500">
                       * ถ้ามี token เดิมบันทึกไว้อยู่แล้ว จะแสดงเป็น ••••••• เพื่อความปลอดภัย หากต้องการเปลี่ยนให้ลบแล้ววาง token ใหม่
@@ -2335,7 +2335,7 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300 flex justify-between">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex justify-between">
                       <span>LINE Channel Secret (ไม่บังคับ)</span>
                       <span className="text-xs text-blue-400">ใช้ตรวจสอบ signature ของ webhook เท่านั้น</span>
                     </label>
@@ -2344,20 +2344,20 @@ export default function SuperAdminPage() {
                       value={lineChannelSecret}
                       onChange={(e) => setLineChannelSecret(e.target.value)}
                       placeholder="Channel Secret จาก LINE Developers Console"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
 
-                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1.5">
-                    <p className="font-bold text-slate-300">Webhook URL (ตั้งค่าใน LINE Developers Console)</p>
+                  <div className="p-4 rounded-xl bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-1.5">
+                    <p className="font-bold text-slate-700 dark:text-slate-300">Webhook URL (ตั้งค่าใน LINE Developers Console)</p>
                     <p className="font-mono text-blue-400 break-all select-all">
                       {(process.env.NEXT_PUBLIC_APP_URL || "https://saas-horset.vercel.app").replace(/\/+$/, "")}/api/webhook/line?scope=super_admin
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-300">เชื่อมต่อ LINE User ID ของ Super Admin</label>
-                    <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-xl w-full max-w-xs">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">เชื่อมต่อ LINE User ID ของ Super Admin</label>
+                    <div className="flex p-1 bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-xs">
                       {[
                         { id: "auto", label: "อัตโนมัติ (ง่าย)" },
                         { id: "manual", label: "กรอกเอง" }
@@ -2369,7 +2369,7 @@ export default function SuperAdminPage() {
                           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                             linePairingMode === tab.id
                               ? "bg-blue-600 text-white shadow-md"
-                              : "text-slate-400 hover:text-slate-200"
+                              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                           }`}
                         >
                           {tab.label}
@@ -2378,10 +2378,10 @@ export default function SuperAdminPage() {
                     </div>
 
                     {linePairingMode === "auto" ? (
-                      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                      <div className="p-4 rounded-xl bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-3">
                         {!lineConnectionCode ? (
                           <div className="text-center py-2 space-y-3">
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                               กดปุ่มด้านล่างเพื่อสร้างรหัส 6 หลัก แล้วพิมพ์ส่งในแชท LINE OA ของ HorSet — ระบบจะผูก LINE User ID ให้อัตโนมัติทันที ไม่ต้องคัดลอก User ID เอง
                             </p>
                             <button
@@ -2400,7 +2400,7 @@ export default function SuperAdminPage() {
                           </div>
                         ) : (
                           <div className="space-y-3 animate-in fade-in duration-200">
-                            <div className="text-center space-y-1.5 py-3 bg-slate-950 border border-blue-500/20 rounded-xl">
+                            <div className="text-center space-y-1.5 py-3 bg-white dark:bg-slate-950 border border-blue-500/20 rounded-xl">
                               <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">
                                 ส่งรหัสนี้หา LINE OA ของ HorSet
                               </span>
@@ -2420,9 +2420,9 @@ export default function SuperAdminPage() {
                             </div>
                             <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-xl flex items-start gap-2.5">
                               <RefreshCw className="w-4 h-4 text-blue-400 shrink-0 mt-0.5 animate-spin" />
-                              <p className="text-xs text-slate-400">กำลังรอรหัสถูกส่งเข้าแชท LINE... ระบบจะผูกบัญชีให้อัตโนมัติทันทีที่ได้รับ</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">กำลังรอรหัสถูกส่งเข้าแชท LINE... ระบบจะผูกบัญชีให้อัตโนมัติทันทีที่ได้รับ</p>
                             </div>
-                            <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px] pl-1">
+                            <ol className="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400 text-[11px] pl-1">
                               <li>แชทกับ LINE OA ของ HorSet (ต้องเป็นเพื่อนกับบอทก่อน)</li>
                               <li>พิมพ์เฉพาะตัวเลข {lineConnectionCode} ส่งหาบอต</li>
                               <li>ระบบจะทำรายการให้เสร็จสรรพโดยไม่ต้องกดปุ่มอะไรอีก!</li>
@@ -2436,13 +2436,13 @@ export default function SuperAdminPage() {
                         value={lineAdminUserId}
                         onChange={(e) => setLineAdminUserId(e.target.value)}
                         placeholder="รองรับหลาย ID คั่นด้วยจุลภาค เว้นวรรค หรือขึ้นบรรทัดใหม่ (สูงสุด 5 คน) — พิมพ์ #MYID หากับบอตเพื่อขอ User ID ของตัวเอง"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                       />
                     )}
 
                     {lineAdminUserId && (
                       <div className="space-y-2 pt-1">
-                        <p className="text-xs font-bold text-slate-400">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
                           คนที่เชื่อมต่อไว้แล้ว {lineProfilesLoading && <RefreshCw className="w-3 h-3 inline animate-spin ml-1" />}
                         </p>
                         {lineProfiles.length > 0 ? (
@@ -2459,18 +2459,18 @@ export default function SuperAdminPage() {
                                 {p.pictureUrl ? (
                                   <img src={p.pictureUrl} alt={p.displayName} className="w-7 h-7 rounded-full object-cover shrink-0" />
                                 ) : (
-                                  <div className="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold shrink-0">
+                                  <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center font-bold shrink-0">
                                     {p.displayName ? p.displayName.charAt(0).toUpperCase() : "?"}
                                   </div>
                                 )}
-                                <span className={p.success ? "text-slate-300 font-bold" : "text-amber-400 font-semibold"}>{p.displayName}</span>
+                                <span className={p.success ? "text-slate-700 dark:text-slate-300 font-bold" : "text-amber-600 dark:text-amber-400 font-semibold"}>{p.displayName}</span>
                                 <span className="font-mono text-slate-600 ml-auto truncate max-w-[120px]">{p.userId}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
                           !lineProfilesLoading && (
-                            <p className="text-xs text-slate-500">User ID: <span className="font-mono text-slate-400">{lineAdminUserId}</span></p>
+                            <p className="text-xs text-slate-500">User ID: <span className="font-mono text-slate-500 dark:text-slate-400">{lineAdminUserId}</span></p>
                           )
                         )}
                       </div>
@@ -2478,19 +2478,19 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-300">LINE Group ID (ถ้าต้องการแจ้งเข้ากลุ่ม)</label>
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">LINE Group ID (ถ้าต้องการแจ้งเข้ากลุ่ม)</label>
                     <input
                       type="text"
                       value={lineAdminGroupId}
                       onChange={(e) => setLineAdminGroupId(e.target.value)}
                       placeholder="เช่น Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-slate-100/60 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
                     <div>
-                      <p id="line-notification-toggle-label" className="text-sm font-bold text-slate-300">เปิดใช้งานการแจ้งเตือน</p>
+                      <p id="line-notification-toggle-label" className="text-sm font-bold text-slate-700 dark:text-slate-300">เปิดใช้งานการแจ้งเตือน</p>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {lineQuotaExhaustedAndSkipping
                           ? "ปิดอัตโนมัติเพราะโควต้าข้อความ LINE หมดแล้ว — กดรีเฟรชโควต้าด้านบนอีกครั้งหลังโควต้าปัดรอบใหม่เพื่อเปิดกลับ"
@@ -2516,14 +2516,14 @@ export default function SuperAdminPage() {
                     </button>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800/50 flex flex-col sm:flex-row justify-end gap-3">
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800/50 flex flex-col sm:flex-row justify-end gap-3">
                     <button
                       onClick={handleTestLineNotification}
                       disabled={isTestingLineNotification}
                       className={`px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${
                         isTestingLineNotification
-                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                          : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
+                          : "bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700"
                       }`}
                     >
                       {isTestingLineNotification ? (
@@ -2538,7 +2538,7 @@ export default function SuperAdminPage() {
                       disabled={isSavingLineSettings}
                       className={`px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${
                         isSavingLineSettings
-                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
                           : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20"
                       }`}
                     >
@@ -2564,12 +2564,12 @@ export default function SuperAdminPage() {
         {/* Workspace Edit Modal */}
         {editingWorkspace && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 dark:bg-slate-950/80 backdrop-blur-md transition-all duration-300"
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditingWorkspace(null)
             }}
           >
-            <div role="dialog" aria-modal="true" aria-labelledby="edit-workspace-title" className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div role="dialog" aria-modal="true" aria-labelledby="edit-workspace-title" className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-blue-600/10 rounded-full blur-[50px] pointer-events-none" />
               
               <div className="flex items-center justify-between">
@@ -2578,14 +2578,14 @@ export default function SuperAdminPage() {
                     <Building className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 id="edit-workspace-title" className="text-base font-bold text-slate-200">แก้ไขพื้นที่ทำงาน (Edit Workspace)</h3>
+                    <h3 id="edit-workspace-title" className="text-base font-bold text-slate-900 dark:text-slate-200">แก้ไขพื้นที่ทำงาน (Edit Workspace)</h3>
                     <p className="text-[10px] text-slate-500">เปลี่ยนชื่อหอพักหรือตึกในระบบ</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEditingWorkspace(null)}
-                  className="p-2 md:p-1.5 hover:bg-slate-900 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800/80 transition-all"
+                  className="p-2 md:p-1.5 hover:bg-slate-200 dark:hover:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-800/80 transition-all"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -2593,12 +2593,12 @@ export default function SuperAdminPage() {
 
               <form onSubmit={handleUpdateWorkspaceName} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-slate-400 font-medium">ชื่อพื้นที่ทำงาน/ชื่อตึก</label>
+                  <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">ชื่อพื้นที่ทำงาน/ชื่อตึก</label>
                   <input
                     type="text"
                     required
                     placeholder="ระบุชื่อหอพัก..."
-                    className="w-full px-4 py-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-200 text-sm md:text-xs transition-colors"
+                    className="w-full px-4 py-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                     value={editingWorkspaceName}
                     onChange={(e) => setEditingWorkspaceName(e.target.value)}
                   />
@@ -2608,7 +2608,7 @@ export default function SuperAdminPage() {
                   <button
                     type="button"
                     onClick={() => setEditingWorkspace(null)}
-                    className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
+                    className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
                   >
                     ยกเลิก
                   </button>
@@ -2632,12 +2632,12 @@ export default function SuperAdminPage() {
         {/* Profile Edit Modal */}
         {editingProfile && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 dark:bg-slate-950/80 backdrop-blur-md transition-all duration-300"
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditingProfile(null)
             }}
           >
-            <div role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" className="w-full max-w-lg glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" className="w-full max-w-lg glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl relative space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="absolute top-0 right-0 w-[200px] h-[100px] bg-indigo-600/10 rounded-full blur-[50px] pointer-events-none" />
               
               <div className="flex items-center justify-between">
@@ -2646,14 +2646,14 @@ export default function SuperAdminPage() {
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 id="edit-profile-title" className="text-base font-bold text-slate-200">แก้ไขข้อมูลผู้ใช้งานและสิทธิ์ (Edit Profile)</h3>
+                    <h3 id="edit-profile-title" className="text-base font-bold text-slate-900 dark:text-slate-200">แก้ไขข้อมูลผู้ใช้งานและสิทธิ์ (Edit Profile)</h3>
                     <p className="text-[10px] text-slate-500">จัดการอีเมล: {editingProfile.email}</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEditingProfile(null)}
-                  className="p-2 md:p-1.5 hover:bg-slate-900 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800/80 transition-all"
+                  className="p-2 md:p-1.5 hover:bg-slate-200 dark:hover:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-800/80 transition-all"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -2662,22 +2662,22 @@ export default function SuperAdminPage() {
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">ชื่อ-นามสกุล</label>
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">ชื่อ-นามสกุล</label>
                     <input
                       type="text"
                       placeholder="เช่น สมใจ รักษ์ดี"
-                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                       value={editingProfileFullName}
                       onChange={(e) => setEditingProfileFullName(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-slate-400 font-medium">เบอร์โทรศัพท์</label>
+                    <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">เบอร์โทรศัพท์</label>
                     <input
                       type="text"
                       placeholder="08xxxxxxxx"
-                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-200 text-sm md:text-xs transition-colors"
+                      className="w-full px-4 py-3.5 md:px-3.5 md:py-2.5 bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 text-sm md:text-xs transition-colors"
                       value={editingProfilePhone}
                       onChange={(e) => setEditingProfilePhone(e.target.value)}
                     />
@@ -2685,9 +2685,9 @@ export default function SuperAdminPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-slate-400 font-medium block">สังกัดหอพัก (Workspace)</label>
+                  <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">สังกัดหอพัก (Workspace)</label>
                   <select
-                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
+                    className="w-full px-4 py-3.5 md:px-3 md:py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:outline-none focus:border-indigo-500 text-sm md:text-xs transition-colors"
                     value={editingProfileWorkspaceId || ""}
                     onChange={(e) => setEditingProfileWorkspaceId(e.target.value || null)}
                   >
@@ -2701,7 +2701,7 @@ export default function SuperAdminPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-slate-400 font-medium block">ระดับสิทธิ์ในระบบ (Role)</label>
+                  <label className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">ระดับสิทธิ์ในระบบ (Role)</label>
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { role: "super_admin", label: "Super Admin" },
@@ -2716,7 +2716,7 @@ export default function SuperAdminPage() {
                         className={`py-3 px-2 md:py-2 md:px-1 text-center rounded-xl text-sm md:text-[10px] font-bold md:font-semibold border transition-all ${
                           editingProfileRole === item.role
                             ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10"
-                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                            : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                         }`}
                       >
                         {item.label}
@@ -2729,7 +2729,7 @@ export default function SuperAdminPage() {
                   <button
                     type="button"
                     onClick={() => setEditingProfile(null)}
-                    className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
+                    className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
                   >
                     ยกเลิก
                   </button>
@@ -2753,7 +2753,7 @@ export default function SuperAdminPage() {
         {/* กล่องยืนยันก่อนดำเนินการที่ทำลายข้อมูล — แทนที่ browser confirm() เพื่อให้ผู้ใช้ยังอยู่ใน UI ที่จัดสไตล์ไว้เสมอ */}
         {confirmDialog && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-300"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 dark:bg-slate-950/80 backdrop-blur-md transition-all duration-300"
             onKeyDown={(e) => {
               if (e.key === "Escape") setConfirmDialog(null)
             }}
@@ -2773,7 +2773,7 @@ export default function SuperAdminPage() {
                   {confirmDialog.title}
                 </h3>
               </div>
-              <p id="confirm-dialog-message" className="text-sm text-slate-400 leading-relaxed">
+              <p id="confirm-dialog-message" className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                 {confirmDialog.message}
               </p>
               <div className="flex gap-3 pt-2">
@@ -2781,7 +2781,7 @@ export default function SuperAdminPage() {
                   type="button"
                   autoFocus
                   onClick={() => setConfirmDialog(null)}
-                  className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
+                  className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
                 >
                   ยกเลิก
                 </button>

@@ -247,8 +247,8 @@ export default function TaxTemplateMappingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-200">
-        <div className="border-b border-slate-800 bg-slate-950/95 sticky top-0 z-20">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-200">
+        <div className="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 sticky top-0 z-20">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
             <Skeleton className="w-9 h-9 rounded-lg shrink-0" />
             <div className="flex-1 space-y-1.5">
@@ -279,13 +279,13 @@ export default function TaxTemplateMappingPage() {
 
   if (error || !formType || !inspection) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
         <div className="max-w-md text-center">
-          <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-slate-300">{error || "ไม่พบข้อมูล template"}</p>
+          <AlertTriangle className="w-10 h-10 text-red-600 dark:text-red-400 mx-auto mb-3" />
+          <p className="text-slate-600 dark:text-slate-300">{error || "ไม่พบข้อมูล template"}</p>
           <button
             onClick={() => router.push("/super-admin")}
-            className="mt-4 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors"
+            className="mt-4 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             กลับหน้า Super Admin
           </button>
@@ -309,17 +309,17 @@ export default function TaxTemplateMappingPage() {
   const currentFields = inspection.fieldsByPage[pageIndex] || []
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <div className="border-b border-slate-800 bg-slate-950/95 backdrop-blur sticky top-0 z-20">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-200">
+      <div className="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => router.push("/super-admin")}
-            className="p-2 rounded-lg hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-bold text-slate-100 truncate">
+            <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
               จัด mapping field — ภ.ง.ด. {formType} ({fileName})
             </h1>
             <p className="text-xs text-slate-500">
@@ -327,13 +327,13 @@ export default function TaxTemplateMappingPage() {
             </p>
           </div>
           {coverage && (
-            <div className="text-xs text-slate-400 shrink-0">
+            <div className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
               map แล้ว {coverage.mappedKeyCount}/{coverage.totalRequiredKeys}
             </div>
           )}
           <button
             onClick={() => router.push(`/super-admin/tax-templates/${templateId}/mapping/help`)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 border border-slate-700 hover:bg-slate-900 hover:text-slate-100 transition-colors"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
             <BookOpen className="w-3.5 h-3.5" />
             วิธีใช้งาน
@@ -351,7 +351,7 @@ export default function TaxTemplateMappingPage() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
                   pageIndex === i
                     ? "bg-blue-600 text-white"
-                    : "bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800"
+                    : "bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800"
                 }`}
               >
                 หน้า {i + 1}
@@ -359,7 +359,7 @@ export default function TaxTemplateMappingPage() {
             ))}
           </div>
 
-          <div className="relative inline-block border border-slate-800 rounded-xl overflow-hidden bg-white">
+          <div className="relative inline-block border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white">
             <canvas ref={canvasRef} style={{ display: "block" }} />
             <div className="absolute inset-0" style={{ width: canvasSize.width, height: canvasSize.height }}>
               {currentFields.map((field) =>
@@ -397,16 +397,16 @@ export default function TaxTemplateMappingPage() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <h2 className="text-xs font-bold text-slate-300 mb-2">ความครบถ้วนของ mapping</h2>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+            <h2 className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">ความครบถ้วนของ mapping</h2>
             {coverage ? (
               <>
-                <p className="text-2xl font-bold text-slate-100">
+                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                   {coverage.mappedKeyCount}
                   <span className="text-sm text-slate-500"> / {coverage.totalRequiredKeys}</span>
                 </p>
                 {coverage.danglingMappings.length > 0 && (
-                  <div className="mt-3 text-xs text-amber-400 flex items-start gap-1.5">
+                  <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>
                       มี {coverage.danglingMappings.length} mapping ที่ชี้ไป field ที่ไม่มีอยู่ในไฟล์นี้แล้ว (อาจเพราะ template เปลี่ยนโครงสร้าง)
@@ -415,7 +415,7 @@ export default function TaxTemplateMappingPage() {
                 )}
                 {coverage.unmappedRequiredKeys.length > 0 ? (
                   <details className="mt-3">
-                    <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-300">
+                    <summary className="text-xs text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700 dark:hover:text-slate-300">
                       ยังไม่ได้ map อีก {coverage.unmappedRequiredKeys.length} รายการ
                     </summary>
                     <ul className="mt-2 space-y-1 text-xs text-slate-500 max-h-64 overflow-y-auto">
@@ -425,7 +425,7 @@ export default function TaxTemplateMappingPage() {
                     </ul>
                   </details>
                 ) : (
-                  <p className="mt-3 text-xs text-emerald-400 flex items-center gap-1.5">
+                  <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4" /> ครบทุกรายการที่จำเป็นแล้ว
                   </p>
                 )}
@@ -435,7 +435,7 @@ export default function TaxTemplateMappingPage() {
             )}
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs text-slate-500 space-y-2">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-500 space-y-2">
             <p><span className="inline-block w-3 h-3 rounded-sm border-2 border-dashed border-rose-500/70 bg-rose-500/10 align-middle mr-2" />ยังไม่ map</p>
             <p><span className="inline-block w-3 h-3 rounded-sm border-2 border-teal-400 bg-teal-400/15 align-middle mr-2" />map แล้ว (ข้อความ)</p>
             <p><span className="inline-block w-3 h-3 rounded-sm border-2 border-amber-400 bg-amber-400/20 align-middle mr-2" />map แล้ว (radio — ตัวเลขคือ widget index)</p>
@@ -445,18 +445,18 @@ export default function TaxTemplateMappingPage() {
 
       {pickerTarget && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-30 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 w-full max-w-md">
-            <h3 className="text-sm font-bold text-slate-100 mb-1">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 w-full max-w-md">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
               {pickerTarget.field.name}
               {pickerTarget.field.fieldKind === "radio" && ` (widget ${pickerTarget.widgetIndex})`}
             </h3>
             <p className="text-xs text-slate-500 mb-4">เลือกว่าช่องนี้ควรมีความหมายอะไร</p>
 
-            <label className="text-xs text-slate-400 block mb-1">ความหมาย</label>
+            <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ความหมาย</label>
             <select
               value={pickerKey}
               onChange={(e) => { setPickerKey(e.target.value); setPickerOption(""); setPickerFormat(guessDefaultFormat(e.target.value)); setMoveConfirm(null) }}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 mb-3"
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 mb-3"
             >
               <option value="">— เลือก —</option>
               {Object.entries(catalogBySection).map(([section, entries]) => (
@@ -479,11 +479,11 @@ export default function TaxTemplateMappingPage() {
 
             {pickerTarget.field.fieldKind === "radio" && selectedCatalogEntry?.options && (
               <>
-                <label className="text-xs text-slate-400 block mb-1">ตัวเลือก (option)</label>
+                <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">ตัวเลือก (option)</label>
                 <select
                   value={pickerOption}
                   onChange={(e) => { setPickerOption(e.target.value); setMoveConfirm(null) }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 mb-3"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 mb-3"
                 >
                   <option value="">— เลือก —</option>
                   {selectedCatalogEntry.options.map((opt) => {
@@ -503,7 +503,7 @@ export default function TaxTemplateMappingPage() {
             )}
 
             {moveConfirm && (
-              <div className="mb-3 text-xs text-amber-200 bg-amber-950/40 border border-amber-900 rounded-lg p-2.5 flex items-start gap-1.5">
+              <div className="mb-3 text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-900 rounded-lg p-2.5 flex items-start gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>
                   ความหมายนี้ map ไว้ที่ <span className="font-mono">{moveConfirm.from}</span> อยู่แล้ว ต้องการย้ายมาที่{" "}
@@ -514,11 +514,11 @@ export default function TaxTemplateMappingPage() {
 
             {pickerTarget.field.fieldKind !== "radio" && (
               <>
-                <label className="text-xs text-slate-400 block mb-1">รูปแบบข้อมูล</label>
+                <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">รูปแบบข้อมูล</label>
                 <select
                   value={pickerFormat}
                   onChange={(e) => setPickerFormat(e.target.value as PndFieldFormat)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 mb-3"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 mb-3"
                 >
                   <option value="raw">raw (ข้อความ/ชื่อ)</option>
                   <option value="comb">comb (จำนวนเงิน แบบบาท-สตางค์)</option>
@@ -530,7 +530,7 @@ export default function TaxTemplateMappingPage() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => { setPickerTarget(null); setMoveConfirm(null) }}
-                className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
               >
                 ยกเลิก
               </button>
@@ -538,7 +538,7 @@ export default function TaxTemplateMappingPage() {
                 <button
                   onClick={handleDeleteAssignment}
                   disabled={saving}
-                  className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-red-950 border border-red-900 text-red-300 hover:bg-red-900 transition-colors disabled:opacity-50"
+                  className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 transition-colors disabled:opacity-50"
                 >
                   ลบ mapping
                 </button>

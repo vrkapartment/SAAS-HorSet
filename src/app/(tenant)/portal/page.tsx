@@ -43,6 +43,7 @@ import PullToRefresh from "@/components/PullToRefresh"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
 import { LanguageToggle } from "@/components/LanguageToggle"
+import { ThemeToggle } from "@/components/ThemeToggle"
 
 
 interface BillHistoryItem {
@@ -727,19 +728,19 @@ export default function TenantPortal() {
 
   if (pageLoading) {
     return (
-      <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center p-4">
         <div className="relative flex flex-col items-center max-w-sm w-full text-center space-y-6">
           <div className="absolute w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl -top-12 animate-pulse pointer-events-none" />
           <div className="absolute w-48 h-48 bg-blue-500/10 rounded-full blur-3xl -bottom-12 animate-pulse pointer-events-none" />
           <div className="relative flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full border-4 border-slate-900 border-t-emerald-500 animate-spin" />
+            <div className="w-16 h-16 rounded-full border-4 border-slate-300 dark:border-slate-900 border-t-emerald-500 animate-spin" />
             <Building className="absolute w-6 h-6 text-emerald-500 animate-bounce" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-lg font-bold tracking-wide text-slate-100 animate-pulse">{t("tenant_portal.loading_bill")}</h2>
-            <p className="text-xs text-slate-400">{t("tenant_portal.loading_wait")}</p>
+            <h2 className="text-lg font-bold tracking-wide text-slate-900 dark:text-slate-100 animate-pulse">{t("tenant_portal.loading_bill")}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t("tenant_portal.loading_wait")}</p>
           </div>
-          <div className="text-[10px] text-slate-500 tracking-wider uppercase border border-slate-900/60 rounded-full px-3 py-1 bg-slate-950/40">
+          <div className="text-[10px] text-slate-500 tracking-wider uppercase border border-slate-300/60 dark:border-slate-900/60 rounded-full px-3 py-1 bg-slate-100/40 dark:bg-slate-950/40">
             Secure Connection • SAAS HorSet
           </div>
         </div>
@@ -749,26 +750,27 @@ export default function TenantPortal() {
 
   return (
     <PullToRefresh onRefresh={async () => { await loadPortalData(false) }}>
-      <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-12 w-full flex-1 flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 font-sans pb-12 w-full flex-1 flex flex-col">
         {/* Header สไตล์ Mobile Portal */}
-        <header className="glass-panel border-b border-slate-900/60 px-6 py-4 sticky top-0 z-20 flex justify-between items-center shrink-0">
+        <header className="glass-panel border-b border-slate-200/60 dark:border-slate-900/60 px-6 py-4 sticky top-0 z-20 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-2">
           <Building className="w-5 h-5 text-blue-500" />
           <div>
             <h1 className="text-sm font-bold">{t("tenant_portal.room_prefix_label").replace("{room}", roomNumber)}</h1>
-            <p className="text-[9px] text-slate-400"><DynamicText>{tenantName}</DynamicText> • {t("tenant_portal.role_tenant")}</p>
+            <p className="text-[9px] text-slate-500 dark:text-slate-400"><DynamicText>{tenantName}</DynamicText> • {t("tenant_portal.role_tenant")}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
           <LanguageToggle />
+          <ThemeToggle />
           {!isLoginFree && (
             <button
               onClick={() => {
                 document.cookie = "horset_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
                 router.push("/login")
               }}
-              className="p-2 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-900/50"
+              className="p-2 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900/50"
               title={t("common.logout")}
             >
               <LogOut className="w-4 h-4" />
@@ -781,17 +783,17 @@ export default function TenantPortal() {
       <main className="max-w-md mx-auto px-4 pt-6 space-y-6">
         
         {/* บิลหลักประจำเดือน */}
-        <div className="glass-panel rounded-2xl border border-slate-900/60 p-6 space-y-5 relative overflow-hidden">
+        <div className="glass-panel rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/5 rounded-full blur-xl pointer-events-none" />
-          
+
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] text-slate-400 font-semibold uppercase">{t("tenant_portal.invoice_cycle_label")}</span>
-              <h2 className="text-lg font-bold text-slate-200 mt-0.5">{billingCycle}</h2>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">{t("tenant_portal.invoice_cycle_label")}</span>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-200 mt-0.5">{billingCycle}</h2>
               {bill && (bill.invoiceId || bill.invoice_id) && (
-                <div className="text-[10px] text-blue-400 font-semibold mt-1 flex items-center gap-1">
+                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-1 flex items-center gap-1">
                   <span>{t("tenant_portal.invoice_id_label")}</span>
-                  <span className="font-mono bg-blue-500/10 px-1.5 py-0.5 rounded text-[10px] text-blue-300">
+                  <span className="font-mono bg-blue-500/10 px-1.5 py-0.5 rounded text-[10px] text-blue-700 dark:text-blue-300">
                     {bill.invoiceId || bill.invoice_id}
                   </span>
                 </div>
@@ -810,19 +812,19 @@ export default function TenantPortal() {
           {/* รายละเอียดค่าใช้จ่าย */}
           <div className="space-y-3 pt-2 text-xs">
             {/* 1. ค่าเช่าห้องพัก */}
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <Building className="w-3.5 h-3.5 text-blue-400" />
+            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200 dark:border-slate-900">
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <Building className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{t("tenant_portal.item_rent")}</span>
               </div>
-              <span className="font-semibold text-slate-200">{rentPrice.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-200">{rentPrice.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* 2. ค่าไฟฟ้า */}
-            <div className="flex justify-between items-start pb-2.5 border-b border-slate-900">
+            <div className="flex justify-between items-start pb-2.5 border-b border-slate-200 dark:border-slate-900">
               <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   <span>{t("tenant_portal.item_electric")}</span>
                 </div>
                 <p className="text-[10px] text-slate-500 pl-5">
@@ -831,14 +833,14 @@ export default function TenantPortal() {
                     : t("tenant_portal.electric_units_used").replace("{units}", String(elecUnits))}
                 </p>
               </div>
-              <span className="font-semibold text-slate-200">{elecAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-200">{elecAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* 3. ค่าน้ำประปา */}
-            <div className="flex justify-between items-start pb-2.5 border-b border-slate-900">
+            <div className="flex justify-between items-start pb-2.5 border-b border-slate-200 dark:border-slate-900">
               <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <Droplet className="w-3.5 h-3.5 text-teal-400" />
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <Droplet className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                   <span>{t("tenant_portal.item_water")}</span>
                 </div>
                 <p className="text-[10px] text-slate-500 pl-5">
@@ -847,98 +849,98 @@ export default function TenantPortal() {
                     : t("tenant_portal.water_units_used").replace("{units}", String(waterUnits))}
                 </p>
               </div>
-              <span className="font-semibold text-slate-200">{waterAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-200">{waterAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* 4. ค่าส่วนกลาง */}
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200 dark:border-slate-900">
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>{t("tenant_portal.item_common_fee")}</span>
               </div>
-              <span className="font-semibold text-slate-200">{commonAreaFee.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-200">{commonAreaFee.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* ค่าใช้จ่ายเสริมรายเดือน (ถ้ามี) */}
             {extraExpenses && extraExpenses.length > 0 && extraExpenses.map((exp: any, index: number) => (
-              <div key={index} className="flex justify-between items-center pb-2.5 border-b border-slate-900">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <div key={index} className="flex justify-between items-center pb-2.5 border-b border-slate-200 dark:border-slate-900">
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>➕ <DynamicText>{exp.name}</DynamicText></span>
                 </div>
-                <span className="font-semibold text-slate-200">{Number(exp.amount || 0).toLocaleString()} {t("daily_bills.baht_unit")}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-200">{Number(exp.amount || 0).toLocaleString()} {t("daily_bills.baht_unit")}</span>
               </div>
             ))}
 
             {/* ค่าบริการอื่น ๆ (ถ้ามี) */}
             {otherServiceAmount > 0 && (
-              <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-200 dark:border-slate-900">
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
                   <span>{t("tenant_portal.item_other_services")}</span>
                 </div>
-                <span className="font-semibold text-slate-200">{otherServiceAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-200">{otherServiceAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
               </div>
             )}
 
             {/* ภาษีมูลค่าเพิ่ม (VAT) — แสดงเฉพาะเมื่อบิลนี้มีการคิดจริง */}
             {vatAmount > 0 && (
-              <div className="flex justify-between items-center pb-2.5 border-b border-slate-900">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-200 dark:border-slate-900">
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   <span>ภาษีมูลค่าเพิ่ม (VAT)</span>
                 </div>
-                <span className="font-semibold text-slate-200">{vatAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-200">{vatAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
               </div>
             )}
 
             {/* 5. ค่าปรับ */}
-            <div className="flex justify-between items-start pb-2.5 border-b border-slate-900">
+            <div className="flex justify-between items-start pb-2.5 border-b border-slate-200 dark:border-slate-900">
               <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                   <span>{t("tenant_portal.item_penalty")}</span>
                 </div>
                 {lateDays > 0 && (
-                  <p className="text-[10px] text-rose-400 pl-5">{t("tenant_portal.late_days_note").replace("{days}", String(lateDays)).replace("{rate}", String(latePenaltyRate))}</p>
+                  <p className="text-[10px] text-rose-600 dark:text-rose-400 pl-5">{t("tenant_portal.late_days_note").replace("{days}", String(lateDays)).replace("{rate}", String(latePenaltyRate))}</p>
                 )}
                 {lateDays === 0 && penaltyAmount > 0 && (
-                  <p className="text-[10px] text-rose-400 pl-5">{t("tenant_portal.accumulated_penalty_note")}</p>
+                  <p className="text-[10px] text-rose-600 dark:text-rose-400 pl-5">{t("tenant_portal.accumulated_penalty_note")}</p>
                 )}
               </div>
-              <span className="font-semibold text-slate-200">{penaltyAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-200">{penaltyAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* ยอดเงินรวมสุทธิ */}
             <div className="flex justify-between items-center pt-2">
-              <span className="font-bold text-slate-300">{t("tenant_portal.net_total_label")}</span>
-              <span className="text-lg font-bold text-blue-400">{totalAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+              <span className="font-bold text-slate-600 dark:text-slate-300">{t("tenant_portal.net_total_label")}</span>
+              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{totalAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
 
             {/* รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน (แสดงเฉพาะเปิดโหมด "หารตามสัดส่วนทั้งอาคาร" และมีข้อมูลของรอบบิลนี้) */}
             {(hasElectricDisclosure || hasWaterDisclosure) && (
-              <div className="mt-2 p-3.5 bg-slate-900/50 border border-slate-800 rounded-xl space-y-2 text-[11px] leading-relaxed">
-                <p className="font-bold text-slate-300">
+              <div className="mt-2 p-3.5 bg-slate-100/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2 text-[11px] leading-relaxed">
+                <p className="font-bold text-slate-600 dark:text-slate-300">
                   รายละเอียด ใบแจ้งหนี้ของการไฟฟ้า/การประปา ประจำรอบเดือน {disclosureCycleThai}
                 </p>
 
                 {hasElectricDisclosure && (
                   <div className="space-y-0.5">
-                    <p className="text-slate-400">การไฟฟ้านครหลวง/การไฟฟ้าส่วนภูมิภาค</p>
-                    <p className="text-slate-400">จำนวนหน่วยที่ใช้ {Number(electricBuildingTotalUnits).toLocaleString()} หน่วย</p>
-                    <p className="text-slate-400">ยอดที่ต้องชำระ {Number(electricBuildingTotalAmount).toLocaleString()} บาท</p>
+                    <p className="text-slate-500 dark:text-slate-400">การไฟฟ้านครหลวง/การไฟฟ้าส่วนภูมิภาค</p>
+                    <p className="text-slate-500 dark:text-slate-400">จำนวนหน่วยที่ใช้ {Number(electricBuildingTotalUnits).toLocaleString()} หน่วย</p>
+                    <p className="text-slate-500 dark:text-slate-400">ยอดที่ต้องชำระ {Number(electricBuildingTotalAmount).toLocaleString()} บาท</p>
                   </div>
                 )}
 
                 {hasWaterDisclosure && (
                   <div className="space-y-0.5">
-                    <p className="text-slate-400">การประปานครหลวง/การประปาส่วนภูมิภาค</p>
-                    <p className="text-slate-400">จำนวนน้ำใช้ {Number(waterBuildingTotalUnits).toLocaleString()} หน่วย</p>
-                    <p className="text-slate-400">ยอดที่ต้องชำระ {Number(waterBuildingTotalAmount).toLocaleString()} บาท</p>
+                    <p className="text-slate-500 dark:text-slate-400">การประปานครหลวง/การประปาส่วนภูมิภาค</p>
+                    <p className="text-slate-500 dark:text-slate-400">จำนวนน้ำใช้ {Number(waterBuildingTotalUnits).toLocaleString()} หน่วย</p>
+                    <p className="text-slate-500 dark:text-slate-400">ยอดที่ต้องชำระ {Number(waterBuildingTotalAmount).toLocaleString()} บาท</p>
                   </div>
                 )}
 
-                <p className="text-slate-500 pt-1 border-t border-slate-800">
+                <p className="text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-800">
                   หมายเหตุ: อัตราค่าไฟฟ้าและค่าน้ำประปาคำนวณจาก (เลขมิเตอร์ปัจจุบัน - เลขมิเตอร์ครั้งก่อน) × อัตราเฉลี่ยจริงตามใบแจ้งหนี้ของการไฟฟ้า/การประปา
                   ประจำรอบเดือน {disclosureCycleThai} โดยไม่มีการบวกกำไรเพิ่มใดๆ ทั้งสิ้น
                 </p>
@@ -949,13 +951,13 @@ export default function TenantPortal() {
             <button
               onClick={handleDownloadBillPdf}
               disabled={downloadingPdf}
-              className="w-full mt-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 disabled:border-slate-800 disabled:text-slate-600 text-slate-300 font-semibold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
+              className="w-full mt-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 disabled:border-slate-100 dark:disabled:border-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-slate-600 dark:text-slate-300 font-semibold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
             >
               {downloadingPdf ? (
-                <div className="w-4 h-4 border-2 border-slate-500 border-t-slate-300 rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-500 border-t-slate-600 dark:border-t-slate-300 rounded-full animate-spin" />
               ) : (
                 <>
-                  <Download className="w-4 h-4 text-blue-400" />
+                  <Download className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>{t("tenant_portal.download_invoice_pdf_btn")}</span>
                 </>
               )}
@@ -965,13 +967,13 @@ export default function TenantPortal() {
 
         {/* หน้าจอโอนเงินสแกน QR พร้อมเพย์ (แสดงเฉพาะเมื่อยังไม่จ่าย หรือรอยืนยัน) */}
         {billStatus !== "paid" && (
-          <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-5">
-            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-              <QrCode className="w-5 h-5 text-blue-400" /> {t("tenant_portal.scan_promptpay_title")}
+          <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-5">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+              <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400" /> {t("tenant_portal.scan_promptpay_title")}
             </h3>
 
             {/* ดีไซน์การ์ด พร้อมเพย์สไตล์หรูหรา */}
-            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-xl flex flex-col items-center gap-4 relative overflow-hidden">
+            <div className="bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 p-6 rounded-xl flex flex-col items-center gap-4 relative overflow-hidden">
               <div className="absolute top-2 left-2 flex items-center gap-1 text-[9px] text-slate-500 font-bold">
                 <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                 PromptPay EMVCo
@@ -982,7 +984,7 @@ export default function TenantPortal() {
                 {isQrLoading ? (
                   <div className="flex flex-col items-center justify-center space-y-2">
                     <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
-                    <span className="text-[9px] text-slate-400 font-medium">{t("tenant_portal.qr_loading")}</span>
+                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">{t("tenant_portal.qr_loading")}</span>
                   </div>
                 ) : (
                   <img
@@ -994,14 +996,14 @@ export default function TenantPortal() {
               </div>
 
               <div className="text-center space-y-1">
-                <p className="text-[10px] text-slate-400">
-                  {t("tenant_portal.promptpay_account_label")} <span className="font-bold text-slate-200">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  {t("tenant_portal.promptpay_account_label")} <span className="font-bold text-slate-900 dark:text-slate-200">
                     {promptPayId.length === 10
                       ? promptPayId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")
                       : promptPayId.replace(/(\d{1})(\d{4})(\d{5})(\d{2})(\d{1})/, "$1-$2-$3-$4-$5")}
                   </span>
                 </p>
-                <p className="text-sm font-bold text-slate-200">{t("tenant_portal.amount_to_pay_label").replace("{amount}", totalAmount.toLocaleString())}</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-200">{t("tenant_portal.amount_to_pay_label").replace("{amount}", totalAmount.toLocaleString())}</p>
                 <p className="text-[9px] text-slate-500 font-medium">{t("tenant_portal.auto_amount_note")}</p>
               </div>
 
@@ -1023,8 +1025,8 @@ export default function TenantPortal() {
             {billStatus === "unpaid" ? (
               <div className="space-y-3.5 pt-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-blue-400" />
+                  <h4 className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     <span>{t("tenant_portal.upload_slip_title")}</span>
                   </h4>
                   <span className="flex h-2 w-2 relative">
@@ -1044,27 +1046,27 @@ export default function TenantPortal() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="w-full py-8 bg-gradient-to-b from-blue-950/20 to-slate-950/40 border border-dashed border-blue-500/35 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-3 text-xs text-slate-300 hover:text-white transition-all shadow-lg hover:shadow-blue-500/5 group cursor-pointer"
+                  className="w-full py-8 bg-gradient-to-b from-blue-50 to-slate-100 dark:from-blue-950/20 dark:to-slate-950/40 border border-dashed border-blue-500/35 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-3 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all shadow-lg hover:shadow-blue-500/5 group cursor-pointer"
                 >
                   {uploading ? (
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-8 h-8 border-3 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-                      <span className="text-[11px] text-slate-400 font-medium">{t("tenant_portal.processing_upload")}</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{t("tenant_portal.processing_upload")}</span>
                     </div>
                   ) : (
                     <>
                       <div className="p-3 bg-blue-500/10 rounded-full group-hover:scale-110 group-hover:bg-blue-500/20 transition-all duration-300">
-                        <ImageIcon className="w-6 h-6 text-blue-400" />
+                        <ImageIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div className="space-y-1 text-center">
-                        <p className="font-semibold text-[13px] text-slate-200 group-hover:text-blue-400 transition-colors">
+                        <p className="font-semibold text-[13px] text-slate-900 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {t("tenant_portal.tap_to_select_slip")}
                         </p>
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
                           {t("tenant_portal.upload_hint")}
                         </p>
                       </div>
-                      <span className="text-[9px] text-slate-500 font-medium bg-slate-950/60 px-3 py-1 rounded-full border border-slate-900">
+                      <span className="text-[9px] text-slate-500 font-medium bg-slate-100/60 dark:bg-slate-950/60 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-900">
                         {t("tenant_portal.supported_formats")}
                       </span>
                     </>
@@ -1072,11 +1074,11 @@ export default function TenantPortal() {
                 </button>
               </div>
             ) : (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 text-xs text-amber-400">
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 text-xs text-amber-600 dark:text-amber-400">
                 <Clock className="w-5 h-5 shrink-0 animate-spin" />
                 <div className="space-y-0.5">
                   <p className="font-bold">{t("tenant_portal.slip_under_review_title")}</p>
-                  <p className="text-[10px] text-slate-400">{t("tenant_portal.slip_under_review_desc")}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("tenant_portal.slip_under_review_desc")}</p>
                 </div>
               </div>
             )}
@@ -1085,11 +1087,11 @@ export default function TenantPortal() {
 
         {/* กรณีจ่ายบิลสำเร็จแล้ว */}
         {billStatus === "paid" && (
-          <div className="glass-card rounded-2xl border border-slate-900/60 p-8 text-center space-y-4">
-            <CheckCircle2 className="w-16 h-16 text-teal-400 mx-auto animate-bounce" />
+          <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-8 text-center space-y-4">
+            <CheckCircle2 className="w-16 h-16 text-teal-600 dark:text-teal-400 mx-auto animate-bounce" />
             <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-100">{t("tenant_portal.payment_complete_title")}</h3>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{t("tenant_portal.payment_complete_title")}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
                 {t("tenant_portal.payment_complete_thanks")}<br />
                 {t("tenant_portal.payment_complete_received_prefix")} <DynamicText>{workspaceName || "แสนสุขแมนชั่น"}</DynamicText> {t("tenant_portal.payment_complete_received_suffix")}
               </p>
@@ -1098,20 +1100,20 @@ export default function TenantPortal() {
         )}
 
         {/* ประวัติการรับบิลย้อนหลัง */}
-        <div className="glass-card rounded-2xl border border-slate-900/60 p-6 space-y-4">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <History className="w-5 h-5 text-indigo-400" /> {t("tenant_portal.history_title")}
+        <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-4">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+            <History className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> {t("tenant_portal.history_title")}
           </h3>
 
           <div className="space-y-3 text-xs">
             {history.map((h, idx) => (
-              <div key={idx} className="flex justify-between items-center p-3 bg-slate-900/40 border border-slate-900/80 rounded-xl">
+              <div key={idx} className="flex justify-between items-center p-3 bg-slate-100/40 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-900/80 rounded-xl">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-slate-500" />
-                  <span className="font-medium text-slate-300">{h.cycle}</span>
+                  <span className="font-medium text-slate-600 dark:text-slate-300">{h.cycle}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-slate-300">{h.amount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+                  <span className="font-bold text-slate-600 dark:text-slate-300">{h.amount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
                   <span className={`inline-block text-[8px] font-bold px-2 py-0.5 rounded-full ${
                     h.status === "paid" ? "bg-teal-500/10 text-teal-400" :
                     h.status === "pending" ? "bg-amber-500/10 text-amber-400 animate-pulse" :

@@ -217,47 +217,47 @@ export default function TaxTemplatesPage() {
               <button
                 type="button"
                 onClick={() => router.push("/super-admin")}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer mb-1"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer mb-1"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Super Admin Console
               </button>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold rounded-full text-xs uppercase tracking-wider">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 font-bold rounded-full text-xs uppercase tracking-wider">
                 <FileText className="w-3.5 h-3.5" /> จัดการ Template ภาษี
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-slate-100">
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
                 แบบฟอร์ม PDF ภ.ง.ด. 90 / 94
               </h1>
-              <p className="text-slate-400 text-sm max-w-xl">
+              <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xl">
                 อัปโหลดไฟล์ PDF ต้นแบบที่กรมสรรพากรประกาศใหม่ และตั้งค่าปีภาษีที่จะพิมพ์บนฟอร์ม ภ.ง.ด. 90
               </p>
             </div>
 
             <button
               onClick={loadData}
-              className="px-5 py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg shrink-0 self-start md:self-center"
+              className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all text-xs font-semibold flex items-center gap-2 shadow-lg shrink-0 self-start md:self-center"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-400" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600 dark:text-blue-400" : ""}`} />
               รีเฟรชข้อมูล
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/25 text-red-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
-            <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
+          <div className="p-4 bg-red-500/10 border border-red-500/25 text-red-600 dark:text-red-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
+            <ShieldAlert className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0" />
             <span>{error}</span>
           </div>
         )}
         {success && (
-          <div className="p-4 bg-teal-500/10 border border-teal-500/25 text-teal-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
-            <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0" />
+          <div className="p-4 bg-teal-500/10 border border-teal-500/25 text-teal-600 dark:text-teal-400 rounded-2xl text-sm md:text-xs flex items-center gap-3 shadow-lg">
+            <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0" />
             <span>{success}</span>
           </div>
         )}
 
         <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
           {/* กล่องอัปโหลด PDF Template แบบฟอร์ม ภ.ง.ด. 90 */}
-          <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden">
+          <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent pointer-events-none" />
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-6">
@@ -265,22 +265,22 @@ export default function TaxTemplatesPage() {
                   <FileText className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-extrabold text-slate-100">แบบฟอร์ม PDF: ภ.ง.ด. 90</h3>
-                  <p className="text-sm text-slate-400 mt-1">Template เดียวใช้ข้ามทุกปี — ปีภาษีที่พิมพ์บนฟอร์มกำหนดโดย Super Admin ด้านล่าง ใช้ค่าเดียวกันทุกครั้งที่ Admin กด Download จนกว่าจะเปลี่ยน</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">แบบฟอร์ม PDF: ภ.ง.ด. 90</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Template เดียวใช้ข้ามทุกปี — ปีภาษีที่พิมพ์บนฟอร์มกำหนดโดย Super Admin ด้านล่าง ใช้ค่าเดียวกันทุกครั้งที่ Admin กด Download จนกว่าจะเปลี่ยน</p>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-950 border border-slate-800 rounded-xl p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
                 <div className="text-sm">
                   {pnd90Template ? (
                     <>
-                      <p className="text-slate-200 font-bold">{pnd90Template.file_name || "template.pdf"}</p>
+                      <p className="text-slate-900 dark:text-slate-200 font-bold">{pnd90Template.file_name || "template.pdf"}</p>
                       <p className="text-slate-500 text-xs mt-0.5">
                         อัปเดตล่าสุด: {new Date(pnd90Template.updated_at).toLocaleString("th-TH")}
                       </p>
                     </>
                   ) : (
-                    <p className="text-slate-400">ยังไม่ได้อัปโหลด — ระบบใช้ไฟล์เริ่มต้นของระบบอยู่</p>
+                    <p className="text-slate-500 dark:text-slate-400">ยังไม่ได้อัปโหลด — ระบบใช้ไฟล์เริ่มต้นของระบบอยู่</p>
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -323,14 +323,14 @@ export default function TaxTemplatesPage() {
 
               <div className="flex flex-col sm:flex-row sm:items-end gap-3 mt-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-300">ปีภาษีที่จะพิมพ์บนฟอร์ม</label>
+                  <label className="text-sm font-bold text-slate-600 dark:text-slate-300">ปีภาษีที่จะพิมพ์บนฟอร์ม</label>
                   <input
                     type="text"
                     value={pnd90TaxYearInput}
                     onChange={(e) => setPnd90TaxYearInput(e.target.value)}
                     placeholder="เช่น 2569"
                     disabled={!pnd90Template}
-                    className="w-full sm:w-40 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm disabled:opacity-50"
+                    className="w-full sm:w-40 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all font-mono text-sm disabled:opacity-50"
                   />
                 </div>
                 <button
@@ -339,7 +339,7 @@ export default function TaxTemplatesPage() {
                   disabled={!pnd90Template || savingPnd90Year}
                   className={`px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all ${
                     !pnd90Template || savingPnd90Year
-                      ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                      ? "bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
                       : "bg-blue-600 hover:bg-blue-500 text-white active:scale-95"
                   }`}
                 >
@@ -354,7 +354,7 @@ export default function TaxTemplatesPage() {
           </div>
 
           {/* กล่องอัปโหลด PDF Template แบบฟอร์ม ภ.ง.ด. 94 (แยกตามปีภาษี) */}
-          <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 p-6 md:p-8 relative overflow-hidden">
+          <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent pointer-events-none" />
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-6">
@@ -362,20 +362,20 @@ export default function TaxTemplatesPage() {
                   <FileText className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-extrabold text-slate-100">แบบฟอร์ม PDF: ภ.ง.ด. 94</h3>
-                  <p className="text-sm text-slate-400 mt-1">ต้องอัปโหลดแยกตามปีภาษี (ปีภาษีถูกพิมพ์ตายตัวอยู่ในตัวฟอร์ม แก้ไขเองไม่ได้)</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">แบบฟอร์ม PDF: ภ.ง.ด. 94</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">ต้องอัปโหลดแยกตามปีภาษี (ปีภาษีถูกพิมพ์ตายตัวอยู่ในตัวฟอร์ม แก้ไขเองไม่ได้)</p>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-5">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-300">ปีภาษี</label>
+                  <label className="text-sm font-bold text-slate-600 dark:text-slate-300">ปีภาษี</label>
                   <input
                     type="text"
                     value={pnd94UploadYear}
                     onChange={(e) => setPnd94UploadYear(e.target.value)}
                     placeholder="เช่น 2026"
-                    className="w-full sm:w-40 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all font-mono text-sm"
+                    className="w-full sm:w-40 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 outline-none transition-all font-mono text-sm"
                   />
                 </div>
                 <label className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-3 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 ${uploadingTaxTemplate === "94" ? "opacity-50 pointer-events-none" : ""}`}>
@@ -395,9 +395,9 @@ export default function TaxTemplatesPage() {
               </div>
 
               {pnd94Templates.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-950 text-slate-500">
+                    <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500">
                       <tr>
                         <th className="px-4 py-2.5 font-bold">ปีภาษี</th>
                         <th className="px-4 py-2.5 font-bold">ชื่อไฟล์</th>
@@ -405,11 +405,11 @@ export default function TaxTemplatesPage() {
                         <th className="px-4 py-2.5 font-bold text-right">จัดการ</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                       {pnd94Templates.map((t) => (
                         <tr key={t.id}>
-                          <td className="px-4 py-2.5 text-slate-200 font-bold">{t.tax_year}</td>
-                          <td className="px-4 py-2.5 text-slate-400">{t.file_name || "template.pdf"}</td>
+                          <td className="px-4 py-2.5 text-slate-900 dark:text-slate-200 font-bold">{t.tax_year}</td>
+                          <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{t.file_name || "template.pdf"}</td>
                           <td className="px-4 py-2.5 text-slate-500">{new Date(t.updated_at).toLocaleDateString("th-TH")}</td>
                           <td className="px-4 py-2.5 text-right">
                             <div className="inline-flex items-center gap-2">
@@ -437,7 +437,7 @@ export default function TaxTemplatesPage() {
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">ยังไม่มีปีภาษีใดที่อัปโหลด template ไว้ — ปีที่ยังไม่อัปโหลดจะใช้ไฟล์เริ่มต้นของระบบ</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">ยังไม่มีปีภาษีใดที่อัปโหลด template ไว้ — ปีที่ยังไม่อัปโหลดจะใช้ไฟล์เริ่มต้นของระบบ</p>
               )}
             </div>
           </div>
@@ -462,11 +462,11 @@ export default function TaxTemplatesPage() {
                 <div className="p-2.5 bg-red-600/10 text-red-400 rounded-xl border border-red-500/20 shrink-0">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
-                <h3 id="tax-confirm-dialog-title" className="text-base font-bold text-slate-100">
+                <h3 id="tax-confirm-dialog-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
                   {confirmDialog.title}
                 </h3>
               </div>
-              <p id="tax-confirm-dialog-message" className="text-sm text-slate-400 leading-relaxed">
+              <p id="tax-confirm-dialog-message" className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                 {confirmDialog.message}
               </p>
               <div className="flex gap-3 pt-2">
@@ -474,7 +474,7 @@ export default function TaxTemplatesPage() {
                   type="button"
                   autoFocus
                   onClick={() => setConfirmDialog(null)}
-                  className="flex-1 py-3 md:py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
+                  className="flex-1 py-3 md:py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm md:text-xs font-bold md:font-semibold transition-all"
                 >
                   ยกเลิก
                 </button>

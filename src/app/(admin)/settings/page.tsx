@@ -289,7 +289,7 @@ function SettingsHubContent() {
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-sm">
         {/* Mobile: one compact grouped control. */}
         <div className="md:hidden">
-          <label htmlFor="settings-section" className="block px-1 pb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">
+          <label htmlFor="settings-section" className="block px-1 pb-2 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {t("settings_hub.select_label")}
           </label>
           <select
@@ -357,7 +357,7 @@ function SettingsHubContent() {
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-black">{tab.name}</span>
-                    <span className="mt-0.5 block truncate text-[9px] font-medium text-slate-400 dark:text-slate-500">{tab.description}</span>
+                    <span className="mt-0.5 block truncate text-xs font-medium text-slate-400 dark:text-slate-500">{tab.description}</span>
                   </span>
                 </button>
               )
