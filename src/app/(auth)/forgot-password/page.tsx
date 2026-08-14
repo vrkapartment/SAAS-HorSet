@@ -128,7 +128,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col justify-center items-center p-4 overflow-hidden bg-slate-950">
+    <main className="dark relative min-h-screen flex flex-col justify-center items-center p-4 overflow-hidden bg-slate-950">
       {/* Script ของ Cloudflare Turnstile */}
       <Script
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback"

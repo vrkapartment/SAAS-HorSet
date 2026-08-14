@@ -421,7 +421,7 @@ function RegisterPageContent() {
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col justify-center items-center p-4 overflow-hidden bg-slate-950">
+    <main className="dark relative min-h-screen flex flex-col justify-center items-center p-4 overflow-hidden bg-slate-950">
       {/* Script ของ Cloudflare Turnstile */}
       <Script
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback"
@@ -857,7 +857,7 @@ function RegisterPageContent() {
 export default function RegisterPage() {
   return (
     <Suspense fallback={
-      <main className="relative min-h-screen flex items-center justify-center bg-slate-950">
+      <main className="dark relative min-h-screen flex items-center justify-center bg-slate-950">
         <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
       </main>
     }>
