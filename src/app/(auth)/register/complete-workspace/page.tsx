@@ -59,7 +59,7 @@ export default function CompleteWorkspacePage() {
         <div className="inline-flex items-center justify-center p-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl shadow-xl shadow-blue-500/10 mb-3 w-16 h-16">
           <img src="/icon-512x512.png" className="w-12 h-12 object-contain" alt="HorSet Logo" />
         </div>
-        <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-400">
+        <h1 className="text-4xl font-bold tracking-tight text-white">
           HorSet <span className="text-blue-500 font-semibold">(หอเสร็จ)</span>
         </h1>
       </div>

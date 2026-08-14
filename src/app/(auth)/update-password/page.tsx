@@ -173,7 +173,7 @@ export default function UpdatePasswordPage() {
         <div className="inline-flex items-center justify-center p-3 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/20 mb-3 animate-pulse">
           <Shield className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-400">
+        <h1 className="text-4xl font-bold tracking-tight text-white">
           HorSet <span className="text-blue-500 font-semibold">(หอเสร็จ)</span>
         </h1>
         <p className="text-slate-400 mt-2 text-sm max-w-xs mx-auto">

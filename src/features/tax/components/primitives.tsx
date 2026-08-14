@@ -295,7 +295,7 @@ export function StatTile({
         ACCENT[accent],
       )}
     >
-      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
         {label}
       </div>
       <div
@@ -303,14 +303,13 @@ export function StatTile({
           'break-all text-2xl font-black leading-tight tabular-nums',
           valueTone === 'pay' && 'text-red-600 dark:text-red-400',
           valueTone === 'refund' && 'text-emerald-600 dark:text-emerald-400',
-          !valueTone &&
-            'bg-gradient-to-r from-blue-600 via-indigo-500 to-indigo-700 bg-clip-text text-transparent dark:from-blue-400 dark:via-indigo-400 dark:to-indigo-300',
+          !valueTone && 'text-blue-600 dark:text-blue-400',
         )}
       >
         <span className="mr-0.5 text-sm font-bold text-slate-400">฿</span>
         {baht(value, decimals)}
       </div>
-      {note && <div className="text-[11px] text-slate-500 dark:text-slate-400">{note}</div>}
+      {note && <div className="text-xs text-slate-500 dark:text-slate-400">{note}</div>}
     </div>
   );
 }
@@ -472,7 +471,7 @@ export function BreakdownRow({
         )}
       >
         {label}
-        {sub && <div className="text-[11px] text-slate-500 dark:text-slate-400">{sub}</div>}
+        {sub && <div className="text-xs text-slate-500 dark:text-slate-400">{sub}</div>}
       </div>
       <div
         className={cx(
@@ -493,9 +492,9 @@ export function BreakdownRow({
 export const tableClasses = {
   wrap: 'overflow-x-auto',
   table: 'w-full border-collapse text-sm',
-  th: 'whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400',
+  th: 'whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400',
   thNum:
-    'whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400',
+    'whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-2 text-right text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400',
   td: 'border-b border-slate-200 px-4 py-2 align-middle dark:border-slate-800',
   tdNum:
     'whitespace-nowrap border-b border-slate-200 px-4 py-2 text-right align-middle tabular-nums dark:border-slate-800',
@@ -529,7 +528,7 @@ export function EmptyState({
 /** ข้อความอธิบายเล็กๆ มีเส้นนำหน้า */
 export function HelpNote({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-2 border-l-2 border-slate-300 pl-3 text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+    <div className="mt-2 border-l-2 border-slate-300 pl-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
       {children}
     </div>
   );

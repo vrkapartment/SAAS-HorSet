@@ -240,7 +240,8 @@ function SettingsHubContent() {
       icon: Network,
       description: t("settings_hub.tabs.supabase.description"),
       group: "advanced",
-      allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
+      // เฉพาะ super_admin เท่านั้น — admin ทั่วไปไม่ต้องเห็นเมนูตรวจสอบการเชื่อมต่อ Supabase
+      allowed: currentUser?.role === "super_admin"
     }
   ]
 
