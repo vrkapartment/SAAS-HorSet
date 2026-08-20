@@ -414,7 +414,7 @@ export default function TaxPage() {
           const taxDatasetCacheKey = `tax_dataset_${taxYear}`
           const cachedTaxDataset = getCachedData<TaxDataset>(currentWsId, taxDatasetCacheKey)
           const extraTaxDatasetPromise = cachedTaxDataset ? null : Promise.all([
-            getBills(undefined, String(Number(taxYear) - 1)),
+            getBills(undefined, String(Number(taxYear) - 1), currentWsId),
             getExpenses(String(Number(taxYear) - 1), currentWsId),
             getPp30Filings(currentWsId),
             getTaxDeductions(currentWsId, Number(taxYear)),
@@ -537,7 +537,7 @@ export default function TaxPage() {
             prefetchTenants = cachedTenants
           } else {
             fetchPromises.push(
-              getTenants().then(tenantsRes => {
+              getTenants(currentWsId).then(tenantsRes => {
                 if (tenantsRes.success && tenantsRes.data) {
                   setTenants(tenantsRes.data)
                   prefetchTenants = tenantsRes.data
@@ -555,7 +555,7 @@ export default function TaxPage() {
             prefetchRooms = cachedRooms
           } else {
             fetchPromises.push(
-              getRooms().then(roomsRes => {
+              getRooms(currentWsId).then(roomsRes => {
                 if (roomsRes.success && roomsRes.data) {
                   const mappedRooms = roomsRes.data.map((r: any) => ({
                     roomNumber: r.roomNumber,
@@ -588,7 +588,7 @@ export default function TaxPage() {
             prefetchBills = cachedBills
           } else {
             fetchPromises.push(
-              getBills(undefined, taxYear).then(billsRes => {
+              getBills(undefined, taxYear, currentWsId).then(billsRes => {
                 if (billsRes.success && billsRes.data) {
                   const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
                     id: b.id,

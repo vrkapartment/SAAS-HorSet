@@ -424,19 +424,45 @@ function UnifiedBillingContent() {
     return true
   }
 
+  // นับ loadData ที่กำลังทำงานอยู่ "ทุกรอบ" (รวม silent) — ใช้กัน refresh เบื้องหลังยิงซ้อนกันเอง
+  const loadDataInFlightCountRef = useRef(0)
+  // นับเฉพาะรอบที่โชว์ spinner — แยกจากตัวบนเพื่อไม่ให้ silent refresh ที่ค้างอยู่ไปกดให้ spinner ค้างไม่ยอมปิด
+  const visibleLoadInFlightRef = useRef(0)
+  // เวลาที่ระงับ refresh เบื้องหลังถึง (epoch ms) — ตั้งตอนที่เราเขียนข้อมูลเอง เพราะ realtime จะ echo
+  // event กลับมาเป็นชุด ซึ่ง optimistic update จัดการ state/cache ครบแล้ว ไม่ต้อง refetch ทับ
+  const suppressRefreshUntilRef = useRef(0)
+
+  const suppressBackgroundRefresh = (ms = 5000) => {
+    suppressRefreshUntilRef.current = Date.now() + ms
+  }
+
+  // ลำดับการเรียก loadData — ใช้ทิ้งผลลัพธ์ของรอบเก่าที่โหลดช้ากว่า ไม่ให้มาทับรอบใหม่ที่เสร็จก่อน
+  // (เช่น silent refresh ของเดือนเดิมยังค้างอยู่ แล้วผู้ใช้สลับเดือน — คำตอบเดือนเดิมต้องถูกทิ้ง)
+  const loadDataSeqRef = useRef(0)
+
   const loadData = async (cycle = billingCycle, forceRefresh = false, silent = false) => {
-    if (!silent) setLoading(true)
-    
+    const seq = ++loadDataSeqRef.current
+    if (!silent) {
+      setLoading(true)
+      visibleLoadInFlightRef.current++
+    }
+    loadDataInFlightCountRef.current++
+
     try {
       // 0. ดึงและแคชข้อมูลโปรไฟล์ผู้ใช้เพื่อระบุ Workspace ปัจจุบันแบบไร้รอยต่อ
+      // refresh เบื้องหลัง (silent) ไม่ต้องดึงโปรไฟล์ใหม่ — role/permissions/workspace ไม่เปลี่ยนกลางเซสชัน
+      // เดิมดึงซ้ำทุกรอบ ซึ่งเป็น 3 query เรียงกัน (auth.getUser + profiles + workspaces) ต่อ 1 event
       let userProfile = getCachedData("global", "profile")
-      if (!userProfile || forceRefresh) {
+      if (!userProfile || (forceRefresh && !silent)) {
         const userRes = await getCurrentUserProfileAction()
         if (userRes.success && userRes.data) {
           userProfile = userRes.data
           setCachedData("global", "profile", userRes.data)
         }
       }
+
+      // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอข้อมูลโปรไฟล์ ให้ทิ้งผลลัพธ์รอบนี้ทั้งหมด
+      if (loadDataSeqRef.current !== seq) return
 
       let wsId = ""
       let regCycleVal = ""
@@ -477,22 +503,35 @@ function UnifiedBillingContent() {
         setCurrentWorkspaceId(wsId)
       }
 
-      // ถ้าเป็นการ Force Refresh (เช่น มีการบันทึกมิเตอร์สำเร็จ หรือกดปุ่มอัปเดต) ให้ล้างแคชเก่าออก
-      if (forceRefresh && wsId) {
+      // ถ้าเป็นการ Force Refresh ที่ผู้ใช้สั่งเอง (กดอัปเดต / เปลี่ยนมิเตอร์) ให้ล้างแคชเก่าออกทั้งก้อน
+      // แต่ refresh เบื้องหลัง (silent) ห้ามล้าง — ข้อมูลที่เปลี่ยนคือบิล/มิเตอร์ของรอบนี้ ซึ่งถูกดึงสด
+      // ทุกครั้งที่ forceRefresh อยู่แล้วด้านล่าง (ดู `!dbBills || forceRefresh`) ส่วน rooms/finance_settings
+      // ไม่เปลี่ยนตอนจดมิเตอร์ ถ้าล้างทุก event จะถูกดึงซ้ำฟรี ๆ ทุกรอบ พร้อม join tenants/room_types ก้อนใหญ่
+      if (forceRefresh && wsId && !silent) {
         clearWorkspaceCache(wsId)
       }
 
+      // refresh เบื้องหลังยอมใช้ rooms/finance_settings ที่แคชไว้ได้ แต่จำกัดอายุสั้นกว่า TTL ปกติ (5 นาที)
+      // เพื่อให้การเปลี่ยนผู้เช่า/อัตราค่าน้ำไฟจากเครื่องอื่นยังตามมาทันในระดับนาทีเหมือนเดิม
+      const sharedCacheTtl = silent ? 60000 : undefined
+
       // ดึงข้อมูลทั้งหมดในคราวเดียวผ่าน Server Action แบบขนาน (หรือใช้ Cache ท้องถิ่นถ้ามีครบและไม่ใช่การ Force Refresh)
-      let rooms = wsId ? getCachedData(wsId, "rooms") : null
+      let rooms = wsId ? getCachedData(wsId, "rooms", sharedCacheTtl) : null
       const prevCycle = getPreviousCycle(cycle)
       let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
       let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
       let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
       let dbPrevMeters = wsId ? getCachedData(wsId, `meters_${prevCycle}`) : null
-      let financeData = wsId ? getCachedData(wsId, "finance_settings") : null
+      let financeData = wsId ? getCachedData(wsId, "finance_settings", sharedCacheTtl) : null
       let usageAveragesData = wsId ? getCachedData(wsId, `usage_avg_${cycle}`) : null
 
       const needsFetch = forceRefresh || !rooms || !dbBills || !dbMeters || !dbReplacements || !dbPrevMeters || !financeData || !usageAveragesData
+
+      // rooms/finance_settings ที่ส่งเข้าไปเป็นค่าจากแคช เซิร์ฟเวอร์จะส่งกลับมาเหมือนเดิมโดยไม่ query ใหม่
+      // จึงต้องจำไว้ว่าค่านี้มาจากแคช ห้ามเอาไป setCachedData ซ้ำ ไม่เช่นนั้น timestamp จะถูกรีเซ็ตทุกรอบ
+      // แล้ว TTL จะไม่มีวันหมดอายุ = ข้อมูลห้อง/ค่าน้ำไฟค้างเก่าถาวรตราบใดที่ยังมี refresh เบื้องหลังวิ่งอยู่
+      const roomsFromCache = !!rooms
+      const financeFromCache = !!financeData
 
       if (needsFetch) {
         // ส่งข้อมูลที่ cache ไว้แล้ว (rooms/finance_settings ไม่เปลี่ยนตามเดือน) เพื่อไม่ให้ Server Action fetch ซ้ำตอนสลับเดือน
@@ -503,7 +542,7 @@ function UnifiedBillingContent() {
         if (unifiedRes.success && unifiedRes.data) {
           const fetched = unifiedRes.data
 
-          if (!rooms || forceRefresh) {
+          if (!roomsFromCache) {
             rooms = fetched.rooms
             if (wsId) setCachedData(wsId, "rooms", rooms)
           }
@@ -523,7 +562,7 @@ function UnifiedBillingContent() {
             dbPrevMeters = fetched.prevMeters
             if (wsId) setCachedData(wsId, `meters_${prevCycle}`, dbPrevMeters)
           }
-          if (!financeData || forceRefresh) {
+          if (!financeFromCache) {
             financeData = fetched.financeSettings
             if (wsId && financeData) setCachedData(wsId, "finance_settings", financeData)
           }
@@ -540,6 +579,9 @@ function UnifiedBillingContent() {
           usageAveragesData = usageAveragesData || {}
         }
       }
+
+      // ถ้ามีการเรียก loadData รอบใหม่กว่าเริ่มไปแล้วระหว่างที่รอบนี้กำลังโหลดอยู่ ให้ทิ้งผลลัพธ์รอบนี้ทั้งหมด
+      if (loadDataSeqRef.current !== seq) return
 
       setRoomsList(rooms)
       setUsageAverages(usageAveragesData || {})
@@ -676,11 +718,23 @@ function UnifiedBillingContent() {
           invoiceId: roomBill?.invoiceId || undefined
         }
       })
-      setUnifiedItems(compiled)
+      // refresh เบื้องหลัง (silent) ห้ามเขียนทับแถวที่ผู้ใช้กำลังพิมพ์ค้างอยู่ — คำขอถูกยิงตอนที่ยังไม่มี
+      // การแก้ไข แต่กว่าจะได้ผลลัพธ์กลับมาผู้ใช้อาจกรอกเลขมิเตอร์ไปแล้ว ถ้า set ทับทั้งก้อนเลขที่พิมพ์จะหาย
+      // (แถวที่ไม่ได้แก้ยังรับข้อมูลใหม่ปกติ เช่น ผู้เช่าห้องอื่นอัปโหลดสลิปเข้ามาระหว่างนั้น)
+      setUnifiedItems(prev => {
+        if (!silent) return compiled
+        const editedByRoom = new Map(prev.filter(i => i.isEdited).map(i => [i.roomNumber, i]))
+        if (editedByRoom.size === 0) return compiled
+        return compiled.map((fresh: UnifiedRoomBillingItem) => editedByRoom.get(fresh.roomNumber) ?? fresh)
+      })
     } catch (err) {
       console.error("Failed to load billing unified items with cache:", err)
     } finally {
-      if (!silent) setLoading(false)
+      loadDataInFlightCountRef.current--
+      if (!silent) {
+        visibleLoadInFlightRef.current--
+        if (visibleLoadInFlightRef.current === 0) setLoading(false)
+      }
     }
   }
 
@@ -690,18 +744,46 @@ function UnifiedBillingContent() {
 
   // เก็บค่าล่าสุดไว้ใน ref เพื่อให้ทั้ง Realtime handler และ fallback poll อ่านค่าปัจจุบันได้
   // โดยไม่ต้องผูก effect ไว้กับ unifiedItems (ซึ่งเปลี่ยนทุกครั้งที่แก้ไขข้อมูล จะทำให้ subscribe ซ้ำไม่จำเป็น)
-  const guardStateRef = useRef({ unifiedItems, slipModalOpen, createBillModalOpen })
+  const guardStateRef = useRef({ unifiedItems, slipModalOpen, createBillModalOpen, billingCycle })
   useEffect(() => {
-    guardStateRef.current = { unifiedItems, slipModalOpen, createBillModalOpen }
-  }, [unifiedItems, slipModalOpen, createBillModalOpen])
+    guardStateRef.current = { unifiedItems, slipModalOpen, createBillModalOpen, billingCycle }
+  }, [unifiedItems, slipModalOpen, createBillModalOpen, billingCycle])
+
+  // ยุบ realtime event ที่มาเป็นชุดให้เหลือ refresh เดียว — bulk upsert 1 ครั้งทำให้ Postgres emit
+  // change ทีละแถว (N ห้อง = N event) ถ้า refresh ทุก event จะกลายเป็น N คำขอหนักแย่งคิวกันเอง
+  const REFRESH_DEBOUNCE_MS = 2000
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshIfSafe = () => {
-    const { unifiedItems: items, slipModalOpen: slipOpen, createBillModalOpen: createOpen } = guardStateRef.current
+    const {
+      unifiedItems: items,
+      slipModalOpen: slipOpen,
+      createBillModalOpen: createOpen,
+      billingCycle: currentCycle
+    } = guardStateRef.current
+
+    if (Date.now() < suppressRefreshUntilRef.current) return
+    if (loadDataInFlightCountRef.current > 0) return
+
     const hasUnsaved = items.some(item => item.isEdited)
-    if (!hasUnsaved && !slipOpen && !createOpen) {
-      loadData(billingCycle, true, true) // forceRefresh=true, silent=true
-    }
+    if (hasUnsaved || slipOpen || createOpen) return
+
+    loadData(currentCycle, true, true) // forceRefresh=true, silent=true
   }
+
+  const scheduleRefresh = () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null
+      refreshIfSafe()
+    }, REFRESH_DEBOUNCE_MS)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    }
+  }, [])
 
   // อัปเดตข้อมูลบิลทันทีผ่าน Supabase Realtime เมื่อมีการเปลี่ยนแปลงจริง (เช่น ผู้เช่าอัปโหลดสลิป)
   // แทนการ poll ถามทุก ๆ ไม่กี่วินาทีโดยไม่รู้ว่ามีอะไรเปลี่ยนหรือไม่
@@ -714,7 +796,17 @@ function UnifiedBillingContent() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bills", filter: `workspace_id=eq.${currentWorkspaceId}` },
-        () => refreshIfSafe()
+        (payload) => {
+          // Supabase realtime รับ filter ได้เงื่อนไขเดียว จึงต้องกรองรอบบิลฝั่ง client — บิลของเดือนอื่น
+          // ไม่กระทบข้อมูลที่หน้านี้แสดง ไม่ควรเสีย refresh ทั้งก้อน
+          // (event DELETE ส่ง old มาแค่ primary key ถ้าไม่ได้ตั้ง REPLICA IDENTITY FULL จึงอ่านรอบบิลไม่ได้
+          //  กรณีนั้นปล่อยให้ refresh ตามปกติ ปลอดภัยกว่าเสี่ยงข้ามการอัปเดตจริง)
+          const changedCycle =
+            (payload.new as Record<string, unknown> | null)?.billing_cycle ??
+            (payload.old as Record<string, unknown> | null)?.billing_cycle
+          if (typeof changedCycle === "string" && changedCycle !== guardStateRef.current.billingCycle) return
+          scheduleRefresh()
+        }
       )
       .subscribe()
 
@@ -728,13 +820,13 @@ function UnifiedBillingContent() {
     // หยุด poll เมื่อแท็บถูกซ่อน (ประหยัด CPU ฝั่งเซิร์ฟเวอร์) แล้ว refresh ทันทีเมื่อกลับมาเปิดดูอีกครั้ง
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        refreshIfSafe()
+        scheduleRefresh()
       }
     }, 60000)
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        refreshIfSafe()
+        scheduleRefresh()
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)
@@ -1281,6 +1373,9 @@ function UnifiedBillingContent() {
     const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal + extraExpensesSum
 
     setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
+    // การบันทึกของเราเองจะทำให้ realtime ยิง event กลับมา แต่ updateLocalStateAndCache ด้านล่าง
+    // อัปเดต state + cache ครบแล้ว ไม่ต้องเสีย refresh ทั้งก้อนมาทับ
+    suppressBackgroundRefresh()
 
     try {
       // 1. บันทึกมิเตอร์ใน DB
@@ -1332,6 +1427,8 @@ function UnifiedBillingContent() {
       alert(t("manage_bills.err_unexpected"))
     } finally {
       setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+      // ต่ออายุช่วงระงับนับจากตอนที่บันทึกเสร็จจริง เผื่อ event เดินทางมาช้ากว่าที่ตั้งไว้ตอนเริ่ม
+      suppressBackgroundRefresh()
     }
   }
 
@@ -1392,6 +1489,10 @@ function UnifiedBillingContent() {
 
     setSavingAll(true)
     setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: t("billing.saving_all_progress") })
+    // bulk upsert 1 ครั้ง = realtime event 1 ตัวต่อ 1 แถว (N ห้อง = N event) ทั้งหมดเป็น echo ของ
+    // การบันทึกที่เรา optimistic update ครบอยู่แล้วด้านล่าง จึงระงับ refresh เบื้องหลังคลุมช่วงนี้ไว้
+    // (ตั้งเผื่อยาวเพราะ saveAllBillsForCycle ใช้เวลาหลายวินาทีเมื่อห้องเยอะ แล้วต่ออายุอีกครั้งหลังอัปเดต state)
+    suppressBackgroundRefresh(30000)
 
     try {
       const items: BulkBillItem[] = unifiedItems.map(item => ({
@@ -1497,6 +1598,9 @@ function UnifiedBillingContent() {
       alert(t("manage_bills.err_unexpected"))
     } finally {
       setSavingAll(false)
+      // ยุบช่วงระงับที่ตั้งเผื่อไว้ 30 วิ ให้เหลือแค่หางสั้น ๆ นับจากตอนนี้ — พอคลุม event ชุดสุดท้าย
+      // ที่ยังเดินทางมา แต่ไม่กลืนการอัปเดตจริงจากผู้เช่านานเกินจำเป็น (และไม่ค้าง 30 วิ เมื่อบันทึกล้มเหลว)
+      suppressBackgroundRefresh(5000)
     }
   }
 

@@ -177,10 +177,10 @@ export async function loadTaxDataset(workspaceId: string, year: number, prefetch
       deductionsRes,
       pitFilingsRes,
     ] = await Promise.all([
-      prefetch?.thisYearBills ? Promise.resolve({ success: true, data: prefetch.thisYearBills }) : getBills(undefined, thisYear),
-      prefetch?.prevYearBills ? Promise.resolve({ success: true, data: prefetch.prevYearBills }) : getBills(undefined, prevYear),
+      prefetch?.thisYearBills ? Promise.resolve({ success: true, data: prefetch.thisYearBills }) : getBills(undefined, thisYear, workspaceId),
+      prefetch?.prevYearBills ? Promise.resolve({ success: true, data: prefetch.prevYearBills }) : getBills(undefined, prevYear, workspaceId),
       prefetch?.rooms ? Promise.resolve({ success: true, data: null }) : getRooms(workspaceId),
-      prefetch?.tenants ? Promise.resolve({ success: true, data: prefetch.tenants }) : getTenants(),
+      prefetch?.tenants ? Promise.resolve({ success: true, data: prefetch.tenants }) : getTenants(workspaceId),
       prefetch?.cancelledContracts ? Promise.resolve({ success: true, data: prefetch.cancelledContracts }) : getCancelledContracts(workspaceId),
       prefetch?.thisYearExpenses ? Promise.resolve({ success: true, data: prefetch.thisYearExpenses }) : getExpenses(thisYear, workspaceId),
       prefetch?.prevYearExpenses ? Promise.resolve({ success: true, data: prefetch.prevYearExpenses }) : getExpenses(prevYear, workspaceId),

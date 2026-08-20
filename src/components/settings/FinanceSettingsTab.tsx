@@ -116,7 +116,7 @@ export default function FinanceSettingsTab() {
           setWorkspaceId(currentWsId)
 
           // Load room types
-          const typesRes = await getRoomTypes()
+          const typesRes = await getRoomTypes(currentWsId)
           let fetchedRoomTypes: any[] = []
           if (typesRes.success && typesRes.data) {
             fetchedRoomTypes = typesRes.data

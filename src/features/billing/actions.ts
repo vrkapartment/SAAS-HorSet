@@ -59,7 +59,7 @@ const isSupabaseConfigured =
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
   process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
 
-export async function getBills(billingCycle?: string, year?: string) {
+export async function getBills(billingCycle?: string, year?: string, workspaceId?: string) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
@@ -67,6 +67,12 @@ export async function getBills(billingCycle?: string, year?: string) {
   try {
     const supabase = await createClient()
     let query = supabase.from("bills").select("*")
+    // กรอง workspace ตรง ๆ เพื่อให้ query ใช้ index ได้ ไม่ต้องพึ่ง RLS ประเมินทีละแถวทั่วทั้งตาราง —
+    // ถ้าไม่กรอง cost จะโตตามขนาดตาราง "รวมทุก workspace" ไม่ใช่ตามข้อมูลของหอที่กำลังเปิดอยู่
+    // (ยังคงเป็น optional เพื่อไม่พังผู้เรียกที่ไม่มี workspaceId ในมือ — RLS ยังเป็นด่านความปลอดภัยเสมอ)
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
     if (billingCycle) {
       query = query.eq("billing_cycle", billingCycle)
     } else if (year) {
@@ -962,11 +968,11 @@ export async function getBillingPageData(
       usageAveragesRes
     ] = await Promise.all([
       // ถ้ามีข้อมูลที่ cache ไว้แล้วจากฝั่ง caller (เช่น สลับเดือนแต่ห้องพัก/การตั้งค่าการเงินยังไม่เปลี่ยน) ไม่ต้อง fetch ซ้ำ
-      cached?.rooms ? Promise.resolve({ success: true, data: cached.rooms }) : getRooms(),
-      getBills(cycle),
-      getMeterRecords(cycle),
-      getMeterReplacements(cycle),
-      getMeterRecords(prevCycle),
+      cached?.rooms ? Promise.resolve({ success: true, data: cached.rooms }) : getRooms(workspaceId),
+      getBills(cycle, undefined, workspaceId),
+      getMeterRecords(cycle, workspaceId),
+      getMeterReplacements(cycle, workspaceId),
+      getMeterRecords(prevCycle, workspaceId),
       cached?.financeSettings
         ? Promise.resolve({ success: true, data: cached.financeSettings })
         : workspaceId ? getFinanceSettings(workspaceId) : Promise.resolve({ success: true, data: null }),

@@ -11,14 +11,14 @@ const isSupabaseConfigured =
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
   process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
 
-export async function getTenants() {
+export async function getTenants(workspaceId?: string) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
 
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
+    let query = supabase
       .from("tenants")
       .select(`
         id,
@@ -33,7 +33,12 @@ export async function getTenants() {
           room_number
         )
       `)
-      .order("created_at", { ascending: false })
+    // กรอง workspace ตรง ๆ ให้ query ใช้ idx_tenants_workspace_id ได้ ไม่ต้องพึ่ง RLS ประเมินทีละแถวทั่วทั้งตาราง
+    // (optional เพื่อไม่พังผู้เรียกที่ไม่มี workspaceId ในมือ — RLS ยังเป็นด่านความปลอดภัยเสมอ)
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
+    const { data, error } = await query.order("created_at", { ascending: false })
 
     if (error) throw error
 
@@ -306,7 +311,7 @@ export async function lazyCleanupPastDueTenants(workspaceId: string) {
 }
 
 
-export async function getOldTenants() {
+export async function getOldTenants(workspaceId?: string) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true, data: [] }
   }
@@ -317,11 +322,16 @@ export async function getOldTenants() {
     // จำกัดประวัติผู้เช่าเก่าไว้แค่ 365 วันล่าสุด เพื่อไม่ให้ query ช้าลงเรื่อยๆ ตามอายุการใช้งานของหอ
     const cutoffDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()
 
-    const { data, error } = await supabase
+    // กรอง workspace ตรง ๆ ให้ query ใช้ idx_tenants_old_workspace_id ได้ ไม่ต้องพึ่ง RLS ประเมินทีละแถว
+    // (optional เพื่อไม่พังผู้เรียกที่ไม่มี workspaceId ในมือ — RLS ยังเป็นด่านความปลอดภัยเสมอ)
+    let query = supabase
       .from("tenants_old")
       .select("id, tenant_id, room_number, tenant_name, tenant_phone, line_user_id, lease_start, lease_end, moved_out_at")
       .gte("moved_out_at", cutoffDate)
-      .order("moved_out_at", { ascending: false })
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
+    const { data, error } = await query.order("moved_out_at", { ascending: false })
 
     if (error) {
       if (error.code === "42P01") {

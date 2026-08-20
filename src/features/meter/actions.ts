@@ -6,18 +6,23 @@ const isSupabaseConfigured =
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
   process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
 
-export async function getMeterRecords(billingCycle: string) {
+export async function getMeterRecords(billingCycle: string, workspaceId?: string) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
 
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
+    // กรอง workspace ตรง ๆ เพื่อให้ query ใช้ index ได้ ไม่ต้องพึ่ง RLS ประเมินทีละแถวทั่วทั้งตาราง
+    // (optional เพื่อไม่พังผู้เรียกที่ไม่มี workspaceId ในมือ — RLS ยังเป็นด่านความปลอดภัยเสมอ)
+    let query = supabase
       .from("meter_records")
       .select("*")
       .eq("billing_cycle", billingCycle)
-      .order("room_number", { ascending: true })
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
+    const { data, error } = await query.order("room_number", { ascending: true })
 
     if (error) throw error
 
@@ -178,18 +183,24 @@ export async function saveMeterReplacement(
   }
 }
 
-export async function getMeterReplacements(billingCycle: string) {
+export async function getMeterReplacements(billingCycle: string, workspaceId?: string) {
   if (!isSupabaseConfigured) {
     return { success: true, data: [] }
   }
 
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
+    // กรอง workspace ตรง ๆ เพื่อให้ query ใช้ index ได้ ไม่ต้องพึ่ง RLS ประเมินทีละแถวทั่วทั้งตาราง
+    // (optional เพื่อไม่พังผู้เรียกที่ไม่มี workspaceId ในมือ — RLS ยังเป็นด่านความปลอดภัยเสมอ)
+    let query = supabase
       .from("meter_replacements")
       .select("*")
       .eq("billing_cycle", billingCycle)
       .eq("is_active", true)
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
+    const { data, error } = await query
 
     if (error) throw error
 

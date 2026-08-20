@@ -109,7 +109,7 @@ export default function PropertySettingsTab() {
           setWorkspaceId(currentWsId)
 
           // โหลดประเภทห้องพัก
-          const typesRes = await getRoomTypes()
+          const typesRes = await getRoomTypes(currentWsId)
           let fetchedRoomTypes: any[] = []
           if (typesRes.success && typesRes.data) {
             fetchedRoomTypes = typesRes.data
