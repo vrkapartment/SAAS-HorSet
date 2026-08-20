@@ -400,8 +400,8 @@ export default function TenantsPage() {
     try {
       const wsId = getCookie("horset_current_workspace_id") || ""
       const [currentRes, oldRes, financeRes, roomsRes] = await Promise.all([
-        getTenants(),
-        getOldTenants(),
+        getTenants(wsId),
+        getOldTenants(wsId),
         getFinanceSettings(wsId).catch(() => ({ success: false, data: null })),
         getRooms(wsId).catch(() => ({ success: false, data: [] }))
       ])

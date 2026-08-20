@@ -10,11 +10,11 @@ export async function getDashboardData(year: string, workspaceId: string) {
     // ดึงข้อมูลทั้งหมดแบบคู่ขนาน (Parallel) บนเซิร์ฟเวอร์โดยตรง
     // ทำให้เหลือ HTTP Request จากหน้าบ้านไปยังหลังบ้านเพียงแค่ 1 ครั้งถ้วน
     const [roomsRes, tenantsRes, billsRes, expensesRes, oldTenantsRes] = await Promise.all([
-      getRooms(),
-      getTenants(),
-      getBills(undefined, year),
+      getRooms(workspaceId),
+      getTenants(workspaceId),
+      getBills(undefined, year, workspaceId),
       getExpenses(year, workspaceId),
-      getOldTenants()
+      getOldTenants(workspaceId)
     ])
 
     return {

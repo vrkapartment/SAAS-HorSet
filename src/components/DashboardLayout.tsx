@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
@@ -313,24 +313,37 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       // ดึงข้อมูลแจ้งเตือนทันที
       fetchNotifications(false, currentWorkspace.id)
 
+      // ยุบทริกเกอร์ที่มาติด ๆ กันให้เหลือคำขอเดียว — การบันทึกบิลทั้งหอ 1 ครั้งเป็น bulk upsert แถวเดียวจบ
+      // แต่ Postgres emit realtime change ทีละแถว (N ห้อง = N event) ถ้ายิง fetchNotifications ทุก event
+      // จะกลายเป็น N คำขอไปแย่งคิว server action เดียวกับที่หน้าบิลใช้บันทึกมิเตอร์อยู่
+      // (focus + visibilitychange ก็ยิงพร้อมกันตอนกลับมาที่แท็บ การยุบรวมจึงตัดคำขอซ้ำทิ้งไปด้วย)
+      let notificationsRefreshTimer: ReturnType<typeof setTimeout> | null = null
+      const scheduleNotificationsRefresh = () => {
+        if (notificationsRefreshTimer) clearTimeout(notificationsRefreshTimer)
+        notificationsRefreshTimer = setTimeout(() => {
+          notificationsRefreshTimer = null
+          fetchNotifications(true, currentWorkspace.id)
+        }, 2000)
+      }
+
       // Poll เป็นแค่ fallback สำรอง (เผื่อ Realtime channel ด้านล่างหลุดการเชื่อมต่อ) เพราะการอัปเดตหลักทำผ่าน
       // Supabase Realtime + window focus refetch ด้านล่างอยู่แล้ว ซึ่งไวกว่าและไม่ต้องยิง Server Action ทุก 15 วิ
       // หยุด poll เมื่อแท็บถูกซ่อน (ประหยัด CPU ฝั่งเซิร์ฟเวอร์) แล้วรีเฟรชทันทีเมื่อกลับมาเปิดดูอีกครั้ง
       const intervalId = setInterval(() => {
         if (document.visibilityState === "visible") {
-          fetchNotifications(true, currentWorkspace.id)
+          scheduleNotificationsRefresh()
         }
       }, 180000)
 
       // ดึงข้อมูลทันทีเมื่อเปิดแท็บหรือหน้าจอเบราว์เซอร์กลับมาโฟกัสอีกครั้ง (ทำงานเงียบๆ ในพื้นหลัง)
       const handleWindowFocus = () => {
-        fetchNotifications(true, currentWorkspace.id)
+        scheduleNotificationsRefresh()
       }
       window.addEventListener("focus", handleWindowFocus)
 
       const handleVisibilityChange = () => {
         if (document.visibilityState === "visible") {
-          fetchNotifications(true, currentWorkspace.id)
+          scheduleNotificationsRefresh()
         }
       }
       document.addEventListener("visibilitychange", handleVisibilityChange)
@@ -349,7 +362,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           },
           (payload) => {
             console.log("Real-time notification: bills table changed.", payload)
-            fetchNotifications(true, currentWorkspace.id)
+            scheduleNotificationsRefresh()
           }
         )
         .on(
@@ -362,7 +375,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           },
           (payload) => {
             console.log("Real-time notification: workspace_line_settings table changed.", payload)
-            fetchNotifications(true, currentWorkspace.id)
+            scheduleNotificationsRefresh()
           }
         )
         .on(
@@ -375,7 +388,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           },
           (payload) => {
             console.log("Real-time notification: tenants table changed.", payload)
-            fetchNotifications(true, currentWorkspace.id)
+            scheduleNotificationsRefresh()
           }
         )
         .subscribe((status) => {
@@ -384,7 +397,11 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
       return () => {
         clearInterval(intervalId)
+        if (notificationsRefreshTimer) clearTimeout(notificationsRefreshTimer)
         window.removeEventListener("focus", handleWindowFocus)
+        // เดิมลืมถอด listener ตัวนี้ ทำให้ทุกครั้งที่สลับ workspace จะมี handler ค้างสะสมเพิ่มขึ้นเรื่อย ๆ
+        // แล้วยิง fetchNotifications ซ้ำเป็นจำนวนเท่าที่สะสมไว้ทุกครั้งที่กลับมาที่แท็บ
+        document.removeEventListener("visibilitychange", handleVisibilityChange)
         supabase.removeChannel(channel)
       }
     }
@@ -635,31 +652,31 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
     switch (path) {
       case "/rooms":
         if (!getCachedData(wsId, "rooms")) {
-          getRooms().then(res => {
+          getRooms(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
           }).catch(() => {})
         }
         if (!getCachedData(wsId, "room_types")) {
-          getRoomTypes().then(res => {
+          getRoomTypes(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "room_types", res.data)
           }).catch(() => {})
         }
         break
       case "/tenants":
         if (!getCachedData(wsId, "tenants")) {
-          getTenants().then(res => {
+          getTenants(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "tenants", res.data)
           }).catch(() => {})
         }
         if (!getCachedData(wsId, "rooms")) {
-          getRooms().then(res => {
+          getRooms(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
           }).catch(() => {})
         }
         break
       case "/billing":
         if (!getCachedData(wsId, "bills_year_2026")) {
-          getBills(undefined, "2026").then(res => {
+          getBills(undefined, "2026", wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }
@@ -683,7 +700,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           }).catch(() => {})
         }
         if (!getCachedData(wsId, "bills_year_2026")) {
-          getBills(undefined, "2026").then(res => {
+          getBills(undefined, "2026", wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }
@@ -698,17 +715,17 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         break
       case "/dashboard":
         if (!getCachedData(wsId, "rooms")) {
-          getRooms().then(res => {
+          getRooms(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
           }).catch(() => {})
         }
         if (!getCachedData(wsId, "tenants")) {
-          getTenants().then(res => {
+          getTenants(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "tenants", res.data)
           }).catch(() => {})
         }
         if (!getCachedData(wsId, "bills_year_2026")) {
-          getBills(undefined, "2026").then(res => {
+          getBills(undefined, "2026", wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }
@@ -728,19 +745,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       try {
         // 1. โหลดข้อมูลห้องพัก & ประเภทห้องล่วงหน้า
         if (!getCachedData(wsId, "rooms")) {
-          getRooms().then(res => {
+          getRooms(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "rooms", res.data)
           }).catch(() => {})
         }
         if (!getCachedData(wsId, "room_types")) {
-          getRoomTypes().then(res => {
+          getRoomTypes(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "room_types", res.data)
           }).catch(() => {})
         }
 
         // 2. โหลดข้อมูลสัญญาผู้เช่าล่วงหน้า
         if (!getCachedData(wsId, "tenants")) {
-          getTenants().then(res => {
+          getTenants(wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "tenants", res.data)
           }).catch(() => {})
         }
@@ -754,7 +771,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
         // 4. โหลดข้อมูลบิลทั้งหมดล่วงหน้า
         if (!getCachedData(wsId, "bills_year_2026")) {
-          getBills(undefined, "2026").then(res => {
+          getBills(undefined, "2026", wsId).then(res => {
             if (res.success && res.data) setCachedData(wsId, "bills_year_2026", res.data)
           }).catch(() => {})
         }

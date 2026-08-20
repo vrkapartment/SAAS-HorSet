@@ -1,10 +1,11 @@
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
 import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, AlertTriangle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
 import { saveMeterReplacement, deleteMeterReplacement } from "@/features/meter/actions"
+import { useIsDesktop } from "@/hooks/useIsDesktop"
 
 interface MeterReadingTableProps {
   isDark: boolean
@@ -109,6 +110,34 @@ export default function MeterReadingTable({
   const [copiedLinks, setCopiedLinks] = useState<{ [room: string]: boolean }>({})
   const [unlockedPaidRooms, setUnlockedPaidRooms] = useState<Record<string, boolean>>({})
 
+  // ดัชนีสำหรับ lookup แบบ O(1) — เดิมทุกแถวเรียก .find() ไล่ทั้ง array ซ้ำหลายรอบต่อการ render 1 ครั้ง
+  // (roomsList 1 ครั้งในแถว + อีก 1 ครั้งใน getUsageAnomaly + meterReplacements ใน getUnitsUsedWithRollover
+  //  และ isMeterRollover) แล้วยัง render ซ้ำทั้ง mobile list และ desktop table พร้อมกัน
+  // ต้นทุนรวมจึงเป็น O(N²) ต่อการกดแป้น 1 ครั้ง เพราะ setUnifiedItems สร้าง array ใหม่ทุกตัวอักษรที่พิมพ์
+  const roomInfoByNumber = useMemo(
+    () => new Map<string, any>((roomsList || []).map((r: any) => [r.roomNumber, r])),
+    [roomsList]
+  )
+  const replacementByRoomType = useMemo(
+    () => new Map<string, any>((meterReplacements || []).map((r: any) => [`${r.roomNumber}:${r.meterType}`, r])),
+    [meterReplacements]
+  )
+  const itemByRoomNumber = useMemo(
+    () => new Map<string, any>((unifiedItems || []).map((i: any) => [i.roomNumber, i])),
+    [unifiedItems]
+  )
+
+  // เดิม render ทั้ง mobile card list และ desktop table พร้อมกันเสมอ แล้วให้ CSS ซ่อนฝั่งที่ไม่ใช้
+  // (block md:hidden / hidden md:block) แปลว่ามี 2N แถวใน tree ตลอด และทุกตัวอักษรที่พิมพ์ต้อง
+  // สร้าง JSX + reconcile ทั้ง 2N แถว ทั้งที่ผู้ใช้เห็นแค่ N แถว
+  //
+  // isDesktop เป็น null ตอน SSR/hydration → ช่วงนั้นยัง render ทั้งสองฝั่งเหมือนเดิม (CSS ซ่อนให้)
+  // พอรู้ขนาดจริงจึงตัดฝั่งที่ไม่ได้แสดงออกจาก tree — คงคลาส CSS เดิมไว้เป็นตัวกันชนด้วย
+  // เผื่อ media query ให้ค่าไม่ตรง จะได้ไม่มีทางแสดงผลผิดฝั่ง
+  const isDesktop = useIsDesktop()
+  const showMobileList = isDesktop !== true
+  const showDesktopTable = isDesktop !== false
+
   // --- มิเตอร์หมุนเวียนครบรอบ (Meter Rollover) & เปลี่ยนมิเตอร์ (Meter Replacement) Helpers ---
   const [replacementModal, setReplacementModal] = useState<{
     isOpen: boolean;
@@ -121,7 +150,7 @@ export default function MeterReadingTable({
   } | null>(null);
 
   const getReplacement = (roomNumber: string, type: "electric" | "water") => {
-    return meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === type);
+    return replacementByRoomType.get(`${roomNumber}:${type}`);
   };
 
   const getUnitsUsedWithRollover = (
@@ -179,7 +208,7 @@ export default function MeterReadingTable({
   };
 
   const handleOpenReplacementModal = (roomNumber: string, meterType: "electric" | "water", existing?: any) => {
-    const item = unifiedItems.find(i => i.roomNumber === roomNumber);
+    const item = itemByRoomNumber.get(roomNumber);
     if (!item) return;
 
     if (!permissions.manage_meters_bills) {
@@ -302,7 +331,7 @@ export default function MeterReadingTable({
     const result = { hasAnomaly: false, elecAbnormal: false, waterAbnormal: false, elecUnits: 0, elecAvg: 0, waterUnits: 0, waterAvg: 0 }
     if (!item.tenantName) return result
 
-    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+    const roomInfo = roomInfoByNumber.get(item.roomNumber)
     const leaseStart = roomInfo?.leaseStart
     if (leaseStart && billingCycle) {
       const leaseDate = new Date(leaseStart)
@@ -338,7 +367,7 @@ export default function MeterReadingTable({
   }
 
   const onSaveRowWithRolloverCheck = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
-    const item = unifiedItems.find(i => i.roomNumber === roomNumber)
+    const item = itemByRoomNumber.get(roomNumber)
     if (!item) return
 
     const doSave = async () => {
@@ -448,17 +477,21 @@ export default function MeterReadingTable({
 
 
   // กรองห้องที่{t("billing.occupied")}และออกบิลประจำรอบนั้นแล้ว (ไม่รวมห้อง{t("billing.vacant")} หรือยังไม่ออกบิล)
-  const activeRooms = unifiedItems.filter(item => item.tenantName && item.billStatus !== "not_created")
+  // ใช้เฉพาะในโมดอลส่ง LINE OA แบบกลุ่ม แต่เดิมคำนวณใหม่ทุกครั้งที่ render (คือทุกตัวอักษรที่พิมพ์)
+  const activeRooms = useMemo(
+    () => unifiedItems.filter(item => item.tenantName && item.billStatus !== "not_created"),
+    [unifiedItems]
+  )
 
-  const connectedRooms = activeRooms.filter(item => {
-    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
-    return !!roomInfo?.lineUserId
-  })
+  const connectedRooms = useMemo(
+    () => activeRooms.filter(item => !!roomInfoByNumber.get(item.roomNumber)?.lineUserId),
+    [activeRooms, roomInfoByNumber]
+  )
 
-  const unconnectedRooms = activeRooms.filter(item => {
-    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
-    return !roomInfo?.lineUserId
-  })
+  const unconnectedRooms = useMemo(
+    () => activeRooms.filter(item => !roomInfoByNumber.get(item.roomNumber)?.lineUserId),
+    [activeRooms, roomInfoByNumber]
+  )
 
   // ฟังก์ชันจัดรูปแบบรอบบิลสำหรับใช้ในหน้านี้ (Bilingual)
   function formatBillingCycleLocal(cycleStr: string, currentLocale: string): string {
@@ -511,7 +544,7 @@ export default function MeterReadingTable({
       portalLink = `${safeAppUrl}/portal`
     }
 
-    const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+    const roomInfo = roomInfoByNumber.get(item.roomNumber)
     const extraExpenses = roomInfo?.extraExpenses || []
     const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -681,7 +714,7 @@ Thank you 🙏`
           continue
         }
 
-        const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+        const roomInfo = roomInfoByNumber.get(item.roomNumber)
         const lineUserId = roomInfo?.lineUserId
 
         if (!lineUserId) {
@@ -860,6 +893,7 @@ Thank you 🙏`
         </div>
 
         {/* Mobile View: Card List (< 768px) */}
+        {showMobileList && (
         <div className="block md:hidden space-y-4">
           {loading ? (
             <div className="py-12 text-center text-slate-500 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-sm">
@@ -882,7 +916,7 @@ Thank you 🙏`
                 ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
               
-              const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+              const roomInfo = roomInfoByNumber.get(item.roomNumber)
               const extraExpenses = roomInfo?.extraExpenses || []
               const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -1611,8 +1645,10 @@ Thank you 🙏`
             </div>
           )}
         </div>
+        )}
 
         {/* Desktop View: Standard Dense Table (>= 768px) */}
+        {showDesktopTable && (
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs xl:text-sm 2xl:text-base border-collapse">
             <thead>
@@ -1682,7 +1718,7 @@ Thank you 🙏`
                     ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
                   
-                  const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+                  const roomInfo = roomInfoByNumber.get(item.roomNumber)
                   const extraExpenses = roomInfo?.extraExpenses || []
                   const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -2383,6 +2419,7 @@ Thank you 🙏`
             </tbody>
           </table>
         </div>
+        )}
 
         {/* ปุ่มบันทึกข้อมูลมิเตอร์ทั้งหมด (Bulk Save - แสดงเฉพาะในแถบมิเตอร์ไฟ / มิเตอร์น้ำ) */}
         {!loading && unifiedItems.length > 0 && activeTab !== "all" && (
