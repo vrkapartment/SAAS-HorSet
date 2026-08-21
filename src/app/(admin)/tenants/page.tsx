@@ -33,6 +33,7 @@ import {
   LayoutGrid,
   List,
   Edit,
+  Building,
   ArrowRightLeft
 } from "lucide-react"
 import { getTenants, getOldTenants, deleteOldTenant, createTenantsBatch, updateTenant } from "@/features/tenant/actions"
@@ -42,6 +43,14 @@ import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { getRooms } from "@/features/room/actions"
 import { getRoomFloor as getRoomFloorShared, sortFloors } from "@/features/room/utils"
+import { getBuildings } from "@/features/building/actions"
+import {
+  buildBuildingNameMap,
+  matchBuildingByName,
+  collectUnmatchedBuildingNames,
+  normalizeBuildingName,
+  type BuildingMappingRow
+} from "@/features/building/utils"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
 
@@ -64,6 +73,19 @@ interface TenantItem {
   contractEnd: string
   depositPaid?: number | null
   status?: string
+}
+
+/** แถวผู้เช่าที่อ่านมาจากไฟล์ CSV แล้ว — ตรงกับรูปที่ createTenantsBatch รับ บวกชื่ออาคารดิบจากไฟล์ */
+interface CsvTenantRow {
+  room_number: string
+  tenant_name: string
+  phone: string
+  lease_start: string
+  line_number: number
+  /** ชื่ออาคารตามที่เขียนมาในไฟล์ ใช้จับคู่ทีหลังถ้าไม่ตรงกับอาคารในระบบ */
+  csv_building_name: string
+  /** อาคารที่จับคู่ได้แล้ว ("" = รอผู้ใช้เลือกในหน้าต่างจับคู่) */
+  building_id: string
 }
 
 interface OldTenantItem {
@@ -107,6 +129,14 @@ export default function TenantsPage() {
   const [csvErrors, setCsvErrors] = useState<string[] | null>(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
   const [isTemplateGuideModalOpen, setIsTemplateGuideModalOpen] = useState(false)
+  // อาคารของหอนี้ ใช้จับคู่คอลัมน์ building_name ในไฟล์ CSV
+  const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
+  // ชื่ออาคารในไฟล์ที่จับคู่ไม่ได้ (รวบเป็นรายการละ 1 ชื่อ) + แถวผู้เช่าที่รออยู่ระหว่างให้ผู้ใช้จับคู่
+  const [csvBuildingMappings, setCsvBuildingMappings] = useState<BuildingMappingRow[]>([])
+  const [pendingCsvTenants, setPendingCsvTenants] = useState<CsvTenantRow[]>([])
+  const [isCsvBuildingMappingOpen, setIsCsvBuildingMappingOpen] = useState(false)
+  const [csvMappingSubmitting, setCsvMappingSubmitting] = useState(false)
+  const [csvMappingError, setCsvMappingError] = useState<string | null>(null)
 
   // Stats Counters
   const [stats, setStats] = useState({
@@ -167,7 +197,13 @@ export default function TenantsPage() {
         )
       }
 
-      const headers = "room_number,tenant_name,phone,lease_start"
+      // ใส่คอลัมน์ building_name เฉพาะหอที่มีมากกว่า 1 อาคาร — หออาคารเดียวระบบเติมให้เองอยู่แล้ว
+      const isMultiBuilding = buildings.length > 1
+      const buildingNameById = new Map(buildings.map(b => [b.id, b.name]))
+
+      const headers = isMultiBuilding
+        ? "room_number,tenant_name,phone,lease_start,building_name"
+        : "room_number,tenant_name,phone,lease_start"
       const duration = financeSettings?.lease_duration ?? 6
       
       const todayDate = new Date()
@@ -179,11 +215,20 @@ export default function TenantsPage() {
       const rows: string[] = []
       if (sortedRooms.length > 0) {
         sortedRooms.forEach(r => {
-          rows.push(`${r.roomNumber},,,${todayStr}`)
+          // เติมชื่ออาคารจริงของแต่ละห้องให้เลย ผู้ใช้ไม่ต้องมานั่งพิมพ์เองและไม่มีทางสะกดผิด
+          const buildingName = isMultiBuilding ? (buildingNameById.get(r.buildingId) || "") : ""
+          rows.push(isMultiBuilding
+            ? `${r.roomNumber},,,${todayStr},${buildingName}`
+            : `${r.roomNumber},,,${todayStr}`)
         })
       } else {
-        rows.push(`101,สมชาย ใจดี,'0812345678,${todayStr}`)
-        rows.push(`102,สมหญิง รักดี,'0898765432,${todayStr}`)
+        const sampleBuilding = isMultiBuilding ? (buildings[0]?.name || "") : ""
+        rows.push(isMultiBuilding
+          ? `101,สมชาย ใจดี,'0812345678,${todayStr},${sampleBuilding}`
+          : `101,สมชาย ใจดี,'0812345678,${todayStr}`)
+        rows.push(isMultiBuilding
+          ? `102,สมหญิง รักดี,'0898765432,${todayStr},${sampleBuilding}`
+          : `102,สมหญิง รักดี,'0898765432,${todayStr}`)
       }
 
       const csvContent = "\ufeff" + [headers, ...rows].join("\n")
@@ -208,6 +253,62 @@ export default function TenantsPage() {
   }
 
   // ฟังก์ชันอัปโหลดไฟล์ CSV และบันทึกข้อมูลผู้เช่า
+  // ส่งรายชื่อผู้เช่าที่จับคู่อาคารครบแล้วไปบันทึก (ใช้ร่วมกันทั้งเส้นทางที่ไม่ต้องจับคู่ และหลังจับคู่เสร็จ)
+  const submitCsvTenants = async (tenantsPayload: CsvTenantRow[], wsId: string) => {
+    const res = await createTenantsBatch(tenantsPayload, wsId)
+    if (res.success) {
+      showToast(t("tenants.csv_import_success").replace("{count}", String(res.count)), "success")
+      await loadData(true)
+      return true
+    }
+    if (res.errors && res.errors.length > 0) {
+      setCsvErrors(res.errors)
+      setIsErrorModalOpen(true)
+      showToast(t("tenants.csv_import_partial_error"), "error")
+      return false
+    }
+    showToast(res.error || t("tenants.err_csv_import_generic"), "error")
+    return false
+  }
+
+  // ยืนยันการจับคู่ชื่ออาคาร แล้วนำเข้าต่อ
+  const handleConfirmCsvBuildingMapping = async () => {
+    const unmapped = csvBuildingMappings.find(m => !m.buildingId)
+    if (unmapped) {
+      setCsvMappingError(
+        t("tenants.csv_building_mapping_required").replace(
+          "{buildingName}",
+          unmapped.csvName || t("tenants.csv_building_blank")
+        )
+      )
+      return
+    }
+
+    setCsvMappingSubmitting(true)
+    setCsvMappingError(null)
+    try {
+      const mappedByName = new Map(
+        csvBuildingMappings.map(m => [normalizeBuildingName(m.csvName), m.buildingId])
+      )
+      const resolved = pendingCsvTenants.map(tn => ({
+        ...tn,
+        building_id: tn.building_id || mappedByName.get(normalizeBuildingName(tn.csv_building_name)) || ""
+      }))
+
+      const wsId = getCookie("horset_current_workspace_id") || ""
+      const ok = await submitCsvTenants(resolved, wsId)
+      if (ok) {
+        setIsCsvBuildingMappingOpen(false)
+        setPendingCsvTenants([])
+        setCsvBuildingMappings([])
+      }
+    } catch (err: any) {
+      setCsvMappingError(err?.message || t("tenants.err_csv_import_generic"))
+    } finally {
+      setCsvMappingSubmitting(false)
+    }
+  }
+
   const handleUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -251,6 +352,7 @@ export default function TenantsPage() {
         const nameIdx = headers.indexOf("tenant_name")
         const phoneIdx = headers.indexOf("phone")
         const startIdx = headers.indexOf("lease_start")
+        const buildingNameIdx = headers.indexOf("building_name")
 
         if (roomNumIdx === -1 || nameIdx === -1) {
           showToast(t("tenants.err_csv_headers"), "error")
@@ -258,7 +360,12 @@ export default function TenantsPage() {
           return
         }
 
-        const parsedTenants: any[] = []
+        // หออาคารเดียวไม่ต้องสนคอลัมน์ building_name — ใส่อาคารนั้นให้ทุกแถว
+        // (ไฟล์เก่าที่ไม่มีคอลัมน์นี้จึงยังใช้ได้เหมือนเดิม ไม่มีหน้าต่างจับคู่มากวน)
+        const singleBuildingId = buildings.length === 1 ? buildings[0].id : ""
+        const buildingNameMap = buildBuildingNameMap(buildings)
+
+        const parsedTenants: CsvTenantRow[] = []
 
         // ฟังก์ชันช่วยทำความสะอาดเบอร์โทรและกู้คืนเลข 0 นำหน้าที่โดน Excel ตัดออก
         const cleanAndRestorePhone = (rawPhone: string) => {
@@ -288,12 +395,19 @@ export default function TenantsPage() {
           // ถ้ามีเลขห้องแต่ไม่มีผู้เช่า ข้ามได้ (ถือว่าไม่ได้เลือกกรอก)
           if (roomNumber && !tenantName) continue
 
+          const csvBuildingName = buildingNameIdx !== -1 ? (row[buildingNameIdx]?.trim() || "") : ""
+          const matchedBuilding = singleBuildingId
+            ? null
+            : matchBuildingByName(csvBuildingName, buildingNameMap)
+
           parsedTenants.push({
             room_number: roomNumber,
             tenant_name: tenantName,
             phone,
             lease_start: leaseStart,
-            line_number: i + 1
+            line_number: i + 1,
+            csv_building_name: csvBuildingName,
+            building_id: singleBuildingId || matchedBuilding?.id || ""
           })
         }
 
@@ -303,18 +417,25 @@ export default function TenantsPage() {
           return
         }
 
-        // ส่งไปบันทึกที่ Server Action
-        const res = await createTenantsBatch(parsedTenants, wsId)
-        if (res.success) {
-          showToast(t("tenants.csv_import_success").replace("{count}", String(res.count)), "success")
-          await loadData(true)
-        } else if (res.errors && res.errors.length > 0) {
-          setCsvErrors(res.errors)
-          setIsErrorModalOpen(true)
-          showToast(t("tenants.csv_import_partial_error"), "error")
-        } else {
-          showToast(res.error || t("tenants.err_csv_import_generic"), "error")
+        // ชื่ออาคารที่จับคู่ไม่ได้ — ต้องให้ผู้ใช้เลือกก่อน ไม่งั้นจะไม่รู้ว่า "ห้อง 101" คือห้องของตึกไหน
+        const buildingMappings = collectUnmatchedBuildingNames(
+          parsedTenants.map(tn => ({
+            roomNumber: tn.room_number,
+            csvBuildingName: tn.csv_building_name,
+            buildingId: tn.building_id
+          }))
+        )
+
+        if (buildingMappings.length > 0) {
+          setPendingCsvTenants(parsedTenants)
+          setCsvBuildingMappings(buildingMappings)
+          setCsvMappingError(null)
+          setIsCsvBuildingMappingOpen(true)
+          setUploadingCsv(false)
+          return
         }
+
+        await submitCsvTenants(parsedTenants, wsId)
         setUploadingCsv(false)
       }
       reader.readAsText(file, "UTF-8")
@@ -400,15 +521,20 @@ export default function TenantsPage() {
     setTableNotFound(false)
     try {
       const wsId = getCookie("horset_current_workspace_id") || ""
-      const [currentRes, oldRes, financeRes, roomsRes] = await Promise.all([
+      const [currentRes, oldRes, financeRes, roomsRes, buildingsRes] = await Promise.all([
         getTenants(wsId),
         getOldTenants(wsId),
         getFinanceSettings(wsId).catch(() => ({ success: false, data: null })),
-        getRooms(wsId).catch(() => ({ success: false, data: [] }))
+        getRooms(wsId).catch(() => ({ success: false, data: [] })),
+        getBuildings(wsId).catch(() => ({ success: false, data: [] }))
       ])
 
       if (roomsRes?.success && roomsRes.data) {
         setRooms(roomsRes.data as any[])
+      }
+
+      if (buildingsRes?.success && buildingsRes.data) {
+        setBuildings((buildingsRes.data as { id: string; name: string }[]).map(b => ({ id: b.id, name: b.name })))
       }
 
       let activeSettings = null
@@ -1582,6 +1708,119 @@ export default function TenantsPage() {
       )}
 
       {/* CSV Error Report Modal */}
+      {/* จับคู่ชื่ออาคารจากไฟล์ CSV กับอาคารในระบบ — จับคู่ต่อ "ชื่อ" ไม่ใช่ต่อแถว
+          ถ้าไฟล์มี 40 แถวเขียนชื่อเดียวกัน ผู้ใช้เลือกครั้งเดียวมีผลทั้ง 40 แถว */}
+      {isCsvBuildingMappingOpen && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="w-full md:max-w-2xl bg-white dark:bg-slate-850 rounded-t-3xl md:rounded-2xl border-t md:border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-start shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-500/10 text-blue-500 rounded-xl border border-blue-500/20">
+                  <Building className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                    {t("tenants.csv_building_mapping_title")}
+                  </h3>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                    {t("tenants.csv_building_mapping_subtitle").replace("{count}", String(csvBuildingMappings.length))}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCsvBuildingMappingOpen(false)}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-650 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                {t("tenants.csv_building_mapping_desc")}
+              </p>
+
+              {csvMappingError && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{csvMappingError}</span>
+                </div>
+              )}
+
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-900">
+                <div className="grid grid-cols-12 bg-slate-100 dark:bg-slate-850 p-3 text-xs font-extrabold text-slate-650 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                  <div className="col-span-7">{t("tenants.csv_building_col_file")}</div>
+                  <div className="col-span-5">{t("tenants.csv_building_col_system")}</div>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                  {csvBuildingMappings.map((m, idx) => (
+                    <div
+                      key={idx}
+                      className={`grid grid-cols-12 items-center gap-2 p-3 text-xs ${!m.buildingId ? "bg-amber-500/5 dark:bg-amber-500/[0.02]" : ""}`}
+                    >
+                      <div className="col-span-7 min-w-0">
+                        <div className="font-bold text-slate-850 dark:text-slate-200 truncate" title={m.csvName}>
+                          {m.csvName || <span className="text-slate-400 font-normal italic">{t("tenants.csv_building_blank")}</span>}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5 truncate">
+                          {t("tenants.csv_building_row_count").replace("{count}", String(m.count))} · {m.sampleRooms.join(", ")}{m.count > m.sampleRooms.length ? " …" : ""}
+                        </div>
+                      </div>
+                      <div className="col-span-5">
+                        <select
+                          value={m.buildingId}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setCsvBuildingMappings(prev => prev.map((row, i) => i === idx ? { ...row, buildingId: val } : row))
+                          }}
+                          className={`w-full p-2 rounded-lg border text-xs font-bold cursor-pointer focus:outline-none focus:border-blue-500 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-200 ${
+                            !m.buildingId ? "border-amber-400 dark:border-amber-500/50" : "border-slate-200 dark:border-slate-800"
+                          }`}
+                        >
+                          <option value="">{t("tenants.csv_building_select_placeholder")}</option>
+                          {buildings.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                {t("tenants.csv_building_no_option_hint")}
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-150 dark:border-slate-800/80 flex flex-col sm:flex-row gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCsvBuildingMappingOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer"
+              >
+                {t("tenants.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCsvBuildingMapping}
+                disabled={csvMappingSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-xs font-extrabold shadow-lg shadow-blue-500/15 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+              >
+                {csvMappingSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    {t("tenants.csv_building_importing")}
+                  </>
+                ) : (
+                  t("tenants.csv_building_confirm").replace("{count}", String(pendingCsvTenants.length))
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isErrorModalOpen && csvErrors && csvErrors.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 max-w-lg w-full shadow-2xl space-y-4 flex flex-col max-h-[85vh]">
@@ -1682,6 +1921,29 @@ export default function TenantsPage() {
                   </p>
                 </div>
               </div>
+
+              {/* ชื่ออาคาร — แสดงเฉพาะหอที่มีมากกว่า 1 อาคาร */}
+              {buildings.length > 1 && (
+                <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                  <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
+                    <Building className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
+                      {t("tenants.csv_guide_building_title")}
+                    </h4>
+                    <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
+                      {t("tenants.csv_guide_building_desc").replace("{buildingName}", buildings[0]?.name || "")}
+                    </p>
+                    <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
+                      {t("tenants.csv_guide_building_create")}
+                    </p>
+                    <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
+                      {t("tenants.csv_guide_building_mismatch")}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Item 3 - Warning */}
               <div className="flex gap-4 items-start bg-amber-50/50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/40">

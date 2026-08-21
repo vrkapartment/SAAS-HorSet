@@ -56,6 +56,13 @@ import {
   createRoomsBatch
 } from "@/features/room/actions"
 import { getBuildings, createBuilding, updateBuilding, deleteBuilding } from "@/features/building/actions"
+import {
+  buildBuildingNameMap,
+  matchBuildingByName,
+  collectUnmatchedBuildingNames,
+  normalizeBuildingName,
+  type BuildingMappingRow
+} from "@/features/building/utils"
 import { 
   createTenant, 
   deleteTenant, 
@@ -130,6 +137,10 @@ interface CsvRoomItem {
   csvTypeName: string
   roomTypeId: string
   baseRent: number
+  /** ชื่ออาคารตามที่เขียนมาในไฟล์ (คงรูปเดิมไว้ ใช้จับคู่กับอาคารในระบบทีหลัง) */
+  csvBuildingName: string
+  /** อาคารที่จับคู่ได้ทันทีจากชื่อ ("" = ต้องให้ผู้ใช้เลือกในหน้าต่างจับคู่) */
+  buildingId: string
 }
 
 function RoomsContent() {
@@ -152,6 +163,9 @@ function RoomsContent() {
   const [autoMappedRooms, setAutoMappedRooms] = useState<CsvRoomItem[]>([])
   const [csvRooms, setCsvRooms] = useState<CsvRoomItem[]>([])
   const [isCsvMappingModalOpen, setIsCsvMappingModalOpen] = useState(false)
+  // ชื่ออาคารในไฟล์ที่จับคู่กับอาคารในระบบไม่ได้ — รวบเป็นรายการละ 1 ชื่อ ไม่ใช่รายละแถว
+  // (ไฟล์ 40 แถวที่เขียนชื่อเดียวกัน ผู้ใช้ควรเลือกครั้งเดียว)
+  const [csvBuildingMappings, setCsvBuildingMappings] = useState<BuildingMappingRow[]>([])
   const [isRoomTemplateGuideModalOpen, setIsRoomTemplateGuideModalOpen] = useState(false)
   const [mappingError, setMappingError] = useState<string | null>(null)
   const [mappingSubmitting, setMappingSubmitting] = useState(false)
@@ -324,13 +338,29 @@ function RoomsContent() {
   const handleDownloadTemplate = () => {
     try {
       const sampleTypeName = roomTypes[0]?.name || (locale === "th" ? "แอร์" : "Air Conditioner")
-      const headers = "room_number,room_type_name,floor"
-      const rows = [
-        `101,${sampleTypeName},1`,
-        `102,${sampleTypeName},1`,
-        `201,${sampleTypeName},2`,
-        `202,${sampleTypeName},2`
-      ]
+      // ใส่คอลัมน์ building_name เฉพาะหอที่มีมากกว่า 1 อาคาร — หออาคารเดียวไม่ต้องกรอกอยู่แล้ว
+      // ระบบใส่อาคารนั้นให้อัตโนมัติ ใส่คอลัมน์ไปก็มีแต่จะทำให้เข้าใจผิดว่าต้องกรอก
+      const isMultiBuilding = buildings.length > 1
+      // ใช้ชื่ออาคารจริงในระบบเป็นตัวอย่าง ผู้ใช้จะได้เห็นว่าต้องสะกดแบบไหนถึงจะตรง
+      const sampleBuildingA = buildings[0]?.name || ""
+      const sampleBuildingB = buildings[1]?.name || sampleBuildingA
+
+      const headers = isMultiBuilding
+        ? "room_number,room_type_name,floor,building_name"
+        : "room_number,room_type_name,floor"
+      const rows = isMultiBuilding
+        ? [
+            `101,${sampleTypeName},1,${sampleBuildingA}`,
+            `102,${sampleTypeName},1,${sampleBuildingA}`,
+            `201,${sampleTypeName},2,${sampleBuildingB}`,
+            `202,${sampleTypeName},2,${sampleBuildingB}`
+          ]
+        : [
+            `101,${sampleTypeName},1`,
+            `102,${sampleTypeName},1`,
+            `201,${sampleTypeName},2`,
+            `202,${sampleTypeName},2`
+          ]
       
       const csvContent = "\ufeff" + [headers, ...rows].join("\n") // มี BOM เพื่อให้เปิดใน Excel สระภาษาไทยแสดงถูกต้องไม่เพี้ยน
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
@@ -398,6 +428,7 @@ function RoomsContent() {
         const roomNumIdx = headers.indexOf("room_number")
         const typeNameIdx = headers.indexOf("room_type_name")
         const floorIdx = headers.indexOf("floor")
+        const buildingNameIdx = headers.indexOf("building_name")
 
         if (roomNumIdx === -1 || typeNameIdx === -1) {
           showToast(t("rooms.toasts.csv_invalid_headers"), "error")
@@ -407,11 +438,16 @@ function RoomsContent() {
 
         const validRooms: CsvRoomItem[] = []
         const invalidRooms: CsvRoomItem[] = []
-        
+
         const typeMap = new Map<string, RoomTypeItem>()
         roomTypes.forEach(rt => {
           typeMap.set(rt.name.trim().toLowerCase(), rt)
         })
+
+        // หอที่มีอาคารเดียวไม่ต้องสนคอลัมน์ building_name เลย ใส่อาคารนั้นให้ทุกห้อง
+        // (ไฟล์ CSV เก่าที่ไม่มีคอลัมน์นี้จึงยังใช้ได้เหมือนเดิม ไม่มีหน้าต่างจับคู่มากวน)
+        const singleBuildingId = buildings.length === 1 ? buildings[0].id : ""
+        const buildingNameMap = buildBuildingNameMap(buildings)
 
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i]
@@ -440,12 +476,20 @@ function RoomsContent() {
 
           const matchedType = typeMap.get(csvTypeName.toLowerCase())
 
+          const csvBuildingName = buildingNameIdx !== -1 ? (row[buildingNameIdx]?.trim() || "") : ""
+          // อาคารเดียว = ใช้อาคารนั้นเสมอ | หลายอาคาร = เทียบชื่อตรงตัว ไม่ตรงก็ปล่อยว่างให้ผู้ใช้เลือก
+          const matchedBuilding = singleBuildingId
+            ? null
+            : matchBuildingByName(csvBuildingName, buildingNameMap)
+
           const item: CsvRoomItem = {
             roomNumber,
             floor,
             csvTypeName,
             roomTypeId: matchedType ? matchedType.id : "",
-            baseRent: matchedType ? Number(matchedType.default_rent || 0) : 0
+            baseRent: matchedType ? Number(matchedType.default_rent || 0) : 0,
+            csvBuildingName,
+            buildingId: singleBuildingId || matchedBuilding?.id || ""
           }
 
           if (matchedType) {
@@ -461,15 +505,19 @@ function RoomsContent() {
           return
         }
 
-        // กรณีที่ 1: ไม่มีห้องพักที่มีปัญหาเลย (ทุกห้องแมปประเภทห้องถูกต้องหมด) นำเข้าทันทีโดยไม่ต้องเปิด Modal!
-        if (invalidRooms.length === 0) {
+        // ชื่ออาคารที่จับคู่ไม่ได้ นับจากทุกแถว (ทั้งแถวที่ประเภทห้องตรงและไม่ตรง)
+        const buildingMappings = collectUnmatchedBuildingNames([...validRooms, ...invalidRooms])
+
+        // กรณีที่ 1: ไม่มีอะไรต้องให้ผู้ใช้จับคู่เลย (ประเภทห้องตรงหมด และอาคารตรงหมด) นำเข้าทันที
+        if (invalidRooms.length === 0 && buildingMappings.length === 0) {
           const roomsPayload = validRooms.map(r => ({
             room_number: r.roomNumber,
             room_type_id: r.roomTypeId,
             base_rent: r.baseRent,
             status: "available" as const,
             floor: r.floor || null,
-            workspace_id: wsId
+            workspace_id: wsId,
+            building_id: r.buildingId || null
           }))
 
           try {
@@ -488,9 +536,11 @@ function RoomsContent() {
           return;
         }
 
-        // กรณีที่ 2: มีห้องพักที่ข้อมูลไม่สมบูรณ์/ไม่ถูกต้อง -> เก็บห้องที่ถูกต้องใน autoMappedRooms และเปิด Modal เฉพาะห้องที่มีปัญหา
+        // กรณีที่ 2: มีอะไรต้องจับคู่ -> เก็บห้องที่ประเภทถูกต้องใน autoMappedRooms, ห้องที่ประเภทไม่ตรงใน csvRooms
+        // และชื่ออาคารที่ไม่ตรงใน csvBuildingMappings แล้วเปิด Modal ให้จับคู่ทีเดียวจบ
         setAutoMappedRooms(validRooms)
         setCsvRooms(invalidRooms)
+        setCsvBuildingMappings(buildingMappings)
         setIsCsvMappingModalOpen(true)
         setUploadingCsv(false)
       }
@@ -516,7 +566,26 @@ function RoomsContent() {
       return
     }
 
+    // ชื่ออาคารทุกชื่อที่จับคู่ไม่ได้ ต้องถูกเลือกให้ครบก่อน ไม่ปล่อยให้ห้องเข้าไปแบบไม่มีอาคาร
+    // (ห้องที่ไม่มี building_id จะหลุดจากตัวกรองอาคาร และคิดค่าน้ำ-ไฟแบบหารตามสัดส่วนทั้งอาคารไม่ได้)
+    const unmappedBuilding = csvBuildingMappings.find(m => !m.buildingId)
+    if (unmappedBuilding) {
+      setMappingError(
+        t("rooms.toasts.mapping_select_building").replace(
+          "{buildingName}",
+          unmappedBuilding.csvName || t("rooms.csv_building_blank")
+        )
+      )
+      setMappingSubmitting(false)
+      return
+    }
+
     const wsId = getCookie("horset_current_workspace_id") || ""
+
+    // แปลงชื่ออาคารที่ผู้ใช้จับคู่ไว้ ให้เป็นดัชนีสำหรับเติมกลับเข้าแต่ละแถว
+    const mappedBuildingByName = new Map(
+      csvBuildingMappings.map(m => [normalizeBuildingName(m.csvName), m.buildingId])
+    )
 
     // รวมทั้งชุดข้อมูลที่ดีอยู่แล้ว และชุดข้อมูลที่ได้รับการแก้ไขแมปเสร็จสิ้นจากในโมดอลป๊อปอัป
     const allRooms = [...autoMappedRooms, ...csvRooms]
@@ -527,7 +596,9 @@ function RoomsContent() {
       base_rent: r.baseRent,
       status: "available" as const,
       floor: r.floor || null,
-      workspace_id: wsId
+      workspace_id: wsId,
+      // ถ้าจับคู่ได้ตรง ๆ ตอนอ่านไฟล์ก็ใช้ค่านั้น ไม่งั้นเอาจากที่ผู้ใช้เลือกในหน้าต่างจับคู่
+      building_id: r.buildingId || mappedBuildingByName.get(normalizeBuildingName(r.csvBuildingName)) || null
     }))
 
     try {
@@ -537,6 +608,7 @@ function RoomsContent() {
         setIsCsvMappingModalOpen(false)
         setCsvRooms([])
         setAutoMappedRooms([])
+        setCsvBuildingMappings([])
         await loadData(true) // โหลดข้อมูลห้องใหม่และล้างแคช
       } else {
         setMappingError(res.error || t("rooms.toasts.db_save_error"))
@@ -4852,10 +4924,13 @@ function RoomsContent() {
                   </div>
                   <div>
                     <h3 className="text-sm md:text-base font-extrabold text-slate-900 dark:text-slate-100">
-                      ตรวจสอบและจับคู่ข้อมูลประเภทห้องพัก
+                      ตรวจสอบและจับคู่ข้อมูลก่อนนำเข้า
                     </h3>
                     <p className="text-[10px] md:text-xs text-amber-600 dark:text-amber-400 font-extrabold mt-0.5 flex items-center gap-1">
-                      ⚠️ พบห้องพักที่มีปัญหาเกี่ยวกับประเภทห้อง {csvRooms.length} ห้อง
+                      ⚠️ {[
+                        csvRooms.length > 0 ? `ประเภทห้องไม่ตรง ${csvRooms.length} ห้อง` : null,
+                        csvBuildingMappings.length > 0 ? `ชื่ออาคารไม่ตรง ${csvBuildingMappings.length} ชื่อ` : null
+                      ].filter(Boolean).join(" · ")}
                     </p>
                   </div>
                 </div>
@@ -4869,10 +4944,6 @@ function RoomsContent() {
 
               {/* Body */}
               <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 py-1">
-                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                  ระบบได้ทำการจับคู่ประเภทห้องที่ถูกต้องให้โดยอัตโนมัติแล้วจำนวน <strong className="text-emerald-600 dark:text-emerald-400">{autoMappedRooms.length} ห้อง</strong> และ <strong className="text-amber-600 dark:text-amber-400">แสดงเฉพาะห้องที่มีปัญหา {csvRooms.length} ห้อง</strong> ด้านล่างนี้เพื่อให้คุณเลือกจับคู่ประเภทห้องให้ถูกต้องครับ
-                </p>
-
                 {mappingError && (
                   <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2.5 animate-pulse">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -4880,7 +4951,70 @@ function RoomsContent() {
                   </div>
                 )}
 
+                {/* จับคู่ชื่ออาคาร — จับคู่ต่อ "ชื่อ" ไม่ใช่ต่อแถว ถ้าไฟล์มี 40 แถวใช้ชื่อเดียวกัน เลือกครั้งเดียวจบ */}
+                {csvBuildingMappings.length > 0 && (
+                  <div className="space-y-2.5">
+                    <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                      ชื่ออาคารในไฟล์ต่อไปนี้ <strong className="text-amber-600 dark:text-amber-400">ไม่ตรงกับอาคารที่มีในระบบ</strong> กรุณาเลือกว่าแต่ละชื่อหมายถึงอาคารไหน — เลือกครั้งเดียวมีผลกับทุกห้องที่ใช้ชื่อนั้น
+                    </p>
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-900">
+                      <div className="grid grid-cols-12 bg-slate-100 dark:bg-slate-850 p-3 text-xs font-extrabold text-slate-650 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                        <div className="col-span-7">ชื่ออาคารในไฟล์ CSV</div>
+                        <div className="col-span-5">อาคารในระบบ</div>
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                        {csvBuildingMappings.map((m, idx) => (
+                          <div
+                            key={idx}
+                            className={`grid grid-cols-12 items-center gap-2 p-3 text-xs ${!m.buildingId ? "bg-amber-500/5 dark:bg-amber-500/[0.02]" : ""}`}
+                          >
+                            <div className="col-span-7 min-w-0">
+                              <div className="font-bold text-slate-850 dark:text-slate-200 truncate" title={m.csvName}>
+                                {m.csvName || <span className="text-slate-400 font-normal italic">(ไม่ได้ระบุอาคาร)</span>}
+                              </div>
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5 truncate">
+                                {m.count} ห้อง · {m.sampleRooms.join(", ")}{m.count > m.sampleRooms.length ? " …" : ""}
+                              </div>
+                            </div>
+                            <div className="col-span-5">
+                              <select
+                                value={m.buildingId}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setCsvBuildingMappings(prev =>
+                                    prev.map((row, i) => i === idx ? { ...row, buildingId: val } : row)
+                                  )
+                                }}
+                                className={`w-full p-2 rounded-lg border text-xs font-bold cursor-pointer focus:outline-none focus:border-blue-500 ${
+                                  !m.buildingId
+                                    ? "border-amber-400 dark:border-amber-500/50 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-200"
+                                    : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-200"
+                                }`}
+                              >
+                                <option value="">— เลือกอาคาร —</option>
+                                {buildings.map(b => (
+                                  <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                      ไม่มีอาคารที่ต้องการในรายการ? ปิดหน้าต่างนี้แล้วไปสร้างอาคารใหม่ที่หน้าจัดการอาคารก่อน แล้วอัปโหลดไฟล์อีกครั้ง
+                    </p>
+                  </div>
+                )}
+
+                {csvRooms.length > 0 && (
+                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                  ระบบได้ทำการจับคู่ประเภทห้องที่ถูกต้องให้โดยอัตโนมัติแล้วจำนวน <strong className="text-emerald-600 dark:text-emerald-400">{autoMappedRooms.length} ห้อง</strong> และ <strong className="text-amber-600 dark:text-amber-400">แสดงเฉพาะห้องที่มีปัญหา {csvRooms.length} ห้อง</strong> ด้านล่างนี้เพื่อให้คุณเลือกจับคู่ประเภทห้องให้ถูกต้องครับ
+                </p>
+                )}
+
                 {/* Table list */}
+                {csvRooms.length > 0 && (
                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-900">
                   <div className="grid grid-cols-12 bg-slate-100 dark:bg-slate-850 p-3 text-xs font-extrabold text-slate-650 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                     <div className="col-span-2">หมายเลขห้อง</div>
@@ -4953,6 +5087,7 @@ function RoomsContent() {
                     })}
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Footer */}
@@ -5061,6 +5196,43 @@ function RoomsContent() {
                     </p>
                   </div>
                 </div>
+
+                {/* Item 4 — ชื่ออาคาร (แสดงเฉพาะหอที่มีมากกว่า 1 อาคาร) */}
+                {buildings.length > 1 && (
+                  <div className="flex gap-4 items-start bg-slate-50/80 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
+                      <Building className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
+                        ชื่ออาคาร (พิมพ์ให้ตรงกับชื่อในระบบ)
+                      </h4>
+                      <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
+                        เนื่องจากหอของท่านมีมากกว่า 1 อาคาร ในไฟล์จะมีคอลัมน์ <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md">building_name</span> เพิ่มมา กรุณา<strong>พิมพ์ชื่ออาคารให้ตรงกับชื่อในระบบ</strong> (เช่น <span className="font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">{buildings[0]?.name}</span>) ระบบเทียบชื่อแบบตรงตัว ไม่เดาให้ เพราะถ้าเดาผิดห้องจะไปอยู่ผิดอาคารและค่าน้ำ-ไฟที่หารตามสัดส่วนทั้งอาคารจะผิดตามไปด้วย
+                      </p>
+                      <p className="text-sm md:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-semibold">
+                        <strong>หากไม่มีอาคารที่ต้องการในระบบ</strong> กรุณาไปกดสร้างอาคารใหม่ที่<strong>หน้าจัดการอาคาร</strong>ก่อน แล้วจึงกลับมาอัปโหลดไฟล์อีกครั้ง
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Item 5 — ถ้าชื่ออาคารไม่ตรง */}
+                {buildings.length > 1 && (
+                  <div className="flex gap-4 items-start bg-amber-50/50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/40">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-xl text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="text-lg md:text-xl font-black text-amber-900 dark:text-amber-300">
+                        หากชื่ออาคารสะกดไม่ตรง
+                      </h4>
+                      <p className="text-sm md:text-base text-amber-850 dark:text-amber-200 leading-relaxed font-semibold">
+                        ระบบจะแสดงหน้าต่างให้ท่านเลือกว่าแต่ละชื่อหมายถึงอาคารไหน โดยเลือกครั้งเดียวมีผลกับทุกห้องที่ใช้ชื่อนั้น ไม่ต้องกลับไปแก้ไฟล์
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer Buttons */}
