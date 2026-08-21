@@ -20,11 +20,13 @@ export interface RoomTransferModalVacantRoom {
 interface RoomTransferModalProps {
   tenant: RoomTransferModalTenant
   vacantRooms: RoomTransferModalVacantRoom[]
+  /** ใช้จำกัดขอบเขตการอ่านเลขมิเตอร์ครั้งก่อนหน้าให้อยู่ในหอนี้เท่านั้น (เลขห้องซ้ำกันได้ข้ามหอ) */
+  workspaceId?: string
   onClose: () => void
   onSuccess: (result: { toRoomNumber: string }) => void
 }
 
-export default function RoomTransferModal({ tenant, vacantRooms, onClose, onSuccess }: RoomTransferModalProps) {
+export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, onClose, onSuccess }: RoomTransferModalProps) {
   const today = new Date().toISOString().split("T")[0]
 
   const [toRoomId, setToRoomId] = useState("")
@@ -47,7 +49,7 @@ export default function RoomTransferModal({ tenant, vacantRooms, onClose, onSucc
     async function loadMeter() {
       setLoadingMeter(true)
       try {
-        const res = await getLatestMeterRecord(tenant.roomNumber)
+        const res = await getLatestMeterRecord(tenant.roomNumber, workspaceId)
         if (cancelled) return
         if (res.success && res.data) {
           const pElec = res.data.elecCurr !== null && res.data.elecCurr !== undefined ? res.data.elecCurr : res.data.elecPrev
