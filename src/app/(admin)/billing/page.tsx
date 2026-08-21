@@ -2026,11 +2026,15 @@ function UnifiedBillingContent() {
   )
 
   // คำนวณสรุปสถิติด้านบนของแดชบอร์ด (ปรับเปลี่ยนให้เหมาะสมกับห้องว่าง/ไม่มีผู้เช่า)
-  const totalOccupied = unifiedItems.filter(item => item.tenantName).length
-  const billedCount = unifiedItems.filter(item => item.tenantName && item.isMeterSaved).length
-  const paidCount = unifiedItems.filter(item => item.billStatus === "paid").length
-  const pendingCount = unifiedItems.filter(item => item.billStatus === "pending").length
-  const unpaidCount = unifiedItems.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length
+  //
+  // นับจาก filteredUnifiedItems (ผ่านตัวกรองอาคารแล้ว) ไม่ใช่ unifiedItems ทั้งก้อน — เดิมเลือกอาคาร A
+  // แล้วตารางแสดง 20 ห้อง แต่การ์ดด้านบนยังนับทั้งหอ 40 ห้อง อ่านแล้วไม่รู้ว่า 40 มาจากไหน
+  // (ไม่กรองตามชั้น เพราะตัวกรองชั้นมีผลแค่แท็บจดเลขมิเตอร์ แต่การ์ดนี้แสดงบนทั้งสองแท็บ)
+  const totalOccupied = filteredUnifiedItems.filter(item => item.tenantName).length
+  const billedCount = filteredUnifiedItems.filter(item => item.tenantName && item.isMeterSaved).length
+  const paidCount = filteredUnifiedItems.filter(item => item.billStatus === "paid").length
+  const pendingCount = filteredUnifiedItems.filter(item => item.billStatus === "pending").length
+  const unpaidCount = filteredUnifiedItems.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length
 
   return (
     <>

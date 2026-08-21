@@ -58,7 +58,10 @@ export async function saveMeterRecord(
   const supabase = await createClient()
 
   // Helper function to perform the insert or update in Supabase
-  async function attemptSave(elecVal: number | null, waterVal: number | null) {
+  // resolvedRoomId = rooms.id ของห้องนี้ (ตัวระบุห้องที่แท้จริง) เขียนควบคู่ไปกับ room_number เสมอ
+  // เพื่อให้แถวใหม่พร้อมสำหรับการเปลี่ยนไปจับคู่ด้วย room_id แทน room_number ที่ซ้ำกันได้ข้ามตึก
+  // (ดู database_patch_add_room_id_to_meters_bills.sql — ขั้นนี้ยังอ่าน/จับคู่ด้วย room_number เหมือนเดิม)
+  async function attemptSave(elecVal: number | null, waterVal: number | null, resolvedRoomId: string | null) {
     // Check if record already exists for this room and cycle
     const { data: existing } = await supabase
       .from("meter_records")
@@ -71,6 +74,7 @@ export async function saveMeterRecord(
       return await supabase
         .from("meter_records")
         .update({
+          room_id: resolvedRoomId,
           elec_prev: elecPrev,
           elec_curr: elecVal,
           water_prev: waterPrev,
@@ -83,6 +87,7 @@ export async function saveMeterRecord(
         .from("meter_records")
         .insert([{
           room_number: roomNumber,
+          room_id: resolvedRoomId,
           billing_cycle: billingCycle,
           elec_prev: elecPrev,
           elec_curr: elecVal,
@@ -101,17 +106,30 @@ export async function saveMeterRecord(
     const elecCurrVal = elecCurr === "" ? null : Number(elecCurr)
     const waterCurrVal = waterCurr === "" ? null : Number(waterCurr)
 
-    let result = await attemptSave(elecCurrVal, waterCurrVal)
+    // หา rooms.id ของห้องนี้เพื่อเขียนลง room_id ควบคู่กับ room_number
+    // หาไม่เจอก็บันทึกต่อได้ (room_id เป็น null) — ไม่ให้เรื่องนี้ทำให้การจดมิเตอร์ล้มเหลว
+    let resolvedRoomId: string | null = null
+    if (workspaceId) {
+      const { data: roomRow } = await supabase
+        .from("rooms")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("room_number", roomNumber)
+        .maybeSingle()
+      resolvedRoomId = roomRow?.id ?? null
+    }
+
+    let result = await attemptSave(elecCurrVal, waterCurrVal, resolvedRoomId)
 
     // Handle database NOT NULL constraint violation (Postgrest code 23502)
     if (result.error && result.error.code === "23502") {
       console.warn("Database column is NOT NULL. Falling back to previous values. Please run migration to drop NOT NULL constraints.");
-      
+
       // Fallback: Substitute empty (null) values with previous values
       const fallbackElec = elecCurrVal === null ? Number(elecPrev) : elecCurrVal
       const fallbackWater = waterCurrVal === null ? Number(waterPrev) : waterCurrVal
-      
-      result = await attemptSave(fallbackElec, fallbackWater)
+
+      result = await attemptSave(fallbackElec, fallbackWater, resolvedRoomId)
     }
 
     if (result.error) throw result.error
