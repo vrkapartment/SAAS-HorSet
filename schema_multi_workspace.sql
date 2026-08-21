@@ -1095,15 +1095,19 @@ using (
   and workspace_id = public.get_current_user_workspace_id()
 );
 
+-- ผูกสิทธิ์กับห้องที่ผู้เช่าเช่าอยู่จริง โดยเทียบทั้ง workspace_id และ room_number พร้อมกัน
+-- ถ้าเทียบแค่ room_number ผู้เช่าห้อง 101 ของหอหนึ่งจะอ่านมิเตอร์ห้อง 101 ของหออื่นได้ทุกหอ
+-- และใช้ exists แทน limit 1 เพื่อให้ผู้เช่าที่เช่าหลายห้องเห็นครบทุกห้องของตัวเอง
 create policy "Read meter_records for tenants" on public.meter_records for select
 using (
   public.get_current_user_role() = 'tenant'
-  and room_number = (
-    select r.room_number 
-    from public.rooms r 
-    join public.tenants t on t.room_id = r.id
+  and exists (
+    select 1
+    from public.tenants t
+    join public.rooms r on r.id = t.room_id
     where t.tenant_phone = public.get_current_user_phone()
-    limit 1
+      and r.workspace_id = meter_records.workspace_id
+      and r.room_number = meter_records.room_number
   )
 );
 
@@ -1133,15 +1137,18 @@ using (
   and workspace_id = public.get_current_user_workspace_id()
 );
 
+-- เทียบทั้ง workspace_id และ room_number เหมือน meter_records — บิลมีชื่อผู้เช่าและยอดเงิน
+-- ถ้าเทียบแค่ room_number ผู้เช่าจะอ่านบิลของห้องเลขเดียวกันในหออื่นได้ (เป็นเรื่อง PDPA)
 create policy "Read bills for tenants" on public.bills for select
 using (
   public.get_current_user_role() = 'tenant'
-  and room_number = (
-    select r.room_number 
-    from public.rooms r 
-    join public.tenants t on t.room_id = r.id
+  and exists (
+    select 1
+    from public.tenants t
+    join public.rooms r on r.id = t.room_id
     where t.tenant_phone = public.get_current_user_phone()
-    limit 1
+      and r.workspace_id = bills.workspace_id
+      and r.room_number = bills.room_number
   )
 );
 
@@ -1263,10 +1270,18 @@ using (
   and workspace_id = public.get_current_user_workspace_id()
 );
 
+-- กรองถึงระดับห้อง ไม่ใช่แค่ workspace — เดิมผู้เช่าเห็นประวัติเปลี่ยนมิเตอร์ของทุกห้องในหอตัวเอง
 create policy "Read meter_replacements for tenants" on public.meter_replacements for select
 using (
   public.get_current_user_role() = 'tenant'
-  and workspace_id = public.get_current_user_workspace_id()
+  and exists (
+    select 1
+    from public.tenants t
+    join public.rooms r on r.id = t.room_id
+    where t.tenant_phone = public.get_current_user_phone()
+      and r.workspace_id = meter_replacements.workspace_id
+      and r.room_number = meter_replacements.room_number
+  )
 );
 
 create policy "Read meter_replacements for super_admin" on public.meter_replacements for select

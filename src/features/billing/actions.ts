@@ -268,9 +268,12 @@ export async function createBill(
     const finalBillAmount = serverCalculatedTotal
 
     // Check if a bill already exists for this room and cycle
+    // กรอง workspace_id ด้วย ไม่พึ่ง RLS อย่างเดียว — super_admin ที่ถือ support grant หลายหอ
+    // จะเห็นหลายแถวแล้ว maybeSingle() พังทันที (ดูหมายเหตุเดียวกันใน saveMeterRecord)
     const { data: existing } = await supabase
       .from("bills")
       .select("id, penalty_amount, invoice_id")
+      .eq("workspace_id", workspaceId)
       .eq("room_number", roomNumber)
       .eq("billing_cycle", billingCycle)
       .maybeSingle()

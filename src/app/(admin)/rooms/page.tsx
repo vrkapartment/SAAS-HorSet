@@ -1450,7 +1450,7 @@ function RoomsContent() {
     try {
       // ดึงเลขมิเตอร์น้ำไฟรอบล่าสุดเพื่อสืบทอด
       const { getLatestMeterRecord } = await import("@/features/meter/actions")
-      const meterRes = await getLatestMeterRecord(room.roomNumber)
+      const meterRes = await getLatestMeterRecord(room.roomNumber, getCookie("horset_current_workspace_id") || undefined)
       
       if (meterRes.success && meterRes.data) {
         const record = meterRes.data
@@ -5308,6 +5308,7 @@ function RoomsContent() {
               depositPaid: selectedRoom.depositPaid
             }}
             vacantRooms={rooms.filter(r => r.status === "available").map(r => ({ id: r.id, roomNumber: r.roomNumber }))}
+            workspaceId={getCookie("horset_current_workspace_id") || undefined}
             onClose={() => setTransferModalOpen(false)}
             onSuccess={({ toRoomNumber }) => {
               setTransferModalOpen(false)

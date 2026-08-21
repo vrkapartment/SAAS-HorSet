@@ -2156,6 +2156,7 @@ export default function TenantsPage() {
             depositPaid: transferTenant.depositPaid
           }}
           vacantRooms={vacantRoomsForTransfer.map(r => ({ id: r.id, roomNumber: r.roomNumber }))}
+          workspaceId={getCookie("horset_current_workspace_id") || undefined}
           onClose={() => {
             setTransferModalOpen(false)
             setTransferTenant(null)

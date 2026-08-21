@@ -145,7 +145,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     const settings = financeRes.data
 
     // 4. ปิดมิเตอร์ห้องเดิม
-    const prevRes = await getLatestMeterRecord(oldRoom.room_number)
+    const prevRes = await getLatestMeterRecord(oldRoom.room_number, workspaceId)
     const prevElec = prevRes.success && prevRes.data ? Number(prevRes.data.elecCurr ?? prevRes.data.elecPrev) : 0
     const prevWater = prevRes.success && prevRes.data ? Number(prevRes.data.waterCurr ?? prevRes.data.waterPrev) : 0
 
