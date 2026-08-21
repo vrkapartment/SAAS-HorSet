@@ -25,12 +25,20 @@ interface MeterReadingTableProps {
   handleWaterPrevChange: (roomNumber: string, value: string) => void
   handleWaterChange: (roomNumber: string, value: string) => void
   handleSaveRow: (roomNumber: string, type?: "electric" | "water" | "all") => Promise<void>
+  // รูปแบบการจดที่เลือกจากแถบหัวของหน้า /billing — ใช้เฉพาะ mode "meters"
+  // (optional เพราะ /manage-bills ใช้ component ตัวเดียวกันด้วย mode "billing" และไม่ส่งค่านี้)
+  meterEntryUtility?: "electric" | "water" | "both"
+  // ชื่อชั้นที่กำลังกรองอยู่ (undefined = ทุกชั้น) ใช้แสดงใน label ปุ่มบันทึกทั้งหมดเท่านั้น
+  activeFloorLabel?: string
+  // จำนวนห้องทั้งหอที่กรอกค้างไว้แต่ยังไม่บันทึก (นับจากทุกอาคาร/ทุกชั้น ไม่ใช่แค่ที่มองเห็น)
+  totalUnsavedCount?: number
   setSelectedBill: (item: any) => void
   setSlipModalOpen: (open: boolean) => void
   handleDownloadBillPdf: (item: any) => Promise<void>
   handleSendLine: (roomNumber: string) => void | Promise<void>
   handleMarkAsPaid: (billId: string, roomNumber: string) => Promise<void>
-  handleSaveAll?: (type: "electric" | "water") => Promise<void>
+  // roomNumbers = ขอบเขตที่มองเห็นจริง ต้องส่งไปด้วยเสมอ ไม่เช่นนั้น page จะบันทึกทับห้องนอกขอบเขต
+  handleSaveAll?: (type: "electric" | "water" | "both", roomNumbers?: string[]) => Promise<void>
   // New props for bulk LINE OA feature
   roomsList: any[]
   usageAverages?: Record<string, { avgElec: number; avgWater: number; sampleCount: number }>
@@ -87,6 +95,9 @@ export default function MeterReadingTable({
   latePenaltyRate = 0,
   handleOtherServiceChange,
   mode = "billing",
+  meterEntryUtility,
+  activeFloorLabel,
+  totalUnsavedCount = 0,
   meterReplacements = [],
   onMeterReplacementsChange,
   savingRows = {},
@@ -96,10 +107,18 @@ export default function MeterReadingTable({
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const hasEdit = hasEditPermission !== undefined ? hasEditPermission : permissions.manage_meters_bills_edit
   const { t, locale } = useLanguage()
-  const [activeTab, setActiveTab] = useState<"all" | "electric" | "water">(
-    mode === "meters" ? "electric" : "all"
-  )
-  const colSpanVal = activeTab === "all" ? 9 : 6
+  // "all" = ชุดคอลัมน์ของหน้าจัดการใบแจ้งหนี้ (/manage-bills, mode "billing") — มิเตอร์อ่านอย่างเดียว
+  // "electric"/"water" = จดทีละสาธารณูปโภค | "both" = จดไฟและน้ำพร้อมกันในแถวเดียว
+  //
+  // ไม่ใช่ state ของ component นี้แล้ว เพราะตัวเลือกย้ายไปอยู่แถบหัวของหน้า /billing (จำค่าไว้ต่อ workspace)
+  // การรับมาเป็น prop ทำให้ค่าที่ผู้ใช้พิมพ์ค้างไว้ไม่หายตอนสลับโหมด — ค่าอยู่ใน unifiedItems ของ page
+  const activeTab: "all" | "electric" | "water" | "both" =
+    mode === "billing" ? "all" : (meterEntryUtility ?? "electric")
+
+  const showElectricColumns = activeTab === "electric" || activeTab === "both"
+  const showWaterColumns = activeTab === "water" || activeTab === "both"
+  // ห้อง + สถานะ + (ไฟ 3 | น้ำ 3 | ทั้งคู่ 6) + ปุ่มบันทึก 1
+  const colSpanVal = activeTab === "all" ? 9 : activeTab === "both" ? 9 : 6
 
   const [bulkSendModalOpen, setBulkSendModalOpen] = useState(false)
   const [modalActiveTab, setModalActiveTab] = useState<"connected" | "unconnected">("connected")
@@ -415,32 +434,36 @@ export default function MeterReadingTable({
     }
   }
 
-  const onSaveAllWithRolloverCheck = async (type: "electric" | "water") => {
+  const onSaveAllWithRolloverCheck = async (type: "electric" | "water" | "both") => {
     if (!handleSaveAll) return;
+    const needsElec = type === "electric" || type === "both"
+    const needsWater = type === "water" || type === "both"
+
     const itemsToSave = unifiedItems.filter(item => {
-      if (type === "electric") {
-        return item.elecCurr !== "" && !item.isMeterSaved;
-      } else {
-        return item.waterCurr !== "" && !item.isMeterSaved;
-      }
+      if (item.isMeterSaved) return false
+      // โหมด "ไฟ+น้ำ" ต้องกรอกครบทั้งสองค่าจึงจะเข้าข่ายบันทึก (page จะข้ามห้องที่ไม่ครบและรายงานให้)
+      if (needsElec && item.elecCurr === "") return false
+      if (needsWater && item.waterCurr === "") return false
+      return true
     });
 
-    const anyRollover = itemsToSave.some(item => {
-      if (type === "electric") {
-        return isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
-      } else {
-        return isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
-      }
-    });
+    const anyRollover = itemsToSave.some(item =>
+      (needsElec && isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")) ||
+      (needsWater && isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water"))
+    );
 
     const doSaveAll = async () => {
-      await handleSaveAll(type)
+      // ส่งเฉพาะเลขห้องที่แสดงอยู่จริง (ผ่านตัวกรองอาคาร/ชั้นมาแล้ว) เพื่อไม่ให้ upsert ไปทับ
+      // ห้องนอกขอบเขตที่ผู้ใช้ไม่ได้กำลังจดอยู่ — ดูคอมเมนต์ที่ handleSaveAll ใน billing/page.tsx
+      await handleSaveAll(type, unifiedItems.map(i => i.roomNumber))
       setUnlockedPaidRooms({})
     }
 
     const checkAnomalyThenSaveAll = () => {
+      // getUsageAnomaly รับ "all" เพื่อหมายถึงตรวจทั้งไฟและน้ำ ซึ่งตรงกับโหมด "both"
+      const anomalyScope = type === "both" ? "all" : type
       const anomalousRooms = itemsToSave
-        .map(item => ({ roomNumber: item.roomNumber, anomaly: getUsageAnomaly(item, type) }))
+        .map(item => ({ roomNumber: item.roomNumber, anomaly: getUsageAnomaly(item, anomalyScope) }))
         .filter(r => r.anomaly.hasAnomaly)
       if (anomalousRooms.length > 0) {
         setUsageAnomalyConfirm({
@@ -466,7 +489,8 @@ export default function MeterReadingTable({
       setRolloverConfirm({
         isOpen: true,
         roomNumber: locale === "en" ? "All selected rooms" : "ทุกห้องที่เลือก",
-        type,
+        // โมดอลยืนยันมิเตอร์หมุนครบรอบใช้ "all" หมายถึงทั้งไฟและน้ำ ซึ่งตรงกับโหมด "both"
+        type: type === "both" ? "all" : type,
         isBulk: true,
         onConfirm: checkAnomalyThenSaveAll
       })
@@ -790,35 +814,20 @@ Thank you 🙏`
         {/* แถบควบคุมหลัก (Tabs) */}
         <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
           {mode !== "billing" ? (
+            /* ตัวเลือก "จดอะไร" ย้ายไปอยู่แถบหัวของหน้า /billing แล้ว (จำค่าไว้ต่อ workspace)
+               เหลือไว้แค่ตัวเตือนว่ายังมีห้องที่กรอกค้างไม่ได้บันทึก ซึ่งนับจากทั้งหอ ไม่ใช่แค่ชั้นที่เห็น
+               กันเคสเดินจดทีละชั้นแล้วลืมกดบันทึกชั้นก่อนหน้า */
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab("electric")}
-                className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
-                  activeTab === "electric"
-                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
-                    : isDark
-                      ? "bg-slate-900/30 border border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
-                      : "bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                <Zap className={`w-3.5 h-3.5 shrink-0 ${activeTab === "electric" ? (isDark ? "text-blue-400" : "text-blue-600") : "text-blue-500"}`} />
-                <span>{t("billing.elec_meter")}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("water")}
-                className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
-                  activeTab === "water"
-                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
-                    : isDark
-                      ? "bg-slate-900/30 border border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
-                      : "bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                <Droplet className={`w-3.5 h-3.5 shrink-0 ${activeTab === "water" ? (isDark ? "text-teal-400" : "text-teal-600") : "text-teal-500"}`} />
-                <span>{t("billing.water_meter")}</span>
-              </button>
+              {totalUnsavedCount > 0 && (
+                <div className={`flex items-center gap-2 px-3 py-1.5 xl:px-4 xl:py-2 rounded-lg text-xs xl:text-sm font-bold border ${
+                  isDark
+                    ? "bg-amber-500/10 border-amber-500/25 text-amber-400"
+                    : "bg-amber-50 border-amber-200 text-amber-700"
+                }`}>
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{t("billing.unsaved_rooms_warning").replace("{count}", String(totalUnsavedCount))}</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className={`text-xs xl:text-xs 2xl:text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
@@ -831,7 +840,7 @@ Thank you 🙏`
               isDark ? "bg-slate-900/30 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                activeTab === "all" ? "bg-teal-500" : activeTab === "electric" ? "bg-blue-500" : "bg-teal-500"
+                activeTab === "electric" ? "bg-blue-500" : activeTab === "both" ? "bg-violet-500" : "bg-teal-500"
               }`} />
               <span>{locale === "en" ? "Cycle: " : "รอบบิล: "}{formatBillingCycleLocal(billingCycle, locale)}</span>
             </div>
@@ -932,7 +941,7 @@ Thank you 🙏`
               const isMeterAlreadySaved = item.tenantName
                 ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
                 : item.isMeterSaved
-              const isSaveDisabled = !hasEdit || isMeterAlreadySaved || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
+              const isSaveDisabled = !hasEdit || isMeterAlreadySaved || (showElectricColumns && isElectricInvalid) || (showWaterColumns && isWaterInvalid)
 
               return (
                 <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
@@ -1200,7 +1209,7 @@ Thank you 🙏`
                       )}
 
                       {/* 2. แถบมิเตอร์ไฟ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์ไฟ) */}
-                      {activeTab === "electric" && (
+                      {showElectricColumns && (
                         <div className="space-y-3">
                           <div className={`rounded-xl p-3.5 border space-y-3 ${
                             isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50/50 border-blue-100"
@@ -1348,7 +1357,8 @@ Thank you 🙏`
                             </div>
                           </div>
 
-                          {!isMeterAlreadySaved && (
+                          {/* โหมด "ไฟ+น้ำ" ใช้ปุ่มบันทึกรวมใบเดียวใต้การ์ด ไม่ใช่ปุ่มแยกของแต่ละสาธารณูปโภค */}
+                          {activeTab === "electric" && !isMeterAlreadySaved && (
                             <button
                               onClick={async () => {
                                 await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
@@ -1376,7 +1386,7 @@ Thank you 🙏`
                       )}
 
                       {/* 3. แถบมิเตอร์น้ำ (แก้ไขได้ & มีปุ่มเซฟมิเตอร์น้ำ) */}
-                      {activeTab === "water" && (
+                      {showWaterColumns && (
                         <div className="space-y-3">
                           <div className="bg-teal-50/50 dark:bg-teal-500/5 rounded-xl p-3.5 border border-teal-100 dark:border-teal-500/10 space-y-3">
                             <div className="flex justify-between items-center gap-2">
@@ -1516,7 +1526,7 @@ Thank you 🙏`
                             </div>
                           </div>
 
-                          {!isMeterAlreadySaved && (
+                          {activeTab === "water" && !isMeterAlreadySaved && (
                             <button
                               onClick={async () => {
                                 await onSaveRowWithRolloverCheck(item.roomNumber, "water");
@@ -1541,6 +1551,32 @@ Thank you 🙏`
                             </button>
                           )}
                         </div>
+                      )}
+
+                      {/* ปุ่มบันทึกรวมของโหมด "ไฟ+น้ำ" บนการ์ดมือถือ — บันทึกทั้งสองค่าในคราวเดียว */}
+                      {activeTab === "both" && !isMeterAlreadySaved && (
+                        <button
+                          onClick={async () => {
+                            await onSaveRowWithRolloverCheck(item.roomNumber, "all");
+                          }}
+                          disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                          className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            (isSaveDisabled || savingRows?.[item.roomNumber])
+                              ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                              : "bg-violet-600 hover:bg-violet-500 border border-violet-500/30 text-white shadow-lg shadow-violet-600/10 active:scale-[0.98]"
+                          }`}
+                        >
+                          {savingRows?.[item.roomNumber] ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>{t("billing.saving")}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4" /> {t("billing.save_both_room").replace("{roomNumber}", item.roomNumber)}
+                            </>
+                          )}
+                        </button>
                       )}
 
                       {/* Action Buttons Section (เฉพาะแถบจัดการบิลเท่านั้น) */}
@@ -1674,23 +1710,33 @@ Thank you 🙏`
                 )}
 
                 {/* 2. แถบมิเตอร์ไฟ */}
-                {activeTab === "electric" && (
+                {showElectricColumns && (
                   <>
                     <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">{t("billing.elec_prev")}</th>
                     <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">{t("billing.elec_curr")}</th>
                     <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">{t("billing.units_elec_amount")}</th>
-                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">{t("billing.save_data")}</th>
+                    {/* โหมด "ไฟ+น้ำ" มีปุ่มบันทึกรวมอันเดียวท้ายแถว จึงไม่ใส่หัวคอลัมน์บันทึกให้แต่ละกลุ่ม */}
+                    {activeTab === "electric" && (
+                      <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">{t("billing.save_data")}</th>
+                    )}
                   </>
                 )}
 
                 {/* 3. แถบมิเตอร์น้ำ */}
-                {activeTab === "water" && (
+                {showWaterColumns && (
                   <>
                     <th className="py-3.5 text-center w-32 xl:w-36 2xl:w-40 text-slate-500 dark:text-slate-450">{t("billing.water_prev")}</th>
                     <th className="py-3.5 text-center w-36 xl:w-40 2xl:w-48 text-slate-500 dark:text-slate-450">{t("billing.water_curr")}</th>
                     <th className="py-3.5 text-center w-28 xl:w-32 2xl:w-36 text-slate-500 dark:text-slate-450">{t("billing.units_water_amount")}</th>
-                    <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">{t("billing.save_data")}</th>
+                    {activeTab === "water" && (
+                      <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">{t("billing.save_data")}</th>
+                    )}
                   </>
+                )}
+
+                {/* หัวคอลัมน์ของปุ่มบันทึกรวมในโหมด "ไฟ+น้ำ" */}
+                {activeTab === "both" && (
+                  <th className="py-3.5 text-center w-40 xl:w-48 2xl:w-56 pr-2">{t("billing.save_data")}</th>
                 )}
               </tr>
             </thead>
@@ -1734,7 +1780,7 @@ Thank you 🙏`
                   const isWaterAnomaly = usageAnomaly.waterAbnormal
                   const isSaveDisabled = !hasEdit || (item.tenantName
                     ? (item.isMeterSaved && item.billStatus !== "not_created" && !isModified)
-                    : item.isMeterSaved) || (activeTab === "electric" && isElectricInvalid) || (activeTab === "water" && isWaterInvalid)
+                    : item.isMeterSaved) || (showElectricColumns && isElectricInvalid) || (showWaterColumns && isWaterInvalid)
 
                   return (
                     <tr key={item.roomNumber} className={`transition-colors border-b border-slate-100 dark:border-slate-800/60 ${isDark ? "hover:bg-slate-900/10" : "hover:bg-slate-50/50"}`}>
@@ -2074,7 +2120,7 @@ Thank you 🙏`
                       )}
 
                       {/* --- 2. แถบมิเตอร์ไฟ --- */}
-                      {activeTab === "electric" && (
+                      {showElectricColumns && (
                         <>
                           {/* ไฟก่อนหน้า */}
                           <td className="py-4 text-center px-2.5">
@@ -2211,32 +2257,35 @@ Thank you 🙏`
                             })()}
                           </td>
 
-                          {/* บันทึก */}
-                          <td className="py-4 text-center pr-2">
-                            <button
-                              onClick={async () => {
-                                await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
-                              }}
-                              disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
-                              className={`px-2.5 py-1 xl:py-1.5 border rounded text-xs xl:text-sm 2xl:text-base font-medium transition-colors flex items-center gap-1.5 mx-auto cursor-pointer ${
-                                (isSaveDisabled || savingRows?.[item.roomNumber])
-                                  ? (isDark ? "border-slate-800/80 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
-                                  : (isDark ? "border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400" : "border-indigo-250 bg-indigo-50 hover:bg-indigo-100 text-indigo-700")
-                              }`}
-                            >
-                              {savingRows?.[item.roomNumber] ? (
-                                <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
-                              ) : (
-                                <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-                              )}
-                              <span>{t("billing.save_elec_meter")}</span>
-                            </button>
-                          </td>
+                          {/* บันทึก — เฉพาะโหมดจดไฟเดี่ยว ๆ โหมด "ไฟ+น้ำ" ใช้ปุ่มบันทึกรวมท้ายแถวแทน
+                              ไม่เช่นนั้นจะมีปุ่มบันทึกสองอันในแถวเดียวและจำนวนคอลัมน์ไม่ตรงกับหัวตาราง */}
+                          {activeTab === "electric" && (
+                            <td className="py-4 text-center pr-2">
+                              <button
+                                onClick={async () => {
+                                  await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
+                                }}
+                                disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                                className={`px-2.5 py-1 xl:py-1.5 border rounded text-xs xl:text-sm 2xl:text-base font-medium transition-colors flex items-center gap-1.5 mx-auto cursor-pointer ${
+                                  (isSaveDisabled || savingRows?.[item.roomNumber])
+                                    ? (isDark ? "border-slate-800/80 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
+                                    : (isDark ? "border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400" : "border-indigo-250 bg-indigo-50 hover:bg-indigo-100 text-indigo-700")
+                                }`}
+                              >
+                                {savingRows?.[item.roomNumber] ? (
+                                  <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
+                                ) : (
+                                  <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                                )}
+                                <span>{t("billing.save_elec_meter")}</span>
+                              </button>
+                            </td>
+                          )}
                         </>
                       )}
 
                       {/* --- 3. แถบมิเตอร์น้ำ --- */}
-                      {activeTab === "water" && (
+                      {showWaterColumns && (
                         <>
                           {/* น้ำก่อนหน้า */}
                           <td className="py-4 text-center px-2.5 bg-teal-500/[0.015] dark:bg-teal-500/[0.02] rounded-l-xl">
@@ -2381,28 +2430,55 @@ Thank you 🙏`
                             })()}
                           </td>
 
-                          {/* บันทึก */}
-                          <td className="py-4 text-center pr-2 bg-teal-500/[0.015] dark:bg-teal-500/[0.02] rounded-r-xl">
-                            <button
-                              onClick={async () => {
-                                await onSaveRowWithRolloverCheck(item.roomNumber, "water");
-                              }}
-                              disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
-                              className={`h-11 px-4 xl:px-5 rounded-xl text-xs xl:text-sm 2xl:text-base font-bold transition-all border flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
-                                (isSaveDisabled || savingRows?.[item.roomNumber])
-                                  ? (isDark ? "border-slate-850 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
-                                  : (isDark ? "border-teal-500/20 bg-teal-500/10 hover:bg-teal-600 text-teal-400 hover:text-white" : "border-teal-200 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white")
-                              }`}
-                            >
-                              {savingRows?.[item.roomNumber] ? (
-                                <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
-                              ) : (
-                                <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-                              )}
-                              <span>{t("billing.save_water_meter")}</span>
-                            </button>
-                          </td>
+                          {/* บันทึก — เฉพาะโหมดจดน้ำเดี่ยว ๆ (ดูหมายเหตุที่ปุ่มบันทึกของแถบมิเตอร์ไฟ) */}
+                          {activeTab === "water" && (
+                            <td className="py-4 text-center pr-2 bg-teal-500/[0.015] dark:bg-teal-500/[0.02] rounded-r-xl">
+                              <button
+                                onClick={async () => {
+                                  await onSaveRowWithRolloverCheck(item.roomNumber, "water");
+                                }}
+                                disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                                className={`h-11 px-4 xl:px-5 rounded-xl text-xs xl:text-sm 2xl:text-base font-bold transition-all border flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
+                                  (isSaveDisabled || savingRows?.[item.roomNumber])
+                                    ? (isDark ? "border-slate-850 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
+                                    : (isDark ? "border-teal-500/20 bg-teal-500/10 hover:bg-teal-600 text-teal-400 hover:text-white" : "border-teal-200 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white")
+                                }`}
+                              >
+                                {savingRows?.[item.roomNumber] ? (
+                                  <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
+                                ) : (
+                                  <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                                )}
+                                <span>{t("billing.save_water_meter")}</span>
+                              </button>
+                            </td>
+                          )}
                         </>
+                      )}
+
+                      {/* ปุ่มบันทึกรวมของโหมด "ไฟ+น้ำ" — บันทึกทั้งสองค่าในคราวเดียว (type "all")
+                          อยู่นอกกลุ่มคอลัมน์ไฟ/น้ำ เพื่อให้เป็นคอลัมน์สุดท้ายเสมอตามหัวตาราง */}
+                      {activeTab === "both" && (
+                        <td className="py-4 text-center pr-2">
+                          <button
+                            onClick={async () => {
+                              await onSaveRowWithRolloverCheck(item.roomNumber, "all");
+                            }}
+                            disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                            className={`h-11 px-4 xl:px-5 rounded-xl text-xs xl:text-sm 2xl:text-base font-bold transition-all border flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
+                              (isSaveDisabled || savingRows?.[item.roomNumber])
+                                ? (isDark ? "border-slate-850 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
+                                : (isDark ? "border-violet-500/20 bg-violet-500/10 hover:bg-violet-600 text-violet-400 hover:text-white" : "border-violet-200 bg-violet-50 hover:bg-violet-600 text-violet-700 hover:text-white")
+                            }`}
+                          >
+                            {savingRows?.[item.roomNumber] ? (
+                              <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
+                            ) : (
+                              <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                            )}
+                            <span>{t("billing.save_both_meter")}</span>
+                          </button>
+                        </td>
                       )}
                     </>
                   )}
@@ -2421,12 +2497,14 @@ Thank you 🙏`
         </div>
         )}
 
-        {/* ปุ่มบันทึกข้อมูลมิเตอร์ทั้งหมด (Bulk Save - แสดงเฉพาะในแถบมิเตอร์ไฟ / มิเตอร์น้ำ) */}
+        {/* ปุ่มบันทึกข้อมูลมิเตอร์ทั้งหมดในขอบเขตที่เห็น (Bulk Save — ไม่แสดงในแถบจัดการบิล)
+            จำนวนห้องและ label อ้างจาก unifiedItems ที่ได้รับมา ซึ่งผ่านตัวกรองอาคาร/ชั้นแล้ว
+            จึงตรงกับสิ่งที่จะถูกบันทึกจริงเสมอ */}
         {!loading && unifiedItems.length > 0 && activeTab !== "all" && (
           <div className="mt-6 flex justify-center px-4 md:px-0 pb-4">
             <button
               onClick={async () => {
-                await onSaveAllWithRolloverCheck(activeTab as "electric" | "water");
+                await onSaveAllWithRolloverCheck(activeTab);
               }}
               disabled={!hasEdit}
               className={`w-full md:w-auto min-w-[240px] px-6 py-2.5 rounded-lg border text-xs font-medium transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer ${
@@ -2434,16 +2512,24 @@ Thank you 🙏`
                   ? (isDark
                     ? "bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500/30"
                     : "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600")
-                  : (isDark
-                    ? "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600")
+                  : activeTab === "both"
+                    ? (isDark
+                      ? "bg-violet-600 hover:bg-violet-500 text-white border-violet-500/30"
+                      : "bg-violet-600 hover:bg-violet-700 text-white border-violet-600")
+                    : (isDark
+                      ? "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600")
               }`}
             >
               <Save className="w-4 h-4 text-white" />
               <span>
-                {activeTab === "electric"
-                  ? t("billing.save_all_elec_count").replace("{count}", String(unifiedItems.length))
-                  : t("billing.save_all_water_count").replace("{count}", String(unifiedItems.length))}
+                {(activeTab === "electric"
+                  ? t("billing.save_all_elec_count")
+                  : activeTab === "both"
+                    ? t("billing.save_all_both_count")
+                    : t("billing.save_all_water_count")
+                ).replace("{count}", String(unifiedItems.length))}
+                {activeFloorLabel && t("billing.save_all_floor_suffix").replace("{floor}", activeFloorLabel)}
               </span>
             </button>
           </div>

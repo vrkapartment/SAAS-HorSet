@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useMemo, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
@@ -31,7 +31,8 @@ import { getBills, createBill, updateBillStatus, getBillingPageData, saveAllBill
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
-import { getFinanceSettings } from "@/features/finance/actions"
+import { getFinanceSettings, saveMeterEntryModeAction } from "@/features/finance/actions"
+import { getRoomFloor, sortFloors } from "@/features/room/utils"
 import { getBuildings } from "@/features/building/actions"
 import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "@/features/billing/building-utility-actions"
 
@@ -249,6 +250,11 @@ function UnifiedBillingContent() {
   const [waterBillingMode, setWaterBillingMode] = useState<"fixed_rate" | "building_total">("fixed_rate")
   const [buildings, setBuildings] = useState<{ id: string; name: string }[]>([])
   const [buildingFilter, setBuildingFilter] = useState<string>("all")
+  // รูปแบบการจดมิเตอร์ — 2 มิติอิสระต่อกัน จำค่าไว้ต่อ workspace (ดู database_patch_add_meter_entry_mode.sql)
+  // "จดอะไร": electric/water = จดทีละสาธารณูปโภคทั้งหอ (เดิม) | both = จดไฟและน้ำพร้อมกันในแถวเดียว
+  // "ชั้น": "all" = ทุกชั้น หรือชื่อชั้น — มีผลเฉพาะแท็บจดเลขมิเตอร์ ไม่กระทบแท็บสรุปบิล
+  const [meterEntryUtility, setMeterEntryUtility] = useState<"electric" | "water" | "both">("electric")
+  const [meterEntryFloor, setMeterEntryFloor] = useState<string>("all")
   const [buildingUtilityBills, setBuildingUtilityBills] = useState<BuildingUtilityBill[]>([])
   const [waterMinChecked, setWaterMinChecked] = useState<boolean>(true)
   const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
@@ -909,6 +915,8 @@ function UnifiedBillingContent() {
             if (financeData.electric_min_unit !== undefined) setElectricMinUnit(financeData.electric_min_unit)
             setElectricBillingMode(financeData.electric_billing_mode || "fixed_rate")
             setWaterBillingMode(financeData.water_billing_mode || "fixed_rate")
+            setMeterEntryUtility(financeData.meter_entry_utility || "electric")
+            setMeterEntryFloor(financeData.meter_entry_floor || "all")
             setVatRegistered(!!financeData.vat_registered)
             setVatRegisteredFrom(financeData.vat_registered_from || null)
             if (financeData.vat_rate !== undefined) setVatRate(financeData.vat_rate)
@@ -959,6 +967,42 @@ function UnifiedBillingContent() {
     setTimeout(() => {
       setToastMessage(null)
     }, 3000)
+  }
+
+  // เปลี่ยนรูปแบบการจดมิเตอร์ แล้วจำไว้ต่อ workspace
+  //
+  // ⚠️ ห้ามเรียก loadData / clearWorkspaceCache ที่นี่เด็ดขาด — เลขมิเตอร์ที่ผู้ใช้พิมพ์ค้างไว้อยู่ใน
+  // unifiedItems ถ้าโหลดใหม่จะถูกเขียนทับหายทั้งหมด (บั๊กเดิมที่แก้ไปแล้ว ห้ามเปิดช่องกลับมา)
+  // จึงอัปเดต state + แคชในที่ แล้วยิง server action แบบไม่ block UI
+  const applyMeterEntryMode = (
+    utility: "electric" | "water" | "both",
+    floor: string
+  ) => {
+    setMeterEntryUtility(utility)
+    setMeterEntryFloor(floor)
+
+    if (!currentWorkspaceId) return
+
+    const cachedFinance = getCachedData(currentWorkspaceId, "finance_settings")
+    if (cachedFinance) {
+      setCachedData(currentWorkspaceId, "finance_settings", {
+        ...cachedFinance,
+        meter_entry_utility: utility,
+        meter_entry_floor: floor
+      })
+    }
+
+    void saveMeterEntryModeAction(currentWorkspaceId, utility, floor)
+      .then(res => {
+        if (!res.success) {
+          console.error("Failed to persist meter entry mode:", res.error)
+          showToast(t("billing.err_save_meter_entry_mode"))
+        }
+      })
+      .catch(err => {
+        console.error("Failed to persist meter entry mode:", err)
+        showToast(t("billing.err_save_meter_entry_mode"))
+      })
   }
 
   // อัปเดตช่องอินพุตเลขมิเตอร์ไฟฟ้าในหน้าจอ
@@ -1432,70 +1476,76 @@ function UnifiedBillingContent() {
     }
   }
 
-  // บันทึกและออกบิลให้ทุกห้องที่ข้อมูลสมบูรณ์ (แยกตามประเภท ไฟฟ้า หรือ น้ำประปา)
-  const handleSaveAll = async (type: "electric" | "water") => {
+  // บันทึกและออกบิลให้ห้องที่กรอกครบ ในขอบเขตที่ระบุ
+  //
+  // roomNumbers = ขอบเขตที่ผู้ใช้เห็นอยู่จริง (ผ่านตัวกรองอาคารและชั้นแล้ว) — จำเป็นต้องส่งมา เพราะ
+  // saveAllBillsForCycle ใช้ upsert ทับ "ทั้งแถว" ของ meter_records (เขียน elec_curr และ water_curr
+  // พร้อมกันเสมอ) ถ้าส่งห้องที่อยู่นอกขอบเขตไปด้วย ค่าของห้องนั้นจะถูกเขียนตามสิ่งที่ค้างอยู่ใน state
+  // เดิมส่ง unifiedItems ทั้งก้อนตลอด ทำให้กรองอาคาร A แล้วกดบันทึกไปโดนห้องอาคาร B ด้วย
+  const handleSaveAll = async (type: "electric" | "water" | "both", roomNumbers?: string[]) => {
     const getUnits = (curr: number, prev: number) => {
       if (curr >= prev) return curr - prev
       return (10000 - prev) + curr
     }
 
-    // กรองหาห้องที่กรอกไม่ครบหรือผิดพลาดตามประเภท
-    const invalidItems = unifiedItems.filter(item => {
+    const scopeSet = roomNumbers ? new Set(roomNumbers) : null
+    const scopedItems = scopeSet ? unifiedItems.filter(i => scopeSet.has(i.roomNumber)) : unifiedItems
+
+    // ตรวจเลขมิเตอร์ของสาธารณูปโภคหนึ่งตัว
+    // required = โหมดที่เลือกบังคับต้องกรอก | ถ้าไม่บังคับแต่มีค่าอยู่ ก็ยังต้องผ่าน validation
+    // เพราะ upsert เขียนทั้งไฟและน้ำพร้อมกัน ค่าที่ผิดของอีกฝั่งจะถูกบันทึกลงไปเงียบ ๆ ถ้าไม่ตรวจ
+    const isUtilityValid = (
+      item: UnifiedRoomBillingItem,
+      meterType: "electric" | "water",
+      required: boolean
+    ): boolean => {
+      const curr = meterType === "electric" ? item.elecCurr : item.waterCurr
+      const prev = meterType === "electric" ? item.elecPrev : item.waterPrev
+      if (curr === "" || curr === null || curr === undefined) return !required
+
+      const currNum = Number(curr)
+      const prevNum = prev === "" ? 0 : Number(prev)
+      if (isNaN(currNum) || isNaN(prevNum)) return false
+
+      const rep = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === meterType)
+      const units = rep
+        ? getUnits(rep.oldFinalReading, prevNum) + getUnits(currNum, rep.newStartReading)
+        : getUnits(currNum, prevNum)
+      return units <= 3000
+    }
+
+    const eligible: UnifiedRoomBillingItem[] = []
+    const skippedRooms: string[] = []
+
+    for (const item of scopedItems) {
+      // ห้องที่แจ้งย้ายออกแล้ว server ข้ามการออกบิลให้อยู่แล้ว ส่งไปได้ ไม่นับเป็นห้องที่กรอกไม่ครบ
       if (item.hasNotifiedCheckout) {
-        return false // ข้ามการตรวจสอบห้องที่แจ้งย้ายออกแล้ว เพราะเราจะไม่ประมวลผลออกบิลอยู่แล้ว
+        eligible.push(item)
+        continue
       }
-      const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
-      const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
-      const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
-      const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
-
-      const repElec = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "electric")
-      const repWater = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === "water")
-      
-      if (type === "electric") {
-        if (elecVal === "" || isNaN(elecVal as number) || isNaN(elecPrevVal)) {
-          return true;
-        }
-        let eUnits = 0
-        if (repElec) {
-          const oldUnits = getUnits(repElec.oldFinalReading, elecPrevVal)
-          const newUnits = getUnits(Number(elecVal), repElec.newStartReading)
-          eUnits = oldUnits + newUnits
-        } else {
-          eUnits = getUnits(Number(elecVal), elecPrevVal)
-        }
-        return eUnits > 3000;
+      const elecOk = isUtilityValid(item, "electric", type === "electric" || type === "both")
+      const waterOk = isUtilityValid(item, "water", type === "water" || type === "both")
+      if (elecOk && waterOk) {
+        eligible.push(item)
       } else {
-        if (waterVal === "" || isNaN(waterVal as number) || isNaN(waterPrevVal)) {
-          return true;
-        }
-        let wUnits = 0
-        if (repWater) {
-          const oldUnits = getUnits(repWater.oldFinalReading, waterPrevVal)
-          const newUnits = getUnits(Number(waterVal), repWater.newStartReading)
-          wUnits = oldUnits + newUnits
-        } else {
-          wUnits = getUnits(Number(waterVal), waterPrevVal)
-        }
-        return wUnits > 3000;
+        skippedRooms.push(item.roomNumber)
       }
-    })
+    }
 
-    if (invalidItems.length > 0) {
-      const typeText = type === "electric" ? t("billing.elec_meter") : t("billing.water_meter")
-      alert(t("billing.err_bulk_save_invalid").replace("{count}", String(invalidItems.length)).replace("{type}", typeText))
+    if (eligible.length === 0) {
+      alert(t("billing.err_bulk_save_none"))
       return
     }
 
     setSavingAll(true)
-    setSavingProgress({ current: 0, total: unifiedItems.length, currentRoom: t("billing.saving_all_progress") })
+    setSavingProgress({ current: 0, total: eligible.length, currentRoom: t("billing.saving_all_progress") })
     // bulk upsert 1 ครั้ง = realtime event 1 ตัวต่อ 1 แถว (N ห้อง = N event) ทั้งหมดเป็น echo ของ
     // การบันทึกที่เรา optimistic update ครบอยู่แล้วด้านล่าง จึงระงับ refresh เบื้องหลังคลุมช่วงนี้ไว้
     // (ตั้งเผื่อยาวเพราะ saveAllBillsForCycle ใช้เวลาหลายวินาทีเมื่อห้องเยอะ แล้วต่ออายุอีกครั้งหลังอัปเดต state)
     suppressBackgroundRefresh(30000)
 
     try {
-      const items: BulkBillItem[] = unifiedItems.map(item => ({
+      const items: BulkBillItem[] = eligible.map(item => ({
         roomNumber: item.roomNumber,
         tenantName: item.tenantName || null,
         elecPrev: item.elecPrev === "" ? 0 : Number(item.elecPrev),
@@ -1591,8 +1641,30 @@ function UnifiedBillingContent() {
         setCachedData(currentWorkspaceId, `bills_${billingCycle}`, updatedBills)
       }
 
-      const successText = type === "electric" ? t("billing.elec_meter") : t("billing.water_meter")
-      showToast(t("billing.toast_bulk_save_success").replace("{type}", successText))
+      const successText = type === "electric"
+        ? t("billing.elec_meter")
+        : type === "water"
+          ? t("billing.water_meter")
+          : t("billing.entry_mode_both")
+
+      if (skippedRooms.length > 0) {
+        // จำกัดความยาวรายชื่อห้อง ไม่ให้ toast ยาวจนอ่านไม่ได้เมื่อข้ามหลายสิบห้อง
+        const preview = skippedRooms.slice(0, 5).join(", ")
+        const roomsText = skippedRooms.length > 5
+          ? t("billing.bulk_save_skipped_rooms_more")
+              .replace("{rooms}", preview)
+              .replace("{rest}", String(skippedRooms.length - 5))
+          : preview
+        showToast(
+          t("billing.toast_bulk_save_partial")
+            .replace("{type}", successText)
+            .replace("{saved}", String(eligible.length))
+            .replace("{skipped}", String(skippedRooms.length))
+            .replace("{rooms}", roomsText)
+        )
+      } else {
+        showToast(t("billing.toast_bulk_save_success").replace("{type}", successText))
+      }
     } catch (err) {
       console.error(err)
       alert(t("manage_bills.err_unexpected"))
@@ -1916,6 +1988,33 @@ function UnifiedBillingContent() {
     ? unifiedItems
     : unifiedItems.filter(item => item.buildingId === buildingFilter)
 
+  // ชั้นที่มีอยู่จริงในอาคารที่เลือก (คิดจาก rooms.floor หรือเดาจากเลขห้องด้วย logic เดียวกับหน้าผู้เช่า)
+  const availableFloors = useMemo(
+    () => sortFloors([...new Set(filteredUnifiedItems.map(item => getRoomFloor(item.roomNumber, roomsList)))]),
+    [filteredUnifiedItems, roomsList]
+  )
+
+  // ถ้าชั้นที่จำไว้ไม่มีอยู่ในอาคาร/รอบบิลที่เลือก (เช่น เพิ่งสลับอาคาร) ให้ถือว่าเป็น "ทุกชั้น"
+  // เพื่อไม่ให้ตารางว่างเปล่าโดยไม่มีเหตุผล — แต่ไม่เขียนค่าลง DB เพราะผู้ใช้ไม่ได้สั่งเปลี่ยนเอง
+  const effectiveMeterFloor =
+    meterEntryFloor !== "all" && !availableFloors.includes(meterEntryFloor) ? "all" : meterEntryFloor
+
+  // รายการห้องของ "แท็บจดเลขมิเตอร์" — กรองชั้นเพิ่มจากตัวกรองอาคาร
+  // แยกจาก filteredUnifiedItems เพื่อไม่ให้ตัวกรองชั้นรั่วไปแท็บสรุปบิล (ตามที่ตกลงไว้)
+  const meterTabItems = useMemo(
+    () => effectiveMeterFloor === "all"
+      ? filteredUnifiedItems
+      : filteredUnifiedItems.filter(item => getRoomFloor(item.roomNumber, roomsList) === effectiveMeterFloor),
+    [filteredUnifiedItems, roomsList, effectiveMeterFloor]
+  )
+
+  // นับห้องที่กรอกเลขค้างไว้แต่ยังไม่บันทึก จาก "ทั้งหอ" ไม่ใช่แค่ชั้น/อาคารที่กำลังดูอยู่
+  // เพื่อกันลืมข้ามชั้น (ตราบใดที่ยังค้าง refresh เบื้องหลังจะถูกบล็อกไว้อยู่แล้ว)
+  const totalUnsavedCount = useMemo(
+    () => unifiedItems.filter(item => item.isEdited).length,
+    [unifiedItems]
+  )
+
   // คำนวณสรุปสถิติด้านบนของแดชบอร์ด (ปรับเปลี่ยนให้เหมาะสมกับห้องว่าง/ไม่มีผู้เช่า)
   const totalOccupied = unifiedItems.filter(item => item.tenantName).length
   const billedCount = unifiedItems.filter(item => item.tenantName && item.isMeterSaved).length
@@ -1944,6 +2043,7 @@ function UnifiedBillingContent() {
           </p>
         </div>
         
+        <div className="flex flex-col gap-3 w-full md:w-auto md:items-end">
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           {/* แถบเลือกเดือนรอบบิล */}
           <select
@@ -1989,6 +2089,81 @@ function UnifiedBillingContent() {
               ))}
             </select>
           )}
+
+          {/* เลือกว่าจะจดอะไร — แสดงเฉพาะแท็บจดเลขมิเตอร์ เพราะแท็บสรุปบิลแสดงทั้งไฟและน้ำอยู่แล้ว
+              (ย้ายขึ้นมาจากแถบควบคุมในตาราง เพื่อให้ตัวเลือกรูปแบบการจดอยู่รวมกันที่หัวหน้าทั้งหมด) */}
+          {pageActiveTab === "meters" && (
+            <div className={`flex items-center gap-1.5 p-1 rounded-xl border w-full md:w-auto ${
+              isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-300"
+            }`}>
+              {([
+                { value: "electric", label: t("billing.elec_meter"), icon: Zap, accent: isDark ? "text-blue-400" : "text-blue-600" },
+                { value: "water", label: t("billing.water_meter"), icon: Droplet, accent: isDark ? "text-teal-400" : "text-teal-600" },
+                { value: "both", label: t("billing.entry_mode_both"), icon: Gauge, accent: isDark ? "text-violet-400" : "text-violet-600" }
+              ] as const).map(opt => {
+                const isActive = meterEntryUtility === opt.value
+                const Icon = opt.icon
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => applyMeterEntryMode(opt.value, meterEntryFloor)}
+                    className={`flex-1 md:flex-none h-9 xl:h-10 2xl:h-12 px-3 xl:px-4 rounded-lg text-xs xl:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                      isActive
+                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black shadow-sm"
+                        : isDark
+                          ? "text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                          : "text-slate-650 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "" : opt.accent}`} />
+                    <span>{opt.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* เลือกชั้นที่จะจด — แสดงเฉพาะแท็บจดเลขมิเตอร์ และเฉพาะเมื่อหอมีมากกว่า 1 ชั้น
+            มีผลแค่แท็บนี้ ไม่กระทบแท็บสรุปบิลซึ่งยังแสดงทุกห้องเสมอ */}
+        {pageActiveTab === "meters" && availableFloors.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto md:justify-end">
+            <span className={`text-xs xl:text-sm font-bold mr-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              {t("billing.floor_label")}
+            </span>
+            {(["all", ...availableFloors]).map(floor => {
+              const isActive = effectiveMeterFloor === floor
+              const roomsOnFloor = floor === "all"
+                ? filteredUnifiedItems
+                : filteredUnifiedItems.filter(item => getRoomFloor(item.roomNumber, roomsList) === floor)
+              const savedOnFloor = roomsOnFloor.filter(item => item.isMeterSaved).length
+              const isFloorComplete = roomsOnFloor.length > 0 && savedOnFloor === roomsOnFloor.length
+              return (
+                <button
+                  key={floor}
+                  type="button"
+                  onClick={() => applyMeterEntryMode(meterEntryUtility, floor)}
+                  title={t("billing.floor_saved_progress")
+                    .replace("{saved}", String(savedOnFloor))
+                    .replace("{total}", String(roomsOnFloor.length))}
+                  className={`h-8 xl:h-9 px-3 rounded-lg border text-xs xl:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isActive
+                      ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-950 dark:border-slate-100 font-black shadow-sm"
+                      : isDark
+                        ? "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                        : "bg-white border-slate-300 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <span>{floor === "all" ? t("billing.floor_all") : floor}</span>
+                  {isFloorComplete && (
+                    <CheckCircle className={`w-3 h-3 shrink-0 ${isActive ? "" : "text-emerald-500"}`} />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
         </div>
       </div>
 
@@ -2055,7 +2230,7 @@ function UnifiedBillingContent() {
           savingRows={savingRows}
           userPermissions={userPermissions}
           hasEditPermission={userPermissions.manage_meters_bills_edit}
-          unifiedItems={filteredUnifiedItems}
+          unifiedItems={meterTabItems}
           commonFee={commonFee}
           electricMinChecked={electricMinChecked}
           electricMinUnit={electricMinUnit}
@@ -2086,6 +2261,9 @@ function UnifiedBillingContent() {
           latePenaltyRate={latePenaltyRate}
           handleOtherServiceChange={handleOtherServiceChange}
           mode="meters"
+          meterEntryUtility={meterEntryUtility}
+          activeFloorLabel={effectiveMeterFloor === "all" ? undefined : effectiveMeterFloor}
+          totalUnsavedCount={totalUnsavedCount}
           meterReplacements={meterReplacements}
           onMeterReplacementsChange={async () => {
             await loadData(billingCycle, true)
