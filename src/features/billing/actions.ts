@@ -293,6 +293,9 @@ export async function createBill(
           water_units: waterUnits,
           other_service_amount: otherServiceAmount,
           invoice_id: invoiceId,
+          // เขียน room_id ควบคู่กับ room_number (ตัวระบุห้องที่แท้จริง) เพื่อเตรียมเลิกจับคู่ด้วยเลขห้อง
+          // ที่ซ้ำกันได้ข้ามตึก — ดู database_patch_add_room_id_to_meters_bills.sql
+          room_id: roomData.id,
           building_id: roomData.building_id ?? null,
           vat_amount: vatAmount
         })
@@ -303,6 +306,8 @@ export async function createBill(
         .from("bills")
         .insert([{
           room_number: roomNumber,
+          // เขียน room_id ควบคู่กับ room_number (ดูหมายเหตุที่ branch update ด้านบน)
+          room_id: roomData.id,
           tenant_name: tenantName,
           amount: finalBillAmount,
           status,
@@ -1072,9 +1077,14 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const elecVal = item.elecCurr === "" ? null : Number(item.elecCurr)
       const waterVal = item.waterCurr === "" ? null : Number(item.waterCurr)
 
+      const roomData = roomsMap.get(item.roomNumber)
+
       meterRows.push({
         workspace_id: workspaceId,
         room_number: item.roomNumber,
+        // เขียน room_id ควบคู่ไปด้วย (ตัวระบุห้องที่แท้จริง) เพื่อให้แถวใหม่พร้อมสำหรับการเปลี่ยนไป
+        // จับคู่ด้วย room_id แทน room_number ที่ซ้ำกันได้ข้ามตึก — ดู database_patch_add_room_id_to_meters_bills.sql
+        room_id: roomData?.id ?? null,
         billing_cycle: billingCycle,
         elec_prev: item.elecPrev,
         elec_curr: elecVal,
@@ -1084,7 +1094,6 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
 
       if (!item.tenantName) continue  // ไม่มีผู้เช่า ไม่ต้องออกบิล (ตาม logic เดิม)
 
-      const roomData = roomsMap.get(item.roomNumber)
       if (!roomData) { skippedRooms.push(item.roomNumber); continue }
 
       // Resolve อัตราไฟฟ้า/น้ำตามโหมดของ workspace — ถ้า building_total ยังไม่ได้กรอกยอดของอาคารนี้
@@ -1116,6 +1125,8 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       billRows.push({
         workspace_id: workspaceId,
         room_number: item.roomNumber,
+        // เขียน room_id ควบคู่ไปด้วย (ดูหมายเหตุที่ meterRows ด้านบน)
+        room_id: roomData.id,
         tenant_name: item.tenantName,
         amount: total + existingPenalty,
         status: item.status,
