@@ -25,7 +25,8 @@ import {
   Zap,
   Droplet,
   Home,
-  ShieldAlert
+  ShieldAlert,
+  Settings
 } from "lucide-react"
 import { getBills, createBill, updateBillStatus, getBillingPageData, saveAllBillsForCycle, type BulkBillItem } from "@/features/billing/actions"
 import { getRooms } from "@/features/room/actions"
@@ -255,6 +256,7 @@ function UnifiedBillingContent() {
   // "ชั้น": "all" = ทุกชั้น หรือชื่อชั้น — มีผลเฉพาะแท็บจดเลขมิเตอร์ ไม่กระทบแท็บสรุปบิล
   const [meterEntryUtility, setMeterEntryUtility] = useState<"electric" | "water" | "both">("electric")
   const [meterEntryFloor, setMeterEntryFloor] = useState<string>("all")
+  const [meterEntrySettingsOpen, setMeterEntrySettingsOpen] = useState(false)
   const [buildingUtilityBills, setBuildingUtilityBills] = useState<BuildingUtilityBill[]>([])
   const [waterMinChecked, setWaterMinChecked] = useState<boolean>(true)
   const [waterMinUnit, setWaterMinUnit] = useState<number>(3)
@@ -1999,6 +2001,14 @@ function UnifiedBillingContent() {
   const effectiveMeterFloor =
     meterEntryFloor !== "all" && !availableFloors.includes(meterEntryFloor) ? "all" : meterEntryFloor
 
+  // การตั้งค่า 2 อย่างในโมดอล เก็บลง 2 คอลัมน์เดิมที่มีอยู่แล้ว ไม่ต้องรัน SQL เพิ่ม:
+  //   meter_entry_utility === "both" → จดพร้อมกัน | ค่าอื่น → จดแยกน้ำ-ไฟ (ไฟ/น้ำ เลือกที่แท็บในตาราง)
+  //   meter_entry_floor === "all"    → แสดงทั้งหมด | ชื่อชั้น → แสดงแยกชั้น และกำลังดูชั้นนั้น
+  const isRecordTogether = meterEntryUtility === "both"
+  const isByFloor = effectiveMeterFloor !== "all"
+  // แสดงแยกชั้นได้เฉพาะหอที่มีมากกว่า 1 ชั้น ไม่งั้นเป็นตัวเลือกที่ไม่มีความหมาย
+  const canGroupByFloor = availableFloors.length > 1
+
   // รายการห้องของ "แท็บจดเลขมิเตอร์" — กรองชั้นเพิ่มจากตัวกรองอาคาร
   // แยกจาก filteredUnifiedItems เพื่อไม่ให้ตัวกรองชั้นรั่วไปแท็บสรุปบิล (ตามที่ตกลงไว้)
   const meterTabItems = useMemo(
@@ -2074,6 +2084,23 @@ function UnifiedBillingContent() {
             ))}
           </select>
 
+          {/* ปุ่มตั้งค่ารูปแบบการจดมิเตอร์ — อยู่ติดตัวเลือกรอบบิล เปิดโมดอลตั้งค่า
+              แสดงเฉพาะแท็บจดเลขมิเตอร์ เพราะการตั้งค่าไม่มีผลกับแท็บสรุปบิล
+              และเฉพาะคนที่มีสิทธิ์แก้มิเตอร์/บิล เพราะเป็นค่าระดับ workspace ที่ทุกคนในหอเห็นเหมือนกัน */}
+          {pageActiveTab === "meters" && userPermissions.manage_meters_bills_edit && (
+            <button
+              type="button"
+              onClick={() => setMeterEntrySettingsOpen(true)}
+              title={t("billing.entry_settings_title")}
+              className={`w-full md:w-auto h-11 px-4 xl:h-12 xl:px-5 2xl:h-14 2xl:px-6 border rounded-xl text-sm xl:text-base 2xl:text-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
+                isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-850" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-50"
+              }`}
+            >
+              <Settings className="w-4 h-4 shrink-0" />
+              <span>{t("billing.entry_settings_button")}</span>
+            </button>
+          )}
+
           {/* ตัวกรองอาคาร — แสดงเฉพาะเมื่อหอมีมากกว่า 1 อาคาร */}
           {buildings.length > 1 && (
             <select
@@ -2090,80 +2117,7 @@ function UnifiedBillingContent() {
             </select>
           )}
 
-          {/* เลือกว่าจะจดอะไร — แสดงเฉพาะแท็บจดเลขมิเตอร์ เพราะแท็บสรุปบิลแสดงทั้งไฟและน้ำอยู่แล้ว
-              (ย้ายขึ้นมาจากแถบควบคุมในตาราง เพื่อให้ตัวเลือกรูปแบบการจดอยู่รวมกันที่หัวหน้าทั้งหมด) */}
-          {pageActiveTab === "meters" && (
-            <div className={`flex items-center gap-1.5 p-1 rounded-xl border w-full md:w-auto ${
-              isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-300"
-            }`}>
-              {([
-                { value: "electric", label: t("billing.elec_meter"), icon: Zap, accent: isDark ? "text-blue-400" : "text-blue-600" },
-                { value: "water", label: t("billing.water_meter"), icon: Droplet, accent: isDark ? "text-teal-400" : "text-teal-600" },
-                { value: "both", label: t("billing.entry_mode_both"), icon: Gauge, accent: isDark ? "text-violet-400" : "text-violet-600" }
-              ] as const).map(opt => {
-                const isActive = meterEntryUtility === opt.value
-                const Icon = opt.icon
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => applyMeterEntryMode(opt.value, meterEntryFloor)}
-                    className={`flex-1 md:flex-none h-9 xl:h-10 2xl:h-12 px-3 xl:px-4 rounded-lg text-xs xl:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                      isActive
-                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black shadow-sm"
-                        : isDark
-                          ? "text-slate-400 hover:bg-slate-850 hover:text-slate-200"
-                          : "text-slate-650 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
-                  >
-                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "" : opt.accent}`} />
-                    <span>{opt.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
         </div>
-
-        {/* เลือกชั้นที่จะจด — แสดงเฉพาะแท็บจดเลขมิเตอร์ และเฉพาะเมื่อหอมีมากกว่า 1 ชั้น
-            มีผลแค่แท็บนี้ ไม่กระทบแท็บสรุปบิลซึ่งยังแสดงทุกห้องเสมอ */}
-        {pageActiveTab === "meters" && availableFloors.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto md:justify-end">
-            <span className={`text-xs xl:text-sm font-bold mr-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-              {t("billing.floor_label")}
-            </span>
-            {(["all", ...availableFloors]).map(floor => {
-              const isActive = effectiveMeterFloor === floor
-              const roomsOnFloor = floor === "all"
-                ? filteredUnifiedItems
-                : filteredUnifiedItems.filter(item => getRoomFloor(item.roomNumber, roomsList) === floor)
-              const savedOnFloor = roomsOnFloor.filter(item => item.isMeterSaved).length
-              const isFloorComplete = roomsOnFloor.length > 0 && savedOnFloor === roomsOnFloor.length
-              return (
-                <button
-                  key={floor}
-                  type="button"
-                  onClick={() => applyMeterEntryMode(meterEntryUtility, floor)}
-                  title={t("billing.floor_saved_progress")
-                    .replace("{saved}", String(savedOnFloor))
-                    .replace("{total}", String(roomsOnFloor.length))}
-                  className={`h-8 xl:h-9 px-3 rounded-lg border text-xs xl:text-sm font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isActive
-                      ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-950 dark:border-slate-100 font-black shadow-sm"
-                      : isDark
-                        ? "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
-                        : "bg-white border-slate-300 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  <span>{floor === "all" ? t("billing.floor_all") : floor}</span>
-                  {isFloorComplete && (
-                    <CheckCircle className={`w-3 h-3 shrink-0 ${isActive ? "" : "text-emerald-500"}`} />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )}
         </div>
       </div>
 
@@ -2261,8 +2215,11 @@ function UnifiedBillingContent() {
           latePenaltyRate={latePenaltyRate}
           handleOtherServiceChange={handleOtherServiceChange}
           mode="meters"
-          meterEntryUtility={meterEntryUtility}
-          activeFloorLabel={effectiveMeterFloor === "all" ? undefined : effectiveMeterFloor}
+          recordTogether={isRecordTogether}
+          byFloor={isByFloor}
+          floorOptions={availableFloors}
+          selectedFloor={effectiveMeterFloor}
+          onFloorChange={(floor) => applyMeterEntryMode(meterEntryUtility, floor)}
           totalUnsavedCount={totalUnsavedCount}
           meterReplacements={meterReplacements}
           onMeterReplacementsChange={async () => {
@@ -2589,6 +2546,135 @@ function UnifiedBillingContent() {
         savingAll={savingAll}
         savingProgress={savingProgress}
       />
+
+      {/* โมดอลตั้งค่ารูปแบบการจดมิเตอร์
+          ค่าที่เลือกจำไว้ต่อ workspace และมีผลเฉพาะแท็บจดเลขมิเตอร์
+          การกดเปลี่ยนไม่โหลดข้อมูลใหม่ ค่าที่กรอกค้างไว้จึงไม่หาย (ดู applyMeterEntryMode) */}
+      {meterEntrySettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5 sm:p-6 bg-black/70 backdrop-blur-sm">
+          <div className={`w-full max-w-lg rounded-3xl relative shadow-2xl border ${
+            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+          }`}>
+            <button
+              type="button"
+              onClick={() => setMeterEntrySettingsOpen(false)}
+              className={`absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+                isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"
+              }`}
+              aria-label={t("billing.close")}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="p-6 sm:p-7 space-y-6">
+              <div className="pr-10">
+                <h3 className={`text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+                  <Settings className="w-5 h-5 text-blue-500 shrink-0" />
+                  {t("billing.entry_settings_title")}
+                </h3>
+                <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  {t("billing.entry_settings_desc")}
+                </p>
+              </div>
+
+              {/* 1. รูปแบบการจด */}
+              <div className="space-y-2.5">
+                <div className={`text-xs sm:text-sm font-extrabold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                  {t("billing.entry_settings_mode_label")}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {([
+                    { together: false, label: t("billing.entry_mode_separate"), desc: t("billing.entry_mode_separate_desc"), icon: Zap },
+                    { together: true, label: t("billing.entry_mode_together"), desc: t("billing.entry_mode_together_desc"), icon: Gauge }
+                  ] as const).map(opt => {
+                    const isActive = isRecordTogether === opt.together
+                    const Icon = opt.icon
+                    return (
+                      <button
+                        key={String(opt.together)}
+                        type="button"
+                        onClick={() => applyMeterEntryMode(opt.together ? "both" : "electric", meterEntryFloor)}
+                        className={`text-left p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                          isActive
+                            ? "border-blue-500 bg-blue-50/60 dark:bg-blue-500/10"
+                            : isDark
+                              ? "border-slate-800 bg-slate-950/30 hover:border-slate-700"
+                              : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        <div className={`flex items-center gap-2 text-sm font-extrabold ${
+                          isActive ? "text-blue-700 dark:text-blue-400" : isDark ? "text-slate-200" : "text-slate-800"
+                        }`}>
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <span>{opt.label}</span>
+                        </div>
+                        <p className={`text-[11px] sm:text-xs mt-1 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                          {opt.desc}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 2. การแสดงผล */}
+              <div className="space-y-2.5">
+                <div className={`text-xs sm:text-sm font-extrabold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                  {t("billing.entry_settings_display_label")}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {([
+                    { byFloor: false, label: t("billing.display_all"), desc: t("billing.display_all_desc") },
+                    { byFloor: true, label: t("billing.display_by_floor"), desc: t("billing.display_by_floor_desc") }
+                  ] as const).map(opt => {
+                    const isActive = isByFloor === opt.byFloor
+                    // เลือก "แสดงแยกชั้น" ไม่ได้ถ้าหอมีชั้นเดียว เพราะผลลัพธ์จะเหมือนแสดงทั้งหมด
+                    const isDisabled = opt.byFloor && !canGroupByFloor
+                    return (
+                      <button
+                        key={String(opt.byFloor)}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => applyMeterEntryMode(
+                          meterEntryUtility,
+                          // เข้าโหมดแยกชั้น: ถ้าค้างชั้นไว้อยู่แล้วใช้ชั้นนั้น ไม่งั้นเริ่มที่ชั้นแรก
+                          opt.byFloor ? (isByFloor ? effectiveMeterFloor : availableFloors[0]) : "all"
+                        )}
+                        className={`text-left p-3.5 rounded-2xl border-2 transition-all ${
+                          isDisabled
+                            ? "opacity-40 cursor-not-allowed border-slate-200 dark:border-slate-800"
+                            : isActive
+                              ? "border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 cursor-pointer"
+                              : isDark
+                                ? "border-slate-800 bg-slate-950/30 hover:border-slate-700 cursor-pointer"
+                                : "border-slate-200 bg-white hover:border-slate-300 cursor-pointer"
+                        }`}
+                      >
+                        <div className={`text-sm font-extrabold ${
+                          isActive && !isDisabled ? "text-blue-700 dark:text-blue-400" : isDark ? "text-slate-200" : "text-slate-800"
+                        }`}>
+                          {opt.label}
+                        </div>
+                        <p className={`text-[11px] sm:text-xs mt-1 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                          {isDisabled ? t("billing.display_by_floor_unavailable") : opt.desc}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMeterEntrySettingsOpen(false)}
+                className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-950 text-sm font-black transition-colors cursor-pointer"
+              >
+                {t("billing.entry_settings_done")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

@@ -25,11 +25,17 @@ interface MeterReadingTableProps {
   handleWaterPrevChange: (roomNumber: string, value: string) => void
   handleWaterChange: (roomNumber: string, value: string) => void
   handleSaveRow: (roomNumber: string, type?: "electric" | "water" | "all") => Promise<void>
-  // รูปแบบการจดที่เลือกจากแถบหัวของหน้า /billing — ใช้เฉพาะ mode "meters"
-  // (optional เพราะ /manage-bills ใช้ component ตัวเดียวกันด้วย mode "billing" และไม่ส่งค่านี้)
-  meterEntryUtility?: "electric" | "water" | "both"
-  // ชื่อชั้นที่กำลังกรองอยู่ (undefined = ทุกชั้น) ใช้แสดงใน label ปุ่มบันทึกทั้งหมดเท่านั้น
-  activeFloorLabel?: string
+  // รูปแบบการจดที่ตั้งไว้ในโมดอลตั้งค่าของหน้า /billing — ใช้เฉพาะ mode "meters"
+  // (optional ทุกตัว เพราะ /manage-bills ใช้ component ตัวเดียวกันด้วย mode "billing" และไม่ส่งค่าเหล่านี้)
+  //
+  // false = จดแยกน้ำ-ไฟ → แสดงแท็บ มิเตอร์ไฟ/มิเตอร์น้ำ ให้สลับเอง (ค่าที่เลือกเป็น state ชั่วคราวของตาราง)
+  // true  = จดพร้อมกัน → แสดงคอลัมน์ไฟและน้ำในแถวเดียว ไม่มีแท็บ
+  recordTogether?: boolean
+  // true = แสดงแยกชั้น (มี dropdown เลือกชั้น) | false = แสดงทุกห้องรวมกัน
+  byFloor?: boolean
+  floorOptions?: string[]
+  selectedFloor?: string
+  onFloorChange?: (floor: string) => void
   // จำนวนห้องทั้งหอที่กรอกค้างไว้แต่ยังไม่บันทึก (นับจากทุกอาคาร/ทุกชั้น ไม่ใช่แค่ที่มองเห็น)
   totalUnsavedCount?: number
   setSelectedBill: (item: any) => void
@@ -95,8 +101,11 @@ export default function MeterReadingTable({
   latePenaltyRate = 0,
   handleOtherServiceChange,
   mode = "billing",
-  meterEntryUtility,
-  activeFloorLabel,
+  recordTogether = false,
+  byFloor = false,
+  floorOptions = [],
+  selectedFloor = "all",
+  onFloorChange,
   totalUnsavedCount = 0,
   meterReplacements = [],
   onMeterReplacementsChange,
@@ -107,13 +116,14 @@ export default function MeterReadingTable({
   const permissions = userPermissions || DEFAULT_STAFF_PERMISSIONS
   const hasEdit = hasEditPermission !== undefined ? hasEditPermission : permissions.manage_meters_bills_edit
   const { t, locale } = useLanguage()
+  // แท็บ มิเตอร์ไฟ/มิเตอร์น้ำ ของโหมด "จดแยกน้ำ-ไฟ" — เป็น state ชั่วคราวของตารางเหมือนเดิม ไม่จำลง DB
+  // (สิ่งที่จำลง DB คือ 2 setting ในโมดอลตั้งค่าเท่านั้น: จดแยก/จดพร้อมกัน และ แสดงทั้งหมด/แยกชั้น)
+  const [separateTab, setSeparateTab] = useState<"electric" | "water">("electric")
+
   // "all" = ชุดคอลัมน์ของหน้าจัดการใบแจ้งหนี้ (/manage-bills, mode "billing") — มิเตอร์อ่านอย่างเดียว
   // "electric"/"water" = จดทีละสาธารณูปโภค | "both" = จดไฟและน้ำพร้อมกันในแถวเดียว
-  //
-  // ไม่ใช่ state ของ component นี้แล้ว เพราะตัวเลือกย้ายไปอยู่แถบหัวของหน้า /billing (จำค่าไว้ต่อ workspace)
-  // การรับมาเป็น prop ทำให้ค่าที่ผู้ใช้พิมพ์ค้างไว้ไม่หายตอนสลับโหมด — ค่าอยู่ใน unifiedItems ของ page
   const activeTab: "all" | "electric" | "water" | "both" =
-    mode === "billing" ? "all" : (meterEntryUtility ?? "electric")
+    mode === "billing" ? "all" : recordTogether ? "both" : separateTab
 
   const showElectricColumns = activeTab === "electric" || activeTab === "both"
   const showWaterColumns = activeTab === "water" || activeTab === "both"
@@ -814,10 +824,65 @@ Thank you 🙏`
         {/* แถบควบคุมหลัก (Tabs) */}
         <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
           {mode !== "billing" ? (
-            /* ตัวเลือก "จดอะไร" ย้ายไปอยู่แถบหัวของหน้า /billing แล้ว (จำค่าไว้ต่อ workspace)
-               เหลือไว้แค่ตัวเตือนว่ายังมีห้องที่กรอกค้างไม่ได้บันทึก ซึ่งนับจากทั้งหอ ไม่ใช่แค่ชั้นที่เห็น
-               กันเคสเดินจดทีละชั้นแล้วลืมกดบันทึกชั้นก่อนหน้า */
             <div className="flex flex-wrap items-center gap-2">
+              {/* โหมด "จดแยกน้ำ-ไฟ": แท็บสลับไฟ/น้ำแบบเดิม
+                  โหมด "จดพร้อมกัน": ไม่มีแท็บ เพราะแสดงทั้งไฟและน้ำในแถวเดียวอยู่แล้ว
+                                     dropdown เลือกชั้นจะมาอยู่ในตำแหน่งนี้แทน */}
+              {!recordTogether && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSeparateTab("electric")}
+                    className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
+                      activeTab === "electric"
+                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
+                        : isDark
+                          ? "bg-slate-900/30 border border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                          : "bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <Zap className={`w-3.5 h-3.5 shrink-0 ${activeTab === "electric" ? (isDark ? "text-blue-400" : "text-blue-600") : "text-blue-500"}`} />
+                    <span>{t("billing.elec_meter")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSeparateTab("water")}
+                    className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 xl:gap-2 shadow-sm ${
+                      activeTab === "water"
+                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 font-black scale-102"
+                        : isDark
+                          ? "bg-slate-900/30 border border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                          : "bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <Droplet className={`w-3.5 h-3.5 shrink-0 ${activeTab === "water" ? (isDark ? "text-teal-400" : "text-teal-600") : "text-teal-500"}`} />
+                    <span>{t("billing.water_meter")}</span>
+                  </button>
+                </>
+              )}
+
+              {/* dropdown เลือกชั้น — มีเฉพาะเมื่อเปิดโหมด "แสดงแยกชั้น" ในโมดอลตั้งค่า
+                  มีแต่ชั้นจริง ไม่มีตัวเลือก "ทุกชั้น" เพราะโหมดแสดงทั้งหมด/แยกชั้น ตั้งที่โมดอลที่เดียว */}
+              {byFloor && floorOptions.length > 0 && (
+                <select
+                  value={selectedFloor}
+                  onChange={(e) => onFloorChange?.(e.target.value)}
+                  className={`px-3.5 py-1.5 xl:px-4 xl:py-2 2xl:px-4.5 2xl:py-2 rounded-xl text-xs xl:text-xs 2xl:text-sm font-extrabold border transition-all cursor-pointer focus:outline-none focus:border-blue-500 shadow-sm ${
+                    isDark
+                      ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-850"
+                      : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50"
+                  }`}
+                >
+                  {floorOptions.map(floor => (
+                    <option key={floor} value={floor} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>
+                      {t("billing.floor_option").replace("{floor}", floor)}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {/* เตือนว่ายังมีห้องกรอกค้างไม่ได้บันทึก นับจากทั้งหอ ไม่ใช่แค่ชั้นที่เห็น
+                  กันเคสเดินจดทีละชั้นแล้วลืมกดบันทึกชั้นก่อนหน้า */}
               {totalUnsavedCount > 0 && (
                 <div className={`flex items-center gap-2 px-3 py-1.5 xl:px-4 xl:py-2 rounded-lg text-xs xl:text-sm font-bold border ${
                   isDark
@@ -2529,7 +2594,7 @@ Thank you 🙏`
                     ? t("billing.save_all_both_count")
                     : t("billing.save_all_water_count")
                 ).replace("{count}", String(unifiedItems.length))}
-                {activeFloorLabel && t("billing.save_all_floor_suffix").replace("{floor}", activeFloorLabel)}
+                {byFloor && selectedFloor !== "all" && t("billing.save_all_floor_suffix").replace("{floor}", selectedFloor)}
               </span>
             </button>
           </div>
