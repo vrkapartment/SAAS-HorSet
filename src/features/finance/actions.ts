@@ -55,6 +55,11 @@ export interface FinanceSettings {
   // โหมดคำนวณค่าน้ำ-ไฟ: fixed_rate = อัตราคงที่ต่อหน่วยที่ตั้งเอง (เดิม) | building_total = หารตามสัดส่วนยอดบิลจริงทั้งอาคาร (ตามกฎหมายใหม่)
   electric_billing_mode?: "fixed_rate" | "building_total"
   water_billing_mode?: "fixed_rate" | "building_total"
+  // รูปแบบการจดมิเตอร์ที่หน้า /billing — เลือกได้ 2 มิติอิสระต่อกัน (ดู database_patch_add_meter_entry_mode.sql)
+  // electric/water = จดทีละสาธารณูปโภคทั้งหอ (เดิม) | both = จดไฟและน้ำพร้อมกันในแถวเดียว
+  meter_entry_utility?: "electric" | "water" | "both"
+  // "all" = ทุกชั้น หรือชื่อชั้นตาม rooms.floor เช่น "2" (ถ้าชั้นที่จำไว้ไม่มีอยู่จริง ฝั่งแอปจะ fallback เป็น all)
+  meter_entry_floor?: string
   // สถานภาพผู้เสียภาษี (กำหนดค่าลดหย่อนส่วนตัว ข.1 ของแบบฟอร์ม ภ.ง.ด. 90/94)
   taxpayer_status?: "individual" | "partnership"
   partner_count?: number
@@ -247,6 +252,27 @@ export async function getFinanceSettings(workspaceId: string) {
       return { electricBillingMode: "fixed_rate", waterBillingMode: "fixed_rate" }
     }
 
+    // 7.6 รูปแบบการจดมิเตอร์ (แยกการดึงเพื่อความปลอดภัยกรณีคอลัมน์ยังไม่ถูกสร้าง
+    //     — ดู database_patch_add_meter_entry_mode.sql) ค่า default ตรงกับพฤติกรรมเดิมก่อนมีฟีเจอร์นี้
+    const fetchMeterEntryMode = async (): Promise<{ meterEntryUtility: "electric" | "water" | "both"; meterEntryFloor: string }> => {
+      try {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("meter_entry_utility, meter_entry_floor")
+          .eq("id", workspaceId)
+          .single()
+        if (!error && data) {
+          return {
+            meterEntryUtility: (data.meter_entry_utility as "electric" | "water" | "both") || "electric",
+            meterEntryFloor: data.meter_entry_floor || "all"
+          }
+        }
+      } catch (e) {
+        console.warn("Columns meter_entry_utility/meter_entry_floor not available in workspaces. Defaulting to electric/all.", e)
+      }
+      return { meterEntryUtility: "electric", meterEntryFloor: "all" }
+    }
+
     // 8. รูปภาพ Logo ของหอพัก (แยกดึงเพื่อความปลอดภัย)
     const fetchLogo = async (): Promise<string> => {
       try {
@@ -305,6 +331,7 @@ export async function getFinanceSettings(workspaceId: string) {
       logoUrl,
       taxpayerStatusData,
       { electricBillingMode, waterBillingMode },
+      { meterEntryUtility, meterEntryFloor },
       vatTaxData
     ] = await Promise.all([
       fetchCore(),
@@ -317,6 +344,7 @@ export async function getFinanceSettings(workspaceId: string) {
       fetchLogo(),
       fetchTaxpayerStatus(),
       fetchBillingMode(),
+      fetchMeterEntryMode(),
       fetchVatTaxSettings()
     ])
 
@@ -339,7 +367,9 @@ export async function getFinanceSettings(workspaceId: string) {
       slip_retention_months: slipRetentionMonths,
       checkout_policy: checkoutPolicy,
       electric_billing_mode: electricBillingMode,
-      water_billing_mode: waterBillingMode
+      water_billing_mode: waterBillingMode,
+      meter_entry_utility: meterEntryUtility,
+      meter_entry_floor: meterEntryFloor
     }
 
     return { 
@@ -371,6 +401,8 @@ export async function getFinanceSettings(workspaceId: string) {
         checkout_policy: merged.checkout_policy || "DAILY_PRORATE",
         electric_billing_mode: (merged.electric_billing_mode as "fixed_rate" | "building_total") || "fixed_rate",
         water_billing_mode: (merged.water_billing_mode as "fixed_rate" | "building_total") || "fixed_rate",
+        meter_entry_utility: (merged.meter_entry_utility as "electric" | "water" | "both") || "electric",
+        meter_entry_floor: merged.meter_entry_floor || "all",
         logo_url: logoUrl,
         taxpayer_status: (taxpayerStatusData?.taxpayer_status as "individual" | "partnership") || "individual",
         partner_count: Number(taxpayerStatusData?.partner_count || 1),
@@ -673,6 +705,49 @@ export async function saveSlipRetentionMonthsAction(workspaceId: string, months:
     return {
       success: false as const,
       error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกระยะเวลาการเก็บสลิป"
+    }
+  }
+}
+
+/**
+ * บันทึกเฉพาะ "รูปแบบการจดมิเตอร์" ที่หน้า /billing เป็นเจ้าของ
+ *
+ * ห้ามส่งผ่าน saveFinanceSettings เพราะ action นั้นตั้งใจเขียนทับทุกฟิลด์ของฟอร์มการเงิน
+ * รวมถึงข้อมูลพร้อมเพย์ (เหตุผลเดียวกับ saveTaxSettings ด้านล่าง)
+ *
+ * ผู้เรียกควรยิงแบบไม่ block UI — หน้าจดมิเตอร์อัปเดต state ของตัวเองไปแล้วก่อนเรียกตัวนี้
+ * และ **ห้าม** สั่งโหลดข้อมูลใหม่หลังบันทึกสำเร็จ เพราะจะทับเลขมิเตอร์ที่ผู้ใช้พิมพ์ค้างไว้
+ */
+export async function saveMeterEntryModeAction(
+  workspaceId: string,
+  utility: "electric" | "water" | "both",
+  floor: string
+) {
+  try {
+    const access = await getWorkspaceAdminClient(workspaceId)
+    if (!access.success) return access
+
+    const allowedUtilities = ["electric", "water", "both"] as const
+    const normalizedUtility = allowedUtilities.includes(utility) ? utility : "electric"
+    // ชื่อชั้นเป็นข้อมูลของผู้ใช้ (rooms.floor เป็น text) จึงไม่จำกัดค่า แค่กันค่าว่าง/ยาวเกินจริง
+    const normalizedFloor = (floor || "all").trim().slice(0, 50) || "all"
+
+    const { data, error } = await access.client
+      .from("workspaces")
+      .update({ meter_entry_utility: normalizedUtility, meter_entry_floor: normalizedFloor })
+      .eq("id", workspaceId)
+      .select("id")
+      .single()
+
+    if (error || !data) {
+      return { success: false as const, error: error?.message || "ไม่สามารถบันทึกรูปแบบการจดมิเตอร์ได้" }
+    }
+
+    return { success: true as const, utility: normalizedUtility, floor: normalizedFloor }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกรูปแบบการจดมิเตอร์"
     }
   }
 }

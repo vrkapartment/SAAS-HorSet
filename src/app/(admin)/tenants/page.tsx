@@ -41,6 +41,7 @@ import { getFinanceSettings } from "@/features/finance/actions"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { getRooms } from "@/features/room/actions"
+import { getRoomFloor as getRoomFloorShared, sortFloors } from "@/features/room/utils"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
 
@@ -733,28 +734,9 @@ export default function TenantsPage() {
   // ห้องว่างทั้งหมด (สำหรับ modal ย้ายห้อง — ไม่รวมห้องปัจจุบันของผู้เช่าเพราะสถานะเป็น occupied อยู่แล้ว)
   const vacantRoomsForTransfer = rooms.filter(r => r.status === "available")
 
-  const getRoomFloor = (roomNum: string) => {
-    const room = rooms.find(r => r.roomNumber === roomNum)
-    if (room && room.floor) return String(room.floor)
-    
-    // Fallback: If room number starts with digits, use the first digit as the floor
-    const match = roomNum.match(/^\d+/)
-    if (match) {
-      if (roomNum.length >= 3) {
-        return roomNum.substring(0, roomNum.length - 2) // e.g. "102" -> "1", "1203" -> "12"
-      }
-      return match[0][0]
-    }
-    const charMatch = roomNum.match(/^[A-Za-z]+(\d+)/) // e.g. "A101"
-    if (charMatch && charMatch[1]) {
-      const numStr = charMatch[1]
-      if (numStr.length >= 3) {
-        return numStr.substring(0, numStr.length - 2)
-      }
-      return numStr[0]
-    }
-    return "1"
-  }
+  // logic การหาชั้นย้ายไปไว้ที่ src/features/room/utils.ts แล้ว เพราะหน้าจดมิเตอร์ต้องใช้ตัวเดียวกัน
+  // (ถ้าแยกกันคนละชุด ชั้นที่แสดงสองหน้าจะไม่ตรงกันแล้วสตาฟจะจดข้ามชั้น)
+  const getRoomFloor = (roomNum: string) => getRoomFloorShared(roomNum, rooms)
 
   // Group filteredCurrent by floor for Grid View
   const currentByFloor = (() => {
@@ -770,9 +752,7 @@ export default function TenantsPage() {
   })()
 
   // Get sorted floors
-  const sortedFloors = Object.keys(currentByFloor).sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-  )
+  const sortedFloors = sortFloors(Object.keys(currentByFloor))
 
   // Group filteredOld by floor for Grid View
   const oldByFloor = (() => {
@@ -788,9 +768,7 @@ export default function TenantsPage() {
   })()
 
   // Get sorted floors for old tenants
-  const sortedOldFloors = Object.keys(oldByFloor).sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-  )
+  const sortedOldFloors = sortFloors(Object.keys(oldByFloor))
 
   const handleSort = (field: "room" | "fullName" | "line" | "lease" | "status") => {
     if (sortField === field) {
