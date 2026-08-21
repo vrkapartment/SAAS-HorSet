@@ -374,6 +374,23 @@
     "svm_zoom_hint": "Click anywhere to close the zoom view"
   },
   "tenants": {
+    "csv_building_mapping_title": "Match building names before importing",
+    "csv_building_mapping_subtitle": "⚠️ {count} building name(s) do not match the system",
+    "csv_building_mapping_desc": "The building names below do not match any building in the system. Choose which building each one means — one choice applies to every row using that name.",
+    "csv_building_col_file": "Building name in CSV",
+    "csv_building_col_system": "Building in system",
+    "csv_building_row_count": "{count} rows",
+    "csv_building_select_placeholder": "— Select building —",
+    "csv_building_blank": "(no building given)",
+    "csv_building_no_option_hint": "Building not listed? Close this dialog, create it on the buildings page, then upload the file again.",
+    "csv_building_mapping_required": "Please choose a building for \"{buildingName}\" before importing.",
+    "csv_building_importing": "Importing…",
+    "csv_building_confirm": "Import {count} record(s)",
+    "cancel": "Cancel",
+    "csv_guide_building_title": "Building name (must match the system exactly)",
+    "csv_guide_building_desc": "Your property has more than one building, so the file includes a building_name column. Type the building name exactly as it appears in the system (e.g. {buildingName}). Matching is exact and never guessed — room numbers can repeat across buildings, so a wrong guess would attach the tenant to a room in the wrong building.",
+    "csv_guide_building_create": "If the building you need does not exist yet, create it on the buildings page first, then upload the file again.",
+    "csv_guide_building_mismatch": "If a building name does not match, a dialog will let you choose which building each name means — one choice applies to every row using that name, so there is no need to edit the file.",
     "downloading_template": "⏳ Preparing template data...",
     "template_downloaded": "✓ Template downloaded successfully, room data included",
     "err_template_create": "An error occurred while creating the template file",
@@ -995,6 +1012,7 @@
     "loading_billing_page": "Opening meter reading and billing page..."
   },
   "rooms": {
+    "csv_building_blank": "(no building given)",
     "title": "Manage Rooms & Tenants",
     "subtitle": "All rooms list. Manage your building from this single page.",
     "config_types": "Manage Categories",
@@ -1073,6 +1091,7 @@
     "cancellation_empty_title": "No checkout or cancellation history yet",
     "cancellation_empty_desc": "History is automatically saved here when you perform a move-out through Room Details.",
     "toasts": {
+      "mapping_select_building": "Please choose a building for \"{buildingName}\" before importing.",
       "download_template_success": "✓ CSV Template downloaded successfully",
       "download_template_error": "Failed to download template",
       "upload_csv_only": "Please select a .csv file only",

@@ -1436,6 +1436,8 @@ export async function createTenantsBatch(
     phone: string
     lease_start: string
     line_number: number
+    /** อาคารของห้องนี้ — ส่งมาเมื่อหอมีหลายอาคาร เพื่อระบุให้ชัดว่า "ห้อง 101" คือห้องของตึกไหน */
+    building_id?: string
   }[],
   workspaceId: string
 ) {
@@ -1472,7 +1474,7 @@ export async function createTenantsBatch(
     // 2. ดึงข้อมูลห้องพักทั้งหมดของ Workspace นี้มาเปรียบเทียบ
     const { data: dbRooms, error: roomsError } = await supabase
       .from("rooms")
-      .select("id, room_number")
+      .select("id, room_number, building_id")
       .eq("workspace_id", workspaceId)
 
     if (roomsError) {
@@ -1480,10 +1482,22 @@ export async function createTenantsBatch(
       return { success: false, error: "ไม่สามารถดึงข้อมูลห้องพักเพื่อตรวจสอบได้" }
     }
 
+    // จับคู่ห้องด้วย (building_id, room_number) เมื่อผู้เรียกระบุอาคารมา และถอยไปใช้ room_number
+    // เพียว ๆ เมื่อไม่ได้ระบุ (หออาคารเดียว หรือไฟล์เก่าที่ไม่มีคอลัมน์ building_name)
+    // จำเป็นเพราะเลขห้องซ้ำกันได้ข้ามตึก ถ้าจับคู่ด้วยเลขห้องอย่างเดียวจะได้ห้องผิดตึกแบบเงียบ ๆ
     const roomMap = new Map<string, string>()
+    const roomByBuilding = new Map<string, string>()
     dbRooms?.forEach(r => {
-      roomMap.set(r.room_number.trim().toLowerCase(), r.id)
+      const numKey = r.room_number.trim().toLowerCase()
+      if (!roomMap.has(numKey)) roomMap.set(numKey, r.id)
+      if (r.building_id) roomByBuilding.set(`${r.building_id}:${numKey}`, r.id)
     })
+
+    const resolveRoomId = (roomNumber: string, buildingId?: string): string | undefined => {
+      const numKey = roomNumber.trim().toLowerCase()
+      if (buildingId) return roomByBuilding.get(`${buildingId}:${numKey}`)
+      return roomMap.get(numKey)
+    }
 
     const errors: string[] = []
     const validTenantsToInsert: any[] = []
@@ -1602,9 +1616,15 @@ export async function createTenantsBatch(
         }
       }
 
-      const roomId = roomMap.get(rawRoomNum.toLowerCase())
+      const roomId = resolveRoomId(rawRoomNum, tenant.building_id)
       if (!roomId) {
-        errors.push(`แถวที่ ${lineNum}: ไม่พบห้องหมายเลข "${rawRoomNum}" ในระบบตึกนี้ กรุณาเพิ่มห้องนี้เข้าสู่ระบบก่อน`)
+        // ถ้าระบุอาคารมาแล้วยังหาไม่เจอ ต้องบอกให้ชัดว่าไม่เจอ "ในอาคารนั้น" ไม่ใช่ไม่เจอทั้งหอ
+        // ไม่เช่นนั้นผู้ใช้จะงงว่าเห็นห้องนี้อยู่ในระบบชัด ๆ ทำไมบอกว่าไม่มี
+        errors.push(
+          tenant.building_id
+            ? `แถวที่ ${lineNum}: ไม่พบห้องหมายเลข "${rawRoomNum}" ในอาคารที่เลือกไว้ กรุณาตรวจสอบว่าห้องนี้อยู่อาคารไหน หรือเพิ่มห้องเข้าระบบก่อน`
+            : `แถวที่ ${lineNum}: ไม่พบห้องหมายเลข "${rawRoomNum}" ในระบบตึกนี้ กรุณาเพิ่มห้องนี้เข้าสู่ระบบก่อน`
+        )
         continue
       }
 
