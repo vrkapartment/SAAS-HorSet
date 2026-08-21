@@ -29,6 +29,7 @@ export async function getMeterRecords(billingCycle: string, workspaceId?: string
     const formatted = data.map((m: any) => ({
       id: m.id,
       roomNumber: m.room_number,
+      roomId: m.room_id ?? null,
       billingCycle: m.billing_cycle,
       elecPrev: Number(m.elec_prev),
       elecCurr: m.elec_curr === null || m.elec_curr === undefined ? "" : Number(m.elec_curr),
@@ -241,6 +242,7 @@ export async function getMeterReplacements(billingCycle: string, workspaceId?: s
       id: m.id,
       workspaceId: m.workspace_id,
       roomNumber: m.room_number,
+      roomId: m.room_id ?? null,
       billingCycle: m.billing_cycle,
       meterType: m.meter_type as "electric" | "water",
       oldFinalReading: Number(m.old_final_reading),

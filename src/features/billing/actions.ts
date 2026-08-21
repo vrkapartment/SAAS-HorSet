@@ -84,6 +84,8 @@ export async function getBills(billingCycle?: string, year?: string, workspaceId
     const formatted = data.map((b: any) => ({
       id: b.id,
       roomNumber: b.room_number,
+      // ตัวระบุห้องที่แท้จริง — ฝั่ง client ใช้ตัวนี้จับคู่ ไม่ใช่ roomNumber ที่ซ้ำกันได้ข้ามอาคาร
+      roomId: b.room_id ?? null,
       tenantName: b.tenant_name,
       amount: Number(b.amount),
       status: b.status as "unpaid" | "pending" | "paid",

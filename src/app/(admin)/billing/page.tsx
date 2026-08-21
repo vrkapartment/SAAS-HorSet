@@ -1098,6 +1098,7 @@ function UnifiedBillingContent() {
   const formatDbBillToCamelCase = (b: any) => ({
     id: b.id,
     roomNumber: b.room_number,
+    roomId: b.room_id ?? null,
     tenantName: b.tenant_name,
     amount: Number(b.amount),
     status: b.status,
@@ -1114,6 +1115,7 @@ function UnifiedBillingContent() {
   const formatDbMeterToCamelCase = (m: any) => ({
     id: m.id,
     roomNumber: m.room_number,
+    roomId: m.room_id ?? null,
     billingCycle: m.billing_cycle,
     elecPrev: Number(m.elec_prev),
     elecCurr: m.elec_curr === null || m.elec_curr === undefined ? "" : Number(m.elec_curr),
