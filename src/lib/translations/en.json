@@ -296,6 +296,8 @@
     "err_no_room_data": "⚠️ No data found for room {room}, please try again",
     "err_no_bill_id": "⚠️ Room {room} has no Bill ID on the system. Try refreshing the page, or create the bill first before recording a penalty",
     "saved_late_days": "Saved late-payment days for room {room} successfully!",
+    "confirm_save_penalty": "Confirm saving the penalty for room {room}\n\n{days} days late · penalty {amount} THB\n\n⚠️ After saving, the system stops calculating this bill's penalty automatically and will use this figure from now on (if it falls further behind, you must update it yourself).",
+    "confirm_save_penalty_waive": "Confirm waiving the penalty for room {room}\n\nSaving the penalty as 0 THB\n\n⚠️ The system will permanently stop calculating this bill's penalty. The tenant will never see a penalty, no matter how overdue it becomes.",
     "err_save_failed_prefix": "❌ Save failed: ",
     "err_penalty_generic": "An error occurred while saving the penalty",
     "err_penalty_fatal_prefix": "💥 A critical error occurred while saving the penalty:\n",

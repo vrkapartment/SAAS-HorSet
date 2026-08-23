@@ -1224,6 +1224,18 @@ function UnifiedBillingContent() {
     const sendLateDays = item.lateDays || 0
     const sendPenaltyAmount = item.penaltyAmount || 0
     const sendBillAmount = item.billAmount
+
+    // เตือนก่อนบันทึก เพราะการบันทึกค่าปรับ "หยุดการนับอัตโนมัติของบิลใบนี้ถาวร"
+    // หลังจากนี้ระบบจะใช้ตัวเลขที่บันทึกไว้ตลอด ไม่คำนวณวันล่าช้าสดให้อีก
+    // (ดูกฎเต็มที่ getTenantPortalDataNoLoginAction ใน features/tenant/actions.ts)
+    // เน้นย้ำเป็นพิเศษเมื่อบันทึกเป็น 0 ซึ่งเท่ากับ "ยกเว้นค่าปรับให้ห้องนี้"
+    const confirmMsg = sendPenaltyAmount === 0
+      ? t("manage_bills.confirm_save_penalty_waive").replace("{room}", roomLabel)
+      : t("manage_bills.confirm_save_penalty")
+          .replace("{room}", roomLabel)
+          .replace("{days}", String(sendLateDays))
+          .replace("{amount}", sendPenaltyAmount.toLocaleString())
+    if (!confirm(confirmMsg)) return
     
     console.log("👉 [Client] Preparing to call updateBillPenalty:", {
       billId: item.billId,
