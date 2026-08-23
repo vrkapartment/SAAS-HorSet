@@ -190,21 +190,25 @@ export default function TenantPortal() {
       setPageLoading(true)
     }
     let wsId = ""
+    let rId = ""
     let rNum = ""
     let token = ""
-    
+
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search)
       wsId = searchParams.get("workspace_id") || ""
+      rId = searchParams.get("room_id") || ""
+      // room_number = ลิงก์รูปแบบเก่าที่ยังค้างอยู่ใน LINE ของผู้เช่า ยังรับไว้ให้เปิดได้
+      // (ฝั่ง server จะปฏิเสธเองถ้าเลขห้องนั้นซ้ำกันหลายอาคารจนระบุไม่ได้ว่าห้องไหน)
       rNum = searchParams.get("room_number") || ""
       token = searchParams.get("token") || ""
     }
 
     try {
       let res
-      if (wsId && rNum) {
+      if (wsId && (rId || rNum)) {
         setIsLoginFree(true)
-        res = await getTenantPortalDataNoLoginAction(wsId, rNum, token)
+        res = await getTenantPortalDataNoLoginAction(wsId, rId ? { roomId: rId } : { roomNumber: rNum }, token)
       } else {
         setIsLoginFree(false)
         res = await getTenantPortalData()
@@ -696,14 +700,18 @@ export default function TenantPortal() {
           .getPublicUrl(fileName)
 
         // 4. Update Database Bill Status
-        let portalAuth: { workspaceId: string; roomNumber: string; token: string } | undefined
+        // ส่งตัวระบุห้อง "ตามที่อยู่ในลิงก์จริง" ไปให้ฝั่ง server ตรวจ token — ลิงก์ใหม่ใช้ room_id
+        // ลิงก์เก่าที่ยังค้างใน LINE ใช้ room_number และ token ถูกเซ็นด้วยเลขห้องนั้น
+        // ถ้าส่งผิดชนิด token จะตรวจไม่ผ่านและผู้เช่าจะอัปโหลดสลิปไม่ได้
+        let portalAuth: { workspaceId: string; room: { roomId: string } | { roomNumber: string }; token: string } | undefined
         if (typeof window !== "undefined") {
           const searchParams = new URLSearchParams(window.location.search)
           const wsId = searchParams.get("workspace_id") || ""
+          const rId = searchParams.get("room_id") || ""
           const rNum = searchParams.get("room_number") || ""
           const token = searchParams.get("token") || ""
-          if (wsId && rNum && token) {
-            portalAuth = { workspaceId: wsId, roomNumber: rNum, token }
+          if (wsId && token && (rId || rNum)) {
+            portalAuth = { workspaceId: wsId, room: rId ? { roomId: rId } : { roomNumber: rNum }, token }
           }
         }
         const res = await updateBillStatus(bill.id, "pending", publicUrl, totalAmount, portalAuth)

@@ -7,15 +7,19 @@ import { calculateBillTotal } from "@/features/billing/bill-calculator"
 import { saveMeterRecord, getLatestMeterRecord } from "@/features/meter/actions"
 import { sendLineBillNotificationAction } from "@/features/notification/actions"
 import { updateRoomStatus } from "@/features/room/actions"
+import { buildInvoiceId } from "@/features/billing/utils"
 
 interface TenantCurrentRoom {
   id: string
   room_number: string
+  building_id: string | null
   base_rent: number | null
   waive_electric_min: boolean | null
   waive_water_min: boolean | null
   room_type_id: string | null
   room_types: { deposit_amount: number | null } | null
+  /** ใช้ประกอบเลขใบกำกับให้ไม่ซ้ำเมื่อคนละอาคารใช้เลขห้องเดียวกัน (ดู buildInvoiceId) */
+  buildings: { code: string | null } | null
 }
 
 interface TenantRoomTransferHistoryRow {
@@ -90,8 +94,9 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       .select(`
         id, workspace_id, tenant_name, room_id, line_user_id, deposit_paid,
         rooms (
-          id, room_number, base_rent, waive_electric_min, waive_water_min, room_type_id,
-          room_types ( deposit_amount )
+          id, room_number, building_id, base_rent, waive_electric_min, waive_water_min, room_type_id,
+          room_types ( deposit_amount ),
+          buildings ( code )
         )
       `)
       .eq("id", input.tenantId)
@@ -145,7 +150,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     const settings = financeRes.data
 
     // 4. ปิดมิเตอร์ห้องเดิม
-    const prevRes = await getLatestMeterRecord(oldRoom.room_number, workspaceId)
+    const prevRes = await getLatestMeterRecord({ roomId: oldRoom.id }, workspaceId)
     const prevElec = prevRes.success && prevRes.data ? Number(prevRes.data.elecCurr ?? prevRes.data.elecPrev) : 0
     const prevWater = prevRes.success && prevRes.data ? Number(prevRes.data.waterCurr ?? prevRes.data.waterPrev) : 0
 
@@ -153,7 +158,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       return { success: false, error: "เลขมิเตอร์ปิดห้องเดิมต้องไม่น้อยกว่าเลขมิเตอร์ครั้งก่อนหน้า" }
     }
 
-    const meterCloseRes = await saveMeterRecord(oldRoom.room_number, billingCycle, prevElec, input.closingElecCurr, prevWater, input.closingWaterCurr)
+    const meterCloseRes = await saveMeterRecord({ roomId: oldRoom.id }, billingCycle, prevElec, input.closingElecCurr, prevWater, input.closingWaterCurr)
     if (!meterCloseRes.success) {
       return { success: false, error: `บันทึกมิเตอร์ปิดห้องเดิมไม่สำเร็จ: ${meterCloseRes.error || "unknown error"}` }
     }
@@ -181,12 +186,17 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       electricMinUnit: settings.electric_min_unit
     })
 
-    const closingInvoiceId = `INV-${billingCycle.replace("-", "")}-${oldRoom.room_number}-TRANSFER`
+    // บิลปิดรอบเป็นบิล "อีกใบ" ของห้องเดิมในรอบเดียวกันได้ (ถ้ามีผู้เช่าใหม่ย้ายเข้าห้องเดิมในเดือนนั้น
+    // ห้องนั้นจะมีทั้งบิลปิดรอบและบิลปกติ) จึงแยกกันด้วย bill_kind ไม่ให้บิลปกติ upsert ทับ
+    // ดู database_patch_room_id_identity_1_additive.sql ข้อ 3 (คอลัมน์) และข้อ 5 (unique key)
+    const closingInvoiceId = `${buildInvoiceId(billingCycle, oldRoom.room_number, oldRoom.buildings?.code ?? null)}-TRANSFER`
     const { data: closingBill, error: closingBillError } = await supabase
       .from("bills")
       .upsert([{
         workspace_id: workspaceId,
         room_number: oldRoom.room_number,
+        room_id: oldRoom.id,
+        building_id: oldRoom.building_id ?? null,
         tenant_name: tenant.tenant_name,
         amount: closingBillTotal,
         status: "unpaid",
@@ -194,8 +204,9 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
         electric_units: elecUnitsUsed,
         water_units: waterUnitsUsed,
         other_service_amount: 0,
+        bill_kind: "transfer_closing",
         invoice_id: closingInvoiceId
-      }], { onConflict: "workspace_id,invoice_id" })
+      }], { onConflict: "workspace_id,room_id,billing_cycle,bill_kind" })
       .select()
       .single()
 
@@ -210,6 +221,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       const sendRes = await sendLineBillNotificationAction({
         lineUserId: tenant.line_user_id,
         roomNumber: oldRoom.room_number,
+        roomId: oldRoom.id,
         tenantName: tenant.tenant_name,
         billingCycle,
         baseRent: proratedRent,
@@ -230,7 +242,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     }
 
     // 7. ตั้งมิเตอร์เริ่มต้นห้องใหม่ (ยังไม่จดรอบนี้ — elecCurr/waterCurr ปล่อยว่างตาม convention เดิม)
-    await saveMeterRecord(toRoom.room_number, billingCycle, input.startingElecReading, "", input.startingWaterReading, "")
+    await saveMeterRecord({ roomId: toRoom.id }, billingCycle, input.startingElecReading, "", input.startingWaterReading, "")
 
     // 8. คำนวณเงินประกันใหม่
     const depositTopup = Number(input.depositTopupAmount || 0)

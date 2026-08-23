@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import type { RoomRef } from "@/features/room/utils"
 
 const isSupabaseConfigured = 
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -29,6 +30,7 @@ export async function getMeterRecords(billingCycle: string, workspaceId?: string
     const formatted = data.map((m: any) => ({
       id: m.id,
       roomNumber: m.room_number,
+      roomId: m.room_id ?? null,
       billingCycle: m.billing_cycle,
       elecPrev: Number(m.elec_prev),
       elecCurr: m.elec_curr === null || m.elec_curr === undefined ? "" : Number(m.elec_curr),
@@ -44,7 +46,7 @@ export async function getMeterRecords(billingCycle: string, workspaceId?: string
 }
 
 export async function saveMeterRecord(
-  roomNumber: string,
+  room: RoomRef,
   billingCycle: string,
   elecPrev: number,
   elecCurr: number | string,
@@ -58,13 +60,13 @@ export async function saveMeterRecord(
   const supabase = await createClient()
 
   // Helper function to perform the insert or update in Supabase
-  // resolvedRoomId = rooms.id ของห้องนี้ (ตัวระบุห้องที่แท้จริง) เขียนควบคู่ไปกับ room_number เสมอ
-  // เพื่อให้แถวใหม่พร้อมสำหรับการเปลี่ยนไปจับคู่ด้วย room_id แทน room_number ที่ซ้ำกันได้ข้ามตึก
-  // (ดู database_patch_add_room_id_to_meters_bills.sql — ขั้นนี้ยังอ่าน/จับคู่ด้วย room_number เหมือนเดิม)
+  // จับคู่แถวเดิมด้วย room_id (ตัวระบุห้องที่แท้จริง) — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วย
+  // room_number การจดมิเตอร์ห้อง 101 ตึก A จะไปทับแถวของห้อง 101 ตึก B
+  // room_number ยังเขียนลงไปด้วยในฐานะ snapshot ของประวัติ (ไว้อ่านได้แม้ห้องถูกลบภายหลัง)
   async function attemptSave(
     elecVal: number | null,
     waterVal: number | null,
-    resolvedRoomId: string | null,
+    roomNumber: string,
     scopedWorkspaceId: string | null
   ) {
     // Check if record already exists for this room and cycle
@@ -75,7 +77,7 @@ export async function saveMeterRecord(
     let existingQuery = supabase
       .from("meter_records")
       .select("id")
-      .eq("room_number", roomNumber)
+      .eq("room_id", room.roomId)
       .eq("billing_cycle", billingCycle)
     if (scopedWorkspaceId) {
       existingQuery = existingQuery.eq("workspace_id", scopedWorkspaceId)
@@ -86,7 +88,8 @@ export async function saveMeterRecord(
       return await supabase
         .from("meter_records")
         .update({
-          room_id: resolvedRoomId,
+          room_id: room.roomId,
+          room_number: roomNumber,
           elec_prev: elecPrev,
           elec_curr: elecVal,
           water_prev: waterPrev,
@@ -99,7 +102,7 @@ export async function saveMeterRecord(
         .from("meter_records")
         .insert([{
           room_number: roomNumber,
-          room_id: resolvedRoomId,
+          room_id: room.roomId,
           billing_cycle: billingCycle,
           elec_prev: elecPrev,
           elec_curr: elecVal,
@@ -118,20 +121,20 @@ export async function saveMeterRecord(
     const elecCurrVal = elecCurr === "" ? null : Number(elecCurr)
     const waterCurrVal = waterCurr === "" ? null : Number(waterCurr)
 
-    // หา rooms.id ของห้องนี้เพื่อเขียนลง room_id ควบคู่กับ room_number
-    // หาไม่เจอก็บันทึกต่อได้ (room_id เป็น null) — ไม่ให้เรื่องนี้ทำให้การจดมิเตอร์ล้มเหลว
-    let resolvedRoomId: string | null = null
-    if (workspaceId) {
-      const { data: roomRow } = await supabase
-        .from("rooms")
-        .select("id")
-        .eq("workspace_id", workspaceId)
-        .eq("room_number", roomNumber)
-        .maybeSingle()
-      resolvedRoomId = roomRow?.id ?? null
+    // อ่านเลขห้องจาก rooms.id ที่ส่งมา (ไม่ให้ผู้เรียกส่งเลขห้องมาเอง — ถ้าสองฝั่งไม่ตรงกัน
+    // คอลัมน์ snapshot จะโกหก) rooms.id เป็น uuid ที่ unique ทั้งระบบ จึงไม่ต้องกรอง workspace ซ้ำ
+    const { data: roomRow, error: roomError } = await supabase
+      .from("rooms")
+      .select("room_number")
+      .eq("id", room.roomId)
+      .maybeSingle()
+    if (roomError) throw roomError
+    if (!roomRow) {
+      return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
     }
+    const roomNumber: string = roomRow.room_number
 
-    let result = await attemptSave(elecCurrVal, waterCurrVal, resolvedRoomId, workspaceId)
+    let result = await attemptSave(elecCurrVal, waterCurrVal, roomNumber, workspaceId)
 
     // Handle database NOT NULL constraint violation (Postgrest code 23502)
     if (result.error && result.error.code === "23502") {
@@ -141,7 +144,7 @@ export async function saveMeterRecord(
       const fallbackElec = elecCurrVal === null ? Number(elecPrev) : elecCurrVal
       const fallbackWater = waterCurrVal === null ? Number(waterPrev) : waterCurrVal
 
-      result = await attemptSave(fallbackElec, fallbackWater, resolvedRoomId, workspaceId)
+      result = await attemptSave(fallbackElec, fallbackWater, roomNumber, workspaceId)
     }
 
     if (result.error) throw result.error
@@ -154,7 +157,7 @@ export async function saveMeterRecord(
 
 export async function saveMeterReplacement(
   workspaceId: string,
-  roomNumber: string,
+  room: RoomRef,
   billingCycle: string,
   meterType: "electric" | "water",
   oldFinalReading: number,
@@ -170,13 +173,25 @@ export async function saveMeterReplacement(
 
     const supabase = await createClient()
 
-    // กรอง workspace_id ด้วย ไม่พึ่ง RLS อย่างเดียว — super_admin ที่ถือ support grant หลายหอ
-    // จะเห็นหลายแถวแล้ว maybeSingle() พังทันที (ดูหมายเหตุเดียวกันใน saveMeterRecord)
+    // อ่านเลขห้องจาก rooms.id ที่ส่งมา (ดูหมายเหตุเดียวกันใน saveMeterRecord)
+    const { data: roomRow, error: roomError } = await supabase
+      .from("rooms")
+      .select("room_number")
+      .eq("id", room.roomId)
+      .maybeSingle()
+    if (roomError) throw roomError
+    if (!roomRow) {
+      return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
+    }
+
+    // จับคู่แถวเดิมด้วย room_id — เลขห้องซ้ำกันได้ข้ามอาคาร (ดูหมายเหตุใน saveMeterRecord)
+    // ยังกรอง workspace_id ด้วย ไม่พึ่ง RLS อย่างเดียว — super_admin ที่ถือ support grant หลายหอ
+    // จะเห็นหลายแถวแล้ว maybeSingle() พังทันที
     const { data: existing } = await supabase
       .from("meter_replacements")
       .select("id")
       .eq("workspace_id", workspaceId)
-      .eq("room_number", roomNumber)
+      .eq("room_id", room.roomId)
       .eq("billing_cycle", billingCycle)
       .eq("meter_type", meterType)
       .maybeSingle()
@@ -187,6 +202,8 @@ export async function saveMeterReplacement(
         .from("meter_replacements")
         .update({
           workspace_id: workspaceId,
+          room_id: room.roomId,
+          room_number: roomRow.room_number,
           old_final_reading: oldFinalReading,
           new_start_reading: newStartReading,
           is_active: true
@@ -198,7 +215,8 @@ export async function saveMeterReplacement(
         .from("meter_replacements")
         .insert([{
           workspace_id: workspaceId,
-          room_number: roomNumber,
+          room_number: roomRow.room_number,
+          room_id: room.roomId,
           billing_cycle: billingCycle,
           meter_type: meterType,
           old_final_reading: oldFinalReading,
@@ -241,6 +259,7 @@ export async function getMeterReplacements(billingCycle: string, workspaceId?: s
       id: m.id,
       workspaceId: m.workspace_id,
       roomNumber: m.room_number,
+      roomId: m.room_id ?? null,
       billingCycle: m.billing_cycle,
       meterType: m.meter_type as "electric" | "water",
       oldFinalReading: Number(m.old_final_reading),
@@ -255,7 +274,7 @@ export async function getMeterReplacements(billingCycle: string, workspaceId?: s
 }
 
 export async function deleteMeterReplacement(
-  roomNumber: string,
+  room: RoomRef,
   billingCycle: string,
   meterType: "electric" | "water"
 ) {
@@ -280,7 +299,7 @@ export async function deleteMeterReplacement(
       .from("meter_replacements")
       .delete()
       .eq("workspace_id", workspaceId)
-      .eq("room_number", roomNumber)
+      .eq("room_id", room.roomId)
       .eq("billing_cycle", billingCycle)
       .eq("meter_type", meterType)
 
@@ -299,7 +318,7 @@ export async function deleteMeterReplacement(
  * เดียวกันได้ (super_admin ที่ถือ support grant หลายหอ) แล้วค่าที่ได้จะถูกเอาไปใช้เป็น
  * "เลขมิเตอร์ครั้งก่อนหน้า" ตอนย้ายห้องจริง ดู transfer-actions.ts
  */
-export async function getLatestMeterRecord(roomNumber: string, workspaceId?: string) {
+export async function getLatestMeterRecord(room: RoomRef, workspaceId?: string) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true, data: null }
   }
@@ -308,7 +327,7 @@ export async function getLatestMeterRecord(roomNumber: string, workspaceId?: str
     let query = supabase
       .from("meter_records")
       .select("*")
-      .eq("room_number", roomNumber)
+      .eq("room_id", room.roomId)
     if (workspaceId) {
       query = query.eq("workspace_id", workspaceId)
     }
@@ -325,6 +344,7 @@ export async function getLatestMeterRecord(roomNumber: string, workspaceId?: str
       data: {
         id: data.id,
         roomNumber: data.room_number,
+        roomId: data.room_id ?? null,
         billingCycle: data.billing_cycle,
         elecPrev: Number(data.elec_prev),
         elecCurr: data.elec_curr === null || data.elec_curr === undefined ? null : Number(data.elec_curr),

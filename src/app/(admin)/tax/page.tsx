@@ -70,6 +70,8 @@ import type { TaxDataset, TaxSettings, Pp30Filing, Pp30Row } from "@/types/tax"
 interface BillItem {
   id: string
   roomNumber: string
+  /** rooms.id ของห้องที่ออกบิลใบนี้ — ใช้จับคู่หาค่าเช่าฐาน (ดู findRoomFor) */
+  roomId?: string | null
   tenantName: string
   amount: number
   status: "unpaid" | "pending" | "paid"
@@ -335,7 +337,7 @@ export default function TaxPage() {
   const [electricRate, setElectricRate] = useState(7)
   const [waterRate, setWaterRate] = useState(18)
   const [commonFee, setCommonFee] = useState(50)
-  const [rooms, setRooms] = useState<{ roomNumber: string; baseRent: number }[]>([])
+  const [rooms, setRooms] = useState<{ roomNumber: string; roomId?: string | null; baseRent: number }[]>([])
 
   // วิธีหักค่าใช้จ่ายสำหรับมาตรา 40(5) และ 40(8) — มาจาก taxDataset.settings.expenseA/expenseB แหล่งเดียว
   // (แก้ไขได้ผ่านการ์ด ExpenseModeSection เท่านั้น) คง string เดิมไว้เพื่อให้ทุกจุดที่เทียบ === ทำงานต่อได้
@@ -367,7 +369,7 @@ export default function TaxPage() {
       // เก็บข้อมูล "ดิบ" ที่ query มาแล้วระหว่างทาง (ก่อนแปลงรูปเป็น state เฉพาะของหน้านี้) ไว้ส่งต่อให้
       // loadTaxDataset() ใช้แทนการยิง query ซ้ำเอง — ดูจุดที่เรียกท้ายฟังก์ชันนี้ (ลด query ซ้ำซ้อน 6 คำสั่ง
       // ระหว่าง pipeline เดิมกับ pipeline ของฟีเจอร์ VAT/ภ.พ.30 ซึ่งเป็นสาเหตุหลักที่ทำให้ 2 ฝั่งโหลดไม่พร้อมกัน)
-      let prefetchRooms: { roomNumber: string; baseRent: number }[] | undefined
+      let prefetchRooms: { roomNumber: string; roomId?: string | null; baseRent: number }[] | undefined
       let prefetchTenants: Awaited<ReturnType<typeof getTenants>>["data"] | undefined
       let prefetchCancelledContracts: Awaited<ReturnType<typeof getCancelledContracts>>["data"] | undefined
       let prefetchFinanceSettings: Awaited<ReturnType<typeof getFinanceSettings>>["data"] | undefined
@@ -559,6 +561,9 @@ export default function TaxPage() {
                 if (roomsRes.success && roomsRes.data) {
                   const mappedRooms = roomsRes.data.map((r: any) => ({
                     roomNumber: r.roomNumber,
+                    // roomId ต้องติดไปด้วย ไม่งั้น adapter ภาษีจับคู่บิลกับห้องด้วยเลขห้อง
+                    // ซึ่งกำกวมเมื่อหอมีหลายตึกใช้เลขห้องซ้ำกัน (ดู findRoom ใน lib/tax/adapter.ts)
+                    roomId: r.id ?? null,
                     baseRent: Number(r.baseRent)
                   }))
                   setRooms(mappedRooms)
@@ -576,6 +581,7 @@ export default function TaxPage() {
             const mappedBills: BillItem[] = cachedBills.map((b: any) => ({
               id: b.id,
               roomNumber: b.roomNumber,
+              roomId: b.roomId ?? null,
               tenantName: b.tenantName || t("tax_page.tenant_fallback"),
               amount: Number(b.amount),
               status: b.status as "unpaid" | "pending" | "paid",
@@ -593,6 +599,7 @@ export default function TaxPage() {
                   const mappedBills: BillItem[] = billsRes.data.map((b: any) => ({
                     id: b.id,
                     roomNumber: b.roomNumber,
+                    roomId: b.roomId ?? null,
                     tenantName: b.tenantName || t("tax_page.tenant_fallback"),
                     amount: Number(b.amount),
                     status: b.status as "unpaid" | "pending" | "paid",
@@ -747,6 +754,25 @@ export default function TaxPage() {
   // 2. ค่าน้ำไฟ/บริการ 40(8) คือ ยูนิตน้ำไฟ + ค่าบริการส่วนกลางคงที่
   // 3. รายได้อื่นๆ 40(8) (ไม่เข้าเกณฑ์หักเหมา) คือ ค่าปรับจ่ายล่าช้า หรือค่าบริการพิเศษอื่นๆ
 
+  /**
+   * หาห้องของบิล/สัญญา เพื่อดึงค่าเช่าฐาน
+   *
+   * ⚠️ ต้องใช้กฎเดียวกับ findRoom() ใน lib/tax/adapter.ts เป๊ะ ๆ ไม่งั้นตัวเลขบนหน้านี้
+   * กับตัวเลขในชุดข้อมูล VAT/ภ.พ.30 จะไม่ตรงกัน แล้วไม่มีใครรู้ว่าฝั่งไหนถูก
+   *
+   * จับด้วย roomId ก่อน — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้อง บิลของตึก B
+   * จะไปดึงค่าเช่าของตึก A แล้วยอดแยก "ค่าเช่า 40(5)" กับ "ค่าน้ำไฟ 40(8)" ผิดทั้งใบ
+   * ถอยไปเทียบเลขห้องเฉพาะเมื่อไม่มี roomId และเลขห้องนั้นไม่กำกวม
+   */
+  const findRoomFor = (ref: { roomId?: string | null; roomNumber: string }) => {
+    if (ref.roomId) {
+      const byId = rooms.find(r => r.roomId && r.roomId === ref.roomId)
+      if (byId) return byId
+    }
+    const byNumber = rooms.filter(r => r.roomNumber === ref.roomNumber)
+    return byNumber.length === 1 ? byNumber[0] : undefined
+  }
+
   // คัดกรองบิลตามปีภาษีที่เลือกและสถานะที่ชำระเงินแล้ว
   const paidBillsInYear = bills.filter(bill => {
     const isPaid = bill.status === "paid"
@@ -776,7 +802,7 @@ export default function TaxPage() {
     const billAmount = Number(bill.amount || 0)
     
     // ค้นหาค่าเช่าห้องพักหลัก (baseRent) จากข้อมูลห้อง หรือใช้ส่วนต่างบิลหักน้ำไฟส่วนกลางเป็นทางเลือกสุดท้าย
-    const matchedRoom = rooms.find(r => r.roomNumber === bill.roomNumber)
+    const matchedRoom = findRoomFor(bill)
     const baseRentVal = matchedRoom ? matchedRoom.baseRent : Math.max(0, billAmount - utilitiesAmount)
     
     // ค่าเช่า 40(5) = เฉพาะค่าเช่าห้องพักหลัก
@@ -814,7 +840,7 @@ export default function TaxPage() {
   
   // คำนวณรายหัว: จำนวนเดือน * ค่าเช่าของห้องนั้นๆ
   const totalAdvanceRentAmount = advanceRentBills.reduce((sum, tenantItem) => {
-    const matchedRoom = rooms.find(r => r.roomNumber === tenantItem.roomNumber)
+    const matchedRoom = findRoomFor(tenantItem)
     const roomRent = matchedRoom ? matchedRoom.baseRent : 0
     return sum + (roomRent * defaultAdvanceRent)
   }, 0)
@@ -826,7 +852,7 @@ export default function TaxPage() {
     return month >= 1 && month <= 6
   })
   const totalAdvanceRentAmountHalf = advanceRentBillsHalf.reduce((sum, tenantItem) => {
-    const matchedRoom = rooms.find(r => r.roomNumber === tenantItem.roomNumber)
+    const matchedRoom = findRoomFor(tenantItem)
     const roomRent = matchedRoom ? matchedRoom.baseRent : 0
     return sum + (roomRent * defaultAdvanceRent)
   }, 0)
@@ -1856,7 +1882,7 @@ export default function TaxPage() {
                         const billAmount = Number(bill.amount || 0)
                         
                         // ค้นหาค่าเช่าห้องพักหลัก (baseRent) จากข้อมูลห้อง หรือใช้ส่วนต่างบิลหักน้ำไฟส่วนกลางเป็นทางเลือกสุดท้าย
-                        const matchedRoom = rooms.find(r => r.roomNumber === bill.roomNumber)
+                        const matchedRoom = findRoomFor(bill)
                         const baseRentVal = matchedRoom ? matchedRoom.baseRent : Math.max(0, billAmount - utilitiesAmount)
                         
                         // ค่าเช่า 40(5) = เฉพาะค่าเช่าห้องพักหลัก
@@ -1872,7 +1898,7 @@ export default function TaxPage() {
                       // บวกค่าเช่าล่วงหน้าสะสมของเดือนนี้ (40(5))
                       const advanceRentBillsInMonth = advanceRentBills.filter(tenantItem => tenantItem.contractStart && tenantItem.contractStart.startsWith(`${taxYear}-${m.num}`))
                       const advanceRentAmountInMonth = advanceRentBillsInMonth.reduce((sum, tenantItem) => {
-                        const matchedRoom = rooms.find(r => r.roomNumber === tenantItem.roomNumber)
+                        const matchedRoom = findRoomFor(tenantItem)
                         const roomRent = matchedRoom ? matchedRoom.baseRent : 0
                         return sum + (roomRent * defaultAdvanceRent)
                       }, 0)
@@ -2044,7 +2070,7 @@ export default function TaxPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-900/30">
                       {advanceRentBills.map((tenantItem) => {
-                        const matchedRoom = rooms.find(r => r.roomNumber === tenantItem.roomNumber)
+                        const matchedRoom = findRoomFor(tenantItem)
                         const roomRent = matchedRoom ? matchedRoom.baseRent : 0
                         const advanceRentVal = roomRent * defaultAdvanceRent
                         return (

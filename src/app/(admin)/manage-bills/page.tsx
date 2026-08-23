@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useMemo, useRef, Suspense } from "react"
 import { useTheme } from "next-themes"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
@@ -27,6 +27,8 @@ import {
   Droplet
 } from "lucide-react"
 import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
+import { buildInvoiceId } from "@/features/billing/utils"
+import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
 import { getBuildings } from "@/features/building/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
@@ -45,6 +47,11 @@ import CreateBillModal from "@/features/billing/components/CreateBillModal"
 import MeterReadingTable from "@/features/billing/components/MeterReadingTable"
 
 interface UnifiedRoomBillingItem {
+  /**
+   * ตัวระบุห้องที่แท้จริง (rooms.id) — ใช้จับคู่/เป็น key ทุกที่
+   * roomNumber ด้านล่างเป็น "ข้อความที่แสดง" เท่านั้น ห้ามใช้เป็น key เพราะซ้ำกันได้ข้ามอาคาร
+   */
+  roomId: RoomId
   roomNumber: string
   tenantName: string | null
   baseRent: number
@@ -353,13 +360,14 @@ function ManageBillsContent() {
   }, [verifyBillId, unifiedItems, loading, billingCycle])
 
   // ข้อมูลสำหรับโมดอลสร้างบิลด้วยมือ (กรณีฉุกเฉิน)
-  const [newRoomNumber, setNewRoomNumber] = useState("105")
+  // เก็บ rooms.id ของห้องที่เลือกในโมดอลออกบิลเอง (ว่างไว้ก่อน แล้วตั้งค่าเมื่อโหลดรายการห้องเสร็จ)
+  const [newRoomId, setNewRoomId] = useState("")
   const [elecUnitsManual, setElecUnitsManual] = useState(80)
   const [waterUnitsManual, setWaterUnitsManual] = useState(10)
   const [otherServiceAmountManual, setOtherServiceAmountManual] = useState(0)
 
-  const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
-  const selectedManualRoom = roomsList.find(r => r.roomNumber === newRoomNumber)
+  const selectedManualRoom = roomsList.find(r => r.id === newRoomId)
+  const rentPrice = selectedManualRoom?.baseRent || 4500
   const isElecWaived = selectedManualRoom?.waiveElectricMin ?? false
   const isWaterWaived = selectedManualRoom?.waiveWaterMin ?? false
 
@@ -419,7 +427,7 @@ function ManageBillsContent() {
     }
   }
 
-  const getFallbackPrevReadings = (roomNumber: string, cycle: string) => {
+  const getFallbackPrevReadings = (roomId: RoomId, cycle: string) => {
     return {
       elecPrev: 0,
       waterPrev: 0
@@ -604,9 +612,12 @@ function ManageBillsContent() {
 
       const activeRooms = rooms
       const compiled = activeRooms.map((r: any) => {
-        const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
-        const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
-        const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
+        // จับคู่ด้วย rooms.id — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้อง ห้อง 101 ของสองอาคาร
+        // จะได้บิล/เลขมิเตอร์ของห้องเดียวกันมาแสดงทั้งคู่ แล้วการกดบันทึกจะเขียนทับกันเอง
+        const roomId = asRoomId(r.id)
+        const roomBill = dbBills.find((b: any) => b.roomId === roomId)
+        const roomMeter = dbMeters.find((m: any) => m.roomId === roomId)
+        const prevMeter = dbPrevMeters.find((m: any) => m.roomId === roomId)
         
         let resolvedTenantName: string | null = null
         const sortedTenants = [...(r.allTenants || [])].sort((a: any, b: any) => {
@@ -644,7 +655,7 @@ function ManageBillsContent() {
 
         const hasNotifiedCheckout = r.status === "Pending_Refund"
 
-        const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
+        const fallbacks = getFallbackPrevReadings(roomId, cycle)
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
         const hasPrevMeterWater = !!(prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
 
@@ -688,6 +699,7 @@ function ManageBillsContent() {
         }
 
         return {
+          roomId,
           roomNumber: r.roomNumber,
           tenantName: resolvedTenantName,
           baseRent: Number(r.baseRent) || 4500,
@@ -724,9 +736,9 @@ function ManageBillsContent() {
       // (แถวที่ไม่ได้แก้ยังรับข้อมูลใหม่ปกติ เช่น ผู้เช่าห้องอื่นอัปโหลดสลิปเข้ามาระหว่างนั้น)
       setUnifiedItems(prev => {
         if (!silent) return compiled
-        const editedByRoom = new Map(prev.filter(i => i.isEdited).map(i => [i.roomNumber, i]))
+        const editedByRoom = new Map(prev.filter(i => i.isEdited).map(i => [i.roomId, i]))
         if (editedByRoom.size === 0) return compiled
-        return compiled.map((fresh: UnifiedRoomBillingItem) => editedByRoom.get(fresh.roomNumber) ?? fresh)
+        return compiled.map((fresh: UnifiedRoomBillingItem) => editedByRoom.get(fresh.roomId) ?? fresh)
       })
     } catch (err) {
       console.error("Failed to load billing unified items with cache:", err)
@@ -967,42 +979,42 @@ function ManageBillsContent() {
     }, 3000)
   }
 
-  const handleElecChange = (roomNumber: string, value: string) => {
+  const handleElecChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, elecCurr: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, elecCurr: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
-  const handleWaterChange = (roomNumber: string, value: string) => {
+  const handleWaterChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, waterCurr: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, waterCurr: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
-  const handleElecPrevChange = (roomNumber: string, value: string) => {
+  const handleElecPrevChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, elecPrev: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, elecPrev: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
-  const handleWaterPrevChange = (roomNumber: string, value: string) => {
+  const handleWaterPrevChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, waterPrev: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, waterPrev: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
-  const handleLateDaysChange = (roomNumber: string, value: string) => {
+  const handleLateDaysChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item => {
-        if (item.roomNumber !== roomNumber) return item
+        if (item.roomId !== roomId) return item
         
         const days = value === "" ? 0 : Number(value)
         if (isNaN(days)) return item
@@ -1024,10 +1036,10 @@ function ManageBillsContent() {
     )
   }
 
-  const handleOtherServiceChange = (roomNumber: string, value: string) => {
+  const handleOtherServiceChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item => {
-        if (item.roomNumber !== roomNumber) return item
+        if (item.roomId !== roomId) return item
         
         const otherVal = value === "" ? 0 : Number(value)
         if (isNaN(otherVal)) return item
@@ -1050,6 +1062,7 @@ function ManageBillsContent() {
   const formatDbBillToCamelCase = (b: any) => ({
     id: b.id,
     roomNumber: b.room_number,
+    roomId: b.room_id ?? null,
     tenantName: b.tenant_name,
     amount: Number(b.amount),
     status: b.status,
@@ -1066,6 +1079,7 @@ function ManageBillsContent() {
   const formatDbMeterToCamelCase = (m: any) => ({
     id: m.id,
     roomNumber: m.room_number,
+    roomId: m.room_id ?? null,
     billingCycle: m.billing_cycle,
     elecPrev: Number(m.elec_prev),
     elecCurr: m.elec_curr === null || m.elec_curr === undefined ? "" : Number(m.elec_curr),
@@ -1074,13 +1088,13 @@ function ManageBillsContent() {
   })
 
   const updateLocalStateAndCache = (
-    roomNumber: string,
+    roomId: RoomId,
     formattedMeter?: any,
     formattedBill?: any
   ) => {
     // 1. อัปเดต React State ทันทีเพื่อความลื่นไหลแบบ 0ms
     setUnifiedItems(prev => prev.map(i => {
-      if (i.roomNumber === roomNumber) {
+      if (i.roomId === roomId) {
         return {
           ...i,
           ...(formattedMeter ? {
@@ -1113,7 +1127,7 @@ function ManageBillsContent() {
     if (currentWorkspaceId) {
       if (formattedMeter) {
         const cachedMeters = getCachedData(currentWorkspaceId, `meters_${billingCycle}`) || []
-        const existingMeterIdx = cachedMeters.findIndex((m: any) => m.roomNumber === roomNumber)
+        const existingMeterIdx = cachedMeters.findIndex((m: any) => m.roomId === roomId)
         let updatedMeters = [...cachedMeters]
         if (existingMeterIdx >= 0) {
           updatedMeters[existingMeterIdx] = { ...updatedMeters[existingMeterIdx], ...formattedMeter }
@@ -1125,7 +1139,7 @@ function ManageBillsContent() {
 
       if (formattedBill) {
         const cachedBills = getCachedData(currentWorkspaceId, `bills_${billingCycle}`) || []
-        const existingBillIdx = cachedBills.findIndex((b: any) => b.roomNumber === roomNumber)
+        const existingBillIdx = cachedBills.findIndex((b: any) => b.roomId === roomId)
         let updatedBills = [...cachedBills]
         if (existingBillIdx >= 0) {
           updatedBills[existingBillIdx] = { ...updatedBills[existingBillIdx], ...formattedBill }
@@ -1138,23 +1152,26 @@ function ManageBillsContent() {
   }
 
   // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
-  const handleSaveLateDays = async (roomNumber: string) => {
+  const handleSaveLateDays = async (roomId: RoomId) => {
     if (!userPermissions.manage_bills_edit) {
       showToast(t("daily_bills.no_permission_msg"))
       return
     }
-    console.log("🚀 [Client] handleSaveLateDays started for room:", roomNumber)
-    const item = unifiedItems.find(i => i.roomNumber === roomNumber)
-    
+    const item = unifiedItems.find(i => i.roomId === roomId)
+
     if (!item) {
-      console.error("❌ [Client] Room item not found in unifiedItems for room:", roomNumber)
-      alert(t("manage_bills.err_no_room_data").replace("{room}", roomNumber))
+      // roomId เป็น uuid ห้ามเอาไปโชว์ผู้ใช้ — เก็บไว้ใน log ให้ทีมดูแลไล่ต่อได้
+      console.error("❌ [Client] Room item not found in unifiedItems for roomId:", roomId)
+      alert(t("manage_bills.err_no_room_data").replace("{room}", "").trim())
       return
     }
-    
+
+    // เลขห้องสำหรับ "แสดงให้ผู้ใช้อ่าน" เท่านั้น — การจับคู่ทุกที่ใช้ roomId
+    const roomLabel = item.roomNumber
+
     if (!item.billId) {
-      console.error("❌ [Client] billId is missing for room:", roomNumber, "item:", item)
-      alert(t("manage_bills.err_no_bill_id").replace("{room}", roomNumber))
+      console.error("❌ [Client] billId is missing for room:", roomLabel, "item:", item)
+      alert(t("manage_bills.err_no_bill_id").replace("{room}", roomLabel))
       return
     }
     
@@ -1170,7 +1187,7 @@ function ManageBillsContent() {
       otherServiceAmount: item.otherServiceAmount || 0
     })
     
-    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
+    setSavingRows(prev => ({ ...prev, [roomId]: true }))
     
     try {
       const { updateBillPenalty } = await import("@/features/billing/actions")
@@ -1187,11 +1204,11 @@ function ManageBillsContent() {
       console.log("✅ [Client] updateBillPenalty responded:", res)
       
       if (res.success) {
-        showToast(t("manage_bills.saved_late_days").replace("{room}", roomNumber))
+        showToast(t("manage_bills.saved_late_days").replace("{room}", roomLabel))
         const formatted = formatDbBillToCamelCase(res.data)
-        updateLocalStateAndCache(roomNumber, undefined, formatted)
+        updateLocalStateAndCache(roomId, undefined, formatted)
         setUnifiedItems(prev =>
-          prev.map(i => i.roomNumber === roomNumber ? { ...i, isEdited: false } : i)
+          prev.map(i => i.roomId === roomId ? { ...i, isEdited: false } : i)
         )
         console.log("👉 [Client] Local state & cache updated successfully")
       } else {
@@ -1202,7 +1219,7 @@ function ManageBillsContent() {
       console.error("💥 [Client] Exception caught in handleSaveLateDays:", err)
       alert(t("manage_bills.err_penalty_fatal_prefix") + (err instanceof Error ? err.message : String(err)))
     } finally {
-      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+      setSavingRows(prev => ({ ...prev, [roomId]: false }))
       // การบันทึกของเราเองจะทำให้ realtime ยิง event กลับมา แต่ optimistic update จัดการ state + cache
       // ครบแล้ว ไม่ต้องเสีย refresh ทั้งก้อนมาทับ
       suppressBackgroundRefresh()
@@ -1239,7 +1256,7 @@ function ManageBillsContent() {
     if (res.success) {
       showToast(t("manage_bills.approved_payment"))
       const formatted = formatDbBillToCamelCase(res.data)
-      updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
+      updateLocalStateAndCache(asRoomId(formatted.roomId), undefined, formatted)
     } else {
       alert(res.error || t("manage_bills.err_update_bill_status"))
       return
@@ -1256,7 +1273,7 @@ function ManageBillsContent() {
     if (res.success) {
       showToast(t("manage_bills.rejected_slip"))
       const formatted = formatDbBillToCamelCase(res.data)
-      updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
+      updateLocalStateAndCache(asRoomId(formatted.roomId), undefined, formatted)
     } else {
       alert(res.error || t("manage_bills.err_update_bill_status"))
       return
@@ -1264,38 +1281,42 @@ function ManageBillsContent() {
     closeSlipModal()
   }
 
-  const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
+  const handleMarkAsPaid = async (billId: string, roomId: RoomId) => {
     if (!userPermissions.manage_bills_edit) {
       showToast(t("daily_bills.no_permission_msg"))
       return
     }
-    if (!confirm(t("manage_bills.confirm_mark_paid").replace("{room}", roomNumber))) return
+    const roomLabel = unifiedItems.find(i => i.roomId === roomId)?.roomNumber ?? ""
+    if (!confirm(t("manage_bills.confirm_mark_paid").replace("{room}", roomLabel))) return
 
     const res = await updateBillStatus(billId, "paid")
     if (res.success) {
-      showToast(t("manage_bills.marked_paid").replace("{room}", roomNumber))
+      showToast(t("manage_bills.marked_paid").replace("{room}", roomLabel))
       const formatted = formatDbBillToCamelCase(res.data)
-      updateLocalStateAndCache(roomNumber, undefined, formatted)
+      updateLocalStateAndCache(roomId, undefined, formatted)
     } else {
       alert(res.error || t("manage_bills.err_update_bill_status"))
     }
   }
 
-  const handleSaveRow = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
+  const handleSaveRow = async (roomId: RoomId, type: "electric" | "water" | "all" = "all") => {
     if (!userPermissions.manage_bills_edit) {
       showToast(t("daily_bills.no_permission_msg"))
       return
     }
-    const item = unifiedItems.find(i => i.roomNumber === roomNumber)
+    const item = unifiedItems.find(i => i.roomId === roomId)
     if (!item) return
+
+    // เลขห้องสำหรับแสดงข้อความเท่านั้น — ทุก query/การจับคู่ใช้ roomId
+    const roomLabel = item.roomNumber
 
     const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
     const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
     const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
     const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-    const repElec = meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === "electric")
-    const repWater = meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === "water")
+    const repElec = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "electric")
+    const repWater = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "water")
 
     const getUnits = (curr: number, prev: number) => {
       if (curr >= prev) return curr - prev
@@ -1362,7 +1383,7 @@ function ManageBillsContent() {
       return
     }
 
-    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
+    setSavingRows(prev => ({ ...prev, [roomId]: true }))
     try {
       const activeElecCurr = elecVal === "" ? 0 : Number(elecVal)
       const activeWaterCurr = waterVal === "" ? 0 : Number(waterVal)
@@ -1370,7 +1391,7 @@ function ManageBillsContent() {
       const activeWaterPrev = waterPrevVal
 
       const meterResult = await saveMeterRecord(
-        roomNumber,
+        { roomId },
         billingCycle,
         activeElecPrev,
         activeElecCurr,
@@ -1380,13 +1401,13 @@ function ManageBillsContent() {
 
       if (!meterResult.success) {
         alert(meterResult.error || t("manage_bills.err_meter_save_failed"))
-        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+        setSavingRows(prev => ({ ...prev, [roomId]: false }))
         return
       }
 
       let createdBillObj = undefined;
       if (item.tenantName) {
-        const roomInfo = roomsList?.find((r: any) => r.roomNumber === roomNumber)
+        const roomInfo = roomsList?.find((r: any) => r.id === roomId)
         const extraExpenses = roomInfo?.extraExpenses || []
         const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -1409,7 +1430,7 @@ function ManageBillsContent() {
         })
 
         const billResult = await createBill(
-          roomNumber,
+          { roomId },
           item.tenantName,
           billTotalAmount,
           item.billStatus === "not_created" ? "unpaid" : item.billStatus,
@@ -1421,21 +1442,21 @@ function ManageBillsContent() {
 
         if (!billResult.success) {
           alert(billResult.error || t("manage_bills.err_bill_create_failed_meter_ok"))
-          setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+          setSavingRows(prev => ({ ...prev, [roomId]: false }))
           return
         }
         createdBillObj = billResult.data
       }
 
-      showToast(t("manage_bills.saved_meter_bill").replace("{room}", roomNumber))
+      showToast(t("manage_bills.saved_meter_bill").replace("{room}", roomLabel))
       const formattedMeter = formatDbMeterToCamelCase(meterResult.data)
       const formattedBill = createdBillObj ? formatDbBillToCamelCase(createdBillObj) : undefined
-      updateLocalStateAndCache(roomNumber, formattedMeter, formattedBill)
+      updateLocalStateAndCache(roomId, formattedMeter, formattedBill)
     } catch (e) {
       console.error(e)
       alert(t("manage_bills.err_unexpected"))
     } finally {
-      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+      setSavingRows(prev => ({ ...prev, [roomId]: false }))
       // การบันทึกของเราเองจะทำให้ realtime ยิง event กลับมา แต่ updateLocalStateAndCache ด้านบน
       // อัปเดต state + cache ครบแล้ว ไม่ต้องเสีย refresh ทั้งก้อนมาทับ
       suppressBackgroundRefresh()
@@ -1444,35 +1465,37 @@ function ManageBillsContent() {
 
 
   // ส่งข้อมูลเข้า LINE OA ของจริง
-  const handleSendLine = async (roomNumber: string) => {
+  const handleSendLine = async (roomId: RoomId) => {
     if (!userPermissions.billing_send_line) {
       alert(t("manage_bills.err_no_permission_line"))
       return
     }
 
     // 1. ค้นหาข้อมูลห้องพักจาก List เพื่อหยิบ lineUserId ของผู้เช่าจริงออกมา
-    const roomInfo = roomsList.find((r: any) => r.roomNumber === roomNumber)
+    const roomInfo = roomsList.find((r: any) => r.id === roomId)
     const lineUserId = roomInfo?.lineUserId
+    // เลขห้องสำหรับแสดงข้อความเท่านั้น (หาจาก roomsList เพราะยังไม่แน่ว่ามี item)
+    const roomLabel = roomInfo?.roomNumber ?? ""
 
     if (!lineUserId) {
-      showToast(t("manage_bills.err_line_not_linked").replace("{room}", roomNumber))
+      showToast(t("manage_bills.err_line_not_linked").replace("{room}", roomLabel))
       return
     }
 
     // 2. ค้นหาบิลประจำงวดของห้องนั้นๆ
-    const item = unifiedItems.find((x: any) => x.roomNumber === roomNumber)
+    const item = unifiedItems.find((x: any) => x.roomId === roomId)
     if (!item) {
-      showToast(t("manage_bills.err_no_bill_data_room").replace("{room}", roomNumber))
+      showToast(t("manage_bills.err_no_bill_data_room").replace("{room}", roomLabel))
       return
     }
 
     if (item.billStatus === "not_created") {
-      showToast(t("manage_bills.err_calc_bill_first").replace("{room}", roomNumber))
+      showToast(t("manage_bills.err_calc_bill_first").replace("{room}", roomLabel))
       return
     }
 
     if (item.billStatus === "paid") {
-      alert(t("manage_bills.info_already_paid").replace("{room}", roomNumber))
+      alert(t("manage_bills.info_already_paid").replace("{room}", roomLabel))
       return
     }
 
@@ -1484,7 +1507,7 @@ function ManageBillsContent() {
         ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr))
         : 0
 
-      const roomInfoForSum = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+      const roomInfoForSum = roomsList?.find((r: any) => r.id === item.roomId)
       const extraExpenses = roomInfoForSum?.extraExpenses || []
       const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -1509,7 +1532,8 @@ function ManageBillsContent() {
       const { sendLineBillNotificationAction } = await import("@/features/notification/actions")
       const result = await sendLineBillNotificationAction({
         lineUserId,
-        roomNumber: item.roomNumber,
+        roomNumber: roomLabelOf(item),
+        roomId: item.roomId,
         tenantName: item.tenantName || "ผู้เช่า",
         billingCycle: formatBillingCycleThai(billingCycle),
         baseRent: item.baseRent,
@@ -1524,7 +1548,7 @@ function ManageBillsContent() {
       })
 
       if (result.success) {
-        showToast(t("manage_bills.sent_line_success").replace("{room}", roomNumber))
+        showToast(t("manage_bills.sent_line_success").replace("{room}", roomLabel))
       } else {
         showToast(t("manage_bills.err_line_send_failed_prefix") + result.error)
       }
@@ -1536,8 +1560,8 @@ function ManageBillsContent() {
 
   // หายอดบิลรวมทั้งอาคาร (ไฟฟ้า/น้ำ) ของห้องนี้ในรอบบิลปัจจุบัน — ใช้แสดง "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน"
   // ในบิล PDF เฉพาะตอนเปิดโหมด building_total เท่านั้น (คืนค่า null ถ้าไม่เข้าเงื่อนไข ไม่ใช้ 0)
-  const getBuildingTotalsForRoom = (roomNumber: string) => {
-    const roomBuildingId = roomsList?.find((r: any) => r.roomNumber === roomNumber)?.buildingId
+  const getBuildingTotalsForRoom = (roomId: RoomId) => {
+    const roomBuildingId = roomsList?.find((r: any) => r.id === roomId)?.buildingId
     const electricRow = roomBuildingId && electricBillingMode === "building_total"
       ? buildingUtilityBills.find(b => b.buildingId === roomBuildingId && b.utilityType === "electric")
       : undefined
@@ -1557,7 +1581,7 @@ function ManageBillsContent() {
       alert(t("manage_bills.err_no_permission_pdf"))
       return
     }
-    setDownloadingPdfId(item.roomNumber)
+    setDownloadingPdfId(item.roomId)
     try {
       const { generateBillPdf } = await import("@/lib/pdfHelper")
       const elecUnitsUsed = item.elecCurr !== ""
@@ -1568,7 +1592,7 @@ function ManageBillsContent() {
         : 0
 
       const blob = await generateBillPdf({
-        roomNumber: item.roomNumber,
+        roomNumber: roomLabelOf(item),
         tenantName: item.tenantName || "ผู้เช่า",
         billingCycle: formatBillingCycleThai(billingCycle),
         baseRent: item.baseRent,
@@ -1582,7 +1606,7 @@ function ManageBillsContent() {
         electricMinChecked,
         electricMinUnit,
         amount: item.billAmount || (() => {
-          const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+          const roomInfo = roomsList?.find((r: any) => r.id === item.roomId)
           const extraExpenses = roomInfo?.extraExpenses || []
           const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
           const { total } = calculateBillTotal({
@@ -1606,7 +1630,7 @@ function ManageBillsContent() {
           })
           return total
         })(),
-        extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
+        extraExpenses: roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || [],
         waiveElectricMin: item.waiveElectricMin,
         waiveWaterMin: item.waiveWaterMin,
         promptPayId,
@@ -1620,22 +1644,22 @@ function ManageBillsContent() {
         latePenaltyRate: latePenaltyRate,
         otherServiceAmount: item.otherServiceAmount || 0,
         vatAmount: item.vatAmount || 0,
-        invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
+        invoiceId: item.invoiceId || buildInvoiceId(billingCycle, item.roomNumber, findRoomRow(item.roomId)?.buildingCode),
         elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
         elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
         waterPrev: item.waterPrev === "" ? null : Number(item.waterPrev),
         waterCurr: item.waterCurr === "" ? null : Number(item.waterCurr),
         billingCycleRaw: billingCycle,
-        ...getBuildingTotalsForRoom(item.roomNumber)
+        ...getBuildingTotalsForRoom(item.roomId)
       })
 
       const link = document.createElement("a")
       link.href = URL.createObjectURL(blob)
-      link.download = `bill_room${item.roomNumber}_${billingCycle}.pdf`
+      link.download = `bill_room${pdfFileSafeRoom(item)}_${billingCycle}.pdf`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      showToast(t("manage_bills.downloaded_pdf").replace("{room}", item.roomNumber))
+      showToast(t("manage_bills.downloaded_pdf").replace("{room}", roomLabelOf(item)))
     } catch (e) {
       console.error(e)
       alert(t("manage_bills.err_pdf_generate"))
@@ -1674,7 +1698,7 @@ function ManageBillsContent() {
           : 0
 
         const blob = await generateBillPdf({
-          roomNumber: item.roomNumber,
+          roomNumber: roomLabelOf(item),
           tenantName: item.tenantName || "ผู้เช่า",
           billingCycle: formatBillingCycleThai(billingCycle),
           baseRent: item.baseRent,
@@ -1688,7 +1712,7 @@ function ManageBillsContent() {
           electricMinChecked,
           electricMinUnit,
           amount: item.billAmount || (() => {
-            const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+            const roomInfo = roomsList?.find((r: any) => r.id === item.roomId)
             const extraExpenses = roomInfo?.extraExpenses || []
             const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
             const { total } = calculateBillTotal({
@@ -1712,7 +1736,7 @@ function ManageBillsContent() {
             })
             return total
           })(),
-          extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
+          extraExpenses: roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || [],
           waiveElectricMin: item.waiveElectricMin,
           waiveWaterMin: item.waiveWaterMin,
           promptPayId,
@@ -1726,16 +1750,16 @@ function ManageBillsContent() {
           latePenaltyRate: latePenaltyRate,
           otherServiceAmount: item.otherServiceAmount || 0,
           vatAmount: item.vatAmount || 0,
-          invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
+          invoiceId: item.invoiceId || buildInvoiceId(billingCycle, item.roomNumber, findRoomRow(item.roomId)?.buildingCode),
           elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
           elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
           waterPrev: item.waterPrev === "" ? null : Number(item.waterPrev),
           waterCurr: item.waterCurr === "" ? null : Number(item.waterCurr),
           billingCycleRaw: billingCycle,
-          ...getBuildingTotalsForRoom(item.roomNumber)
+          ...getBuildingTotalsForRoom(item.roomId)
         })
 
-        const fileName = `bill_room${item.roomNumber}_${billingCycle}.pdf`
+        const fileName = `bill_room${pdfFileSafeRoom(item)}_${billingCycle}.pdf`
         zip.file(fileName, blob)
         addedCount++
       }
@@ -1771,7 +1795,11 @@ function ManageBillsContent() {
     }
     
     let targetTenant = ""
-    const room = roomsList.find(r => r.roomNumber === newRoomNumber)
+    const room = roomsList.find(r => r.id === newRoomId)
+    if (!room) {
+      alert(t("manage_bills.err_no_tenant_or_expired"))
+      return
+    }
     if (room) {
       const sortedTenants = [...(room.allTenants || [])].sort((a: any, b: any) => {
         const aTime = a.leaseStart ? new Date(a.leaseStart).getTime() : 0
@@ -1793,7 +1821,7 @@ function ManageBillsContent() {
     }
 
     const res = await createBill(
-      newRoomNumber,
+      { roomId: newRoomId },
       targetTenant,
       computedTotal,
       "unpaid",
@@ -1803,7 +1831,7 @@ function ManageBillsContent() {
       otherServiceAmountManual
     )
     if (res.success) {
-      showToast(t("manage_bills.created_manual_bill").replace("{room}", newRoomNumber))
+      showToast(t("manage_bills.created_manual_bill").replace("{room}", room.roomNumber))
       await loadData(billingCycle, true)
     } else {
       alert(res.error || t("manage_bills.err_bill_create_failed"))
@@ -1818,6 +1846,24 @@ function ManageBillsContent() {
   const paidCount = unifiedItems.filter(item => item.billStatus === "paid").length
   const pendingCount = unifiedItems.filter(item => item.billStatus === "pending").length
   const unpaidCount = unifiedItems.filter(item => item.tenantName && (item.billStatus === "unpaid" || item.billStatus === "not_created")).length
+
+  // เลขห้องที่ซ้ำกันในหอนี้ — คำนวณจาก unifiedItems ทั้งก้อน ไม่ใช่ชุดที่กรองแล้ว เพื่อให้ป้ายกำกับ
+  // อาคารไม่หาย/ไม่โผล่สลับไปมาเวลาผู้ใช้เปลี่ยนตัวกรองอาคาร
+  const duplicatedRoomNumbers = useMemo(() => findDuplicateRoomNumbers(unifiedItems), [unifiedItems])
+
+  /** หาแถวห้องจาก rooms.id — ใช้ดึงรหัสอาคารไปประกอบป้ายกำกับเลขห้องและเลขใบกำกับ */
+  const findRoomRow = (roomId: string): { buildingCode?: string | null; buildingName?: string | null } | undefined =>
+    roomsList?.find((r: { id: string }) => r.id === roomId)
+
+  // ข้อความเลขห้องที่แสดง — เติมรหัสอาคารต่อท้ายเฉพาะเลขห้องที่ซ้ำกัน
+  const roomLabelOf = (item: { roomId: RoomId; roomNumber: string }): string => {
+    const row = findRoomRow(item.roomId)
+    return formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, { code: row?.buildingCode, name: row?.buildingName })
+  }
+
+  // ชื่อไฟล์ PDF — ต้องแยกกันด้วยเมื่อเลขห้องซ้ำ ไม่งั้นดาวน์โหลดทั้งอาคารเป็น zip แล้วไฟล์ทับกันหายไปใบหนึ่ง
+  const pdfFileSafeRoom = (item: { roomId: RoomId; roomNumber: string }): string =>
+    roomLabelOf(item).replace(/[^\p{L}\p{N}_-]+/gu, "")
 
   const filteredUnifiedItems = unifiedItems.filter(item => {
     if (buildingFilter !== "all" && item.buildingId !== buildingFilter) return false
@@ -1861,10 +1907,10 @@ function ManageBillsContent() {
           {(currentUserRole === "admin" || currentUserRole === "super_admin") && (
             <button
               onClick={() => {
-                // เลือกห้องว่างห้องแรกในอาคารเป็นค่าตั้งต้นในโมดอล
-                const occupiedRooms = unifiedItems.filter(i => i.tenantName).map(i => i.roomNumber)
-                if (occupiedRooms.length > 0) {
-                  setNewRoomNumber(occupiedRooms[0])
+                // เลือกห้องที่มีผู้เช่าห้องแรกในอาคารเป็นค่าตั้งต้นในโมดอล (เก็บเป็น rooms.id)
+                const occupiedRoomIds = unifiedItems.filter(i => i.tenantName).map(i => i.roomId)
+                if (occupiedRoomIds.length > 0) {
+                  setNewRoomId(occupiedRoomIds[0])
                 }
                 setCreateBillModalOpen(true)
               }}
@@ -2039,8 +2085,8 @@ function ManageBillsContent() {
         isDark={isDark}
         createBillModalOpen={createBillModalOpen}
         roomsList={roomsList}
-        newRoomNumber={newRoomNumber}
-        setNewRoomNumber={setNewRoomNumber}
+        newRoomId={newRoomId}
+        setNewRoomId={setNewRoomId}
         billingCycle={billingCycle}
         elecUnitsManual={elecUnitsManual}
         setElecUnitsManual={setElecUnitsManual}

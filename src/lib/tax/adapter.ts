@@ -26,6 +26,11 @@ import { todayISO } from './period';
 
 export interface HorSetBill {
   roomNumber: string;
+  /**
+   * ตัวระบุห้องที่แท้จริง (rooms.id) — ใช้จับคู่กับ HorSetRoom เพื่อหาค่าเช่าฐาน
+   * null ได้ในบิลเก่าที่ออกก่อนมีคอลัมน์นี้ (จะถอยไปเทียบด้วย roomNumber)
+   */
+  roomId?: string | null;
   amount: number;
   status: 'unpaid' | 'pending' | 'paid';
   billingCycle: string; // 'YYYY-MM'
@@ -39,11 +44,15 @@ export interface HorSetBill {
 
 export interface HorSetRoom {
   roomNumber: string;
+  /** rooms.id — ตัวระบุห้องที่แท้จริง */
+  roomId?: string | null;
   baseRent: number;
 }
 
 export interface HorSetTenant {
   roomNumber: string;
+  /** tenants.room_id — ใช้จับคู่ห้องเพื่อหาค่าเช่าล่วงหน้า (ดูหมายเหตุที่ findRoom) */
+  roomId?: string | null;
   contractStart: string | null; // tenants.lease_start
 }
 
@@ -104,8 +113,23 @@ export interface HorSetTaxSourceData {
   settings: HorSetWorkspaceTaxSettings;
 }
 
-function findRoom(rooms: HorSetRoom[], roomNumber: string): HorSetRoom | undefined {
-  return rooms.find((r) => r.roomNumber === roomNumber);
+/**
+ * หาห้องของบิลใบนี้เพื่อดึงค่าเช่าฐาน
+ *
+ * จับด้วย roomId ก่อนเสมอ — หอที่มีหลายตึกใช้เลขห้องซ้ำกันได้ ถ้าเทียบด้วยเลขห้อง
+ * บิลของตึก B จะไปดึงค่าเช่าของตึก A แล้วยอดแยก "ค่าเช่า 40(5)" กับ "ค่าน้ำไฟ 40(8)"
+ * ในแบบ ภ.ง.ด. จะผิดทั้งใบ
+ *
+ * ถอยไปเทียบด้วย roomNumber เฉพาะบิลเก่าที่ยังไม่มี roomId (และเฉพาะเมื่อเลขห้องนั้น
+ * ไม่กำกวม — ถ้ามีหลายห้องใช้เลขเดียวกันให้ยอมไม่รู้ ดีกว่าเดาผิดแล้วยอดภาษีเพี้ยน)
+ */
+function findRoom(rooms: HorSetRoom[], bill: Pick<HorSetBill, 'roomId' | 'roomNumber'>): HorSetRoom | undefined {
+  if (bill.roomId) {
+    const byId = rooms.find((r) => r.roomId && r.roomId === bill.roomId);
+    if (byId) return byId;
+  }
+  const byNumber = rooms.filter((r) => r.roomNumber === bill.roomNumber);
+  return byNumber.length === 1 ? byNumber[0] : undefined;
 }
 
 /** ค่าใช้จ่ายจากบิล 1 ใบ → รายรับ 3 บรรทัด (เช่า 40(5) / ค่าน้ำไฟ 40(8) / อื่นๆ 40(8) ที่ไม่เข้าเกณฑ์หักเหมา) */
@@ -120,7 +144,7 @@ function billToIncomeRows(
   const waterAmount = bill.waterUnits * settings.waterRate;
   const utilitiesAmount = elecAmount + waterAmount + settings.commonFee;
 
-  const matchedRoom = findRoom(rooms, bill.roomNumber);
+  const matchedRoom = findRoom(rooms, bill);
   const baseRentVal = matchedRoom ? matchedRoom.baseRent : Math.max(0, bill.amount - utilitiesAmount);
   const rentAmount = Math.max(0, Math.min(baseRentVal, bill.amount));
   const otherAmount = Math.max(0, bill.amount - rentAmount - utilitiesAmount);
@@ -178,7 +202,7 @@ function tenantsToAdvanceRentRows(tenants: HorSetTenant[], rooms: HorSetRoom[], 
   return tenants
     .filter((t) => Boolean(t.contractStart))
     .map((t) => {
-      const room = findRoom(rooms, t.roomNumber);
+      const room = findRoom(rooms, t);
       const amount = (room?.baseRent ?? 0) * months;
       return {
         id: `advance-${t.roomNumber}-${t.contractStart}`,

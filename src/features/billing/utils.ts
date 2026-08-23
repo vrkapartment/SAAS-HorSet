@@ -1,3 +1,27 @@
+/**
+ * สร้างเลขใบกำกับ (invoice_id) — helper กลางตัวเดียวของทั้งระบบ
+ *
+ * รูปแบบ: `INV-{รอบบิลไม่มีขีด}-{รหัสอาคาร}-{เลขห้อง}` เช่น `INV-202608-A-101`
+ *
+ * ต้องมีรหัสอาคารประกอบ เพราะหอที่มีหลายตึกใช้เลขห้องซ้ำกันได้ (ตึก A ห้อง 101 / ตึก B ห้อง 101)
+ * ถ้าไม่ใส่รหัสอาคาร บิลของสองห้องนั้นจะได้เลขเดียวกันแล้วผู้เช่าแยกไม่ออกว่าใบไหนของห้องใคร
+ *
+ * ห้องที่ยังไม่มีอาคาร (buildingCode ว่าง) ใช้รูปแบบเดิมไม่มีรหัสอาคาร — คงเลขให้เหมือนบิลเก่า
+ * ที่ออกไปก่อนหน้านี้ ไม่ให้ผู้เช่าเห็นเลขบิลเปลี่ยนรูปแบบไปโดยไม่มีเหตุผล
+ *
+ * ⚠️ ห้ามเขียนสูตรนี้ซ้ำที่อื่น — ถ้าฝั่งสร้างบิลกับฝั่งพิมพ์ PDF สร้างเลขไม่เหมือนกัน
+ * ผู้เช่าจะได้ใบที่เลขบนกระดาษไม่ตรงกับในระบบ
+ */
+export function buildInvoiceId(
+  billingCycle: string,
+  roomNumber: string,
+  buildingCode?: string | null
+): string {
+  const cycle = (billingCycle || "").replace(/-/g, "")
+  const code = (buildingCode || "").trim()
+  return code ? `INV-${cycle}-${code}-${roomNumber}` : `INV-${cycle}-${roomNumber}`
+}
+
 export function calculateLateDays(cycleStr: string): number {
   if (!cycleStr || !cycleStr.includes("-")) return 0
   const [yearStr, monthStr] = cycleStr.split("-")

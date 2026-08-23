@@ -21,6 +21,8 @@ export async function sendNotificationPlaceholder() {
 interface LineBillNotificationPayload {
   lineUserId: string
   roomNumber: string
+  /** rooms.id — ใช้สร้างลิงก์ดูบิล ต้องส่งมาเสมอ เลขห้องซ้ำกันได้ข้ามอาคารจึงใช้เป็นตัวระบุไม่ได้ */
+  roomId?: string | null
   tenantName: string
   billingCycle: string
   baseRent: number
@@ -43,6 +45,7 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
     const {
       lineUserId,
       roomNumber,
+      roomId,
       tenantName,
       billingCycle,
       baseRent,
@@ -123,10 +126,15 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
     const safeCommonFee = typeof commonFee === "number" && !isNaN(commonFee) ? commonFee : 0
     const safeTotalAmount = typeof totalAmount === "number" && !isNaN(totalAmount) ? totalAmount : 0
 
-    // สร้างลิงก์เข้าดูบิลตรงแบบไม่ต้องล็อกอิน (โดยระบุ workspace_id, room_number และ token ที่มีความปลอดภัยป้องกัน IDOR)
-    const token = workspaceId ? await generatePortalToken(workspaceId, safeRoomNumber) : ""
-    const portalLink = workspaceId
-      ? `${safeAppUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(safeRoomNumber)}&token=${token}`
+    // สร้างลิงก์เข้าดูบิลตรงแบบไม่ต้องล็อกอิน (ระบุ workspace_id, room_id และ token ที่ป้องกัน IDOR)
+    //
+    // ⚠️ ตัวระบุห้องในลิงก์ต้องเป็น rooms.id ไม่ใช่เลขห้อง — หอที่มีหลายอาคารใช้เลขห้องซ้ำกันได้
+    // ถ้าใช้เลขห้อง ผู้เช่าห้อง 101 ตึก A จะกดลิงก์แล้วเห็นบิลของห้อง 101 ตึก B
+    // ไม่มี roomId (ผู้เรียกรุ่นเก่า) ให้ส่งลิงก์หน้า portal เปล่า ๆ ให้ผู้เช่าล็อกอินเอง ดีกว่าส่งลิงก์ที่อาจพาไปห้องผิด
+    const portalRoomId = roomId && roomId.trim() ? roomId.trim() : ""
+    const token = workspaceId && portalRoomId ? await generatePortalToken(workspaceId, portalRoomId) : ""
+    const portalLink = workspaceId && portalRoomId
+      ? `${safeAppUrl}/portal?workspace_id=${workspaceId}&room_id=${encodeURIComponent(portalRoomId)}&token=${token}`
       : `${safeAppUrl}/portal`
 
     // สร้างข้อความสำรองสำหรับหน้าจอแจ้งเตือน (Notification / Lock Screen)

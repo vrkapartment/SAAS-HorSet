@@ -9,6 +9,11 @@ export interface Building {
   id: string
   workspaceId: string
   name: string
+  /**
+   * รหัสอาคารสั้น ๆ (A, B, …) ใช้ประกอบเลขใบกำกับและกำกับเลขห้องที่ซ้ำกันข้ามอาคาร
+   * ดู database_patch_room_id_identity_1_additive.sql ข้อ 1 — backfill ให้ทุกอาคารแล้ว แอดมินแก้ได้ทีหลัง
+   */
+  code: string | null
   address: string | null
   createdAt: string
   updatedAt: string
@@ -19,6 +24,7 @@ function mapBuildingRow(row: Record<string, unknown>): Building {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
     name: row.name as string,
+    code: (row.code as string) ?? null,
     address: (row.address as string) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string
@@ -54,7 +60,7 @@ export async function getBuildings(workspaceId?: string) {
 /**
  * สร้างอาคารใหม่ใน workspace ปัจจุบัน (ต้องเช็คสถานะ subscription และโควตาจำนวนอาคารก่อนเสมอ)
  */
-export async function createBuilding(name: string, address: string) {
+export async function createBuilding(name: string, address: string, code?: string) {
   try {
     if (!name?.trim()) {
       return { success: false, error: "กรุณาระบุชื่ออาคาร" }
@@ -73,7 +79,14 @@ export async function createBuilding(name: string, address: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("buildings")
-      .insert([{ workspace_id: workspaceId, name: name.trim(), address: address?.trim() || null }])
+      .insert([{
+        workspace_id: workspaceId,
+        name: name.trim(),
+        address: address?.trim() || null,
+        // ไม่กรอกรหัสมาก็ให้ null ไว้ก่อน — เลขใบกำกับจะไม่มีรหัสอาคารกำกับจนกว่าแอดมินจะมาตั้ง
+        // (ยังออกบิลได้ปกติ แต่ถ้ามีอาคารอื่นใช้เลขห้องเดียวกันควรตั้งรหัสให้ครบ)
+        code: code?.trim() || null
+      }])
       .select()
       .single()
 
@@ -86,9 +99,12 @@ export async function createBuilding(name: string, address: string) {
 }
 
 /**
- * แก้ไขชื่อ/ที่อยู่อาคาร
+ * แก้ไขชื่อ/ที่อยู่/รหัสอาคาร
+ *
+ * code = รหัสสั้น ๆ ที่ไปประกอบเลขใบกำกับ (INV-202608-A-101) และกำกับเลขห้องที่ซ้ำกันข้ามอาคาร
+ * ส่ง undefined มา = ไม่แก้ค่าเดิม (ผู้เรียกที่ยังไม่รองรับช่องนี้จะไม่ล้างรหัสทิ้งโดยไม่ตั้งใจ)
  */
-export async function updateBuilding(id: string, name: string, address: string) {
+export async function updateBuilding(id: string, name: string, address: string, code?: string) {
   try {
     if (!name?.trim()) {
       return { success: false, error: "กรุณาระบุชื่ออาคาร" }
@@ -103,7 +119,12 @@ export async function updateBuilding(id: string, name: string, address: string) 
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("buildings")
-      .update({ name: name.trim(), address: address?.trim() || null, updated_at: new Date().toISOString() })
+      .update({
+        name: name.trim(),
+        address: address?.trim() || null,
+        ...(code === undefined ? {} : { code: code.trim() || null }),
+        updated_at: new Date().toISOString()
+      })
       .eq("id", id)
       .select()
       .single()
