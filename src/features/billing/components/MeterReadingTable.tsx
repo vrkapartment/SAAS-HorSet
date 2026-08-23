@@ -207,8 +207,16 @@ export default function MeterReadingTable({
     () => findDuplicateRoomNumbers(unifiedItems || []),
     [unifiedItems]
   )
-  const roomLabelOf = (item: MeterReadingRow): string =>
-    formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, roomInfoById.get(item.roomId))
+  const roomLabelOf = (item: MeterReadingRow): string => {
+    // ⚠️ ต้องหยิบ buildingCode/buildingName ออกมาส่งให้ formatRoomLabel เอง — แถวห้องจาก getRooms()
+    // ไม่มีฟิลด์ชื่อ code/name (name บนแถวห้องคือชื่อประเภทห้อง) ถ้าส่งแถวห้องดิบเข้าไป
+    // ป้ายกำกับอาคารจะไม่ขึ้นเลยทั้งที่เลขห้องซ้ำกันอยู่
+    const row = roomInfoById.get(item.roomId)
+    return formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, {
+      code: row?.buildingCode,
+      name: row?.buildingName
+    })
+  }
 
   // เดิม render ทั้ง mobile card list และ desktop table พร้อมกันเสมอ แล้วให้ CSS ซ่อนฝั่งที่ไม่ใช้
   // (block md:hidden / hidden md:block) แปลว่ามี 2N แถวใน tree ตลอด และทุกตัวอักษรที่พิมพ์ต้อง

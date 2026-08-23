@@ -447,6 +447,9 @@ function UnifiedBillingContent() {
   // event กลับมาเป็นชุด ซึ่ง optimistic update จัดการ state/cache ครบแล้ว ไม่ต้อง refetch ทับ
   const suppressRefreshUntilRef = useRef(0)
 
+  // หมายเหตุ: ถูกเรียกจาก handleSaveRow / handleSaveAll (async event handler) เท่านั้น
+  // ไม่เคยถูกเรียกตอน render — ถ้าจะย้ายไปเรียกที่อื่น ต้องเช็คข้อนี้ก่อน (กฎ react-hooks/purity
+  // พิสูจน์เองไม่ได้ และบางครั้งจะเตือน Date.now() บรรทัดล่างขึ้นมาแบบไม่คงเส้นคงวา)
   const suppressBackgroundRefresh = (ms = 5000) => {
     suppressRefreshUntilRef.current = Date.now() + ms
   }
@@ -1203,8 +1206,9 @@ function UnifiedBillingContent() {
     const item = unifiedItems.find(i => i.roomId === roomId)
 
     if (!item) {
+      // roomId เป็น uuid ห้ามเอาไปโชว์ผู้ใช้ — เก็บไว้ใน log ให้ทีมดูแลไล่ต่อได้
       console.error("❌ [Client] Room item not found in unifiedItems for roomId:", roomId)
-      alert(t("manage_bills.err_no_room_data").replace("{room}", roomId))
+      alert(t("manage_bills.err_no_room_data").replace("{room}", "").trim())
       return
     }
 
@@ -1549,7 +1553,7 @@ function UnifiedBillingContent() {
       if (elecOk && waterOk) {
         eligible.push(item)
       } else {
-        skippedRooms.push(item.roomNumber)
+        skippedRooms.push(roomLabelOf(item))
       }
     }
 
@@ -1610,13 +1614,17 @@ function UnifiedBillingContent() {
         if (update) {
           return {
             ...i,
-            meterRecordId: update.formattedMeter.id,
-            elecPrev: update.formattedMeter.elecPrev,
-            elecCurr: update.formattedMeter.elecCurr,
-            waterPrev: update.formattedMeter.waterPrev,
-            waterCurr: update.formattedMeter.waterCurr,
-            isMeterSaved: true,
-            isEdited: false,
+            // ห้องที่ไม่มีผู้เช่าจะได้แถวมิเตอร์แต่ไม่มีบิล ส่วนทางกลับกันไม่ควรเกิด —
+            // แต่ถ้าเกิด (เช่น upsert มิเตอร์คืนมาไม่ครบ) ต้องไม่ล้มทั้งหน้าเพราะอ่าน field ของ undefined
+            ...(update.formattedMeter ? {
+              meterRecordId: update.formattedMeter.id,
+              elecPrev: update.formattedMeter.elecPrev,
+              elecCurr: update.formattedMeter.elecCurr,
+              waterPrev: update.formattedMeter.waterPrev,
+              waterCurr: update.formattedMeter.waterCurr,
+              isMeterSaved: true,
+              isEdited: false
+            } : {}),
             ...(update.formattedBill ? {
               billId: update.formattedBill.id,
               billAmount: update.formattedBill.amount,
@@ -2018,14 +2026,14 @@ function UnifiedBillingContent() {
   const duplicatedRoomNumbers = useMemo(() => findDuplicateRoomNumbers(unifiedItems), [unifiedItems])
 
   /** หาแถวห้องจาก rooms.id — ใช้ดึงรหัสอาคารไปประกอบป้ายกำกับเลขห้องและเลขใบกำกับ */
-  const findRoomRow = (roomId: string): { code?: string | null; name?: string | null; buildingCode?: string | null } | undefined =>
+  const findRoomRow = (roomId: string): { buildingCode?: string | null; buildingName?: string | null } | undefined =>
     roomsList?.find((r: { id: string }) => r.id === roomId)
 
   // ข้อความเลขห้องที่แสดง — เติมรหัสอาคารต่อท้ายเฉพาะเลขห้องที่ซ้ำกัน
   // (หอที่ไม่มีเลขห้องซ้ำกันเลยจะได้ข้อความเหมือนเดิมทุกแถว)
   const roomLabelOf = (item: { roomId: RoomId; roomNumber: string }): string => {
     const row = findRoomRow(item.roomId)
-    return formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, { code: row?.buildingCode, name: row?.name })
+    return formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, { code: row?.buildingCode, name: row?.buildingName })
   }
 
   // ชื่อไฟล์ PDF — ต้องแยกกันด้วยเมื่อเลขห้องซ้ำ ไม่งั้นดาวน์โหลดทั้งอาคารเป็น zip แล้วไฟล์ทับกันหายไปใบหนึ่ง

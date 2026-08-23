@@ -1160,8 +1160,9 @@ function ManageBillsContent() {
     const item = unifiedItems.find(i => i.roomId === roomId)
 
     if (!item) {
+      // roomId เป็น uuid ห้ามเอาไปโชว์ผู้ใช้ — เก็บไว้ใน log ให้ทีมดูแลไล่ต่อได้
       console.error("❌ [Client] Room item not found in unifiedItems for roomId:", roomId)
-      alert(t("manage_bills.err_no_room_data").replace("{room}", roomId))
+      alert(t("manage_bills.err_no_room_data").replace("{room}", "").trim())
       return
     }
 
@@ -1851,13 +1852,13 @@ function ManageBillsContent() {
   const duplicatedRoomNumbers = useMemo(() => findDuplicateRoomNumbers(unifiedItems), [unifiedItems])
 
   /** หาแถวห้องจาก rooms.id — ใช้ดึงรหัสอาคารไปประกอบป้ายกำกับเลขห้องและเลขใบกำกับ */
-  const findRoomRow = (roomId: string): { code?: string | null; name?: string | null; buildingCode?: string | null } | undefined =>
+  const findRoomRow = (roomId: string): { buildingCode?: string | null; buildingName?: string | null } | undefined =>
     roomsList?.find((r: { id: string }) => r.id === roomId)
 
   // ข้อความเลขห้องที่แสดง — เติมรหัสอาคารต่อท้ายเฉพาะเลขห้องที่ซ้ำกัน
   const roomLabelOf = (item: { roomId: RoomId; roomNumber: string }): string => {
     const row = findRoomRow(item.roomId)
-    return formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, { code: row?.buildingCode, name: row?.name })
+    return formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, { code: row?.buildingCode, name: row?.buildingName })
   }
 
   // ชื่อไฟล์ PDF — ต้องแยกกันด้วยเมื่อเลขห้องซ้ำ ไม่งั้นดาวน์โหลดทั้งอาคารเป็น zip แล้วไฟล์ทับกันหายไปใบหนึ่ง

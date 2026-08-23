@@ -1163,7 +1163,8 @@ function RoomsContent() {
         await loadData(true) // เคลียร์แคชและโหลดข้อมูลจริง
         
         // อัปเดต selectedRoom ใน state ทันทีเพื่อให้แสดงผลใน Success View ได้ครบถ้วน
-        const updatedRoom = rooms.find(r => r.roomNumber === selectedRoom.roomNumber)
+        // จับด้วย rooms.id — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้องอาจได้ห้องของอีกอาคารมาแสดง
+        const updatedRoom = rooms.find(r => r.id === selectedRoom.id)
         setSelectedRoom({
           ...(updatedRoom || selectedRoom),
           tenantName: tenantNameInput,
