@@ -4,25 +4,46 @@ import { createClient } from "@/lib/supabase/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 /**
- * หา building_id ที่จะใช้ตอนสร้าง/แก้ไขห้อง — ถ้าไม่ได้ระบุมา (buildingId ว่าง) และ workspace
- * นี้มีอาคารเดียว จะใช้อาคารนั้นให้อัตโนมัติ (ครอบคลุมเคสส่วนใหญ่ที่มีอาคารเดียวโดยไม่ต้องเลือกเอง)
- * ถ้ามีมากกว่า 1 อาคารและไม่ได้ระบุมา จะคืนค่า null (ห้ามเดา ต้องให้ผู้ใช้เลือกจาก UI)
+ * หา building_id ที่จะใช้ตอนสร้างห้อง — ระบุมาก็ใช้ตัวนั้น ไม่ระบุมาและหอมีอาคารเดียวก็ใช้อาคารนั้น
+ *
+ * ⚠️ ห้ามคืน null เด็ดขาด — โยน error ออกไปแทนถ้าระบุไม่ได้
+ *
+ * เหตุผล: กฎความไม่ซ้ำของเลขห้องคือ `unique (workspace_id, building_id, room_number)` และ
+ * Postgres ไม่ถือว่า null ชนกัน ห้องที่ building_id เป็น null จึงไม่ถูกกฎนี้คุ้มกันเลย —
+ * สร้างเลขห้องซ้ำกันได้ไม่จำกัดในหอเดียวกัน
+ *
+ * เดิมฟังก์ชันนี้คืน null เมื่อหอมีหลายอาคารแล้วผู้เรียกไม่ระบุมา ซึ่งไม่มีปัญหาตอนที่กฎเก่าเป็น
+ * `unique (workspace_id, room_number)` (ดักเลขซ้ำโดยไม่สนอาคาร) แต่กลายเป็นช่องโหว่ทันทีที่
+ * เปลี่ยนกฎ — ดู database_patch_room_id_identity_2_switch.sql
+ *
+ * ปฏิเสธพร้อมข้อความชัด ๆ ดีกว่าสร้างห้องลอยที่ไม่มีอาคาร เพราะห้องลอยจะทำให้ค่าน้ำ-ไฟแบบ
+ * หารตามสัดส่วนทั้งอาคารคำนวณไม่ได้ด้วย
  */
-async function resolveBuildingId(
+async function resolveBuildingIdStrict(
   supabase: SupabaseClient,
   workspaceId: string | null | undefined,
   buildingId?: string | null
-): Promise<string | null> {
+): Promise<string> {
   if (buildingId) return buildingId
-  if (!workspaceId) return null
+  if (!workspaceId) {
+    throw new Error("ไม่พบรหัสหอพักของผู้ใช้ กรุณาเข้าสู่ระบบใหม่แล้วลองอีกครั้ง")
+  }
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("buildings")
     .select("id")
     .eq("workspace_id", workspaceId)
 
-  if (data && data.length === 1) return data[0].id
-  return null
+  if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error("หอพักนี้ยังไม่มีข้อมูลอาคาร กรุณาสร้างอาคารก่อนเพิ่มห้องพัก")
+  }
+  if (data.length === 1) return data[0].id
+
+  throw new Error(
+    `หอพักนี้มี ${data.length} อาคาร กรุณาระบุอาคารให้ห้องพักทุกห้องก่อนบันทึก ` +
+    `(ห้องที่ไม่มีอาคารจะทำให้ระบบกันเลขห้องซ้ำในอาคารเดียวกันไม่ได้)`
+  )
 }
 
 // =========================================================================
@@ -207,7 +228,7 @@ export async function createRoom(roomNumber: string, roomTypeId: string, baseRen
     }
 
     const supabase = await createClient()
-    const resolvedBuildingId = await resolveBuildingId(supabase, workspaceId, buildingId)
+    const resolvedBuildingId = await resolveBuildingIdStrict(supabase, workspaceId, buildingId)
 
     const { data, error } = await supabase
       .from("rooms")
@@ -441,8 +462,10 @@ export async function importRoomsFromCSV(csvText: string, workspaceId: string) {
       roomTypeMap.set(rt.name.trim().toLowerCase(), { id: rt.id, defaultRent: Number(rt.default_rent || 0) })
     })
 
-    // 1.5 หาอาคารเริ่มต้นของ workspace นี้ (ใช้ตอนที่ workspace มีอาคารเดียวเท่านั้น กันเดาผิดถ้ามีหลายอาคาร)
-    const defaultBuildingId = await resolveBuildingId(supabase, workspaceId, undefined)
+    // 1.5 หาอาคารที่จะใส่ให้ห้องที่นำเข้า — ไฟล์ CSV รูปแบบนี้ไม่มีคอลัมน์อาคาร จึงใช้ได้เฉพาะ
+    // หอที่มีอาคารเดียว ถ้ามีหลายอาคาร resolveBuildingIdStrict จะโยน error พร้อมข้อความให้ผู้ใช้
+    // ไปใช้หน้านำเข้าที่ระบุอาคารได้แทน (ห้ามสร้างห้องที่ไม่มีอาคาร — ดูหมายเหตุที่ตัวฟังก์ชัน)
+    const defaultBuildingId = await resolveBuildingIdStrict(supabase, workspaceId, undefined)
 
     // 2. แปลงไฟล์ CSV เป็นอาร์เรย์แถว
     const rows = parseCSV(csvText)
@@ -589,11 +612,18 @@ export async function createRoomsBatch(rooms: {
 
     const supabase = await createClient()
 
-    // ถ้าแถวไหนไม่ได้ระบุ building_id มา ให้ resolve อาคารเริ่มต้นของ workspace นั้น (เฉพาะกรณีมีอาคารเดียว)
-    const defaultBuildingId = await resolveBuildingId(supabase, workspaceId, undefined)
+    // เติมอาคารให้ทุกแถวที่ยังไม่มี — resolve ครั้งเดียวแล้วใช้ร่วมกัน
+    //
+    // ⚠️ ต้องเช็ค falsy ไม่ใช่แค่ undefined: ผู้เรียกฝั่งหน้าเว็บส่ง `building_id: r.buildingId || null`
+    // ซึ่งกลายเป็น null ชัดเจนเมื่อจับคู่อาคารไม่ได้ ถ้าเช็คแค่ `!== undefined` null จะรอดผ่านไป
+    // แล้วได้ห้องที่ไม่มีอาคาร ซึ่งกฎกันเลขห้องซ้ำในอาคารเดียวกันคุ้มไม่ถึง
+    const needsDefaultBuilding = rooms.some(r => !r.building_id)
+    const defaultBuildingId = needsDefaultBuilding
+      ? await resolveBuildingIdStrict(supabase, workspaceId, undefined)
+      : null
     const roomsWithBuilding = rooms.map(r => ({
       ...r,
-      building_id: r.building_id !== undefined ? r.building_id : defaultBuildingId
+      building_id: r.building_id || defaultBuildingId
     }))
 
     const { data, error } = await supabase
