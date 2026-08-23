@@ -43,11 +43,20 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (tenantPaths.includes(path) && mockRole !== "tenant") {
-    // อนุญาตให้ผู้เช่าเข้าหน้า /portal ได้โดยไม่ต้อง Login หากเข้าผ่านลิงก์ตรงจากไลน์ (มี workspace_id, room_number และ token ที่มีความปลอดภัย)
+    // อนุญาตให้ผู้เช่าเข้าหน้า /portal ได้โดยไม่ต้อง Login หากเข้าผ่านลิงก์ตรงจากไลน์
+    // (มี workspace_id + ตัวระบุห้อง + token ที่เซ็นไว้)
+    //
+    // ⚠️ ต้องรับ "ทั้งสองชื่อ" ของตัวระบุห้อง:
+    //   room_id     = ลิงก์รูปแบบปัจจุบัน (rooms.id) — ทุกลิงก์ที่ระบบออกให้ตั้งแต่ patch room_id
+    //   room_number = ลิงก์รูปแบบเก่าที่ยังค้างอยู่ใน LINE ของผู้เช่า
+    //
+    // ถ้าเช็คแค่ชื่อเดียว ลิงก์อีกแบบจะถูกเด้งไปหน้า login ทั้งหมด ซึ่งเท่ากับผู้เช่าเปิดบิลไม่ได้เลย
+    // (เคยเกิดขึ้นจริงตอน deploy patch room_id — ลิงก์เปลี่ยนเป็น room_id แต่ที่นี่ยังเช็ค room_number)
     const workspaceId = request.nextUrl.searchParams.get("workspace_id")
+    const roomId = request.nextUrl.searchParams.get("room_id")
     const roomNumber = request.nextUrl.searchParams.get("room_number")
     const token = request.nextUrl.searchParams.get("token")
-    const isLoginFreePortal = workspaceId && roomNumber && token
+    const isLoginFreePortal = Boolean(workspaceId && token && (roomId || roomNumber))
 
     if (!isLoginFreePortal) {
       const url = request.nextUrl.clone()
