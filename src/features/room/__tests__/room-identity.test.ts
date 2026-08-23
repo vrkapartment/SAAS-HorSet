@@ -6,7 +6,7 @@ import { buildInvoiceId } from "../../billing/utils"
  * กฎความปลอดภัยของ "เลขห้องซ้ำข้ามอาคาร"
  *
  * ทั้งไฟล์นี้คุมพฤติกรรมที่ถ้าพลาดแล้วข้อมูลจะไปลงห้องผิดแบบเงียบ ๆ — ไม่มี error ไม่มีใครรู้
- * จนกว่าผู้เช่าจะทักมาว่าบิลผิด ดู database_patch_room_id_identity.sql
+ * จนกว่าผู้เช่าจะทักมาว่าบิลผิด ดู database_patch_room_id_identity_1_additive.sql
  */
 
 describe("findDuplicateRoomNumbers", () => {

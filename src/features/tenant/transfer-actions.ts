@@ -188,7 +188,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
 
     // บิลปิดรอบเป็นบิล "อีกใบ" ของห้องเดิมในรอบเดียวกันได้ (ถ้ามีผู้เช่าใหม่ย้ายเข้าห้องเดิมในเดือนนั้น
     // ห้องนั้นจะมีทั้งบิลปิดรอบและบิลปกติ) จึงแยกกันด้วย bill_kind ไม่ให้บิลปกติ upsert ทับ
-    // ดู database_patch_room_id_identity.sql ข้อ 3
+    // ดู database_patch_room_id_identity_1_additive.sql ข้อ 3 (คอลัมน์) และข้อ 5 (unique key)
     const closingInvoiceId = `${buildInvoiceId(billingCycle, oldRoom.room_number, oldRoom.buildings?.code ?? null)}-TRANSFER`
     const { data: closingBill, error: closingBillError } = await supabase
       .from("bills")

@@ -11,7 +11,7 @@ export interface Building {
   name: string
   /**
    * รหัสอาคารสั้น ๆ (A, B, …) ใช้ประกอบเลขใบกำกับและกำกับเลขห้องที่ซ้ำกันข้ามอาคาร
-   * ดู database_patch_room_id_identity.sql ข้อ 1 — backfill ให้ทุกอาคารแล้ว แอดมินแก้ได้ทีหลัง
+   * ดู database_patch_room_id_identity_1_additive.sql ข้อ 1 — backfill ให้ทุกอาคารแล้ว แอดมินแก้ได้ทีหลัง
    */
   code: string | null
   address: string | null
