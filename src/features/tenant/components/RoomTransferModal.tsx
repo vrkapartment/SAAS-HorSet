@@ -7,6 +7,8 @@ import { getLatestMeterRecord } from "@/features/meter/actions"
 
 export interface RoomTransferModalTenant {
   id: string
+  /** rooms.id ของห้องปัจจุบัน — ใช้อ่านเลขมิเตอร์ครั้งก่อนหน้า (เลขห้องซ้ำกันได้ข้ามอาคาร) */
+  roomId: string
   roomNumber: string
   fullName: string
   depositPaid?: number | null
@@ -20,7 +22,7 @@ export interface RoomTransferModalVacantRoom {
 interface RoomTransferModalProps {
   tenant: RoomTransferModalTenant
   vacantRooms: RoomTransferModalVacantRoom[]
-  /** ใช้จำกัดขอบเขตการอ่านเลขมิเตอร์ครั้งก่อนหน้าให้อยู่ในหอนี้เท่านั้น (เลขห้องซ้ำกันได้ข้ามหอ) */
+  /** ใช้จำกัดขอบเขตการอ่านเลขมิเตอร์ครั้งก่อนหน้าให้อยู่ในหอนี้เท่านั้น */
   workspaceId?: string
   onClose: () => void
   onSuccess: (result: { toRoomNumber: string }) => void
@@ -49,7 +51,7 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, on
     async function loadMeter() {
       setLoadingMeter(true)
       try {
-        const res = await getLatestMeterRecord(tenant.roomNumber, workspaceId)
+        const res = await getLatestMeterRecord({ roomId: tenant.roomId }, workspaceId)
         if (cancelled) return
         if (res.success && res.data) {
           const pElec = res.data.elecCurr !== null && res.data.elecCurr !== undefined ? res.data.elecCurr : res.data.elecPrev
@@ -70,7 +72,7 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, on
     }
     loadMeter()
     return () => { cancelled = true }
-  }, [tenant.roomNumber])
+  }, [tenant.roomId, workspaceId])
 
   const depositBefore = tenant.depositPaid ?? null
   const topupNum = Number(depositTopupAmount || 0)

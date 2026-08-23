@@ -29,11 +29,12 @@ import {
   Settings
 } from "lucide-react"
 import { createBill, updateBillStatus, getBillingPageData, saveAllBillsForCycle, type BulkBillItem } from "@/features/billing/actions"
+import { buildInvoiceId } from "@/features/billing/utils"
 import { getRooms } from "@/features/room/actions"
 import { saveMeterRecord } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings, saveMeterEntryModeAction } from "@/features/finance/actions"
-import { getRoomFloor, sortFloors } from "@/features/room/utils"
+import { getRoomFloor, sortFloors, asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { getBuildings } from "@/features/building/actions"
 import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "@/features/billing/building-utility-actions"
 
@@ -51,6 +52,11 @@ import BuildingUtilityBillPanel from "@/features/billing/components/BuildingUtil
 
 
 interface UnifiedRoomBillingItem {
+  /**
+   * ตัวระบุห้องที่แท้จริง (rooms.id) — ใช้จับคู่/เป็น key ทุกที่
+   * roomNumber ด้านล่างเป็น "ข้อความที่แสดง" เท่านั้น ห้ามใช้เป็น key เพราะซ้ำกันได้ข้ามอาคาร
+   */
+  roomId: RoomId
   roomNumber: string
   tenantName: string | null
   baseRent: number
@@ -309,7 +315,8 @@ function UnifiedBillingContent() {
   }, [verifyBillId, unifiedItems, loading, billingCycle])
 
   // ข้อมูลสำหรับโมดอลสร้างบิลด้วยมือ (กรณีฉุกเฉิน)
-  const [newRoomNumber, setNewRoomNumber] = useState("105")
+  // เก็บ rooms.id ของห้องที่เลือกในโมดอลออกบิลเอง (ว่างไว้ก่อน แล้วตั้งค่าเมื่อโหลดรายการห้องเสร็จ)
+  const [newRoomId, setNewRoomId] = useState("")
   const [elecUnitsManual, setElecUnitsManual] = useState(80)
   const [waterUnitsManual, setWaterUnitsManual] = useState(10)
   const [otherServiceAmountManual, setOtherServiceAmountManual] = useState(0)
@@ -318,8 +325,8 @@ function UnifiedBillingContent() {
   const [savingRows, setSavingRows] = useState<Record<string, boolean>>({})
   const [savingProgress, setSavingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
 
-  const rentPrice = roomsList.find(r => r.roomNumber === newRoomNumber)?.baseRent || 4500
-  const selectedManualRoom = roomsList.find(r => r.roomNumber === newRoomNumber)
+  const selectedManualRoom = roomsList.find(r => r.id === newRoomId)
+  const rentPrice = selectedManualRoom?.baseRent || 4500
   const isElecWaived = selectedManualRoom?.waiveElectricMin ?? false
   const isWaterWaived = selectedManualRoom?.waiveWaterMin ?? false
 
@@ -370,7 +377,7 @@ function UnifiedBillingContent() {
     }
   }
 
-  const getFallbackPrevReadings = (roomNumber: string, cycle: string) => {
+  const getFallbackPrevReadings = (roomId: RoomId, cycle: string) => {
     return {
       elecPrev: 0,
       waterPrev: 0
@@ -599,9 +606,12 @@ function UnifiedBillingContent() {
       // โหมด Supabase ดั้งเดิมและถาวร (รวมทุกห้องแม้ไม่มีผู้เช่า)
       const activeRooms = rooms
       const compiled = activeRooms.map((r: any) => {
-        const roomBill = dbBills.find((b: any) => b.roomNumber === r.roomNumber)
-        const roomMeter = dbMeters.find((m: any) => m.roomNumber === r.roomNumber)
-        const prevMeter = dbPrevMeters.find((m: any) => m.roomNumber === r.roomNumber)
+        // จับคู่ด้วย rooms.id — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้อง ห้อง 101 ของสองอาคาร
+        // จะได้บิล/เลขมิเตอร์ของห้องเดียวกันมาแสดงทั้งคู่ แล้วการกดบันทึกจะเขียนทับกันเอง
+        const roomId = asRoomId(r.id)
+        const roomBill = dbBills.find((b: any) => b.roomId === roomId)
+        const roomMeter = dbMeters.find((m: any) => m.roomId === roomId)
+        const prevMeter = dbPrevMeters.find((m: any) => m.roomId === roomId)
         
         // ค้นหาผู้เช่าที่ครอบคลุมในรอบบิลปัจจุบันตามประวัติสัญญาเช่า
         let resolvedTenantName: string | null = null
@@ -646,7 +656,7 @@ function UnifiedBillingContent() {
         const hasNotifiedCheckout = r.status === "Pending_Refund"
 
         // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
-        const fallbacks = getFallbackPrevReadings(r.roomNumber, cycle)
+        const fallbacks = getFallbackPrevReadings(roomId, cycle)
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
         const hasPrevMeterWater = !!(prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
 
@@ -695,6 +705,7 @@ function UnifiedBillingContent() {
         }
 
         return {
+          roomId,
           roomNumber: r.roomNumber,
           tenantName: resolvedTenantName,
           baseRent: Number(r.baseRent) || 4500,
@@ -731,9 +742,9 @@ function UnifiedBillingContent() {
       // (แถวที่ไม่ได้แก้ยังรับข้อมูลใหม่ปกติ เช่น ผู้เช่าห้องอื่นอัปโหลดสลิปเข้ามาระหว่างนั้น)
       setUnifiedItems(prev => {
         if (!silent) return compiled
-        const editedByRoom = new Map(prev.filter(i => i.isEdited).map(i => [i.roomNumber, i]))
+        const editedByRoom = new Map(prev.filter(i => i.isEdited).map(i => [i.roomId, i]))
         if (editedByRoom.size === 0) return compiled
-        return compiled.map((fresh: UnifiedRoomBillingItem) => editedByRoom.get(fresh.roomNumber) ?? fresh)
+        return compiled.map((fresh: UnifiedRoomBillingItem) => editedByRoom.get(fresh.roomId) ?? fresh)
       })
     } catch (err) {
       console.error("Failed to load billing unified items with cache:", err)
@@ -1008,46 +1019,46 @@ function UnifiedBillingContent() {
   }
 
   // อัปเดตช่องอินพุตเลขมิเตอร์ไฟฟ้าในหน้าจอ
-  const handleElecChange = (roomNumber: string, value: string) => {
+  const handleElecChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, elecCurr: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, elecCurr: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
   // อัปเดตช่องอินพุตเลขมิเตอร์น้ำในหน้าจอ
-  const handleWaterChange = (roomNumber: string, value: string) => {
+  const handleWaterChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, waterCurr: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, waterCurr: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
   // อัปเดตช่องอินพุตเลขมิเตอร์ไฟฟ้าก่อนหน้าในหน้าจอ
-  const handleElecPrevChange = (roomNumber: string, value: string) => {
+  const handleElecPrevChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, elecPrev: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, elecPrev: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
   // อัปเดตช่องอินพุตเลขมิเตอร์น้ำก่อนหน้าในหน้าจอ
-  const handleWaterPrevChange = (roomNumber: string, value: string) => {
+  const handleWaterPrevChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item =>
-        item.roomNumber === roomNumber ? { ...item, waterPrev: value, isMeterSaved: false, isEdited: true } : item
+        item.roomId === roomId ? { ...item, waterPrev: value, isMeterSaved: false, isEdited: true } : item
       )
     )
   }
 
   // อัปเดตและคำนวณวันปรับล่าช้าในหน้าจอแบบเรียลไทม์
-  const handleLateDaysChange = (roomNumber: string, value: string) => {
+  const handleLateDaysChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item => {
-        if (item.roomNumber !== roomNumber) return item
+        if (item.roomId !== roomId) return item
         
         const days = value === "" ? 0 : Number(value)
         if (isNaN(days)) return item
@@ -1071,10 +1082,10 @@ function UnifiedBillingContent() {
   }
 
   // อัปเดตและคำนวณยอดเงินรวมเมื่อเปลี่ยนค่าบริการอื่นๆ แบบเรียลไทม์
-  const handleOtherServiceChange = (roomNumber: string, value: string) => {
+  const handleOtherServiceChange = (roomId: RoomId, value: string) => {
     setUnifiedItems(prev =>
       prev.map(item => {
-        if (item.roomNumber !== roomNumber) return item
+        if (item.roomId !== roomId) return item
         
         const otherVal = value === "" ? 0 : Number(value)
         if (isNaN(otherVal)) return item
@@ -1124,13 +1135,13 @@ function UnifiedBillingContent() {
   })
 
   const updateLocalStateAndCache = (
-    roomNumber: string,
+    roomId: RoomId,
     formattedMeter?: any,
     formattedBill?: any
   ) => {
     // 1. อัปเดต React State ทันทีเพื่อความลื่นไหลแบบ 0ms
     setUnifiedItems(prev => prev.map(i => {
-      if (i.roomNumber === roomNumber) {
+      if (i.roomId === roomId) {
         return {
           ...i,
           ...(formattedMeter ? {
@@ -1163,7 +1174,7 @@ function UnifiedBillingContent() {
     if (currentWorkspaceId) {
       if (formattedMeter) {
         const cachedMeters = getCachedData(currentWorkspaceId, `meters_${billingCycle}`) || []
-        const existingMeterIdx = cachedMeters.findIndex((m: any) => m.roomNumber === roomNumber)
+        const existingMeterIdx = cachedMeters.findIndex((m: any) => m.roomId === roomId)
         let updatedMeters = [...cachedMeters]
         if (existingMeterIdx >= 0) {
           updatedMeters[existingMeterIdx] = { ...updatedMeters[existingMeterIdx], ...formattedMeter }
@@ -1175,7 +1186,7 @@ function UnifiedBillingContent() {
 
       if (formattedBill) {
         const cachedBills = getCachedData(currentWorkspaceId, `bills_${billingCycle}`) || []
-        const existingBillIdx = cachedBills.findIndex((b: any) => b.roomNumber === roomNumber)
+        const existingBillIdx = cachedBills.findIndex((b: any) => b.roomId === roomId)
         let updatedBills = [...cachedBills]
         if (existingBillIdx >= 0) {
           updatedBills[existingBillIdx] = { ...updatedBills[existingBillIdx], ...formattedBill }
@@ -1188,19 +1199,21 @@ function UnifiedBillingContent() {
   }
 
   // บันทึกวันปรับล่าช้าและคำนวณค่าปรับลง Supabase
-  const handleSaveLateDays = async (roomNumber: string) => {
-    console.log("🚀 [Client] handleSaveLateDays started for room:", roomNumber)
-    const item = unifiedItems.find(i => i.roomNumber === roomNumber)
-    
+  const handleSaveLateDays = async (roomId: RoomId) => {
+    const item = unifiedItems.find(i => i.roomId === roomId)
+
     if (!item) {
-      console.error("❌ [Client] Room item not found in unifiedItems for room:", roomNumber)
-      alert(t("manage_bills.err_no_room_data").replace("{room}", roomNumber))
+      console.error("❌ [Client] Room item not found in unifiedItems for roomId:", roomId)
+      alert(t("manage_bills.err_no_room_data").replace("{room}", roomId))
       return
     }
-    
+
+    // เลขห้องสำหรับ "แสดงให้ผู้ใช้อ่าน" เท่านั้น — การจับคู่ทุกที่ใช้ roomId
+    const roomLabel = item.roomNumber
+
     if (!item.billId) {
-      console.error("❌ [Client] billId is missing for room:", roomNumber, "item:", item)
-      alert(t("manage_bills.err_no_bill_id").replace("{room}", roomNumber))
+      console.error("❌ [Client] billId is missing for room:", roomLabel, "item:", item)
+      alert(t("manage_bills.err_no_bill_id").replace("{room}", roomLabel))
       return
     }
     
@@ -1214,7 +1227,7 @@ function UnifiedBillingContent() {
       penaltyAmount: sendPenaltyAmount,
       billAmount: sendBillAmount
     })
-    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
+    setSavingRows(prev => ({ ...prev, [roomId]: true }))
     
     try {
       const { updateBillPenalty } = await import("@/features/billing/actions")
@@ -1230,11 +1243,11 @@ function UnifiedBillingContent() {
       console.log("✅ [Client] updateBillPenalty responded:", res)
       
       if (res.success) {
-        showToast(t("manage_bills.saved_late_days").replace("{room}", roomNumber))
+        showToast(t("manage_bills.saved_late_days").replace("{room}", roomLabel))
         const formatted = formatDbBillToCamelCase(res.data)
-        updateLocalStateAndCache(roomNumber, undefined, formatted)
+        updateLocalStateAndCache(roomId, undefined, formatted)
         setUnifiedItems(prev =>
-          prev.map(i => i.roomNumber === roomNumber ? { ...i, isEdited: false } : i)
+          prev.map(i => i.roomId === roomId ? { ...i, isEdited: false } : i)
         )
         console.log("👉 [Client] Local state & cache updated successfully")
       } else {
@@ -1245,7 +1258,7 @@ function UnifiedBillingContent() {
       console.error("💥 [Client] Exception caught in handleSaveLateDays:", err)
       alert(`${t("manage_bills.err_penalty_fatal_prefix")}${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+      setSavingRows(prev => ({ ...prev, [roomId]: false }))
       console.log("🏁 [Client] handleSaveLateDays finished execution flow")
     }
   }
@@ -1280,7 +1293,7 @@ function UnifiedBillingContent() {
     if (res.success) {
       showToast(t("manage_bills.approved_payment"))
       const formatted = formatDbBillToCamelCase(res.data)
-      updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
+      updateLocalStateAndCache(asRoomId(formatted.roomId), undefined, formatted)
     } else {
       alert(res.error || t("manage_bills.err_update_bill_status"))
       return
@@ -1298,7 +1311,7 @@ function UnifiedBillingContent() {
     if (res.success) {
       showToast(t("manage_bills.rejected_slip"))
       const formatted = formatDbBillToCamelCase(res.data)
-      updateLocalStateAndCache(formatted.roomNumber, undefined, formatted)
+      updateLocalStateAndCache(asRoomId(formatted.roomId), undefined, formatted)
     } else {
       alert(res.error || t("manage_bills.err_update_bill_status"))
       return
@@ -1307,35 +1320,39 @@ function UnifiedBillingContent() {
   }
 
   // เปลี่ยนสถานะเป็นชำระเงินแล้วโดยตรง (สำหรับกรณีแอดมินรับเงินสด/โอนตรง)
-  const handleMarkAsPaid = async (billId: string, roomNumber: string) => {
+  const handleMarkAsPaid = async (billId: string, roomId: RoomId) => {
     if (currentUserRole === "staff") {
       alert(t("billing.err_admin_only_cash"))
       return
     }
-    if (!confirm(t("manage_bills.confirm_mark_paid").replace("{room}", roomNumber))) return
+    const roomLabel = unifiedItems.find(i => i.roomId === roomId)?.roomNumber ?? ""
+    if (!confirm(t("manage_bills.confirm_mark_paid").replace("{room}", roomLabel))) return
 
     const res = await updateBillStatus(billId, "paid")
     if (res.success) {
-      showToast(t("manage_bills.marked_paid").replace("{room}", roomNumber))
+      showToast(t("manage_bills.marked_paid").replace("{room}", roomLabel))
       const formatted = formatDbBillToCamelCase(res.data)
-      updateLocalStateAndCache(roomNumber, undefined, formatted)
+      updateLocalStateAndCache(roomId, undefined, formatted)
     } else {
       alert(res.error || t("manage_bills.err_update_bill_status"))
     }
   }
 
   // บันทึกเฉพาะห้องและสร้างบิล
-  const handleSaveRow = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
-    const item = unifiedItems.find(i => i.roomNumber === roomNumber)
+  const handleSaveRow = async (roomId: RoomId, type: "electric" | "water" | "all" = "all") => {
+    const item = unifiedItems.find(i => i.roomId === roomId)
     if (!item) return
+
+    // เลขห้องสำหรับแสดงข้อความเท่านั้น — ทุก query/การจับคู่ใช้ roomId
+    const roomLabel = item.roomNumber
 
     const elecVal = item.elecCurr === "" ? "" : Number(item.elecCurr)
     const waterVal = item.waterCurr === "" ? "" : Number(item.waterCurr)
     const elecPrevVal = item.elecPrev === "" ? 0 : Number(item.elecPrev)
     const waterPrevVal = item.waterPrev === "" ? 0 : Number(item.waterPrev)
 
-    const repElec = meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === "electric")
-    const repWater = meterReplacements?.find(r => r.roomNumber === roomNumber && r.meterType === "water")
+    const repElec = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "electric")
+    const repWater = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "water")
 
     const getUnits = (curr: number, prev: number) => {
       if (curr >= prev) return curr - prev
@@ -1413,14 +1430,14 @@ function UnifiedBillingContent() {
           ? waterMinUnit * waterRate
           : wUnits * waterRate)
           
-    const roomInfo = roomsList?.find((r: any) => r.roomNumber === roomNumber)
+    const roomInfo = roomsList?.find((r: any) => r.id === roomId)
     const extraExpenses = roomInfo?.extraExpenses || []
     const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
     const otherServiceVal = Number(item.otherServiceAmount || 0)
     const totalAmount = item.baseRent + elecCost + waterCost + commonFee + otherServiceVal + extraExpensesSum
 
-    setSavingRows(prev => ({ ...prev, [roomNumber]: true }))
+    setSavingRows(prev => ({ ...prev, [roomId]: true }))
     // การบันทึกของเราเองจะทำให้ realtime ยิง event กลับมา แต่ updateLocalStateAndCache ด้านล่าง
     // อัปเดต state + cache ครบแล้ว ไม่ต้องเสีย refresh ทั้งก้อนมาทับ
     suppressBackgroundRefresh()
@@ -1428,7 +1445,7 @@ function UnifiedBillingContent() {
     try {
       // 1. บันทึกมิเตอร์ใน DB
       const meterRes = await saveMeterRecord(
-        roomNumber,
+        { roomId },
         billingCycle,
         elecPrevVal,
         elecVal,
@@ -1437,21 +1454,21 @@ function UnifiedBillingContent() {
       )
       if (!meterRes.success) {
         alert(meterRes.error || t("manage_bills.err_meter_save_failed"))
-        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+        setSavingRows(prev => ({ ...prev, [roomId]: false }))
         return
       }
 
       // 2. สร้าง/อัปเดตบิลใน DB (เฉพาะกรณีมีผู้เช่าเท่านั้น)
       if (!item.tenantName) {
-        showToast(t("billing.toast_save_meter_no_tenant").replace("{room}", roomNumber))
+        showToast(t("billing.toast_save_meter_no_tenant").replace("{room}", roomLabel))
         const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
-        updateLocalStateAndCache(roomNumber, formattedMeter, undefined)
-        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+        updateLocalStateAndCache(roomId, formattedMeter, undefined)
+        setSavingRows(prev => ({ ...prev, [roomId]: false }))
         return
       }
 
       const billRes = await createBill(
-        roomNumber,
+        { roomId },
         item.tenantName || "ผู้เช่า",
         totalAmount,
         item.billStatus === "not_created" ? "unpaid" : (item.billStatus as any),
@@ -1462,19 +1479,19 @@ function UnifiedBillingContent() {
       )
       if (!billRes.success) {
         alert(billRes.error || t("manage_bills.err_bill_create_failed"))
-        setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+        setSavingRows(prev => ({ ...prev, [roomId]: false }))
         return
       }
 
-      showToast(t("manage_bills.saved_meter_bill").replace("{room}", roomNumber))
+      showToast(t("manage_bills.saved_meter_bill").replace("{room}", roomLabel))
       const formattedMeter = formatDbMeterToCamelCase(meterRes.data)
       const formattedBill = formatDbBillToCamelCase(billRes.data)
-      updateLocalStateAndCache(roomNumber, formattedMeter, formattedBill)
+      updateLocalStateAndCache(roomId, formattedMeter, formattedBill)
     } catch (err) {
       console.error(err)
       alert(t("manage_bills.err_unexpected"))
     } finally {
-      setSavingRows(prev => ({ ...prev, [roomNumber]: false }))
+      setSavingRows(prev => ({ ...prev, [roomId]: false }))
       // ต่ออายุช่วงระงับนับจากตอนที่บันทึกเสร็จจริง เผื่อ event เดินทางมาช้ากว่าที่ตั้งไว้ตอนเริ่ม
       suppressBackgroundRefresh()
     }
@@ -1482,18 +1499,18 @@ function UnifiedBillingContent() {
 
   // บันทึกและออกบิลให้ห้องที่กรอกครบ ในขอบเขตที่ระบุ
   //
-  // roomNumbers = ขอบเขตที่ผู้ใช้เห็นอยู่จริง (ผ่านตัวกรองอาคารและชั้นแล้ว) — จำเป็นต้องส่งมา เพราะ
+  // roomIds = ขอบเขตที่ผู้ใช้เห็นอยู่จริง (ผ่านตัวกรองอาคารและชั้นแล้ว) — จำเป็นต้องส่งมา เพราะ
   // saveAllBillsForCycle ใช้ upsert ทับ "ทั้งแถว" ของ meter_records (เขียน elec_curr และ water_curr
   // พร้อมกันเสมอ) ถ้าส่งห้องที่อยู่นอกขอบเขตไปด้วย ค่าของห้องนั้นจะถูกเขียนตามสิ่งที่ค้างอยู่ใน state
   // เดิมส่ง unifiedItems ทั้งก้อนตลอด ทำให้กรองอาคาร A แล้วกดบันทึกไปโดนห้องอาคาร B ด้วย
-  const handleSaveAll = async (type: "electric" | "water" | "both", roomNumbers?: string[]) => {
+  const handleSaveAll = async (type: "electric" | "water" | "both", roomIds?: RoomId[]) => {
     const getUnits = (curr: number, prev: number) => {
       if (curr >= prev) return curr - prev
       return (10000 - prev) + curr
     }
 
-    const scopeSet = roomNumbers ? new Set(roomNumbers) : null
-    const scopedItems = scopeSet ? unifiedItems.filter(i => scopeSet.has(i.roomNumber)) : unifiedItems
+    const scopeSet = roomIds ? new Set<string>(roomIds) : null
+    const scopedItems = scopeSet ? unifiedItems.filter(i => scopeSet.has(i.roomId)) : unifiedItems
 
     // ตรวจเลขมิเตอร์ของสาธารณูปโภคหนึ่งตัว
     // required = โหมดที่เลือกบังคับต้องกรอก | ถ้าไม่บังคับแต่มีค่าอยู่ ก็ยังต้องผ่าน validation
@@ -1511,7 +1528,7 @@ function UnifiedBillingContent() {
       const prevNum = prev === "" ? 0 : Number(prev)
       if (isNaN(currNum) || isNaN(prevNum)) return false
 
-      const rep = meterReplacements?.find(r => r.roomNumber === item.roomNumber && r.meterType === meterType)
+      const rep = meterReplacements?.find(r => r.roomId === item.roomId && r.meterType === meterType)
       const units = rep
         ? getUnits(rep.oldFinalReading, prevNum) + getUnits(currNum, rep.newStartReading)
         : getUnits(currNum, prevNum)
@@ -1550,6 +1567,7 @@ function UnifiedBillingContent() {
 
     try {
       const items: BulkBillItem[] = eligible.map(item => ({
+        roomId: item.roomId,
         roomNumber: item.roomNumber,
         tenantName: item.tenantName || null,
         elecPrev: item.elecPrev === "" ? 0 : Number(item.elecPrev),
@@ -1572,23 +1590,23 @@ function UnifiedBillingContent() {
       const updatedMetersList = (result.data?.meters || []).map((m: any) => formatDbMeterToCamelCase(m))
       const updatedBillsList = (result.data?.bills || []).map((b: any) => formatDbBillToCamelCase(b))
 
-      const stateUpdates: { [roomNumber: string]: { formattedMeter: any; formattedBill?: any } } = {}
+      const stateUpdates: { [roomId: string]: { formattedMeter: any; formattedBill?: any } } = {}
 
       updatedMetersList.forEach((m: any) => {
-        stateUpdates[m.roomNumber] = { formattedMeter: m }
+        stateUpdates[m.roomId] = { formattedMeter: m }
       })
 
       updatedBillsList.forEach((b: any) => {
-        if (stateUpdates[b.roomNumber]) {
-          stateUpdates[b.roomNumber].formattedBill = b
+        if (stateUpdates[b.roomId]) {
+          stateUpdates[b.roomId].formattedBill = b
         } else {
-          stateUpdates[b.roomNumber] = { formattedMeter: undefined, formattedBill: b }
+          stateUpdates[b.roomId] = { formattedMeter: undefined, formattedBill: b }
         }
       })
 
       // ปลุกพลัง Optimistic UI: อัปเดต React State ทันทีแบบไม่ต้องพึ่งการโหลดเน็ตเวิร์ก
       setUnifiedItems(prev => prev.map(i => {
-        const update = stateUpdates[i.roomNumber]
+        const update = stateUpdates[i.roomId]
         if (update) {
           return {
             ...i,
@@ -1622,7 +1640,7 @@ function UnifiedBillingContent() {
         const cachedMeters = getCachedData(currentWorkspaceId, `meters_${billingCycle}`) || []
         let updatedMeters = [...cachedMeters]
         updatedMetersList.forEach(formattedMeter => {
-          const idx = updatedMeters.findIndex((m: any) => m.roomNumber === formattedMeter.roomNumber)
+          const idx = updatedMeters.findIndex((m: any) => m.roomId === formattedMeter.roomId)
           if (idx >= 0) {
             updatedMeters[idx] = { ...updatedMeters[idx], ...formattedMeter }
           } else {
@@ -1635,7 +1653,7 @@ function UnifiedBillingContent() {
         const cachedBills = getCachedData(currentWorkspaceId, `bills_${billingCycle}`) || []
         let updatedBills = [...cachedBills]
         updatedBillsList.forEach(formattedBill => {
-          const idx = updatedBills.findIndex((b: any) => b.roomNumber === formattedBill.roomNumber)
+          const idx = updatedBills.findIndex((b: any) => b.roomId === formattedBill.roomId)
           if (idx >= 0) {
             updatedBills[idx] = { ...updatedBills[idx], ...formattedBill }
           } else {
@@ -1681,35 +1699,37 @@ function UnifiedBillingContent() {
   }
 
   // ส่งข้อมูลเข้า LINE OA ของจริง
-  const handleSendLine = async (roomNumber: string) => {
+  const handleSendLine = async (roomId: RoomId) => {
     if (!userPermissions.billing_send_line) {
       alert(t("manage_bills.err_no_permission_line"))
       return
     }
 
     // 1. ค้นหาข้อมูลห้องพักจาก List เพื่อหยิบ lineUserId ของผู้เช่าจริงออกมา
-    const roomInfo = roomsList.find((r: any) => r.roomNumber === roomNumber)
+    const roomInfo = roomsList.find((r: any) => r.id === roomId)
     const lineUserId = roomInfo?.lineUserId
+    // เลขห้องสำหรับแสดงข้อความเท่านั้น (หาจาก roomsList เพราะยังไม่แน่ว่ามี item)
+    const roomLabel = roomInfo?.roomNumber ?? ""
 
     if (!lineUserId) {
-      showToast(t("manage_bills.err_line_not_linked").replace("{room}", roomNumber))
+      showToast(t("manage_bills.err_line_not_linked").replace("{room}", roomLabel))
       return
     }
 
     // 2. ค้นหาบิลประจำงวดของห้องนั้นๆ
-    const item = unifiedItems.find((x: any) => x.roomNumber === roomNumber)
+    const item = unifiedItems.find((x: any) => x.roomId === roomId)
     if (!item) {
-      showToast(t("manage_bills.err_no_bill_data_room").replace("{room}", roomNumber))
+      showToast(t("manage_bills.err_no_bill_data_room").replace("{room}", roomLabel))
       return
     }
 
     if (item.billStatus === "not_created") {
-      showToast(t("manage_bills.err_calc_bill_first").replace("{room}", roomNumber))
+      showToast(t("manage_bills.err_calc_bill_first").replace("{room}", roomLabel))
       return
     }
 
     if (item.billStatus === "paid") {
-      alert(t("manage_bills.info_already_paid").replace("{room}", roomNumber))
+      alert(t("manage_bills.info_already_paid").replace("{room}", roomLabel))
       return
     }
 
@@ -1724,6 +1744,7 @@ function UnifiedBillingContent() {
       const result = await sendLineBillNotificationAction({
         lineUserId,
         roomNumber: item.roomNumber,
+        roomId: item.roomId,
         tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
         billingCycle: formatBillingCycle(billingCycle, locale),
         baseRent: item.baseRent,
@@ -1738,7 +1759,7 @@ function UnifiedBillingContent() {
       })
 
       if (result.success) {
-        showToast(t("manage_bills.sent_line_success").replace("{room}", roomNumber))
+        showToast(t("manage_bills.sent_line_success").replace("{room}", roomLabel))
       } else {
         showToast(`${t("manage_bills.err_line_send_failed_prefix")}${result.error}`)
       }
@@ -1750,8 +1771,8 @@ function UnifiedBillingContent() {
 
   // หายอดบิลรวมทั้งอาคาร (ไฟฟ้า/น้ำ) ของห้องนี้ในรอบบิลปัจจุบัน — ใช้แสดง "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน"
   // ในบิล PDF เฉพาะตอนเปิดโหมด building_total เท่านั้น (คืนค่า null ถ้าไม่เข้าเงื่อนไข ไม่ใช้ 0)
-  const getBuildingTotalsForRoom = (roomNumber: string) => {
-    const roomBuildingId = roomsList?.find((r: any) => r.roomNumber === roomNumber)?.buildingId
+  const getBuildingTotalsForRoom = (roomId: RoomId) => {
+    const roomBuildingId = roomsList?.find((r: any) => r.id === roomId)?.buildingId
     const electricRow = roomBuildingId && electricBillingMode === "building_total"
       ? buildingUtilityBills.find(b => b.buildingId === roomBuildingId && b.utilityType === "electric")
       : undefined
@@ -1772,14 +1793,14 @@ function UnifiedBillingContent() {
       alert(t("manage_bills.err_no_permission_pdf"))
       return
     }
-    setDownloadingPdfId(item.roomNumber)
+    setDownloadingPdfId(item.roomId)
     try {
       const { generateBillPdf } = await import("@/lib/pdfHelper")
       const elecUnitsUsed = item.elecCurr !== "" ? (Number(item.elecCurr) >= Number(item.elecPrev) ? Number(item.elecCurr) - Number(item.elecPrev) : (10000 - Number(item.elecPrev)) + Number(item.elecCurr)) : 0
       const waterUnitsUsed = item.waterCurr !== "" ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
 
       const blob = await generateBillPdf({
-        roomNumber: item.roomNumber,
+        roomNumber: roomLabelOf(item),
         tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
         billingCycle: formatBillingCycle(billingCycle, locale),
         baseRent: item.baseRent,
@@ -1795,12 +1816,12 @@ function UnifiedBillingContent() {
         amount: item.billAmount || (() => {
           const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
           const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
-          const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+          const roomInfo = roomsList?.find((r: any) => r.id === item.roomId)
           const extraExpenses = roomInfo?.extraExpenses || []
           const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
           return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + extraExpensesSum
         })(),
-        extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
+        extraExpenses: roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || [],
         waiveElectricMin: item.waiveElectricMin,
         waiveWaterMin: item.waiveWaterMin,
         promptPayId,
@@ -1814,22 +1835,22 @@ function UnifiedBillingContent() {
         latePenaltyRate: latePenaltyRate,
         otherServiceAmount: item.otherServiceAmount || 0,
         vatAmount: item.vatAmount || 0,
-        invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
+        invoiceId: item.invoiceId || buildInvoiceId(billingCycle, item.roomNumber, findRoomRow(item.roomId)?.buildingCode),
         elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
         elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
         waterPrev: item.waterPrev === "" ? null : Number(item.waterPrev),
         waterCurr: item.waterCurr === "" ? null : Number(item.waterCurr),
         billingCycleRaw: billingCycle,
-        ...getBuildingTotalsForRoom(item.roomNumber)
+        ...getBuildingTotalsForRoom(item.roomId)
       })
 
       const link = document.createElement("a")
       link.href = URL.createObjectURL(blob)
-      link.download = `bill_room${item.roomNumber}_${billingCycle}.pdf`
+      link.download = `bill_room${pdfFileSafeRoom(item)}_${billingCycle}.pdf`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      showToast(t("manage_bills.downloaded_pdf").replace("{room}", item.roomNumber))
+      showToast(t("manage_bills.downloaded_pdf").replace("{room}", roomLabelOf(item)))
     } catch (e) {
       console.error(e)
       alert(t("manage_bills.err_pdf_generate"))
@@ -1866,7 +1887,7 @@ function UnifiedBillingContent() {
         const waterUnitsUsed = item.waterCurr !== "" ? (Number(item.waterCurr) >= Number(item.waterPrev) ? Number(item.waterCurr) - Number(item.waterPrev) : (10000 - Number(item.waterPrev)) + Number(item.waterCurr)) : 0
 
         const blob = await generateBillPdf({
-          roomNumber: item.roomNumber,
+          roomNumber: roomLabelOf(item),
           tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
           billingCycle: formatBillingCycle(billingCycle, locale),
           baseRent: item.baseRent,
@@ -1882,12 +1903,12 @@ function UnifiedBillingContent() {
           amount: item.billAmount || (() => {
             const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
             const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
-            const roomInfo = roomsList?.find((r: any) => r.roomNumber === item.roomNumber)
+            const roomInfo = roomsList?.find((r: any) => r.id === item.roomId)
             const extraExpenses = roomInfo?.extraExpenses || []
             const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
             return item.baseRent + elecCost + waterCost + commonFee + (item.otherServiceAmount || 0) + extraExpensesSum
           })(),
-          extraExpenses: roomsList?.find((r: any) => r.roomNumber === item.roomNumber)?.extraExpenses || [],
+          extraExpenses: roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || [],
           waiveElectricMin: item.waiveElectricMin,
           waiveWaterMin: item.waiveWaterMin,
           promptPayId,
@@ -1901,16 +1922,16 @@ function UnifiedBillingContent() {
           latePenaltyRate: latePenaltyRate,
           otherServiceAmount: item.otherServiceAmount || 0,
           vatAmount: item.vatAmount || 0,
-          invoiceId: item.invoiceId || `INV-${billingCycle.replace('-', '')}-${item.roomNumber}`,
+          invoiceId: item.invoiceId || buildInvoiceId(billingCycle, item.roomNumber, findRoomRow(item.roomId)?.buildingCode),
           elecPrev: item.elecPrev === "" ? null : Number(item.elecPrev),
           elecCurr: item.elecCurr === "" ? null : Number(item.elecCurr),
           waterPrev: item.waterPrev === "" ? null : Number(item.waterPrev),
           waterCurr: item.waterCurr === "" ? null : Number(item.waterCurr),
           billingCycleRaw: billingCycle,
-          ...getBuildingTotalsForRoom(item.roomNumber)
+          ...getBuildingTotalsForRoom(item.roomId)
         })
 
-        const fileName = `bill_room${item.roomNumber}_${billingCycle}.pdf`
+        const fileName = `bill_room${pdfFileSafeRoom(item)}_${billingCycle}.pdf`
         zip.file(fileName, blob)
         addedCount++
       }
@@ -1944,7 +1965,11 @@ function UnifiedBillingContent() {
     e.preventDefault()
     
     let targetTenant = ""
-    const room = roomsList.find(r => r.roomNumber === newRoomNumber)
+    const room = roomsList.find(r => r.id === newRoomId)
+    if (!room) {
+      alert(t("manage_bills.err_no_tenant_or_expired"))
+      return
+    }
     if (room) {
       const sortedTenants = [...(room.allTenants || [])].sort((a: any, b: any) => {
         const aTime = a.leaseStart ? new Date(a.leaseStart).getTime() : 0
@@ -1966,7 +1991,7 @@ function UnifiedBillingContent() {
     }
 
     const res = await createBill(
-      newRoomNumber,
+      { roomId: newRoomId },
       targetTenant,
       computedTotal,
       "unpaid",
@@ -1976,9 +2001,9 @@ function UnifiedBillingContent() {
       otherServiceAmountManual
     )
     if (res.success) {
-      showToast(t("manage_bills.created_manual_bill").replace("{room}", newRoomNumber))
+      showToast(t("manage_bills.created_manual_bill").replace("{room}", room.roomNumber))
       const formatted = formatDbBillToCamelCase(res.data)
-      updateLocalStateAndCache(newRoomNumber, undefined, formatted)
+      updateLocalStateAndCache(asRoomId(newRoomId), undefined, formatted)
     } else {
       alert(res.error || t("manage_bills.err_bill_create_failed"))
       return
@@ -1988,13 +2013,32 @@ function UnifiedBillingContent() {
   }
 
   // รายการห้องที่กรองตามอาคารที่เลือก (ใช้แสดงผลในตารางเท่านั้น สถิติด้านบนยังคงนับรวมทั้งหมดของหอ)
+  // เลขห้องที่ซ้ำกันในหอนี้ — คำนวณจาก unifiedItems ทั้งก้อน ไม่ใช่ชุดที่กรองแล้ว เพื่อให้ป้ายกำกับ
+  // อาคารไม่หาย/ไม่โผล่สลับไปมาเวลาผู้ใช้เปลี่ยนตัวกรองอาคาร (ซึ่งจะทำให้สับสนกว่าเดิม)
+  const duplicatedRoomNumbers = useMemo(() => findDuplicateRoomNumbers(unifiedItems), [unifiedItems])
+
+  /** หาแถวห้องจาก rooms.id — ใช้ดึงรหัสอาคารไปประกอบป้ายกำกับเลขห้องและเลขใบกำกับ */
+  const findRoomRow = (roomId: string): { code?: string | null; name?: string | null; buildingCode?: string | null } | undefined =>
+    roomsList?.find((r: { id: string }) => r.id === roomId)
+
+  // ข้อความเลขห้องที่แสดง — เติมรหัสอาคารต่อท้ายเฉพาะเลขห้องที่ซ้ำกัน
+  // (หอที่ไม่มีเลขห้องซ้ำกันเลยจะได้ข้อความเหมือนเดิมทุกแถว)
+  const roomLabelOf = (item: { roomId: RoomId; roomNumber: string }): string => {
+    const row = findRoomRow(item.roomId)
+    return formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, { code: row?.buildingCode, name: row?.name })
+  }
+
+  // ชื่อไฟล์ PDF — ต้องแยกกันด้วยเมื่อเลขห้องซ้ำ ไม่งั้นดาวน์โหลดทั้งอาคารเป็น zip แล้วไฟล์ทับกันหายไปใบหนึ่ง
+  const pdfFileSafeRoom = (item: { roomId: RoomId; roomNumber: string }): string =>
+    roomLabelOf(item).replace(/[^\p{L}\p{N}_-]+/gu, "")
+
   const filteredUnifiedItems = buildingFilter === "all"
     ? unifiedItems
     : unifiedItems.filter(item => item.buildingId === buildingFilter)
 
   // ชั้นที่มีอยู่จริงในอาคารที่เลือก (คิดจาก rooms.floor หรือเดาจากเลขห้องด้วย logic เดียวกับหน้าผู้เช่า)
   const availableFloors = useMemo(
-    () => sortFloors([...new Set(filteredUnifiedItems.map(item => getRoomFloor(item.roomNumber, roomsList)))]),
+    () => sortFloors([...new Set(filteredUnifiedItems.map(item => getRoomFloor(item, roomsList)))]),
     [filteredUnifiedItems, roomsList]
   )
 
@@ -2016,7 +2060,7 @@ function UnifiedBillingContent() {
   const meterTabItems = useMemo(
     () => effectiveMeterFloor === "all"
       ? filteredUnifiedItems
-      : filteredUnifiedItems.filter(item => getRoomFloor(item.roomNumber, roomsList) === effectiveMeterFloor),
+      : filteredUnifiedItems.filter(item => getRoomFloor(item, roomsList) === effectiveMeterFloor),
     [filteredUnifiedItems, roomsList, effectiveMeterFloor]
   )
 
@@ -2279,8 +2323,8 @@ function UnifiedBillingContent() {
                     const simplifiedTotal = item.baseRent + elecCost + waterCost + commonFee
 
                     return (
-                      <tr key={item.roomNumber} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
-                        <td className={`py-4 xl:py-5 2xl:py-6 pl-3 xl:pl-4 2xl:pl-5 font-black text-sm sm:text-base xl:text-lg 2xl:text-xl ${isDark ? "text-slate-100" : "text-slate-800"}`}>{item.roomNumber}</td>
+                      <tr key={item.roomId} className={`transition-colors ${isDark ? "hover:bg-slate-900/15" : "hover:bg-slate-50/80"}`}>
+                        <td className={`py-4 xl:py-5 2xl:py-6 pl-3 xl:pl-4 2xl:pl-5 font-black text-sm sm:text-base xl:text-lg 2xl:text-xl ${isDark ? "text-slate-100" : "text-slate-800"}`}>{roomLabelOf(item)}</td>
                         
                         {/* สถานะห้อง */}
                         <td className="py-4 xl:py-5 2xl:py-6 text-center">
@@ -2390,7 +2434,7 @@ function UnifiedBillingContent() {
                 const simplifiedTotal = item.baseRent + elecCost + waterCost + commonFee
 
                 return (
-                  <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-3 shadow-sm ${
+                  <div key={item.roomId} className={`p-4 rounded-2xl border space-y-3 shadow-sm ${
                     isDark ? "bg-slate-950/35 border-slate-900/60" : "bg-white border-slate-200"
                   }`}>
                     <div className="flex justify-between items-start">
@@ -2398,7 +2442,7 @@ function UnifiedBillingContent() {
                         <span className={`text-base font-black px-3 py-1 rounded-xl border ${
                           isDark ? "text-slate-100 bg-slate-900 border-slate-800" : "text-slate-800 bg-slate-100 border-slate-200"
                         }`}>
-                          {item.roomNumber}
+                          {roomLabelOf(item)}
                         </span>
                         {item.status === "occupied" ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -2522,8 +2566,8 @@ function UnifiedBillingContent() {
         isDark={isDark}
         createBillModalOpen={createBillModalOpen}
         roomsList={roomsList}
-        newRoomNumber={newRoomNumber}
-        setNewRoomNumber={setNewRoomNumber}
+        newRoomId={newRoomId}
+        setNewRoomId={setNewRoomId}
         billingCycle={billingCycle}
         elecUnitsManual={elecUnitsManual}
         setElecUnitsManual={setElecUnitsManual}

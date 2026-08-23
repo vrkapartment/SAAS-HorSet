@@ -6,8 +6,12 @@ interface CreateBillModalProps {
   isDark: boolean
   createBillModalOpen: boolean
   roomsList: any[]
-  newRoomNumber: string
-  setNewRoomNumber: (val: string) => void
+  /**
+   * rooms.id ของห้องที่เลือก ไม่ใช่เลขห้อง — หอที่มีหลายอาคารใช้เลขห้องซ้ำกันได้
+   * ถ้าใช้เลขห้องเป็นค่าของ dropdown จะเลือกไม่ได้ว่าหมายถึงห้อง 101 ของตึกไหน
+   */
+  newRoomId: string
+  setNewRoomId: (val: string) => void
   billingCycle: string
   elecUnitsManual: number
   setElecUnitsManual: (val: number) => void
@@ -35,8 +39,8 @@ export default function CreateBillModal({
   isDark,
   createBillModalOpen,
   roomsList,
-  newRoomNumber,
-  setNewRoomNumber,
+  newRoomId,
+  setNewRoomId,
   billingCycle,
   elecUnitsManual,
   setElecUnitsManual,
@@ -90,11 +94,11 @@ export default function CreateBillModal({
                 className={`w-full h-11 md:h-10 px-3 border rounded-xl focus:outline-none focus:border-blue-500 text-sm md:text-xs font-semibold cursor-pointer ${
                   isDark ? "bg-slate-950 text-slate-100 border-slate-800" : "bg-white text-slate-800 border-slate-300"
                 }`}
-                value={newRoomNumber}
-                onChange={(e) => setNewRoomNumber(e.target.value)}
+                value={newRoomId}
+                onChange={(e) => setNewRoomId(e.target.value)}
               >
                 {roomsList.map(r => (
-                  <option key={r.roomNumber} value={r.roomNumber} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{t("billing.room_label").replace("{roomNumber}", r.roomNumber)}</option>
+                  <option key={r.id} value={r.id} className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}>{t("billing.room_label").replace("{roomNumber}", r.roomNumber)}</option>
                 ))}
               </select>
             </div>

@@ -139,6 +139,9 @@ export async function getRooms(workspaceId?: string) {
           lease_start,
           lease_end,
           deposit_paid
+        ),
+        buildings (
+          code
         )
       `)
 
@@ -166,6 +169,8 @@ export async function getRooms(workspaceId?: string) {
         leaseEnd: tenant ? tenant.lease_end : null,
         depositPaid: tenant && tenant.deposit_paid !== null && tenant.deposit_paid !== undefined ? Number(tenant.deposit_paid) : null,
         buildingId: room.building_id || null,
+        // รหัสอาคาร ใช้กำกับเลขห้องที่ซ้ำกันข้ามอาคาร และประกอบเลขใบกำกับฝั่ง client
+        buildingCode: room.buildings?.code ?? null,
         roomTypeId: room.room_type_id,
         roomTypeName: room.room_types ? room.room_types.name : "ไม่ได้ระบุ",
         waiveElectricMin: !!room.waive_electric_min,

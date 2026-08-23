@@ -83,14 +83,36 @@ begin
 end $$;
 
 -- bills: invoice_id เลิกเป็น conflict key เหลือเป็นเลขอ้างอิงที่พิมพ์บนบิลเท่านั้น
+--
+-- bill_kind แยก "บิลปกติ" ออกจาก "บิลปิดรอบตอนย้ายห้อง" เพราะห้องเดียวกันในรอบเดียวกัน
+-- มีทั้งสองใบได้จริง: ผู้เช่าเก่าย้ายออกกลางเดือน (ได้บิลปิดรอบแบบ prorate จาก transferTenantRoom)
+-- แล้วผู้เช่าใหม่ย้ายเข้าห้องเดิมในเดือนนั้น (ได้บิลปกติ)
+--
+-- ถ้าไม่แยก บิลปิดรอบจะถูกบิลปกติ upsert ทับทั้งแถว — ทั้งยอด prorate ทั้งชื่อผู้เช่าเก่าหายไป
+-- เงียบ ๆ ซึ่งเป็นหลักฐานการเรียกเก็บเงินที่ผู้เช่าเก่าถืออยู่ในมือ
+--
+-- หมายเหตุ: เดิมสองใบนี้อยู่ร่วมกันได้เพราะ invoice_id ต่างกัน (ลงท้าย -TRANSFER) แต่การเช็ค
+-- บิลเดิมใน createBill ใช้ maybeSingle() ซึ่งเจอ 2 แถวแล้ว error ทันที — เป็น bug ที่มีอยู่ก่อน
+-- patch นี้ และแก้ไปพร้อมกันด้วยการให้ฝั่งโค้ดกรอง bill_kind = 'regular'
+alter table public.bills
+  add column if not exists bill_kind text not null default 'regular';
+
+update public.bills
+set bill_kind = 'transfer_closing'
+where bill_kind = 'regular'
+  and invoice_id like '%-TRANSFER';
+
+comment on column public.bills.bill_kind is 'ชนิดบิล: regular = บิลรอบปกติ, transfer_closing = บิลปิดรอบตอนย้ายห้อง (มีร่วมกันได้ในห้อง+รอบเดียวกัน)';
+
 alter table public.bills
   drop constraint if exists bills_workspace_id_invoice_id_key;
 
 do $$
 begin
-  if not exists (select 1 from pg_constraint where conname = 'bills_workspace_room_id_cycle_key') then
+  if not exists (select 1 from pg_constraint where conname = 'bills_workspace_room_id_cycle_kind_key') then
     alter table public.bills
-      add constraint bills_workspace_room_id_cycle_key unique (workspace_id, room_id, billing_cycle);
+      add constraint bills_workspace_room_id_cycle_kind_key
+      unique (workspace_id, room_id, billing_cycle, bill_kind);
   end if;
 end $$;
 
@@ -186,7 +208,7 @@ end $$;
 --   select conname from pg_constraint where conname in (
 --     'buildings_workspace_id_code_key',
 --     'meter_records_workspace_room_id_cycle_key',
---     'bills_workspace_room_id_cycle_key',
+--     'bills_workspace_room_id_cycle_kind_key',
 --     'meter_replacements_workspace_room_id_cycle_type_key',
 --     'rooms_workspace_building_room_number_key'
 --   );

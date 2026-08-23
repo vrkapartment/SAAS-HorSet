@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import type { RoomRef } from "@/features/room/utils"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
 import { calculateLateDays } from "@/features/billing/utils"
@@ -64,7 +65,7 @@ export async function getTenants(workspaceId?: string) {
 }
 
 export async function createTenant(
-  roomNumber: string,
+  room: RoomRef,
   fullName: string,
   phone: string,
   lineUserId: string | null,
@@ -82,16 +83,18 @@ export async function createTenant(
 
     const supabase = await createClient()
 
-    // 1. ค้นหา roomId จาก roomNumber (พร้อมข้อมูลค่าเช่า/ประเภทห้องสำหรับคำนวณเงินประกันตั้งต้น)
-    const { data: room, error: roomError } = await supabase
+    // 1. อ่านข้อมูลห้องจาก rooms.id ที่ส่งมา (ค่าเช่า/ประเภทห้องใช้คำนวณเงินประกันตั้งต้น)
+    //    ห้ามหาห้องจากเลขห้อง — เลขห้องซ้ำกันได้ข้ามอาคาร ผู้เช่าจะไปผูกกับห้องผิดอาคาร
+    const { data: roomRow, error: roomError } = await supabase
       .from("rooms")
-      .select("id, base_rent, room_types(deposit_amount)")
-      .eq("room_number", roomNumber)
+      .select("id, room_number, base_rent, room_types(deposit_amount)")
+      .eq("id", room.roomId)
       .single()
 
-    if (roomError || !room) {
-      throw new Error(`ไม่พบห้องหมายเลข ${roomNumber} ในระบบ กรุณาตรวจสอบหรือสร้างห้องพักก่อนทำสัญญา`)
+    if (roomError || !roomRow) {
+      throw new Error("ไม่พบข้อมูลห้องพักนี้ในระบบ กรุณาตรวจสอบหรือสร้างห้องพักก่อนทำสัญญา")
     }
+    const roomNumber: string = roomRow.room_number
 
     // 1.5 คำนวณยอดเงินประกันตั้งต้น (ground truth) จากการตั้งค่า workspace/room_type ปัจจุบัน
     //     เพื่อให้ deposit_paid มีค่าเสมอตั้งแต่สร้างสัญญา ไม่ต้องรอ backfill
@@ -99,9 +102,9 @@ export async function createTenant(
     if (workspaceId) {
       const financeRes = await getFinanceSettings(workspaceId)
       if (financeRes.success && financeRes.data) {
-        const roomTypeDeposit = (room.room_types as any)?.deposit_amount
+        const roomTypeDeposit = (roomRow.room_types as { deposit_amount?: number | null } | null)?.deposit_amount
         depositPaid = computeStandardDeposit(
-          Number(room.base_rent || 0),
+          Number(roomRow.base_rent || 0),
           financeRes.data.deposit_type,
           Number(financeRes.data.deposit_amount || 0),
           roomTypeDeposit !== null && roomTypeDeposit !== undefined ? Number(roomTypeDeposit) : null
@@ -113,7 +116,7 @@ export async function createTenant(
     const { data: tenant, error: tenantError } = await supabase
       .from("tenants")
       .insert([{
-        room_id: room.id,
+        room_id: roomRow.id,
         tenant_name: fullName,
         tenant_phone: phone,
         line_user_id: lineUserId || null,
@@ -129,7 +132,7 @@ export async function createTenant(
     const { error: roomUpdateError } = await supabase
       .from("rooms")
       .update({ status: "occupied" })
-      .eq("id", room.id)
+      .eq("id", roomRow.id)
 
     if (roomUpdateError) throw roomUpdateError
 
@@ -195,18 +198,13 @@ export async function deleteTenant(id: string, roomNumber: string) {
 
     if (deleteError) throw deleteError
 
-    // 4. ค้นหาห้องและตั้งค่าเป็นว่าง (available)
-    const { data: room } = await supabase
-      .from("rooms")
-      .select("id")
-      .eq("room_number", roomNumber)
-      .single()
-
-    if (room) {
+    // 4. ตั้งห้องของผู้เช่ารายนี้เป็นว่าง (available)
+    //    ใช้ tenant.room_id ที่อ่านมาแล้ว ไม่หาห้องจากเลขห้องซ้ำ — ไม่งั้นอาจไปปล่อยห้องของอีกอาคาร
+    if (tenant?.room_id) {
       await supabase
         .from("rooms")
         .update({ status: "available" })
-        .eq("id", room.id)
+        .eq("id", tenant.room_id)
     }
 
     return { success: true }
@@ -387,7 +385,7 @@ export async function deleteOldTenant(id: string) {
 
 export async function updateTenant(
   id: string,
-  roomNumber: string,
+  room: RoomRef,
   fullName: string,
   phone: string,
   lineUserId: string | null,
@@ -412,16 +410,17 @@ export async function updateTenant(
       throw new Error("ไม่พบข้อมูลผู้เช่าที่ต้องการแก้ไข")
     }
 
-    // 2. ค้นหา roomId ใหม่จาก roomNumber
+    // 2. ตรวจว่าห้องที่ระบุมามีจริง (จับด้วย rooms.id ไม่ใช่เลขห้องที่ซ้ำกันได้ข้ามอาคาร)
     const { data: newRoom, error: roomError } = await supabase
       .from("rooms")
-      .select("id")
-      .eq("room_number", roomNumber)
+      .select("id, room_number")
+      .eq("id", room.roomId)
       .single()
 
     if (roomError || !newRoom) {
-      throw new Error(`ไม่พบห้องหมายเลข ${roomNumber} ในระบบ`)
+      throw new Error("ไม่พบข้อมูลห้องพักนี้ในระบบ")
     }
+    const roomNumber: string = newRoom.room_number
 
     // 3. อัปเดตข้อมูลผู้เช่า
     const { data: updatedTenant, error: tenantError } = await supabase
@@ -590,15 +589,17 @@ export async function getTenantPortalData() {
       }
     }
 
-    // 4. Get bills for this room number
+    // 4. Get bills for this room
+    //    จับด้วย room_id เท่านั้น — ถ้าเทียบด้วยเลขห้อง ผู้เช่าจะเห็นบิลของห้องเลขเดียวกันในอาคารอื่นด้วย
     const roomNumber = tenant.rooms?.room_number
+    const tenantRoomId: string | null = tenant.room_id ?? null
     let formattedBills: any[] = []
 
-    if (roomNumber) {
+    if (tenantRoomId) {
       const { data: bills, error: billsError } = await supabase
         .from("bills")
         .select("*")
-        .eq("room_number", roomNumber)
+        .eq("room_id", tenantRoomId)
         .eq("workspace_id", tenant.workspace_id)
         .order("billing_cycle", { ascending: false })
 
@@ -636,12 +637,12 @@ export async function getTenantPortalData() {
         // เพื่อเอาไปโชว์ "เลขมิเตอร์เดือนก่อนหน้า - เลขมิเตอร์เดือนที่วางบิล" ในหน้าบิลของผู้เช่า
         const billingCyclesForMeters = Array.from(new Set(filteredBills.map((b: any) => b.billing_cycle)))
         const meterByCycle = new Map<string, { elecPrev: number; elecCurr: number | null; waterPrev: number; waterCurr: number | null }>()
-        if (roomNumber && billingCyclesForMeters.length > 0) {
+        if (tenantRoomId && billingCyclesForMeters.length > 0) {
           const { data: meterRows } = await supabase
             .from("meter_records")
             .select("billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
             .eq("workspace_id", tenant.workspace_id)
-            .eq("room_number", roomNumber)
+            .eq("room_id", tenantRoomId)
             .in("billing_cycle", billingCyclesForMeters)
 
           meterRows?.forEach((m: any) => {
@@ -768,17 +769,31 @@ function getSignatureSecret() {
   return process.env.PORTAL_SIGNATURE_SECRET || process.env.LINE_CHANNEL_SECRET || "horset-portal-signature-secret-key-fallback"
 }
 
-export async function generatePortalToken(workspaceId: string, roomNumber: string): Promise<string> {
+/**
+ * ตัวระบุห้องในลิงก์ดูบิลแบบไม่ล็อกอิน
+ *
+ * `roomId` = รูปแบบปัจจุบัน (rooms.id) — ใช้กับลิงก์ที่ออกใหม่ทุกใบ
+ * `roomNumber` = รูปแบบเก่าที่เคยส่งไปใน LINE ก่อนหน้านี้ ยังรับไว้เพื่อไม่ให้ผู้เช่ากดลิงก์
+ * เดือนก่อนแล้วเปิดไม่ได้ — แต่เปิดได้เฉพาะเมื่อเลขห้องนั้นไม่กำกวมในหอ (ดู resolvePortalRoom)
+ */
+export type PortalRoomRef = { roomId: string } | { roomNumber: string }
+
+/** คีย์ที่ใช้เซ็น token — roomId สำหรับลิงก์ใหม่, roomNumber สำหรับลิงก์เก่า */
+function portalRoomKey(room: PortalRoomRef): string {
+  return "roomId" in room ? room.roomId : room.roomNumber
+}
+
+export async function generatePortalToken(workspaceId: string, roomKey: string): Promise<string> {
   const secret = getSignatureSecret()
   return crypto
     .createHmac("sha256", secret)
-    .update(`${workspaceId}:${roomNumber}`)
+    .update(`${workspaceId}:${roomKey}`)
     .digest("hex")
 }
 
-export async function verifyPortalToken(workspaceId: string, roomNumber: string, token: string): Promise<boolean> {
+export async function verifyPortalToken(workspaceId: string, roomKey: string, token: string): Promise<boolean> {
   if (!token) return false
-  const expectedToken = await generatePortalToken(workspaceId, roomNumber)
+  const expectedToken = await generatePortalToken(workspaceId, roomKey)
   try {
     return crypto.timingSafeEqual(Buffer.from(token, "utf-8"), Buffer.from(expectedToken, "utf-8"))
   } catch {
@@ -786,11 +801,17 @@ export async function verifyPortalToken(workspaceId: string, roomNumber: string,
   }
 }
 
-export async function generateSecurePortalLinkAction(workspaceId: string, roomNumber: string) {
+/**
+ * สร้างลิงก์ดูบิลแบบไม่ต้องล็อกอิน
+ *
+ * ⚠️ ต้องส่ง rooms.id เข้ามา ไม่ใช่เลขห้อง — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าใช้เลขห้องเป็นตัวระบุ
+ * ผู้เช่าห้อง 101 ตึก A จะเปิดลิงก์แล้วเห็นบิลของห้อง 101 ตึก B (หรือกลับกัน) แบบสุ่ม
+ */
+export async function generateSecurePortalLinkAction(workspaceId: string, roomId: string) {
   try {
-    const token = await generatePortalToken(workspaceId, roomNumber)
+    const token = await generatePortalToken(workspaceId, roomId)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ""
-    const link = `${appUrl}/portal?workspace_id=${workspaceId}&room_number=${encodeURIComponent(roomNumber)}&token=${token}`
+    const link = `${appUrl}/portal?workspace_id=${workspaceId}&room_id=${encodeURIComponent(roomId)}&token=${token}`
     return { success: true, link }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -798,15 +819,17 @@ export async function generateSecurePortalLinkAction(workspaceId: string, roomNu
 }
 
 /**
- * ดึงข้อมูลบิลและค่าใช้จ่ายแบบไม่ต้อง Login โดยอาศัยรหัสความปลอดภัยร่วมกัน (workspaceId + roomNumber + token เพื่อความปลอดภัย)
+ * ดึงข้อมูลบิลและค่าใช้จ่ายแบบไม่ต้อง Login โดยอาศัยรหัสความปลอดภัยร่วมกัน (workspaceId + ตัวระบุห้อง + token เพื่อความปลอดภัย)
+ *
+ * รับตัวระบุห้องได้ 2 รูปแบบ (ดู PortalRoomRef) — ลิงก์ใหม่ใช้ roomId, ลิงก์เก่าที่ยังค้างใน LINE ใช้ roomNumber
  */
-export async function getTenantPortalDataNoLoginAction(workspaceId: string, roomNumber: string, token?: string) {
+export async function getTenantPortalDataNoLoginAction(workspaceId: string, room: PortalRoomRef, token?: string) {
   try {
     if (!token) {
       return { success: false, error: "กรุณาระบุรหัสความปลอดภัยในการเข้าถึงข้อมูล (Missing signature token)" }
     }
 
-    const isValid = await verifyPortalToken(workspaceId, roomNumber, token)
+    const isValid = await verifyPortalToken(workspaceId, portalRoomKey(room), token)
     if (!isValid) {
       return { success: false, error: "ลิงก์ดูข้อมูลบิลไม่ถูกต้องหรือไม่ได้รับอนุญาต (Invalid signature token)" }
     }
@@ -827,22 +850,45 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
     })
 
     // 1. ค้นหาข้อมูลห้องพัก
-    const { data: room, error: roomError } = await supabase
-      .from("rooms")
-      .select("id, base_rent, building_id, waive_electric_min, waive_water_min, extra_expenses, room_types(default_rent)")
-      .eq("workspace_id", workspaceId)
-      .eq("room_number", roomNumber)
-      .maybeSingle()
+    //
+    // ลิงก์รูปแบบเก่าเทียบด้วยเลขห้อง ซึ่งกำกวมได้เมื่อหอมีหลายอาคารใช้เลขห้องซ้ำกัน —
+    // ในกรณีนั้นต้องปฏิเสธ ไม่ใช่หยิบห้องแรกที่เจอ (ไม่งั้นผู้เช่าจะเห็นบิลของคนอื่น)
+    // ผู้เช่าใช้ลิงก์รอบบิลล่าสุดที่ระบบส่งให้ทาง LINE ได้เสมอ ลิงก์นั้นใช้ roomId แล้ว
+    const roomSelect = "id, room_number, base_rent, building_id, waive_electric_min, waive_water_min, extra_expenses, room_types(default_rent)"
+    let roomRow: any = null
+    if ("roomId" in room) {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select(roomSelect)
+        .eq("workspace_id", workspaceId)
+        .eq("id", room.roomId)
+        .maybeSingle()
+      if (error) return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
+      roomRow = data
+    } else {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select(roomSelect)
+        .eq("workspace_id", workspaceId)
+        .eq("room_number", room.roomNumber)
+      if (error) return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
+      if (data && data.length > 1) {
+        return { success: false, error: "ลิงก์นี้เป็นรูปแบบเดิมและใช้ไม่ได้แล้วเนื่องจากหอพักมีห้องเลขนี้มากกว่าหนึ่งอาคาร กรุณาใช้ลิงก์จากใบแจ้งหนี้รอบล่าสุด" }
+      }
+      roomRow = data && data.length === 1 ? data[0] : null
+    }
 
-    if (roomError || !room) {
+    if (!roomRow) {
       return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
     }
+    const roomId: string = roomRow.id
+    const roomNumber: string = roomRow.room_number
 
     // 2. ค้นหาข้อมูลผู้เช่าของห้องนี้ (ดึงสัญญาล่าสุดของห้องนี้เพื่อป้องกันข้อผิดพลาดกรณีมีประวัติสัญญาเช่าหลายใบ)
     const { data: tenantsList, error: tenantError } = await supabase
       .from("tenants")
       .select("*")
-      .eq("room_id", room.id)
+      .eq("room_id", roomId)
       .eq("workspace_id", workspaceId)
       .order("lease_start", { ascending: false })
 
@@ -896,11 +942,12 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       if (ws.water_billing_mode === "building_total") waterBillingMode = "building_total"
     }
 
-    // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้
+    // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้ — จับด้วย room_id เท่านั้น
+    // (เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้องผู้เช่าจะเห็นบิลของห้องเลขเดียวกันในตึกอื่นด้วย)
     const { data: bills, error: billsError } = await supabase
       .from("bills")
       .select("*")
-      .eq("room_number", roomNumber)
+      .eq("room_id", roomId)
       .eq("workspace_id", workspaceId)
       .order("billing_cycle", { ascending: false })
 
@@ -937,7 +984,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
           .from("meter_records")
           .select("billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
           .eq("workspace_id", workspaceId)
-          .eq("room_number", roomNumber)
+          .eq("room_id", roomId)
           .in("billing_cycle", billingCyclesForMeters)
 
         meterRows?.forEach((m: any) => {
@@ -953,7 +1000,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       // ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของทุกรอบบิลที่จะแสดง
       // ใช้ building_id ที่ snapshot ไว้ ณ ตอนออกบิล (bills.building_id) ไม่ใช่ building_id ปัจจุบันของห้อง
       // เพราะห้องอาจถูกย้ายไปอาคารอื่นภายหลัง บิลเก่าต้องอ้างอิงอาคารที่ถูกต้อง ณ ตอนออกบิลเสมอ
-      const currentRoomBuildingId = (room as any).building_id ?? null
+      const currentRoomBuildingId = roomRow.building_id ?? null
       const buildingIdsForUtility = Array.from(new Set(
         filteredBills.map((b: any) => b.building_id ?? currentRoomBuildingId).filter(Boolean)
       ))
@@ -1019,7 +1066,7 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       })
     }
 
-    const baseRent = room.room_types ? Number((room.room_types as any).default_rent) : Number(room.base_rent)
+    const baseRent = roomRow.room_types ? Number(roomRow.room_types.default_rent) : Number(roomRow.base_rent)
 
     return {
       success: true,
@@ -1027,9 +1074,9 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
         roomNumber,
         tenantName: tenant ? tenant.tenant_name : "ผู้เช่า",
         baseRent,
-        waiveElectricMin: room.waive_electric_min,
-        waiveWaterMin: room.waive_water_min,
-        extraExpenses: room.extra_expenses || [],
+        waiveElectricMin: roomRow.waive_electric_min,
+        waiveWaterMin: roomRow.waive_water_min,
+        extraExpenses: roomRow.extra_expenses || [],
         bills: formattedBills,
         electricBillingMode,
         waterBillingMode,

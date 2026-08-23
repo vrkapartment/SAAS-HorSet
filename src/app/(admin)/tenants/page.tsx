@@ -718,9 +718,10 @@ export default function TenantsPage() {
     setEditSubmitting(true)
     setEditFormError(null)
     try {
+      // ฟอร์มนี้ไม่ให้ย้ายห้อง (ช่องเลขห้องแสดงผลอย่างเดียว) จึงส่งห้องเดิมของผู้เช่ากลับไปตรง ๆ
       const res = await updateTenant(
         selectedTenant.id,
-        editRoomNumber.trim(),
+        { roomId: selectedTenant.roomId ?? "" },
         editFullName.trim(),
         editPhone.trim(),
         editLineUserId.trim() || null,
@@ -862,13 +863,13 @@ export default function TenantsPage() {
 
   // logic การหาชั้นย้ายไปไว้ที่ src/features/room/utils.ts แล้ว เพราะหน้าจดมิเตอร์ต้องใช้ตัวเดียวกัน
   // (ถ้าแยกกันคนละชุด ชั้นที่แสดงสองหน้าจะไม่ตรงกันแล้วสตาฟจะจดข้ามชั้น)
-  const getRoomFloor = (roomNum: string) => getRoomFloorShared(roomNum, rooms)
+  const getRoomFloor = (t: { roomId?: string | null; roomNumber: string }) => getRoomFloorShared(t, rooms)
 
   // Group filteredCurrent by floor for Grid View
   const currentByFloor = (() => {
     const grouped: { [key: string]: TenantItem[] } = {}
     filteredCurrent.forEach((t) => {
-      const floor = getRoomFloor(t.roomNumber)
+      const floor = getRoomFloor(t)
       if (!grouped[floor]) {
         grouped[floor] = []
       }
@@ -884,7 +885,7 @@ export default function TenantsPage() {
   const oldByFloor = (() => {
     const grouped: { [key: string]: OldTenantItem[] } = {}
     filteredOld.forEach((t) => {
-      const floor = getRoomFloor(t.roomNumber)
+      const floor = getRoomFloor(t)
       if (!grouped[floor]) {
         grouped[floor] = []
       }
@@ -2147,10 +2148,11 @@ export default function TenantsPage() {
         </div>
       )}
       {/* Room Transfer Modal */}
-      {transferModalOpen && transferTenant && (
+      {transferModalOpen && transferTenant && transferTenant.roomId && (
         <RoomTransferModal
           tenant={{
             id: transferTenant.id,
+            roomId: transferTenant.roomId,
             roomNumber: transferTenant.roomNumber,
             fullName: transferTenant.fullName,
             depositPaid: transferTenant.depositPaid

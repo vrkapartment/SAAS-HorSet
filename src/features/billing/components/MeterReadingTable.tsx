@@ -4,13 +4,51 @@ import { DynamicText } from "@/lib/translations/DynamicText"
 import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, AlertTriangle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
+import { findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { saveMeterReplacement, deleteMeterReplacement } from "@/features/meter/actions"
 import { useIsDesktop } from "@/hooks/useIsDesktop"
+
+/**
+ * รูปร่างของแถวที่ตารางนี้ต้องใช้ — ทั้ง /billing และ /manage-bills ส่ง UnifiedRoomBillingItem ของตัวเองเข้ามา
+ *
+ * เหตุผลที่ต้องประกาศชนิดไว้ (เดิมเป็น `any[]`): ถ้า item เป็น any ทั้ง item.roomId และ item.roomNumber
+ * จะเป็น any เหมือนกันหมด แล้ว branded type RoomId จะไม่ช่วยอะไรเลยภายในไฟล์นี้ — การจับคู่ห้อง
+ * ผิดพลาดจะหลุดผ่าน compiler ไปทั้งหมด ทั้งที่นี่คือไฟล์ที่มีจุดใช้ตัวระบุห้องมากที่สุดในระบบ
+ */
+export type MeterReadingRow = {
+  /** ตัวระบุห้องที่แท้จริง (rooms.id) — ใช้เป็น key / จับคู่ทุกที่ */
+  roomId: RoomId
+  /** ข้อความที่แสดงให้ผู้ใช้เห็นเท่านั้น ห้ามใช้เป็น key (ซ้ำกันได้ข้ามอาคาร) */
+  roomNumber: string
+  tenantName: string | null
+  baseRent: number
+  status: "occupied" | "available"
+
+  elecPrev: string | number
+  elecCurr: string | number
+  waterPrev: string | number
+  waterCurr: string | number
+  isMeterSaved: boolean
+  isElecPrevEditable: boolean
+  isWaterPrevEditable: boolean
+
+  billId?: string
+  billAmount: number
+  billStatus: "unpaid" | "pending" | "paid" | "not_created"
+  penaltyAmount?: number
+  lateDays?: number
+  otherServiceAmount?: number
+
+  isEdited?: boolean
+  waiveElectricMin?: boolean
+  waiveWaterMin?: boolean
+  hasNotifiedCheckout?: boolean
+}
 
 interface MeterReadingTableProps {
   isDark: boolean
   loading: boolean
-  unifiedItems: any[]
+  unifiedItems: MeterReadingRow[]
   commonFee: number
   electricMinChecked: boolean
   electricMinUnit: number
@@ -20,11 +58,13 @@ interface MeterReadingTableProps {
   waterRate: number
   currentUserRole: string | null
   downloadingPdfId: string | null
-  handleElecPrevChange: (roomNumber: string, value: string) => void
-  handleElecChange: (roomNumber: string, value: string) => void
-  handleWaterPrevChange: (roomNumber: string, value: string) => void
-  handleWaterChange: (roomNumber: string, value: string) => void
-  handleSaveRow: (roomNumber: string, type?: "electric" | "water" | "all") => Promise<void>
+  // ทุก handler รับ RoomId (branded) ไม่ใช่เลขห้อง — compiler จะปฏิเสธทันทีถ้าใครส่งเลขห้องมา
+  // ดูเหตุผลที่ RoomId ใน features/room/utils.ts
+  handleElecPrevChange: (roomId: RoomId, value: string) => void
+  handleElecChange: (roomId: RoomId, value: string) => void
+  handleWaterPrevChange: (roomId: RoomId, value: string) => void
+  handleWaterChange: (roomId: RoomId, value: string) => void
+  handleSaveRow: (roomId: RoomId, type?: "electric" | "water" | "all") => Promise<void>
   // รูปแบบการจดที่ตั้งไว้ในโมดอลตั้งค่าของหน้า /billing — ใช้เฉพาะ mode "meters"
   // (optional ทุกตัว เพราะ /manage-bills ใช้ component ตัวเดียวกันด้วย mode "billing" และไม่ส่งค่าเหล่านี้)
   //
@@ -41,10 +81,10 @@ interface MeterReadingTableProps {
   setSelectedBill: (item: any) => void
   setSlipModalOpen: (open: boolean) => void
   handleDownloadBillPdf: (item: any) => Promise<void>
-  handleSendLine: (roomNumber: string) => void | Promise<void>
-  handleMarkAsPaid: (billId: string, roomNumber: string) => Promise<void>
-  // roomNumbers = ขอบเขตที่มองเห็นจริง ต้องส่งไปด้วยเสมอ ไม่เช่นนั้น page จะบันทึกทับห้องนอกขอบเขต
-  handleSaveAll?: (type: "electric" | "water" | "both", roomNumbers?: string[]) => Promise<void>
+  handleSendLine: (roomId: RoomId) => void | Promise<void>
+  handleMarkAsPaid: (billId: string, roomId: RoomId) => Promise<void>
+  // roomIds = ขอบเขตที่มองเห็นจริง ต้องส่งไปด้วยเสมอ ไม่เช่นนั้น page จะบันทึกทับห้องนอกขอบเขต
+  handleSaveAll?: (type: "electric" | "water" | "both", roomIds?: RoomId[]) => Promise<void>
   // New props for bulk LINE OA feature
   roomsList: any[]
   usageAverages?: Record<string, { avgElec: number; avgWater: number; sampleCount: number }>
@@ -53,14 +93,14 @@ interface MeterReadingTableProps {
   currentWorkspaceId: string
   userPermissions?: StaffPermissions
   hasEditPermission?: boolean
-  handleLateDaysChange?: (roomNumber: string, value: string) => void
-  handleSaveLateDays?: (roomNumber: string) => Promise<void>
+  handleLateDaysChange?: (roomId: RoomId, value: string) => void
+  handleSaveLateDays?: (roomId: RoomId) => Promise<void>
   latePenaltyRate?: number
-  handleOtherServiceChange?: (roomNumber: string, value: string) => void
+  handleOtherServiceChange?: (roomId: RoomId, value: string) => void
   mode?: "meters" | "billing"
   meterReplacements?: any[]
   onMeterReplacementsChange?: () => void | Promise<void>
-  savingRows?: {[roomNumber: string]: boolean}
+  savingRows?: {[roomId: string]: boolean}
   handleDownloadAllBillsPdf?: () => Promise<void>
   downloadingAllPdf?: boolean
 }
@@ -133,7 +173,9 @@ export default function MeterReadingTable({
   const [bulkSendModalOpen, setBulkSendModalOpen] = useState(false)
   const [modalActiveTab, setModalActiveTab] = useState<"connected" | "unconnected">("connected")
   const [bulkSendingStatus, setBulkSendingStatus] = useState<"idle" | "sending" | "completed">("idle")
-  const [bulkSendingProgress, setBulkSendingProgress] = useState({ current: 0, total: 0, currentRoom: "" })
+  // currentRoom = roomId (ใช้เทียบว่าแถวไหนกำลังส่ง) · currentRoomLabel = เลขห้องสำหรับแสดงข้อความ
+  // แยกกันเพราะเลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้องจะขึ้นสถานะ "กำลังส่ง" พร้อมกันสองแถว
+  const [bulkSendingProgress, setBulkSendingProgress] = useState({ current: 0, total: 0, currentRoom: "", currentRoomLabel: "" })
   const [bulkSendResults, setBulkSendResults] = useState<{ [room: string]: { success: boolean; error?: string } }>({})
   const [copiedRooms, setCopiedRooms] = useState<{ [room: string]: boolean }>({})
   const [copiedLinks, setCopiedLinks] = useState<{ [room: string]: boolean }>({})
@@ -143,18 +185,30 @@ export default function MeterReadingTable({
   // (roomsList 1 ครั้งในแถว + อีก 1 ครั้งใน getUsageAnomaly + meterReplacements ใน getUnitsUsedWithRollover
   //  และ isMeterRollover) แล้วยัง render ซ้ำทั้ง mobile list และ desktop table พร้อมกัน
   // ต้นทุนรวมจึงเป็น O(N²) ต่อการกดแป้น 1 ครั้ง เพราะ setUnifiedItems สร้าง array ใหม่ทุกตัวอักษรที่พิมพ์
-  const roomInfoByNumber = useMemo(
-    () => new Map<string, any>((roomsList || []).map((r: any) => [r.roomNumber, r])),
+  //
+  // ⚠️ ทุกดัชนีคีย์ด้วย rooms.id ไม่ใช่เลขห้อง — หอที่มีสองอาคารใช้เลขห้องซ้ำกันได้ ถ้าคีย์ด้วยเลขห้อง
+  // ห้อง 101 ของอาคารที่สองจะทับตัวแรกในดัชนี แล้วทุกแถวของทั้งสองห้องจะอ่านข้อมูลของห้องเดียวกัน
+  const roomInfoById = useMemo(
+    () => new Map<string, any>((roomsList || []).map((r: any) => [r.id, r])),
     [roomsList]
   )
   const replacementByRoomType = useMemo(
-    () => new Map<string, any>((meterReplacements || []).map((r: any) => [`${r.roomNumber}:${r.meterType}`, r])),
+    () => new Map<string, any>((meterReplacements || []).map((r: any) => [`${r.roomId}:${r.meterType}`, r])),
     [meterReplacements]
   )
-  const itemByRoomNumber = useMemo(
-    () => new Map<string, any>((unifiedItems || []).map((i: any) => [i.roomNumber, i])),
+  const itemById = useMemo(
+    () => new Map<string, any>((unifiedItems || []).map((i: any) => [i.roomId, i])),
     [unifiedItems]
   )
+
+  // ข้อความเลขห้องที่แสดงให้ผู้ใช้เห็น — เติมรหัสอาคารต่อท้ายเฉพาะเลขห้องที่ซ้ำกันในชุดที่มองเห็นอยู่
+  // หอที่ไม่มีเลขห้องซ้ำกันเลยจะได้ข้อความเหมือนเดิมทุกแถว (ดู formatRoomLabel)
+  const duplicatedRoomNumbers = useMemo(
+    () => findDuplicateRoomNumbers(unifiedItems || []),
+    [unifiedItems]
+  )
+  const roomLabelOf = (item: MeterReadingRow): string =>
+    formatRoomLabel(item.roomNumber, duplicatedRoomNumbers, roomInfoById.get(item.roomId))
 
   // เดิม render ทั้ง mobile card list และ desktop table พร้อมกันเสมอ แล้วให้ CSS ซ่อนฝั่งที่ไม่ใช้
   // (block md:hidden / hidden md:block) แปลว่ามี 2N แถวใน tree ตลอด และทุกตัวอักษรที่พิมพ์ต้อง
@@ -170,6 +224,8 @@ export default function MeterReadingTable({
   // --- มิเตอร์หมุนเวียนครบรอบ (Meter Rollover) & เปลี่ยนมิเตอร์ (Meter Replacement) Helpers ---
   const [replacementModal, setReplacementModal] = useState<{
     isOpen: boolean;
+    roomId: RoomId;
+    /** ใช้แสดงในหัวข้อโมดอลเท่านั้น การบันทึก/ลบใช้ roomId */
     roomNumber: string;
     meterType: "electric" | "water";
     oldFinalReading: string;
@@ -178,14 +234,14 @@ export default function MeterReadingTable({
     loading: boolean;
   } | null>(null);
 
-  const getReplacement = (roomNumber: string, type: "electric" | "water") => {
-    return replacementByRoomType.get(`${roomNumber}:${type}`);
+  const getReplacement = (roomId: RoomId, type: "electric" | "water") => {
+    return replacementByRoomType.get(`${roomId}:${type}`);
   };
 
   const getUnitsUsedWithRollover = (
     curr: string | number | null | undefined,
     prev: string | number | null | undefined,
-    roomNumber?: string,
+    roomId?: RoomId,
     meterType?: "electric" | "water"
   ): number => {
     if (curr === "" || curr === null || curr === undefined) return 0;
@@ -198,7 +254,7 @@ export default function MeterReadingTable({
       return (10000 - p) + c;
     };
 
-    const replacement = roomNumber && meterType ? getReplacement(roomNumber, meterType) : undefined;
+    const replacement = roomId && meterType ? getReplacement(roomId, meterType) : undefined;
 
     if (replacement) {
       const oldFinal = Number(replacement.oldFinalReading ?? 0);
@@ -215,7 +271,7 @@ export default function MeterReadingTable({
   const isMeterRollover = (
     curr: string | number | null | undefined,
     prev: string | number | null | undefined,
-    roomNumber?: string,
+    roomId?: RoomId,
     meterType?: "electric" | "water"
   ): boolean => {
     if (curr === "" || curr === null || curr === undefined) return false;
@@ -223,7 +279,7 @@ export default function MeterReadingTable({
     const prevNum = Number(prev || 0);
     if (isNaN(currNum) || isNaN(prevNum)) return false;
 
-    const replacement = roomNumber && meterType ? getReplacement(roomNumber, meterType) : undefined;
+    const replacement = roomId && meterType ? getReplacement(roomId, meterType) : undefined;
 
     if (replacement) {
       const oldFinal = Number(replacement.oldFinalReading ?? 0);
@@ -236,8 +292,8 @@ export default function MeterReadingTable({
     return currNum < prevNum;
   };
 
-  const handleOpenReplacementModal = (roomNumber: string, meterType: "electric" | "water", existing?: any) => {
-    const item = itemByRoomNumber.get(roomNumber);
+  const handleOpenReplacementModal = (roomId: RoomId, meterType: "electric" | "water", existing?: any) => {
+    const item = itemById.get(roomId);
     if (!item) return;
 
     if (!permissions.manage_meters_bills) {
@@ -245,14 +301,15 @@ export default function MeterReadingTable({
       return;
     }
 
-    if (item.billStatus === "paid" && !unlockedPaidRooms[roomNumber]) {
+    if (item.billStatus === "paid" && !unlockedPaidRooms[roomId]) {
       alert(locale === "en" ? "Cannot record or replace meter because the bill for this room has been paid and not unlocked for editing." : "ไม่สามารถบันทึกหรือเปลี่ยนมิเตอร์ได้ เนื่องจากบิลของห้องนี้ได้รับการชำระเงินเรียบร้อยแล้วและยังไม่ได้ปลดล็อกแก้ไข");
       return;
     }
 
     setReplacementModal({
       isOpen: true,
-      roomNumber,
+      roomId,
+      roomNumber: roomLabelOf(item),
       meterType,
       oldFinalReading: existing ? String(existing.oldFinalReading) : "",
       newStartReading: existing ? String(existing.newStartReading) : "",
@@ -263,7 +320,7 @@ export default function MeterReadingTable({
 
   const handleSaveReplacement = async () => {
     if (!replacementModal) return;
-    const { roomNumber, meterType, oldFinalReading, newStartReading } = replacementModal;
+    const { roomId, meterType, oldFinalReading, newStartReading } = replacementModal;
 
     const oldNum = Number(oldFinalReading);
     const newNum = Number(newStartReading);
@@ -282,7 +339,7 @@ export default function MeterReadingTable({
     try {
       const res = await saveMeterReplacement(
         currentWorkspaceId,
-        roomNumber,
+        { roomId },
         billingCycle,
         meterType,
         oldNum,
@@ -306,7 +363,7 @@ export default function MeterReadingTable({
 
   const handleDeleteReplacement = async () => {
     if (!replacementModal) return;
-    const { roomNumber, meterType } = replacementModal;
+    const { roomId, meterType } = replacementModal;
 
     if (!confirm(locale === "en" ? "Are you sure you want to delete this mid-month meter replacement record? The system will revert to normal calculation." : "คุณต้องการลบข้อมูลการเปลี่ยนมิเตอร์กลางเดือนนี้ใช่หรือไม่? ระบบจะกลับไปคิดแบบปกติ")) {
       return;
@@ -315,7 +372,7 @@ export default function MeterReadingTable({
     setReplacementModal(prev => prev ? { ...prev, loading: true } : null);
 
     try {
-      const res = await deleteMeterReplacement(roomNumber, billingCycle, meterType);
+      const res = await deleteMeterReplacement({ roomId }, billingCycle, meterType);
       if (res.success) {
         if (onMeterReplacementsChange) {
           await onMeterReplacementsChange();
@@ -343,7 +400,10 @@ export default function MeterReadingTable({
     isOpen: boolean
     isBulk: boolean
     rooms: {
-      roomNumber: string
+      /** ใช้เป็น React key — เลขห้องซ้ำกันได้ข้ามอาคาร ใช้เป็น key ไม่ได้ */
+      roomId: RoomId
+      /** ข้อความที่แสดง (กำกับรหัสอาคารแล้วถ้าเลขห้องซ้ำ) */
+      roomLabel: string
       elecAbnormal: boolean
       waterAbnormal: boolean
       elecUnits: number
@@ -360,7 +420,7 @@ export default function MeterReadingTable({
     const result = { hasAnomaly: false, elecAbnormal: false, waterAbnormal: false, elecUnits: 0, elecAvg: 0, waterUnits: 0, waterAvg: 0 }
     if (!item.tenantName) return result
 
-    const roomInfo = roomInfoByNumber.get(item.roomNumber)
+    const roomInfo = roomInfoById.get(item.roomId)
     const leaseStart = roomInfo?.leaseStart
     if (leaseStart && billingCycle) {
       const leaseDate = new Date(leaseStart)
@@ -369,11 +429,11 @@ export default function MeterReadingTable({
       if (monthsSinceLease < 3) return result
     }
 
-    const avgData = usageAverages?.[item.roomNumber]
+    const avgData = usageAverages?.[item.roomId]
     if (!avgData || avgData.sampleCount === 0) return result
 
     if (type !== "water" && item.elecCurr !== "") {
-      const elecUnits = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")
+      const elecUnits = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomId, "electric")
       if (avgData.avgElec > 0 && elecUnits <= 3000 && Math.abs(elecUnits - avgData.avgElec) / avgData.avgElec > 1) {
         result.elecAbnormal = true
         result.elecUnits = elecUnits
@@ -383,7 +443,7 @@ export default function MeterReadingTable({
     }
 
     if (type !== "electric" && item.waterCurr !== "") {
-      const waterUnits = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water")
+      const waterUnits = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomId, "water")
       if (avgData.avgWater > 0 && waterUnits <= 3000 && Math.abs(waterUnits - avgData.avgWater) / avgData.avgWater > 1) {
         result.waterAbnormal = true
         result.waterUnits = waterUnits
@@ -395,14 +455,14 @@ export default function MeterReadingTable({
     return result
   }
 
-  const onSaveRowWithRolloverCheck = async (roomNumber: string, type: "electric" | "water" | "all" = "all") => {
-    const item = itemByRoomNumber.get(roomNumber)
+  const onSaveRowWithRolloverCheck = async (roomId: RoomId, type: "electric" | "water" | "all" = "all") => {
+    const item = itemById.get(roomId)
     if (!item) return
 
     const doSave = async () => {
-      await handleSaveRow(roomNumber, type)
+      await handleSaveRow(roomId, type)
       if (item.billStatus === "paid") {
-        setUnlockedPaidRooms(prev => ({ ...prev, [roomNumber]: false }))
+        setUnlockedPaidRooms(prev => ({ ...prev, [roomId]: false }))
       }
     }
 
@@ -413,7 +473,8 @@ export default function MeterReadingTable({
           isOpen: true,
           isBulk: false,
           rooms: [{
-            roomNumber,
+            roomId: item.roomId,
+            roomLabel: roomLabelOf(item),
             elecAbnormal: anomaly.elecAbnormal,
             waterAbnormal: anomaly.waterAbnormal,
             elecUnits: anomaly.elecUnits,
@@ -428,13 +489,13 @@ export default function MeterReadingTable({
       }
     }
 
-    const hasElecRolloverVal = type !== "water" && isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")
-    const hasWaterRolloverVal = type !== "electric" && isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water")
+    const hasElecRolloverVal = type !== "water" && isMeterRollover(item.elecCurr, item.elecPrev, item.roomId, "electric")
+    const hasWaterRolloverVal = type !== "electric" && isMeterRollover(item.waterCurr, item.waterPrev, item.roomId, "water")
 
     if (hasElecRolloverVal || hasWaterRolloverVal) {
       setRolloverConfirm({
         isOpen: true,
-        roomNumber,
+        roomNumber: roomLabelOf(item),
         type,
         isBulk: false,
         onConfirm: checkAnomalyThenSave
@@ -458,14 +519,14 @@ export default function MeterReadingTable({
     });
 
     const anyRollover = itemsToSave.some(item =>
-      (needsElec && isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric")) ||
-      (needsWater && isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water"))
+      (needsElec && isMeterRollover(item.elecCurr, item.elecPrev, item.roomId, "electric")) ||
+      (needsWater && isMeterRollover(item.waterCurr, item.waterPrev, item.roomId, "water"))
     );
 
     const doSaveAll = async () => {
       // ส่งเฉพาะเลขห้องที่แสดงอยู่จริง (ผ่านตัวกรองอาคาร/ชั้นมาแล้ว) เพื่อไม่ให้ upsert ไปทับ
       // ห้องนอกขอบเขตที่ผู้ใช้ไม่ได้กำลังจดอยู่ — ดูคอมเมนต์ที่ handleSaveAll ใน billing/page.tsx
-      await handleSaveAll(type, unifiedItems.map(i => i.roomNumber))
+      await handleSaveAll(type, unifiedItems.map(i => i.roomId))
       setUnlockedPaidRooms({})
     }
 
@@ -473,14 +534,15 @@ export default function MeterReadingTable({
       // getUsageAnomaly รับ "all" เพื่อหมายถึงตรวจทั้งไฟและน้ำ ซึ่งตรงกับโหมด "both"
       const anomalyScope = type === "both" ? "all" : type
       const anomalousRooms = itemsToSave
-        .map(item => ({ roomNumber: item.roomNumber, anomaly: getUsageAnomaly(item, anomalyScope) }))
+        .map(item => ({ roomId: item.roomId, roomLabel: roomLabelOf(item), anomaly: getUsageAnomaly(item, anomalyScope) }))
         .filter(r => r.anomaly.hasAnomaly)
       if (anomalousRooms.length > 0) {
         setUsageAnomalyConfirm({
           isOpen: true,
           isBulk: true,
           rooms: anomalousRooms.map(r => ({
-            roomNumber: r.roomNumber,
+            roomId: r.roomId,
+            roomLabel: r.roomLabel,
             elecAbnormal: r.anomaly.elecAbnormal,
             waterAbnormal: r.anomaly.waterAbnormal,
             elecUnits: r.anomaly.elecUnits,
@@ -518,13 +580,13 @@ export default function MeterReadingTable({
   )
 
   const connectedRooms = useMemo(
-    () => activeRooms.filter(item => !!roomInfoByNumber.get(item.roomNumber)?.lineUserId),
-    [activeRooms, roomInfoByNumber]
+    () => activeRooms.filter(item => !!roomInfoById.get(item.roomId)?.lineUserId),
+    [activeRooms, roomInfoById]
   )
 
   const unconnectedRooms = useMemo(
-    () => activeRooms.filter(item => !roomInfoByNumber.get(item.roomNumber)?.lineUserId),
-    [activeRooms, roomInfoByNumber]
+    () => activeRooms.filter(item => !roomInfoById.get(item.roomId)?.lineUserId),
+    [activeRooms, roomInfoById]
   )
 
   // ฟังก์ชันจัดรูปแบบรอบบิลสำหรับใช้ในหน้านี้ (Bilingual)
@@ -558,27 +620,27 @@ export default function MeterReadingTable({
       alert(locale === "en" ? "You do not have permission to copy summary. Please contact Admin." : "คุณไม่มีสิทธิ์ในการคัดลอกสรุปบิล กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอสิทธิ์การใช้งาน")
       return
     }
-    const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
-    const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
+    const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomId, "electric") : 0
+    const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomId, "water") : 0
 
     const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
     const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
 
     let portalLink = ""
     if (currentWorkspaceId) {
-      const res = await generateSecurePortalLinkAction(currentWorkspaceId, item.roomNumber)
+      const res = await generateSecurePortalLinkAction(currentWorkspaceId, item.roomId)
       if (res.success && res.link) {
         portalLink = res.link
       } else {
         const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
-        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_number=${encodeURIComponent(item.roomNumber)}`
+        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_id=${encodeURIComponent(item.roomId)}`
       }
     } else {
       const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
       portalLink = `${safeAppUrl}/portal`
     }
 
-    const roomInfo = roomInfoByNumber.get(item.roomNumber)
+    const roomInfo = roomInfoById.get(item.roomId)
     const extraExpenses = roomInfo?.extraExpenses || []
     const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -597,7 +659,7 @@ export default function MeterReadingTable({
 
     const text = locale === "en"
       ? `🏠 ${workspaceName || "Dormitory"} - Monthly Billing Summary ${cycleText}
-Room No.: ${item.roomNumber}
+Room No.: ${roomLabelOf(item)}
 Tenant: ${item.tenantName || "Tenant"}
 ----------------------------------
 • Room Rent: ${item.baseRent.toLocaleString()} THB
@@ -612,7 +674,7 @@ You can view your bill online and upload the transfer slip here:
 
 Thank you 🙏`
       : `🏠 ${workspaceName || "หอพัก"} - ใบแจ้งค่าใช้จ่ายประจำเดือน ${cycleText}
-เลขห้อง: ${item.roomNumber}
+เลขห้อง: ${roomLabelOf(item)}
 ผู้เช่า: ${item.tenantName || "ผู้เช่า"}
 ----------------------------------
 • ค่าเช่าห้อง: ${item.baseRent.toLocaleString()} บาท
@@ -656,9 +718,9 @@ Thank you 🙏`
     }
 
     if (copied) {
-      setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: true }))
+      setCopiedRooms(prev => ({ ...prev, [item.roomId]: true }))
       setTimeout(() => {
-        setCopiedRooms(prev => ({ ...prev, [item.roomNumber]: false }))
+        setCopiedRooms(prev => ({ ...prev, [item.roomId]: false }))
       }, 3500)
     } else {
       alert(locale === "en" ? "Your device or browser does not support automatic copying. Please copy the text manually." : "เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง");
@@ -674,12 +736,12 @@ Thank you 🙏`
 
     let portalLink = ""
     if (currentWorkspaceId) {
-      const res = await generateSecurePortalLinkAction(currentWorkspaceId, item.roomNumber)
+      const res = await generateSecurePortalLinkAction(currentWorkspaceId, item.roomId)
       if (res.success && res.link) {
         portalLink = res.link
       } else {
         const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
-        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_number=${encodeURIComponent(item.roomNumber)}`
+        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_id=${encodeURIComponent(item.roomId)}`
       }
     } else {
       const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
@@ -715,9 +777,9 @@ Thank you 🙏`
     }
 
     if (copied) {
-      setCopiedLinks(prev => ({ ...prev, [item.roomNumber]: true }))
+      setCopiedLinks(prev => ({ ...prev, [item.roomId]: true }))
       setTimeout(() => {
-        setCopiedLinks(prev => ({ ...prev, [item.roomNumber]: false }))
+        setCopiedLinks(prev => ({ ...prev, [item.roomId]: false }))
       }, 3500)
     } else {
       alert(locale === "en" ? "Your device or browser does not support automatic copying. Please copy the text manually." : "เครื่องหรือเบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความด้วยตนเอง");
@@ -733,7 +795,7 @@ Thank you 🙏`
     if (connectedRooms.length === 0) return
     
     setBulkSendingStatus("sending")
-    setBulkSendingProgress({ current: 0, total: connectedRooms.length, currentRoom: "" })
+    setBulkSendingProgress({ current: 0, total: connectedRooms.length, currentRoom: "", currentRoomLabel: "" })
     const results: { [room: string]: { success: boolean; error?: string } } = {}
 
     try {
@@ -741,18 +803,18 @@ Thank you 🙏`
 
       for (let i = 0; i < connectedRooms.length; i++) {
         const item = connectedRooms[i]
-        setBulkSendingProgress({ current: i + 1, total: connectedRooms.length, currentRoom: item.roomNumber })
+        setBulkSendingProgress({ current: i + 1, total: connectedRooms.length, currentRoom: item.roomId, currentRoomLabel: roomLabelOf(item) })
         
         if (item.billStatus === "paid") {
-          results[item.roomNumber] = { success: false, error: locale === "en" ? "Paid" : "ชำระเงินแล้ว" }
+          results[item.roomId] = { success: false, error: locale === "en" ? "Paid" : "ชำระเงินแล้ว" }
           continue
         }
 
-        const roomInfo = roomInfoByNumber.get(item.roomNumber)
+        const roomInfo = roomInfoById.get(item.roomId)
         const lineUserId = roomInfo?.lineUserId
 
         if (!lineUserId) {
-          results[item.roomNumber] = { success: false, error: locale === "en" ? "LINE User ID not found" : "ไม่พบข้อมูลรหัส LINE User ID" }
+          results[item.roomId] = { success: false, error: locale === "en" ? "LINE User ID not found" : "ไม่พบข้อมูลรหัส LINE User ID" }
           continue
         }
 
@@ -760,15 +822,16 @@ Thank you 🙏`
         const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
         try {
-          const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
-          const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
+          const elecUnitsUsed = item.elecCurr !== "" ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomId, "electric") : 0
+          const waterUnitsUsed = item.waterCurr !== "" ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomId, "water") : 0
 
           const elecCost = !item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? (electricMinUnit * elecRate) : elecUnitsUsed * elecRate
           const waterCost = !item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? (waterMinUnit * waterRate) : waterUnitsUsed * waterRate
 
           const result = await sendLineBillNotificationAction({
             lineUserId,
-            roomNumber: item.roomNumber,
+            roomNumber: roomLabelOf(item),
+            roomId: item.roomId,
             tenantName: item.tenantName || (locale === "en" ? "Tenant" : "ผู้เช่า"),
             billingCycle: formatBillingCycleLocal(billingCycle, locale),
             baseRent: item.baseRent,
@@ -783,10 +846,10 @@ Thank you 🙏`
             extraExpenses,
           })
 
-          results[item.roomNumber] = { success: result.success, error: result.error }
+          results[item.roomId] = { success: result.success, error: result.error }
         } catch (err: any) {
           console.error(`Error sending LINE to room ${item.roomNumber}:`, err)
-          results[item.roomNumber] = { success: false, error: err.message || (locale === "en" ? "Connection error" : "เกิดข้อผิดพลาดในการเชื่อมต่อ") }
+          results[item.roomId] = { success: false, error: err.message || (locale === "en" ? "Connection error" : "เกิดข้อผิดพลาดในการเชื่อมต่อ") }
         }
       }
 
@@ -979,18 +1042,18 @@ Thank you 🙏`
           ) : unifiedItems.length > 0 ? (
             unifiedItems.map((item) => {
               const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-              const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
+              const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomId, "electric") : 0
               const elecCost = hasElecCurr && elecUnitsUsed >= 0
                 ? (!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                 : 0
 
               const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-              const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
+              const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomId, "water") : 0
               const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                 ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                 : 0
               
-              const roomInfo = roomInfoByNumber.get(item.roomNumber)
+              const roomInfo = roomInfoById.get(item.roomId)
               const extraExpenses = roomInfo?.extraExpenses || []
               const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -1009,7 +1072,7 @@ Thank you 🙏`
               const isSaveDisabled = !hasEdit || isMeterAlreadySaved || (showElectricColumns && isElectricInvalid) || (showWaterColumns && isWaterInvalid)
 
               return (
-                <div key={item.roomNumber} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
+                <div key={item.roomId} className={`p-4 rounded-2xl border space-y-4 shadow-sm ${
                   isDark ? "bg-slate-950/35 border-slate-900/60" : "bg-white border-slate-200"
                 }`}>
                   {/* Card Header: Room, Tenant, Status */}
@@ -1019,7 +1082,7 @@ Thank you 🙏`
                         <span className={`text-lg font-black px-3 py-1 rounded-xl border ${
                           isDark ? "text-slate-100 bg-slate-900 border-slate-800" : "text-slate-800 bg-slate-100 border-slate-200"
                         }`}>
-                          {item.roomNumber}
+                          {roomLabelOf(item)}
                         </span>
                         {item.hasNotifiedCheckout ? (
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
@@ -1161,7 +1224,7 @@ Thank you 🙏`
                                 <div className="mt-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
                                   {elecUnitsUsed >= 0 ? (locale === "en" ? `Used ${elecUnitsUsed} units (${elecCost.toLocaleString()} THB)` : `ใช้ไป ${elecUnitsUsed} หน่วย (${elecCost.toLocaleString()}.-)`) : (locale === "en" ? "Error" : "ผิดพลาด")}
                                   {(() => {
-                                    const repl = getReplacement(item.roomNumber, "electric");
+                                    const repl = getReplacement(item.roomId, "electric");
                                     if (repl) {
                                       return (
                                         <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
@@ -1191,7 +1254,7 @@ Thank you 🙏`
                                 <div className="mt-1 text-[10px] font-bold text-teal-600 dark:text-teal-400">
                                   {waterUnitsUsed >= 0 ? (locale === "en" ? `Used ${waterUnitsUsed} units (${waterCost.toLocaleString()} THB)` : `ใช้ไป ${waterUnitsUsed} หน่วย (${waterCost.toLocaleString()}.-)`) : (locale === "en" ? "Error" : "ผิดพลาด")}
                                   {(() => {
-                                    const repl = getReplacement(item.roomNumber, "water");
+                                    const repl = getReplacement(item.roomId, "water");
                                     if (repl) {
                                       return (
                                         <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
@@ -1229,12 +1292,12 @@ Thank you 🙏`
                                   type="text"
                                   inputMode="numeric"
                                   placeholder="0"
-                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                   className={`w-12 text-center py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                     isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                   }`}
                                   value={item.lateDays !== undefined ? item.lateDays : 0}
-                                  onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
+                                  onChange={(e) => handleLateDaysChange?.(item.roomId, e.target.value)}
                                 />
                                 <span className="text-xs font-bold text-slate-500">{t("billing.days_unit")}</span>
                               </div>
@@ -1259,12 +1322,12 @@ Thank you 🙏`
                                   type="text"
                                   inputMode="numeric"
                                   placeholder="0"
-                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                   className={`w-20 text-right pr-2 py-1 border rounded-lg font-mono text-xs focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
                                     isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-300 text-slate-800"
                                   }`}
                                   value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
-                                  onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
+                                  onChange={(e) => handleOtherServiceChange?.(item.roomId, e.target.value)}
                                 />
                                 <span className="text-xs font-bold text-slate-500">{t("billing.baht_unit")}</span>
                               </div>
@@ -1294,7 +1357,7 @@ Thank you 🙏`
                                       isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
                                     }`}
                                     value={item.elecPrev}
-                                    onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
+                                    onChange={(e) => handleElecPrevChange(item.roomId, e.target.value)}
                                   />
                                 </div>
                               ) : (
@@ -1311,12 +1374,12 @@ Thank you 🙏`
                                 type="text"
                                 inputMode="decimal"
                                 placeholder={t("billing.elec_curr_placeholder")}
-                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                 className={`w-full h-12 px-3 text-base border rounded-xl font-mono font-bold focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
                                 }`}
                                 value={item.elecCurr}
-                                onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
+                                onChange={(e) => handleElecChange(item.roomId, e.target.value)}
                               />
                               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
                                 kWh
@@ -1325,13 +1388,13 @@ Thank you 🙏`
 
                             {/* Replacement Trigger */}
                             {(() => {
-                              const repl = getReplacement(item.roomNumber, "electric");
-                              const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                              const repl = getReplacement(item.roomId, "electric");
+                              const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomId];
                               if (repl) {
                                 return (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
+                                    onClick={() => handleOpenReplacementModal(item.roomId, "electric", repl)}
                                     disabled={isDisabled}
                                     className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
                                       isDark 
@@ -1352,7 +1415,7 @@ Thank you 🙏`
                                 return (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "electric")}
+                                    onClick={() => handleOpenReplacementModal(item.roomId, "electric")}
                                     disabled={isDisabled}
                                     className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
                                       isDark 
@@ -1368,8 +1431,8 @@ Thank you 🙏`
                             })()}
 
                             {item.elecCurr !== "" && (() => {
-                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
-                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
+                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomId, "electric");
+                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomId, "electric");
                               if (units > 3000) {
                                 return (
                                   <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
@@ -1401,7 +1464,7 @@ Thank you 🙏`
                               </span>
                             </div>
                             {(() => {
-                              const repl = getReplacement(item.roomNumber, "electric");
+                              const repl = getReplacement(item.roomId, "electric");
                               if (repl && hasElecCurr) {
                                 return (
                                   <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
@@ -1426,23 +1489,23 @@ Thank you 🙏`
                           {activeTab === "electric" && !isMeterAlreadySaved && (
                             <button
                               onClick={async () => {
-                                await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
+                                await onSaveRowWithRolloverCheck(item.roomId, "electric");
                               }}
-                              disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                              disabled={isSaveDisabled || savingRows?.[item.roomId]}
                               className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                (isSaveDisabled || savingRows?.[item.roomNumber])
+                                (isSaveDisabled || savingRows?.[item.roomId])
                                   ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
                               }`}
                             >
-                              {savingRows?.[item.roomNumber] ? (
+                              {savingRows?.[item.roomId] ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 animate-spin" />
                                   <span>{t("billing.saving")}</span>
                                 </>
                               ) : (
                                 <>
-                                  <Save className="w-4 h-4" /> {t("billing.save_elec_room").replace("{roomNumber}", item.roomNumber)}
+                                  <Save className="w-4 h-4" /> {t("billing.save_elec_room").replace("{roomNumber}", roomLabelOf(item))}
                                 </>
                               )}
                             </button>
@@ -1467,7 +1530,7 @@ Thank you 🙏`
                                     placeholder={locale === "en" ? "Enter" : "กรอก"}
                                     className="w-16 h-6.5 text-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-slate-800 dark:text-slate-200 font-mono text-[10px] font-bold focus:outline-none focus:border-teal-500 transition-all"
                                     value={item.waterPrev}
-                                    onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
+                                    onChange={(e) => handleWaterPrevChange(item.roomId, e.target.value)}
                                   />
                                 </div>
                               ) : (
@@ -1482,10 +1545,10 @@ Thank you 🙏`
                                 type="text"
                                 inputMode="decimal"
                                 placeholder={t("billing.water_curr_placeholder")}
-                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                 className="w-full h-12 px-3 text-base bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:border-teal-500/80 focus:ring-1 focus:ring-teal-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
                                 value={item.waterCurr}
-                                onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
+                                onChange={(e) => handleWaterChange(item.roomId, e.target.value)}
                               />
                               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-black pointer-events-none">
                                 m³
@@ -1494,13 +1557,13 @@ Thank you 🙏`
 
                             {/* Replacement Trigger */}
                             {(() => {
-                              const repl = getReplacement(item.roomNumber, "water");
-                              const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                              const repl = getReplacement(item.roomId, "water");
+                              const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomId];
                               if (repl) {
                                 return (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "water", repl)}
+                                    onClick={() => handleOpenReplacementModal(item.roomId, "water", repl)}
                                     disabled={isDisabled}
                                     className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
                                       isDark 
@@ -1521,7 +1584,7 @@ Thank you 🙏`
                                 return (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenReplacementModal(item.roomNumber, "water")}
+                                    onClick={() => handleOpenReplacementModal(item.roomId, "water")}
                                     disabled={isDisabled}
                                     className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-xs font-bold transition-all ${
                                       isDark 
@@ -1537,8 +1600,8 @@ Thank you 🙏`
                             })()}
 
                             {item.waterCurr !== "" && (() => {
-                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
-                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
+                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomId, "water");
+                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomId, "water");
                               if (units > 3000) {
                                 return (
                                   <div className="text-[10px] text-red-500 font-extrabold flex items-center gap-1">
@@ -1570,7 +1633,7 @@ Thank you 🙏`
                               </span>
                             </div>
                             {(() => {
-                              const repl = getReplacement(item.roomNumber, "water");
+                              const repl = getReplacement(item.roomId, "water");
                               if (repl && hasWaterCurr) {
                                 return (
                                   <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex justify-between">
@@ -1594,23 +1657,23 @@ Thank you 🙏`
                           {activeTab === "water" && !isMeterAlreadySaved && (
                             <button
                               onClick={async () => {
-                                await onSaveRowWithRolloverCheck(item.roomNumber, "water");
+                                await onSaveRowWithRolloverCheck(item.roomId, "water");
                               }}
-                              disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                              disabled={isSaveDisabled || savingRows?.[item.roomId]}
                               className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                (isSaveDisabled || savingRows?.[item.roomNumber])
+                                (isSaveDisabled || savingRows?.[item.roomId])
                                   ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                                   : "bg-teal-600 hover:bg-teal-500 border border-teal-500/30 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98]"
                               }`}
                             >
-                              {savingRows?.[item.roomNumber] ? (
+                              {savingRows?.[item.roomId] ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 animate-spin" />
                                   <span>{t("billing.saving")}</span>
                                 </>
                               ) : (
                                 <>
-                                  <Save className="w-4 h-4" /> {t("billing.save_water_room").replace("{roomNumber}", item.roomNumber)}
+                                  <Save className="w-4 h-4" /> {t("billing.save_water_room").replace("{roomNumber}", roomLabelOf(item))}
                                 </>
                               )}
                             </button>
@@ -1622,23 +1685,23 @@ Thank you 🙏`
                       {activeTab === "both" && !isMeterAlreadySaved && (
                         <button
                           onClick={async () => {
-                            await onSaveRowWithRolloverCheck(item.roomNumber, "all");
+                            await onSaveRowWithRolloverCheck(item.roomId, "all");
                           }}
-                          disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                          disabled={isSaveDisabled || savingRows?.[item.roomId]}
                           className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                            (isSaveDisabled || savingRows?.[item.roomNumber])
+                            (isSaveDisabled || savingRows?.[item.roomId])
                               ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                               : "bg-violet-600 hover:bg-violet-500 border border-violet-500/30 text-white shadow-lg shadow-violet-600/10 active:scale-[0.98]"
                           }`}
                         >
-                          {savingRows?.[item.roomNumber] ? (
+                          {savingRows?.[item.roomId] ? (
                             <>
                               <RefreshCw className="w-4 h-4 animate-spin" />
                               <span>{t("billing.saving")}</span>
                             </>
                           ) : (
                             <>
-                              <Save className="w-4 h-4" /> {t("billing.save_both_room").replace("{roomNumber}", item.roomNumber)}
+                              <Save className="w-4 h-4" /> {t("billing.save_both_room").replace("{roomNumber}", roomLabelOf(item))}
                             </>
                           )}
                         </button>
@@ -1650,19 +1713,19 @@ Thank you 🙏`
                           {item.isEdited ? (
                             <button
                               onClick={async () => {
-                                await handleSaveLateDays?.(item.roomNumber);
+                                await handleSaveLateDays?.(item.roomId);
                                 if (item.billStatus === "paid") {
-                                  setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                                  setUnlockedPaidRooms(prev => ({ ...prev, [item.roomId]: false }));
                                 }
                               }}
-                              disabled={savingRows?.[item.roomNumber]}
+                              disabled={savingRows?.[item.roomId]}
                               className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                savingRows?.[item.roomNumber]
+                                savingRows?.[item.roomId]
                                   ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                                   : "bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/30 text-white shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
                               }`}
                             >
-                              {savingRows?.[item.roomNumber] ? (
+                              {savingRows?.[item.roomId] ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 animate-spin" />
                                   <span>{t("billing.saving")}</span>
@@ -1688,7 +1751,7 @@ Thank you 🙏`
                               {/* บันทึกชำระเงินค้างชำระ */}
                               {item.billStatus === "unpaid" && (
                                 <button
-                                  onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
+                                  onClick={() => handleMarkAsPaid(item.billId!, item.roomId)}
                                   disabled={currentUserRole === "staff"}
                                   className={`w-full h-12 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
                                     currentUserRole === "staff"
@@ -1706,19 +1769,19 @@ Thank you 🙏`
                               {item.billStatus === "paid" && (
                                 <button
                                   onClick={() => {
-                                    const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomNumber];
+                                    const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomId];
                                     setUnlockedPaidRooms(prev => ({
                                       ...prev,
-                                      [item.roomNumber]: !isCurrentlyUnlocked
+                                      [item.roomId]: !isCurrentlyUnlocked
                                     }));
                                   }}
                                   className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                    unlockedPaidRooms[item.roomNumber]
+                                    unlockedPaidRooms[item.roomId]
                                       ? "bg-rose-600 hover:bg-rose-500 border border-rose-500/30 text-white shadow-lg shadow-rose-600/10 active:scale-[0.98]"
                                       : "bg-blue-600 hover:bg-blue-500 border border-blue-500/30 text-white shadow-lg shadow-blue-600/10 active:scale-[0.98]"
                                   }`}
                                 >
-                                  {unlockedPaidRooms[item.roomNumber] ? (
+                                  {unlockedPaidRooms[item.roomId] ? (
                                     <>
                                       <X className="w-4 h-4" />
                                       <span>{t("billing.cancel_edit")}</span>
@@ -1818,18 +1881,18 @@ Thank you 🙏`
               ) : unifiedItems.length > 0 ? (
                 unifiedItems.map((item) => {
                   const hasElecCurr = item.elecCurr !== "" && item.elecCurr !== null && item.elecCurr !== undefined
-                  const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric") : 0
+                  const elecUnitsUsed = hasElecCurr ? getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomId, "electric") : 0
                   const elecCost = hasElecCurr && elecUnitsUsed >= 0
                     ? (!item.waiveElectricMin && electricMinChecked && elecUnitsUsed <= electricMinUnit ? electricMinUnit * elecRate : elecUnitsUsed * elecRate)
                     : 0
 
                   const hasWaterCurr = item.waterCurr !== "" && item.waterCurr !== null && item.waterCurr !== undefined
-                  const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water") : 0
+                  const waterUnitsUsed = hasWaterCurr ? getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomId, "water") : 0
                   const waterCost = hasWaterCurr && waterUnitsUsed >= 0
                     ? (!item.waiveWaterMin && waterMinChecked && waterUnitsUsed <= waterMinUnit ? waterMinUnit * waterRate : waterUnitsUsed * waterRate)
                     : 0
                   
-                  const roomInfo = roomInfoByNumber.get(item.roomNumber)
+                  const roomInfo = roomInfoById.get(item.roomId)
                   const extraExpenses = roomInfo?.extraExpenses || []
                   const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
@@ -1848,9 +1911,9 @@ Thank you 🙏`
                     : item.isMeterSaved) || (showElectricColumns && isElectricInvalid) || (showWaterColumns && isWaterInvalid)
 
                   return (
-                    <tr key={item.roomNumber} className={`transition-colors border-b border-slate-100 dark:border-slate-800/60 ${isDark ? "hover:bg-slate-900/10" : "hover:bg-slate-50/50"}`}>
+                    <tr key={item.roomId} className={`transition-colors border-b border-slate-100 dark:border-slate-800/60 ${isDark ? "hover:bg-slate-900/10" : "hover:bg-slate-50/50"}`}>
                       {/* ห้อง */}
-                      <td className={`py-4 pl-3 font-semibold text-sm xl:text-base 2xl:text-lg ${isDark ? "text-slate-200" : "text-slate-700"}`}>{item.roomNumber}</td>
+                      <td className={`py-4 pl-3 font-semibold text-sm xl:text-base 2xl:text-lg ${isDark ? "text-slate-200" : "text-slate-700"}`}>{roomLabelOf(item)}</td>
                       
                       {/* ผู้เช่า / ค่าเช่าห้อง หรือ สถานะห้อง */}
                       <td className="py-4">
@@ -1965,12 +2028,12 @@ Thank you 🙏`
                                   type="text"
                                   inputMode="numeric"
                                   placeholder="0"
-                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                  disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                   className={`w-20 xl:w-24 2xl:w-28 text-right px-2 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                     isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                   }`}
                                   value={item.otherServiceAmount !== undefined ? item.otherServiceAmount : 0}
-                                  onChange={(e) => handleOtherServiceChange?.(item.roomNumber, e.target.value)}
+                                  onChange={(e) => handleOtherServiceChange?.(item.roomId, e.target.value)}
                                 />
                                 <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>{t("billing.baht_unit")}</span>
                               </div>
@@ -1988,12 +2051,12 @@ Thank you 🙏`
                                     type="text"
                                     inputMode="numeric"
                                     placeholder="0"
-                                    disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                    disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                     className={`w-14 xl:w-16 2xl:w-20 text-center px-1.5 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                       isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                     }`}
                                     value={item.lateDays !== undefined ? item.lateDays : 0}
-                                    onChange={(e) => handleLateDaysChange?.(item.roomNumber, e.target.value)}
+                                    onChange={(e) => handleLateDaysChange?.(item.roomId, e.target.value)}
                                   />
                                   <span className={`text-[11px] xl:text-xs 2xl:text-sm font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>{t("billing.days_unit")}</span>
                                 </div>
@@ -2081,14 +2144,14 @@ Thank you 🙏`
                               {item.isEdited ? (
                                 <button
                                   onClick={async () => {
-                                    await handleSaveLateDays?.(item.roomNumber);
+                                    await handleSaveLateDays?.(item.roomId);
                                     if (item.billStatus === "paid") {
-                                      setUnlockedPaidRooms(prev => ({ ...prev, [item.roomNumber]: false }));
+                                      setUnlockedPaidRooms(prev => ({ ...prev, [item.roomId]: false }));
                                     }
                                   }}
-                                  disabled={savingRows?.[item.roomNumber]}
+                                  disabled={savingRows?.[item.roomId]}
                                   className={`px-2.5 py-1 xl:py-1.5 border rounded text-xs xl:text-sm 2xl:text-base font-medium transition-colors flex items-center gap-1 xl:gap-1.5 cursor-pointer ${
-                                    savingRows?.[item.roomNumber]
+                                    savingRows?.[item.roomId]
                                       ? (isDark ? "border-slate-800/80 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                       : (isDark
                                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
@@ -2096,13 +2159,13 @@ Thank you 🙏`
                                   }`}
                                   title={locale === "en" ? "Save late penalty days to system" : "บันทึกจำนวนวันปรับล่าช้าลงระบบ"}
                                 >
-                                  {savingRows?.[item.roomNumber] ? (
+                                  {savingRows?.[item.roomId] ? (
                                     <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
                                   ) : (
                                     <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                   )}
                                   <span>
-                                    {savingRows?.[item.roomNumber] ? (locale === "en" ? "Saving..." : "กำลังบันทึก") : t("billing.save_bill")}
+                                    {savingRows?.[item.roomId] ? (locale === "en" ? "Saving..." : "กำลังบันทึก") : t("billing.save_bill")}
                                   </span>
                                 </button>
                               ) : item.billStatus === "pending" ? (
@@ -2123,7 +2186,7 @@ Thank you 🙏`
                                   {/* บันทึกชำระเงินค้างชำระ */}
                                   {item.billStatus === "unpaid" && (
                                     <button
-                                      onClick={() => handleMarkAsPaid(item.billId!, item.roomNumber)}
+                                      onClick={() => handleMarkAsPaid(item.billId!, item.roomId)}
                                       disabled={currentUserRole === "staff"}
                                       className={`px-2.5 py-1 xl:py-1.5 border rounded transition-colors flex items-center gap-1 xl:gap-1.5 ${
                                         currentUserRole === "staff"
@@ -2145,14 +2208,14 @@ Thank you 🙏`
                                   {item.billStatus === "paid" && (
                                     <button
                                       onClick={() => {
-                                        const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomNumber];
+                                        const isCurrentlyUnlocked = !!unlockedPaidRooms[item.roomId];
                                         setUnlockedPaidRooms(prev => ({
                                           ...prev,
-                                          [item.roomNumber]: !isCurrentlyUnlocked
+                                          [item.roomId]: !isCurrentlyUnlocked
                                         }));
                                       }}
                                       className={`px-2.5 py-1 xl:py-1.5 border rounded transition-colors text-xs xl:text-sm 2xl:text-base font-medium flex items-center gap-1 xl:gap-1.5 cursor-pointer ${
-                                        unlockedPaidRooms[item.roomNumber]
+                                        unlockedPaidRooms[item.roomId]
                                           ? isDark
                                             ? "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20"
                                             : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
@@ -2160,9 +2223,9 @@ Thank you 🙏`
                                             ? "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-850"
                                             : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                                       }`}
-                                      title={unlockedPaidRooms[item.roomNumber] ? t("billing.lock_edit_bill") : t("billing.unlock_edit_bill")}
+                                      title={unlockedPaidRooms[item.roomId] ? t("billing.lock_edit_bill") : t("billing.unlock_edit_bill")}
                                     >
-                                      {unlockedPaidRooms[item.roomNumber] ? (
+                                      {unlockedPaidRooms[item.roomId] ? (
                                         <>
                                           <X className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                           <span>{t("billing.cancel_edit")}</span>
@@ -2198,7 +2261,7 @@ Thank you 🙏`
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                 }`}
                                 value={item.elecPrev}
-                                onChange={(e) => handleElecPrevChange(item.roomNumber, e.target.value)}
+                                onChange={(e) => handleElecPrevChange(item.roomId, e.target.value)}
                               />
                             ) : (
                               <span className={`font-mono text-xs xl:text-sm 2xl:text-base px-2 py-0.5 xl:px-2.5 xl:py-1 rounded border ${
@@ -2215,12 +2278,12 @@ Thank you 🙏`
                               <input
                                 type="text"
                                 placeholder={t("billing.fill_number")}
-                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                 className={`w-24 xl:w-28 2xl:w-32 text-left pl-2 pr-8 py-1 xl:py-1.5 border rounded font-mono text-xs xl:text-sm 2xl:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-200 text-slate-800"
                                 }`}
                                 value={item.elecCurr}
-                                onChange={(e) => handleElecChange(item.roomNumber, e.target.value)}
+                                onChange={(e) => handleElecChange(item.roomId, e.target.value)}
                               />
                               <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[10px] xl:text-xs 2xl:text-sm font-medium pointer-events-none ${
                                 isDark ? "text-slate-500" : "text-slate-400"
@@ -2229,8 +2292,8 @@ Thank you 🙏`
                               </span>
                             </div>
                             {item.elecCurr !== "" && (() => {
-                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
-                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomNumber, "electric");
+                              const units = getUnitsUsedWithRollover(item.elecCurr, item.elecPrev, item.roomId, "electric");
+                              const isRollover = isMeterRollover(item.elecCurr, item.elecPrev, item.roomId, "electric");
                               if (units > 3000) {
                                   return (
                                     <div className="text-[11px] xl:text-xs 2xl:text-sm text-rose-600 dark:text-rose-450 font-medium flex items-center justify-center gap-1 mt-1">
@@ -2254,13 +2317,13 @@ Thank you 🙏`
                             })()}
                             <div className="block mt-1">
                               {(() => {
-                                const repl = getReplacement(item.roomNumber, "electric");
-                                const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                                const repl = getReplacement(item.roomId, "electric");
+                                const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomId];
                                 if (repl) {
                                   return (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "electric", repl)}
+                                      onClick={() => handleOpenReplacementModal(item.roomId, "electric", repl)}
                                       disabled={isDisabled}
                                       title={locale === "en" ? `Meter replaced mid-month: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (Click to edit/delete)` : `เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
                                       className={`inline-flex items-center gap-1 px-2 py-0.5 xl:px-2.5 xl:py-1 rounded border text-[11px] xl:text-xs 2xl:text-sm font-medium transition-colors ${
@@ -2277,7 +2340,7 @@ Thank you 🙏`
                                   return (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "electric")}
+                                      onClick={() => handleOpenReplacementModal(item.roomId, "electric")}
                                       disabled={isDisabled}
                                       className={`inline-flex items-center gap-1 px-2 py-0.5 xl:px-2.5 xl:py-1 rounded border border-dashed text-[11px] xl:text-xs 2xl:text-sm font-medium transition-colors ${
                                         isDark 
@@ -2305,7 +2368,7 @@ Thank you 🙏`
                                 : "-"}
                             </div>
                             {(() => {
-                              const repl = getReplacement(item.roomNumber, "electric");
+                              const repl = getReplacement(item.roomId, "electric");
                               if (repl && hasElecCurr && elecUnitsUsed >= 0 && elecUnitsUsed <= 3000) {
                                   return (
                                     <div 
@@ -2328,16 +2391,16 @@ Thank you 🙏`
                             <td className="py-4 text-center pr-2">
                               <button
                                 onClick={async () => {
-                                  await onSaveRowWithRolloverCheck(item.roomNumber, "electric");
+                                  await onSaveRowWithRolloverCheck(item.roomId, "electric");
                                 }}
-                                disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                                disabled={isSaveDisabled || savingRows?.[item.roomId]}
                                 className={`px-2.5 py-1 xl:py-1.5 border rounded text-xs xl:text-sm 2xl:text-base font-medium transition-colors flex items-center gap-1.5 mx-auto cursor-pointer ${
-                                  (isSaveDisabled || savingRows?.[item.roomNumber])
+                                  (isSaveDisabled || savingRows?.[item.roomId])
                                     ? (isDark ? "border-slate-800/80 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                     : (isDark ? "border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400" : "border-indigo-250 bg-indigo-50 hover:bg-indigo-100 text-indigo-700")
                                 }`}
                               >
-                                {savingRows?.[item.roomNumber] ? (
+                                {savingRows?.[item.roomId] ? (
                                   <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
                                 ) : (
                                   <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
@@ -2363,7 +2426,7 @@ Thank you 🙏`
                                   isDark ? "bg-slate-950 border-slate-800/80 text-slate-100" : "bg-white border-slate-250 text-slate-800"
                                 }`}
                                 value={item.waterPrev}
-                                onChange={(e) => handleWaterPrevChange(item.roomNumber, e.target.value)}
+                                onChange={(e) => handleWaterPrevChange(item.roomId, e.target.value)}
                               />
                             ) : (
                               <span className={`font-mono text-xs xl:text-sm 2xl:text-base px-3 py-1.5 rounded-lg border font-semibold inline-block ${
@@ -2380,14 +2443,14 @@ Thank you 🙏`
                               <input
                                 type="text"
                                 placeholder={t("billing.fill_number")}
-                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber])}
+                                disabled={!hasEdit || (item.billStatus === "paid" && !unlockedPaidRooms[item.roomId])}
                                 className={`w-32 xl:w-36 2xl:w-40 h-11 text-center font-mono text-sm xl:text-base 2xl:text-lg font-semibold rounded-xl border transition-all focus:outline-none focus:ring-4 disabled:opacity-60 disabled:cursor-not-allowed ${
                                   isDark 
                                     ? "bg-slate-950 border-slate-800/80 text-slate-100 placeholder:text-slate-600 focus:border-teal-500 focus:ring-teal-500/10" 
                                     : "bg-white border-slate-250 text-slate-800 placeholder:text-slate-400 focus:border-teal-500 focus:ring-teal-500/10"
                                 }`}
                                 value={item.waterCurr}
-                                onChange={(e) => handleWaterChange(item.roomNumber, e.target.value)}
+                                onChange={(e) => handleWaterChange(item.roomId, e.target.value)}
                               />
                               <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] xl:text-xs 2xl:text-sm font-bold pointer-events-none ${
                                 isDark ? "text-slate-500" : "text-slate-400"
@@ -2396,8 +2459,8 @@ Thank you 🙏`
                               </span>
                             </div>
                             {item.waterCurr !== "" && (() => {
-                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
-                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomNumber, "water");
+                              const units = getUnitsUsedWithRollover(item.waterCurr, item.waterPrev, item.roomId, "water");
+                              const isRollover = isMeterRollover(item.waterCurr, item.waterPrev, item.roomId, "water");
                               if (units > 3000) {
                                   return (
                                     <div className="text-[11px] xl:text-xs 2xl:text-sm text-rose-600 dark:text-rose-450 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg font-medium flex items-center justify-center gap-1 mt-1.5 max-w-[130px] mx-auto">
@@ -2421,13 +2484,13 @@ Thank you 🙏`
                             })()}
                             <div className="block mt-1.5">
                               {(() => {
-                                const repl = getReplacement(item.roomNumber, "water");
-                                const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomNumber];
+                                const repl = getReplacement(item.roomId, "water");
+                                const isDisabled = item.billStatus === "paid" && !unlockedPaidRooms[item.roomId];
                                 if (repl) {
                                   return (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "water", repl)}
+                                      onClick={() => handleOpenReplacementModal(item.roomId, "water", repl)}
                                       disabled={isDisabled}
                                       title={locale === "en" ? `Meter replaced mid-month: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (Click to edit/delete)` : `เปลี่ยนมิเตอร์กลางเดือน: ${repl.oldFinalReading} ➔ ${repl.newStartReading} (คลิกเพื่อแก้ไข/ลบ)`}
                                       className={`inline-flex items-center gap-1 px-2.5 py-1 xl:px-3 xl:py-1.5 rounded-xl border text-[11px] xl:text-xs 2xl:text-sm font-semibold transition-all ${
@@ -2444,7 +2507,7 @@ Thank you 🙏`
                                   return (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenReplacementModal(item.roomNumber, "water")}
+                                      onClick={() => handleOpenReplacementModal(item.roomId, "water")}
                                       disabled={isDisabled}
                                       className={`inline-flex items-center gap-1 px-2.5 py-1 xl:px-3 xl:py-1.5 rounded-xl border border-dashed text-[11px] xl:text-xs 2xl:text-sm font-semibold transition-all ${
                                         isDark 
@@ -2478,7 +2541,7 @@ Thank you 🙏`
                               )}
                             </div>
                             {(() => {
-                              const repl = getReplacement(item.roomNumber, "water");
+                              const repl = getReplacement(item.roomId, "water");
                               if (repl && hasWaterCurr && waterUnitsUsed >= 0 && waterUnitsUsed <= 3000) {
                                   return (
                                     <div 
@@ -2500,16 +2563,16 @@ Thank you 🙏`
                             <td className="py-4 text-center pr-2 bg-teal-500/[0.015] dark:bg-teal-500/[0.02] rounded-r-xl">
                               <button
                                 onClick={async () => {
-                                  await onSaveRowWithRolloverCheck(item.roomNumber, "water");
+                                  await onSaveRowWithRolloverCheck(item.roomId, "water");
                                 }}
-                                disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                                disabled={isSaveDisabled || savingRows?.[item.roomId]}
                                 className={`h-11 px-4 xl:px-5 rounded-xl text-xs xl:text-sm 2xl:text-base font-bold transition-all border flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
-                                  (isSaveDisabled || savingRows?.[item.roomNumber])
+                                  (isSaveDisabled || savingRows?.[item.roomId])
                                     ? (isDark ? "border-slate-850 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                     : (isDark ? "border-teal-500/20 bg-teal-500/10 hover:bg-teal-600 text-teal-400 hover:text-white" : "border-teal-200 bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white")
                                 }`}
                               >
-                                {savingRows?.[item.roomNumber] ? (
+                                {savingRows?.[item.roomId] ? (
                                   <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
                                 ) : (
                                   <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
@@ -2527,16 +2590,16 @@ Thank you 🙏`
                         <td className="py-4 text-center pr-2">
                           <button
                             onClick={async () => {
-                              await onSaveRowWithRolloverCheck(item.roomNumber, "all");
+                              await onSaveRowWithRolloverCheck(item.roomId, "all");
                             }}
-                            disabled={isSaveDisabled || savingRows?.[item.roomNumber]}
+                            disabled={isSaveDisabled || savingRows?.[item.roomId]}
                             className={`h-11 px-4 xl:px-5 rounded-xl text-xs xl:text-sm 2xl:text-base font-bold transition-all border flex items-center justify-center gap-1.5 mx-auto cursor-pointer ${
-                              (isSaveDisabled || savingRows?.[item.roomNumber])
+                              (isSaveDisabled || savingRows?.[item.roomId])
                                 ? (isDark ? "border-slate-850 bg-slate-950/20 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed")
                                 : (isDark ? "border-violet-500/20 bg-violet-500/10 hover:bg-violet-600 text-violet-400 hover:text-white" : "border-violet-200 bg-violet-50 hover:bg-violet-600 text-violet-700 hover:text-white")
                             }`}
                           >
-                            {savingRows?.[item.roomNumber] ? (
+                            {savingRows?.[item.roomId] ? (
                               <RefreshCw className="w-3.5 h-3.5 xl:w-4 xl:h-4 animate-spin" />
                             ) : (
                               <Save className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
@@ -2697,17 +2760,17 @@ Thank you 🙏`
                 <div className="space-y-2.5">
                   {connectedRooms.length > 0 ? (
                     connectedRooms.map(item => {
-                      const result = bulkSendResults[item.roomNumber]
-                      const isCopied = copiedRooms[item.roomNumber]
+                      const result = bulkSendResults[item.roomId]
+                      const isCopied = copiedRooms[item.roomId]
                       return (
-                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
+                        <div key={item.roomId} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
                           <div className="flex items-center gap-2 flex-nowrap min-w-0">
                             <span className={`font-black text-sm px-2.5 py-1 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>
-                              {t("billing.room_label").replace("{roomNumber}", item.roomNumber)}
+                              {t("billing.room_label").replace("{roomNumber}", roomLabelOf(item))}
                             </span>
                             <span className={`font-extrabold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                               <DynamicText>{item.tenantName}</DynamicText>
@@ -2725,7 +2788,7 @@ Thank you 🙏`
                               className={`h-8 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all shrink-0 ${
                                 !permissions.billing_copy_summary
                                   ? "bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
-                                  : copiedLinks[item.roomNumber]
+                                  : copiedLinks[item.roomId]
                                     ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                                     : isDark 
                                       ? "bg-slate-950 border-slate-850 hover:bg-slate-900 text-slate-200 cursor-pointer" 
@@ -2733,7 +2796,7 @@ Thank you 🙏`
                               }`}
                               title={!permissions.billing_copy_summary ? (locale === "en" ? "You do not have permission to copy portal link" : "คุณไม่มีสิทธิ์ในการคัดลอกลิงก์ portal") : undefined}
                             >
-                              {copiedLinks[item.roomNumber] ? (
+                              {copiedLinks[item.roomId] ? (
                                 <>
                                   <Check className="w-3.5 h-3.5 text-emerald-500" />
                                   <span className="whitespace-nowrap">{t("billing.copied_success")}</span>
@@ -2750,10 +2813,10 @@ Thank you 🙏`
                               <button
                                 onClick={() => {
                                   if (item.billStatus === "paid") {
-                                    alert(locale === "en" ? `Room ${item.roomNumber} is already paid` : `ห้อง ${item.roomNumber} ชำระเงินแล้ว`)
+                                    alert(locale === "en" ? `Room ${roomLabelOf(item)} is already paid` : `ห้อง ${roomLabelOf(item)} ชำระเงินแล้ว`)
                                     return
                                   }
-                                  handleSendLine(item.roomNumber)
+                                  handleSendLine(item.roomId)
                                 }}
                                 disabled={!permissions.billing_send_line}
                                 className={`h-8 px-3 rounded-lg text-sm font-black flex items-center justify-center gap-1.5 transition-all shadow-sm ${
@@ -2765,18 +2828,18 @@ Thank you 🙏`
                                         ? "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/30 hover:text-emerald-300 cursor-pointer" 
                                         : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-800 cursor-pointer"
                                 }`}
-                                title={!permissions.billing_send_line ? (locale === "en" ? "You do not have permission to send LINE OA" : "คุณไม่มีสิทธิ์ในการส่ง LINE OA") : item.billStatus === "paid" ? (locale === "en" ? `Room ${item.roomNumber} is paid` : `ห้อง ${item.roomNumber} ชำระเงินแล้ว`) : undefined}
+                                title={!permissions.billing_send_line ? (locale === "en" ? "You do not have permission to send LINE OA" : "คุณไม่มีสิทธิ์ในการส่ง LINE OA") : item.billStatus === "paid" ? (locale === "en" ? `Room ${roomLabelOf(item)} is paid` : `ห้อง ${roomLabelOf(item)} ชำระเงินแล้ว`) : undefined}
                               >
                                 <Send className="w-3 h-3" />
                                 <span className="whitespace-nowrap">{t("billing.send_line_oa")}</span>
                               </button>
                             )}
-                            {bulkSendingStatus === "sending" && bulkSendingProgress.currentRoom === item.roomNumber && (
+                            {bulkSendingStatus === "sending" && bulkSendingProgress.currentRoom === item.roomId && (
                               <span className="text-sm font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 animate-pulse whitespace-nowrap">
                                 {t("billing.sending")}
                               </span>
                             )}
-                            {bulkSendingStatus === "sending" && !result && bulkSendingProgress.currentRoom !== item.roomNumber && (
+                            {bulkSendingStatus === "sending" && !result && bulkSendingProgress.currentRoom !== item.roomId && (
                               <span className="text-sm font-semibold text-slate-450 dark:text-slate-500 whitespace-nowrap">
                                 {t("billing.queueing")}
                               </span>
@@ -2825,16 +2888,16 @@ Thank you 🙏`
 
                   {unconnectedRooms.length > 0 ? (
                     unconnectedRooms.map(item => {
-                      const isCopied = copiedRooms[item.roomNumber]
+                      const isCopied = copiedRooms[item.roomId]
                       return (
-                        <div key={item.roomNumber} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
+                        <div key={item.roomId} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border text-sm gap-3.5 transition-all ${
                           isDark ? "bg-slate-900/60 border-slate-850" : "bg-white border-slate-200"
                         }`}>
                           <div className="flex items-center gap-2 flex-nowrap min-w-0">
                             <span className={`font-black text-sm px-2.5 py-1 rounded-lg border shrink-0 ${
                               isDark ? "bg-slate-950 text-slate-200 border-slate-800" : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>
-                              {t("billing.room_label").replace("{roomNumber}", item.roomNumber)}
+                              {t("billing.room_label").replace("{roomNumber}", roomLabelOf(item))}
                             </span>
                             <span className={`font-extrabold truncate max-w-[140px] sm:max-w-none ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                               <DynamicText>{item.tenantName}</DynamicText>
@@ -2860,7 +2923,7 @@ Thank you 🙏`
                               }`}
                               title={!permissions.billing_download_pdf ? (locale === "en" ? "You do not have permission to download PDF" : "คุณไม่มีสิทธิ์ในการดาวน์โหลด PDF") : undefined}
                             >
-                              {downloadingPdfId === item.roomNumber ? (
+                              {downloadingPdfId === item.roomId ? (
                                 <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
                               ) : (
                                 <>
@@ -2918,7 +2981,7 @@ Thank you 🙏`
               }`}>
                 <div className="flex justify-between text-sm font-bold font-mono">
                   <span className={isDark ? "text-slate-300" : "text-slate-700"}>
-                    {t("billing.sending_room").replace("{roomNumber}", bulkSendingProgress.currentRoom)}
+                    {t("billing.sending_room").replace("{roomNumber}", bulkSendingProgress.currentRoomLabel)}
                   </span>
                   <span className="text-blue-500">
                     {bulkSendingProgress.current} / {bulkSendingProgress.total} {t("billing.rooms_count_unit")}
@@ -3094,7 +3157,7 @@ Thank you 🙏`
                   <strong className="text-yellow-500 font-extrabold">
                     {usageAnomalyConfirm.isBulk
                       ? t("billing.all_anomaly_rooms")
-                      : t("billing.room_label").replace("{roomNumber}", usageAnomalyConfirm.rooms[0]?.roomNumber || "")}
+                      : t("billing.room_label").replace("{roomNumber}", usageAnomalyConfirm.rooms[0]?.roomLabel || "")}
                   </strong>
                 </p>
               </div>
@@ -3108,8 +3171,8 @@ Thank you 🙏`
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
                   {usageAnomalyConfirm.rooms.map(r => (
-                    <li key={r.roomNumber}>
-                      <strong className="text-yellow-600 dark:text-yellow-400">{t("billing.room_label").replace("{roomNumber}", r.roomNumber)}</strong>
+                    <li key={r.roomId}>
+                      <strong className="text-yellow-600 dark:text-yellow-400">{t("billing.room_label").replace("{roomNumber}", r.roomLabel)}</strong>
                       {r.elecAbnormal && <>{" — "}{t("billing.usage_anomaly_elec_detail").replace("{units}", String(r.elecUnits)).replace("{avg}", r.elecAvg.toFixed(1))}</>}
                       {r.waterAbnormal && <>{" — "}{t("billing.usage_anomaly_water_detail").replace("{units}", String(r.waterUnits)).replace("{avg}", r.waterAvg.toFixed(1))}</>}
                     </li>

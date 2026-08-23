@@ -367,7 +367,7 @@ export default function TaxPage() {
       // เก็บข้อมูล "ดิบ" ที่ query มาแล้วระหว่างทาง (ก่อนแปลงรูปเป็น state เฉพาะของหน้านี้) ไว้ส่งต่อให้
       // loadTaxDataset() ใช้แทนการยิง query ซ้ำเอง — ดูจุดที่เรียกท้ายฟังก์ชันนี้ (ลด query ซ้ำซ้อน 6 คำสั่ง
       // ระหว่าง pipeline เดิมกับ pipeline ของฟีเจอร์ VAT/ภ.พ.30 ซึ่งเป็นสาเหตุหลักที่ทำให้ 2 ฝั่งโหลดไม่พร้อมกัน)
-      let prefetchRooms: { roomNumber: string; baseRent: number }[] | undefined
+      let prefetchRooms: { roomNumber: string; roomId?: string | null; baseRent: number }[] | undefined
       let prefetchTenants: Awaited<ReturnType<typeof getTenants>>["data"] | undefined
       let prefetchCancelledContracts: Awaited<ReturnType<typeof getCancelledContracts>>["data"] | undefined
       let prefetchFinanceSettings: Awaited<ReturnType<typeof getFinanceSettings>>["data"] | undefined
@@ -559,6 +559,9 @@ export default function TaxPage() {
                 if (roomsRes.success && roomsRes.data) {
                   const mappedRooms = roomsRes.data.map((r: any) => ({
                     roomNumber: r.roomNumber,
+                    // roomId ต้องติดไปด้วย ไม่งั้น adapter ภาษีจับคู่บิลกับห้องด้วยเลขห้อง
+                    // ซึ่งกำกวมเมื่อหอมีหลายตึกใช้เลขห้องซ้ำกัน (ดู findRoom ใน lib/tax/adapter.ts)
+                    roomId: r.id ?? null,
                     baseRent: Number(r.baseRent)
                   }))
                   setRooms(mappedRooms)

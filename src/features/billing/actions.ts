@@ -2,9 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
-import { verifyPortalToken } from "@/features/tenant/actions"
+import { verifyPortalToken, type PortalRoomRef } from "@/features/tenant/actions"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { calculateLateDays } from "./utils"
+import { calculateLateDays, buildInvoiceId } from "./utils"
+import type { RoomRef } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, getMeterReplacements } from "@/features/meter/actions"
 import { getFinanceSettings, type FinanceSettings } from "@/features/finance/actions"
@@ -136,14 +137,17 @@ export async function getRoomUsageAverages(workspaceId: string, currentCycle: st
 
     const { data, error } = await supabase
       .from("bills")
-      .select("room_number, electric_units, water_units")
+      .select("room_id, electric_units, water_units")
       .eq("workspace_id", workspaceId)
       .in("billing_cycle", previousCycles)
     if (error) throw error
 
+    // คีย์ด้วย room_id — ถ้าคีย์ด้วยเลขห้อง ค่าเฉลี่ยของห้อง 101 สองอาคารจะถูกเฉลี่ยรวมกัน
+    // แล้วคำเตือน "เลขมิเตอร์ผิดปกติ" จะเทียบกับค่าที่ไม่ใช่ของห้องนั้น
     const totals = new Map<string, { elecSum: number; waterSum: number; count: number }>()
     for (const row of data) {
-      const key = row.room_number
+      const key = row.room_id
+      if (!key) continue
       const entry = totals.get(key) || { elecSum: 0, waterSum: 0, count: 0 }
       entry.elecSum += Number(row.electric_units) || 0
       entry.waterSum += Number(row.water_units) || 0
@@ -152,8 +156,8 @@ export async function getRoomUsageAverages(workspaceId: string, currentCycle: st
     }
 
     const averages: Record<string, { avgElec: number; avgWater: number; sampleCount: number }> = {}
-    for (const [roomNumber, entry] of totals) {
-      averages[roomNumber] = {
+    for (const [roomId, entry] of totals) {
+      averages[roomId] = {
         avgElec: entry.elecSum / entry.count,
         avgWater: entry.waterSum / entry.count,
         sampleCount: entry.count
@@ -168,7 +172,7 @@ export async function getRoomUsageAverages(workspaceId: string, currentCycle: st
 }
 
 export async function createBill(
-  roomNumber: string,
+  room: RoomRef,
   tenantName: string,
   amount: number,
   status: "unpaid" | "pending" | "paid",
@@ -203,22 +207,29 @@ export async function createBill(
     const settings = financeRes.data
 
     // 3. Fetch room details
+    // จับด้วย rooms.id (uuid ที่ unique ทั้งระบบ) ไม่ใช่เลขห้อง — เลขห้องซ้ำกันได้ข้ามอาคาร
+    // ดึงรหัสอาคารมาด้วยเพื่อประกอบเลขใบกำกับให้ไม่ซ้ำระหว่างสองอาคารที่ใช้เลขห้องเดียวกัน
     const { data: roomData, error: roomError } = await supabase
       .from("rooms")
       .select(`
         *,
         room_types (
           default_rent
+        ),
+        buildings (
+          code
         )
       `)
-      .eq("room_number", roomNumber)
+      .eq("id", room.roomId)
       .eq("workspace_id", workspaceId)
       .maybeSingle()
 
     if (roomError) throw roomError
     if (!roomData) {
-      return { success: false, error: `ไม่พบข้อมูลห้องพักเลขที่ ${roomNumber}` }
+      return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
     }
+    const roomNumber: string = roomData.room_number
+    const buildingCode: string | null = (roomData.buildings as { code?: string | null } | null)?.code ?? null
 
     const baseRent = roomData.room_types ? Number(roomData.room_types.default_rent) : Number(roomData.base_rent || 0)
     const waiveElectricMin = !!roomData.waive_electric_min
@@ -270,14 +281,18 @@ export async function createBill(
     const finalBillAmount = serverCalculatedTotal
 
     // Check if a bill already exists for this room and cycle
-    // กรอง workspace_id ด้วย ไม่พึ่ง RLS อย่างเดียว — super_admin ที่ถือ support grant หลายหอ
-    // จะเห็นหลายแถวแล้ว maybeSingle() พังทันที (ดูหมายเหตุเดียวกันใน saveMeterRecord)
+    // จับด้วย room_id — เลขห้องซ้ำกันได้ข้ามอาคาร (ดูหมายเหตุเดียวกันใน saveMeterRecord)
+    // ยังกรอง workspace_id ด้วย ไม่พึ่ง RLS อย่างเดียว — super_admin ที่ถือ support grant หลายหอ
+    // จะเห็นหลายแถวแล้ว maybeSingle() พังทันที
+    // กรอง bill_kind = 'regular' ด้วย — ห้องเดียวกันในรอบเดียวกันมีบิลปิดรอบตอนย้ายห้องอยู่ได้อีกใบ
+    // ถ้าไม่กรอง maybeSingle() จะเจอ 2 แถวแล้ว error ทันที (bug ที่มีอยู่ก่อน patch room_id)
     const { data: existing } = await supabase
       .from("bills")
       .select("id, penalty_amount, invoice_id")
       .eq("workspace_id", workspaceId)
-      .eq("room_number", roomNumber)
+      .eq("room_id", room.roomId)
       .eq("billing_cycle", billingCycle)
+      .eq("bill_kind", "regular")
       .maybeSingle()
 
     let result
@@ -286,7 +301,8 @@ export async function createBill(
       const existingPenalty = Number(existing.penalty_amount || 0)
       const finalAmount = finalBillAmount + existingPenalty
       
-      const invoiceId = (existing as any).invoice_id || `INV-${billingCycle.replace('-', '')}-${roomNumber}`
+      // บิลที่มีอยู่แล้วคงเลขเดิมเสมอ — ห้ามให้การออกบิลซ้ำเปลี่ยนเลขบนใบที่ผู้เช่าถืออยู่
+      const invoiceId = existing.invoice_id || buildInvoiceId(billingCycle, roomNumber, buildingCode)
 
       result = await supabase
         .from("bills")
@@ -313,6 +329,7 @@ export async function createBill(
           room_number: roomNumber,
           // เขียน room_id ควบคู่กับ room_number (ดูหมายเหตุที่ branch update ด้านบน)
           room_id: roomData.id,
+          bill_kind: "regular",
           tenant_name: tenantName,
           amount: finalBillAmount,
           status,
@@ -322,7 +339,7 @@ export async function createBill(
           other_service_amount: otherServiceAmount,
           late_days: null,
           penalty_amount: null,
-          invoice_id: `INV-${billingCycle.replace('-', '')}-${roomNumber}`,
+          invoice_id: buildInvoiceId(billingCycle, roomNumber, buildingCode),
           building_id: roomData.building_id ?? null,
           vat_amount: vatAmount
         }])
@@ -347,7 +364,7 @@ export async function updateBillStatus(
   status: "unpaid" | "pending" | "paid",
   slipUrl?: string | null,
   amount?: number,
-  portalAuth?: { workspaceId: string; roomNumber: string; token: string }
+  portalAuth?: { workspaceId: string; room: PortalRoomRef; token: string }
 ) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -378,8 +395,12 @@ export async function updateBillStatus(
       }
 
       // เส้นทางที่ 2: หน้า Portal แบบไม่ต้อง Login (ไม่มี session ให้ RLS ตรวจ) - ตรวจสอบผ่าน token เซ็นชื่อแทน
-      if (!isOwner && portalAuth?.workspaceId && portalAuth?.roomNumber && portalAuth?.token) {
-        const tokenValid = await verifyPortalToken(portalAuth.workspaceId, portalAuth.roomNumber, portalAuth.token)
+      if (!isOwner && portalAuth?.workspaceId && portalAuth?.room && portalAuth?.token) {
+        // คีย์ที่ใช้เซ็น token ต้องตรงกับตัวระบุห้องที่อยู่ในลิงก์จริง — ลิงก์ใหม่เซ็นด้วย rooms.id
+        // ลิงก์เก่าที่ยังค้างใน LINE เซ็นด้วยเลขห้อง (ดู PortalRoomRef ใน tenant/actions.ts)
+        const portalRoom = portalAuth.room
+        const roomKey = "roomId" in portalRoom ? portalRoom.roomId : portalRoom.roomNumber
+        const tokenValid = await verifyPortalToken(portalAuth.workspaceId, roomKey, portalAuth.token)
         if (tokenValid) {
           const url = process.env.NEXT_PUBLIC_SUPABASE_URL
           const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -387,13 +408,15 @@ export async function updateBillStatus(
             const checkClient = createSupabaseClient(url, serviceKey, {
               auth: { persistSession: false, autoRefreshToken: false }
             })
-            const { data: scopedBill } = await checkClient
+            let scopedQuery = checkClient
               .from("bills")
               .select("id")
               .eq("id", id)
               .eq("workspace_id", portalAuth.workspaceId)
-              .eq("room_number", portalAuth.roomNumber)
-              .maybeSingle()
+            scopedQuery = "roomId" in portalRoom
+              ? scopedQuery.eq("room_id", portalRoom.roomId)
+              : scopedQuery.eq("room_number", portalRoom.roomNumber)
+            const { data: scopedBill } = await scopedQuery.maybeSingle()
             if (scopedBill) isOwner = true
           }
         }
@@ -856,7 +879,10 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
     const calculatedPenaltyAmount = lateDays * latePenaltyRate
 
     // 5. Fetch room details
-    const { data: roomData, error: roomError } = await activeClient
+    // จับด้วย room_id ของบิลใบนี้ — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้องจะได้ค่าเช่า
+    // ของห้องผิดอาคาร แล้วยอดบิลที่คำนวณใหม่ตอนคิดค่าปรับจะเพี้ยน
+    // (ถอยไปเทียบเลขห้องเฉพาะบิลเก่าที่ยังไม่มี room_id)
+    let roomQuery = activeClient
       .from("rooms")
       .select(`
         *,
@@ -864,9 +890,11 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
           default_rent
         )
       `)
-      .eq("room_number", billData.room_number)
       .eq("workspace_id", workspaceId)
-      .maybeSingle()
+    roomQuery = billData.room_id
+      ? roomQuery.eq("id", billData.room_id)
+      : roomQuery.eq("room_number", billData.room_number)
+    const { data: roomData, error: roomError } = await roomQuery.maybeSingle()
 
     if (roomError) {
       console.error("🖥️ [Server Action] Room fetch error:", roomError)
@@ -1008,6 +1036,8 @@ export async function getBillingPageData(
 }
 
 export interface BulkBillItem {
+  /** rooms.id — ตัวจับคู่ห้องที่แท้จริง (roomNumber ใช้แค่ในข้อความรายงานห้องที่ถูกข้าม) */
+  roomId: string
   roomNumber: string
   tenantName: string | null
   elecPrev: number
@@ -1044,20 +1074,24 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
 
     const { data: roomsData, error: roomsError } = await supabase
       .from("rooms")
-      .select(`*, room_types (default_rent)`)
+      .select(`*, room_types (default_rent), buildings (code)`)
       .eq("workspace_id", workspaceId)
     if (roomsError) throw roomsError
-    const roomsMap = new Map(roomsData.map(r => [r.room_number, r]))
+    // ดัชนีคีย์ด้วย rooms.id — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าคีย์ด้วยเลขห้อง ห้อง 101 ของตึกที่สอง
+    // จะทับตัวแรกในดัชนี แล้วบิลของทั้งสองห้องจะใช้ค่าเช่า/อาคารของห้องเดียวกัน
+    const roomsMap = new Map(roomsData.map(r => [r.id as string, r]))
 
     // 1.7 ดึงบิลที่มีอยู่แล้วของรอบนี้มาก่อน "ครั้งเดียว" — กันไม่ให้การออกบิลซ้ำ (เช่น แก้เลขมิเตอร์แล้วกดออกบิลใหม่)
     // ไปเขียนทับค่าปรับล่าช้า/จำนวนวันที่บันทึกไว้แล้วของห้องที่มีอยู่ก่อน (ตรงกับ logic ป้องกันเดียวกับ createBill)
     const { data: existingBillsData, error: existingBillsError } = await supabase
       .from("bills")
-      .select("room_number, penalty_amount, late_days")
+      .select("room_id, penalty_amount, late_days")
       .eq("workspace_id", workspaceId)
       .eq("billing_cycle", billingCycle)
+      // เฉพาะบิลรอบปกติ — บิลปิดรอบตอนย้ายห้องเป็นอีกใบ ไม่ใช่ใบที่กำลังจะเขียนทับ
+      .eq("bill_kind", "regular")
     if (existingBillsError) throw existingBillsError
-    const existingBillsMap = new Map(existingBillsData.map(b => [b.room_number, b]))
+    const existingBillsMap = new Map(existingBillsData.map(b => [b.room_id as string, b]))
 
     // 1.5 ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของรอบนี้มาครั้งเดียว
     let buildingBillsMap = new Map<string, BuildingUtilityBill>()
@@ -1082,14 +1116,17 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const elecVal = item.elecCurr === "" ? null : Number(item.elecCurr)
       const waterVal = item.waterCurr === "" ? null : Number(item.waterCurr)
 
-      const roomData = roomsMap.get(item.roomNumber)
+      const roomData = roomsMap.get(item.roomId)
+      // ห้องที่หาไม่เจอใน workspace นี้ ห้ามเขียนอะไรลงไปเลย — แถวที่ room_id เป็น null
+      // จะไม่ถูก unique constraint คุ้มกัน แล้วการกดบันทึกซ้ำจะสร้างแถวซ้ำเพิ่มทุกครั้ง
+      if (!roomData) { skippedRooms.push(item.roomNumber); continue }
 
       meterRows.push({
         workspace_id: workspaceId,
-        room_number: item.roomNumber,
+        room_number: roomData.room_number,
         // เขียน room_id ควบคู่ไปด้วย (ตัวระบุห้องที่แท้จริง) เพื่อให้แถวใหม่พร้อมสำหรับการเปลี่ยนไป
         // จับคู่ด้วย room_id แทน room_number ที่ซ้ำกันได้ข้ามตึก — ดู database_patch_add_room_id_to_meters_bills.sql
-        room_id: roomData?.id ?? null,
+        room_id: roomData.id,
         billing_cycle: billingCycle,
         elec_prev: item.elecPrev,
         elec_curr: elecVal,
@@ -1098,8 +1135,6 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       })
 
       if (!item.tenantName) continue  // ไม่มีผู้เช่า ไม่ต้องออกบิล (ตาม logic เดิม)
-
-      if (!roomData) { skippedRooms.push(item.roomNumber); continue }
 
       // Resolve อัตราไฟฟ้า/น้ำตามโหมดของ workspace — ถ้า building_total ยังไม่ได้กรอกยอดของอาคารนี้
       // ในรอบบิลนี้ ให้ข้ามห้องนี้ไปก่อน (ห้ามเดา/ใช้อัตราคงที่แทนแบบเงียบๆ) ห้องอื่นที่ไม่ติดเงื่อนไขนี้ยังออกบิลต่อได้ปกติ
@@ -1124,14 +1159,15 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       })
 
       // ป้องกันยอดเงินรวม/ค่าปรับล่าช้าโดนทับ หากห้องนี้มีบิลของรอบนี้อยู่แล้ว (ตรงกับ logic เดียวกับ createBill)
-      const existingBill = existingBillsMap.get(item.roomNumber)
+      const existingBill = existingBillsMap.get(roomData.id as string)
       const existingPenalty = Number(existingBill?.penalty_amount || 0)
 
       billRows.push({
         workspace_id: workspaceId,
-        room_number: item.roomNumber,
+        room_number: roomData.room_number,
         // เขียน room_id ควบคู่ไปด้วย (ดูหมายเหตุที่ meterRows ด้านบน)
         room_id: roomData.id,
+        bill_kind: "regular",
         tenant_name: item.tenantName,
         amount: total + existingPenalty,
         status: item.status,
@@ -1139,7 +1175,7 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         electric_units: eUnits,
         water_units: wUnits,
         other_service_amount: item.otherServiceAmount,
-        invoice_id: `INV-${billingCycle.replace(/-/g, "")}-${item.roomNumber}`,
+        invoice_id: buildInvoiceId(billingCycle, roomData.room_number, (roomData.buildings as { code?: string | null } | null)?.code ?? null),
         building_id: roomData.building_id ?? null,
         vat_amount: vatAmount,
         // บิลใหม่ (ไม่เคยมีมาก่อน) ต้องเป็น null เสมอ เพื่อให้หน้าจัดการใบแจ้งหนี้คำนวณวันล่าช้าสดจากวันที่ปัจจุบัน
@@ -1153,13 +1189,15 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
     // 3. บันทึกเป็น bulk upsert 2 ครั้ง (แทน N×2 ครั้ง)
     const { data: savedMeters, error: meterErr } = await supabase
       .from("meter_records")
-      .upsert(meterRows, { onConflict: "workspace_id,room_number,billing_cycle" })
+      .upsert(meterRows, { onConflict: "workspace_id,room_id,billing_cycle" })
       .select()
     if (meterErr) throw meterErr
 
     const { data: savedBills, error: billErr } = await supabase
       .from("bills")
-      .upsert(billRows, { onConflict: "workspace_id,invoice_id" })
+      // ต้องมี bill_kind ใน conflict target ให้ตรงกับ unique constraint ของ bills
+      // (workspace_id, room_id, billing_cycle, bill_kind) — บิลปิดรอบตอนย้ายห้องเป็นอีกใบของห้องเดียวกัน
+      .upsert(billRows, { onConflict: "workspace_id,room_id,billing_cycle,bill_kind" })
       .select()
     if (billErr) throw billErr
 

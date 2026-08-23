@@ -136,7 +136,7 @@ async function assertTaxAccess(workspaceId: string) {
  * (ดูหมายเหตุที่เรียกใช้ใน tax/page.tsx สำหรับที่มาของ parallel fetch นี้)
  */
 export interface LoadTaxDatasetPrefetch {
-  rooms?: { roomNumber: string; baseRent: number }[]
+  rooms?: { roomNumber: string; roomId?: string | null; baseRent: number }[]
   tenants?: Awaited<ReturnType<typeof getTenants>>["data"]
   cancelledContracts?: Awaited<ReturnType<typeof getCancelledContracts>>["data"]
   financeSettings?: Awaited<ReturnType<typeof getFinanceSettings>>["data"]
@@ -212,6 +212,7 @@ export async function loadTaxDataset(workspaceId: string, year: number, prefetch
     // แล้วเอา vat แนบแยกต่างหาก — ไม่งั้น VAT จะถูกนับซ้ำเป็นฐานรายได้ 40(8) เพิ่มขึ้นมาอีกก้อน
     const horsetBills = bills.map((b) => ({
       roomNumber: b.roomNumber,
+      roomId: b.roomId ?? null,
       amount: Number(b.amount) - Number(b.vatAmount || 0),
       status: b.status,
       billingCycle: b.billingCycle,
@@ -225,11 +226,13 @@ export async function loadTaxDataset(workspaceId: string, year: number, prefetch
     // rooms มาจาก prefetch ได้เลย (หน้าเรียกอยู่แล้วในรูปแบบ {roomNumber, baseRent} สำเร็จรูป) หรือ map จาก getRooms() สด
     const horsetRooms = prefetch?.rooms ?? rooms.map((r) => ({
       roomNumber: r.roomNumber,
+      roomId: r.id ?? null,
       baseRent: Number(r.baseRent || 0),
     }))
 
     const horsetTenants = tenants.map((t) => ({
       roomNumber: t.roomNumber,
+      roomId: t.roomId ?? null,
       contractStart: t.contractStart || null,
     }))
 

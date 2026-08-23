@@ -249,7 +249,7 @@ function RoomsContent() {
   const [waiveWaterMin, setWaiveWaterMin] = useState(false)
   const [extraExpenses, setExtraExpenses] = useState<{ name: string; amount: number }[]>([])
   const [newRoomBuildingId, setNewRoomBuildingId] = useState("")
-  const [buildings, setBuildings] = useState<{ id: string; name: string; address?: string | null }[]>([])
+  const [buildings, setBuildings] = useState<{ id: string; name: string; code?: string | null; address?: string | null }[]>([])
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [roomFormError, setRoomFormError] = useState<string | null>(null)
 
@@ -258,10 +258,12 @@ function RoomsContent() {
   const [buildingsLoading, setBuildingsLoading] = useState(false)
   const [buildingFilter, setBuildingFilter] = useState<string>("all")
   const [newBuildingName, setNewBuildingName] = useState("")
+  const [newBuildingCode, setNewBuildingCode] = useState("")
   const [newBuildingAddress, setNewBuildingAddress] = useState("")
   const [buildingSubmitting, setBuildingSubmitting] = useState(false)
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null)
   const [editingBuildingName, setEditingBuildingName] = useState("")
+  const [editingBuildingCode, setEditingBuildingCode] = useState("")
   const [editingBuildingAddress, setEditingBuildingAddress] = useState("")
 
   // Room Type Form State (inside Manage Types modal)
@@ -704,7 +706,7 @@ function RoomsContent() {
       getBuildings(wsId).then(res => {
         if (currentFetchId !== fetchCounterRef.current) return
         if (res.success && res.data) {
-          setBuildings(res.data.map(b => ({ id: b.id, name: b.name, address: b.address })))
+          setBuildings(res.data.map(b => ({ id: b.id, name: b.name, code: b.code, address: b.address })))
         }
       })
 
@@ -1036,10 +1038,11 @@ function RoomsContent() {
     if (!newBuildingName.trim()) return
     setBuildingSubmitting(true)
     try {
-      const res = await createBuilding(newBuildingName, newBuildingAddress)
+      const res = await createBuilding(newBuildingName, newBuildingAddress, newBuildingCode)
       if (res.success && res.data) {
-        setBuildings(prev => [...prev, { id: res.data!.id, name: res.data!.name, address: res.data!.address }].sort((a, b) => a.name.localeCompare(b.name)))
+        setBuildings(prev => [...prev, { id: res.data!.id, name: res.data!.name, code: res.data!.code, address: res.data!.address }].sort((a, b) => a.name.localeCompare(b.name)))
         setNewBuildingName("")
+        setNewBuildingCode("")
         setNewBuildingAddress("")
         showToast("เพิ่มอาคารสำเร็จ", "success")
       } else {
@@ -1050,9 +1053,10 @@ function RoomsContent() {
     }
   }
 
-  const handleStartEditBuilding = (b: { id: string; name: string; address?: string | null }) => {
+  const handleStartEditBuilding = (b: { id: string; name: string; code?: string | null; address?: string | null }) => {
     setEditingBuildingId(b.id)
     setEditingBuildingName(b.name)
+    setEditingBuildingCode(b.code || "")
     setEditingBuildingAddress(b.address || "")
   }
 
@@ -1060,9 +1064,9 @@ function RoomsContent() {
     if (!editingBuildingName.trim()) return
     setBuildingSubmitting(true)
     try {
-      const res = await updateBuilding(id, editingBuildingName, editingBuildingAddress)
+      const res = await updateBuilding(id, editingBuildingName, editingBuildingAddress, editingBuildingCode)
       if (res.success && res.data) {
-        setBuildings(prev => prev.map(b => b.id === id ? { id: res.data!.id, name: res.data!.name, address: res.data!.address } : b).sort((a, b) => a.name.localeCompare(b.name)))
+        setBuildings(prev => prev.map(b => b.id === id ? { id: res.data!.id, name: res.data!.name, code: res.data!.code, address: res.data!.address } : b).sort((a, b) => a.name.localeCompare(b.name)))
         setEditingBuildingId(null)
         showToast("แก้ไขอาคารสำเร็จ", "success")
       } else {
@@ -1146,7 +1150,7 @@ function RoomsContent() {
 
     try {
       const res = await createTenant(
-        selectedRoom.roomNumber,
+        { roomId: selectedRoom.id },
         tenantNameInput,
         tenantPhoneInput,
         null, // lineUserId is null, waiting for Line LIFF registration!
@@ -1274,7 +1278,7 @@ function RoomsContent() {
     try {
       const res = await updateTenant(
         selectedRoom.tenantId,
-        selectedRoom.roomNumber,
+        { roomId: selectedRoom.id },
         editTenantName,
         editTenantPhone,
         selectedRoom.lineUserId || null,
@@ -1383,7 +1387,7 @@ function RoomsContent() {
         // 1. ถ้าเป็นการย้ายออกล่วงหน้า ให้ปล่อยผู้เช่าค้างในห้องพักไปก่อน แต่เปลี่ยนวันสิ้นสุดสัญญา (lease_end) เป็นวันที่ย้ายออกจริง
         const updateRes = await updateTenant(
           selectedRoom.tenantId,
-          selectedRoom.roomNumber,
+          { roomId: selectedRoom.id },
           selectedRoom.tenantName || "",
           selectedRoom.tenantPhone || "",
           selectedRoom.lineUserId || null,
@@ -1450,7 +1454,7 @@ function RoomsContent() {
     try {
       // ดึงเลขมิเตอร์น้ำไฟรอบล่าสุดเพื่อสืบทอด
       const { getLatestMeterRecord } = await import("@/features/meter/actions")
-      const meterRes = await getLatestMeterRecord(room.roomNumber, getCookie("horset_current_workspace_id") || undefined)
+      const meterRes = await getLatestMeterRecord({ roomId: room.id }, getCookie("horset_current_workspace_id") || undefined)
       
       if (meterRes.success && meterRes.data) {
         const record = meterRes.data
@@ -1572,7 +1576,7 @@ function RoomsContent() {
         const { saveMeterRecord } = await import("@/features/meter/actions")
         
         const currentMeterRes = await saveMeterRecord(
-          refundingRoom.roomNumber,
+          { roomId: refundingRoom.id },
           currentCycle,
           prevElec,
           fElec,
@@ -1597,7 +1601,7 @@ function RoomsContent() {
         const nextCycle = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
         
         const nextMeterRes = await saveMeterRecord(
-          refundingRoom.roomNumber,
+          { roomId: refundingRoom.id },
           nextCycle,
           fElec,
           "", // current value is empty for next tenant to write later
@@ -3482,6 +3486,14 @@ function RoomsContent() {
                             />
                             <input
                               type="text"
+                              value={editingBuildingCode}
+                              onChange={(e) => setEditingBuildingCode(e.target.value)}
+                              placeholder="รหัสอาคารสั้น ๆ เช่น A (ใช้กำกับเลขห้องที่ซ้ำกันและเลขใบกำกับ)"
+                              maxLength={8}
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-teal-500"
+                            />
+                            <input
+                              type="text"
                               value={editingBuildingAddress}
                               onChange={(e) => setEditingBuildingAddress(e.target.value)}
                               placeholder="ที่อยู่ (ไม่บังคับ)"
@@ -3499,7 +3511,10 @@ function RoomsContent() {
                         ) : (
                           <div className="flex items-center gap-2">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{b.name}</p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                                {b.name}
+                                {b.code && <span className="ml-2 px-1.5 py-0.5 rounded-md bg-teal-100 dark:bg-teal-950/50 text-teal-700 dark:text-teal-400 text-[11px] font-extrabold align-middle">{b.code}</span>}
+                              </p>
                               {b.address && <p className="text-xs text-slate-450 truncate">{b.address}</p>}
                             </div>
                             {hasEditPermission && (
@@ -3543,6 +3558,14 @@ function RoomsContent() {
                       value={newBuildingName}
                       onChange={(e) => setNewBuildingName(e.target.value)}
                       className="w-full h-11 px-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-800 dark:text-slate-100 text-sm transition-colors placeholder-slate-400 font-medium"
+                    />
+                    <input
+                      type="text"
+                      placeholder="รหัสอาคารสั้น ๆ เช่น A (ใช้กำกับเลขห้องที่ซ้ำกันและเลขใบกำกับ)"
+                      value={newBuildingCode}
+                      onChange={(e) => setNewBuildingCode(e.target.value)}
+                      maxLength={8}
+                      className="w-full h-11 px-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-800 dark:text-slate-100 text-sm transition-colors placeholder-slate-400"
                     />
                     <input
                       type="text"
@@ -5303,6 +5326,7 @@ function RoomsContent() {
           <RoomTransferModal
             tenant={{
               id: selectedRoom.tenantId,
+              roomId: selectedRoom.id,
               roomNumber: selectedRoom.roomNumber,
               fullName: selectedRoom.tenantName || "",
               depositPaid: selectedRoom.depositPaid
