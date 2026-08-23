@@ -22,6 +22,55 @@ export function buildInvoiceId(
   return code ? `INV-${cycle}-${code}-${roomNumber}` : `INV-${cycle}-${roomNumber}`
 }
 
+/**
+ * ตัดสินว่าบิลใบนี้จะแสดง "ค่าปรับล่าช้า" เท่าไร และยอดรวมที่ผู้เช่าต้องจ่ายเป็นเท่าไร
+ *
+ * กฎ: **เคารพค่าที่บันทึกไว้เสมอ** แล้วคำนวณสดเฉพาะบิลที่ยังไม่มีใครแตะ
+ *
+ *   savedPenaltyAmount = null  → ยังไม่มีเหตุการณ์จริงมาตั้งค่า (saveAllBillsForCycle ตั้ง null
+ *                                ให้บิลใหม่โดยเจตนา) → คำนวณสดจากวันที่ปัจจุบัน แล้วบวกเข้ายอด
+ *   savedPenaltyAmount = ตัวเลข → แอดมินบันทึกไว้จริง → ใช้ค่านั้น และ **ห้ามบวกซ้ำ** เพราะ
+ *                                updateBillPenalty เขียนค่าปรับรวมไว้ใน bills.amount แล้ว
+ *                                (รวมกรณี 0 ซึ่งหมายถึง "ยกเว้นค่าปรับให้ห้องนี้")
+ *
+ * ⚠️ ห้ามกลับไปคำนวณทับค่าที่บันทึกไว้ เดิมโค้ดทำแบบนั้นแล้วเกิดสองอาการ:
+ *   1) ค่าปรับที่แอดมินตั้งไว้หายจากรายการเมื่อบิลยังไม่เลยกำหนด (คำนวณได้ 0 วัน) แต่ยอดรวม
+ *      ยังถูกเพราะค่าปรับฝังอยู่ใน amount แล้ว → ผู้เช่าเห็นยอดที่อธิบายไม่ได้
+ *   2) นับซ้ำเมื่อบิลเลยกำหนดจริง — amount ที่มีค่าปรับอยู่แล้วถูกบวกค่าที่คำนวณใหม่ทับอีก
+ */
+export function resolveBillPenalty(input: {
+  /** bills.penalty_amount — null = ยังไม่เคยตั้ง */
+  savedPenaltyAmount: number | null | undefined
+  /** bills.late_days */
+  savedLateDays: number | null | undefined
+  /** bills.amount (รวมค่าปรับที่บันทึกไว้แล้วถ้ามี) */
+  billAmount: number
+  /** bills.billing_cycle รูปแบบ 'YYYY-MM' */
+  billingCycle: string
+  billStatus: string
+  /** workspaces.late_penalty_rate — บาทต่อวัน */
+  latePenaltyRate: number
+}): { lateDays: number | null; penaltyAmount: number | null; amount: number } {
+  const { savedPenaltyAmount, savedLateDays, billAmount, billingCycle, billStatus, latePenaltyRate } = input
+
+  const savedPenalty = savedPenaltyAmount !== null && savedPenaltyAmount !== undefined
+    ? Number(savedPenaltyAmount)
+    : null
+  const lateDays = savedLateDays !== null && savedLateDays !== undefined ? Number(savedLateDays) : null
+
+  if (savedPenalty !== null || billStatus !== "unpaid") {
+    return { lateDays, penaltyAmount: savedPenalty, amount: Number(billAmount) }
+  }
+
+  const calculatedLateDays = calculateLateDays(billingCycle)
+  const calculatedPenalty = calculatedLateDays * latePenaltyRate
+  return {
+    lateDays: calculatedLateDays,
+    penaltyAmount: calculatedPenalty,
+    amount: Number(billAmount) + calculatedPenalty
+  }
+}
+
 export function calculateLateDays(cycleStr: string): number {
   if (!cycleStr || !cycleStr.includes("-")) return 0
   const [yearStr, monthStr] = cycleStr.split("-")

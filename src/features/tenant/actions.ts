@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import type { RoomRef } from "@/features/room/utils"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
-import { calculateLateDays } from "@/features/billing/utils"
+import { resolveBillPenalty } from "@/features/billing/utils"
 import { calculateDepositProration, computeStandardDeposit } from "@/features/room/deposit-calculator"
 import { getFinanceSettings } from "@/features/finance/actions"
 
@@ -680,17 +680,15 @@ export async function getTenantPortalData() {
         }
 
         formattedBills = filteredBills.map((b: any) => {
-          let lateDays = b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
-          let penaltyAmount = b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null
-          let amount = Number(b.amount)
-
-          if (b.status === "unpaid") {
-            const calculatedLateDays = calculateLateDays(b.billing_cycle)
-            const calculatedPenalty = calculatedLateDays * latePenaltyRate
-            lateDays = calculatedLateDays
-            penaltyAmount = calculatedPenalty
-            amount = amount + penaltyAmount
-          }
+          // ค่าปรับล่าช้า — กฎอยู่ใน resolveBillPenalty ที่เดียว (ห้ามเขียนซ้ำที่นี่)
+          const { lateDays, penaltyAmount, amount } = resolveBillPenalty({
+            savedPenaltyAmount: b.penalty_amount,
+            savedLateDays: b.late_days,
+            billAmount: b.amount,
+            billingCycle: b.billing_cycle,
+            billStatus: b.status,
+            latePenaltyRate
+          })
 
           const meter = meterByCycle.get(b.billing_cycle)
           const billBuildingId = b.building_id ?? currentRoomBuildingId
@@ -1021,17 +1019,16 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       }
 
       formattedBills = filteredBills.map((b: any) => {
-        let lateDays = b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null
-        let penaltyAmount = b.penalty_amount !== null && b.penalty_amount !== undefined ? Number(b.penalty_amount) : null
-        let amount = Number(b.amount)
-
-        if (b.status === "unpaid") {
-          const calculatedLateDays = calculateLateDays(b.billing_cycle)
-          const calculatedPenalty = calculatedLateDays * latePenaltyRate
-          lateDays = calculatedLateDays
-          penaltyAmount = calculatedPenalty
-          amount = amount + penaltyAmount
-        }
+        // ค่าปรับล่าช้า — กฎอยู่ใน resolveBillPenalty ที่เดียว (ห้ามเขียนซ้ำที่นี่)
+        // เดิมตรรกะนี้ถูกคัดลอกไว้สองที่ ซึ่งเสี่ยงให้ผู้เช่าที่ล็อกอินกับที่กดลิงก์เห็นยอดต่างกัน
+        const { lateDays, penaltyAmount, amount } = resolveBillPenalty({
+          savedPenaltyAmount: b.penalty_amount,
+          savedLateDays: b.late_days,
+          billAmount: b.amount,
+          billingCycle: b.billing_cycle,
+          billStatus: b.status,
+          latePenaltyRate
+        })
 
         const meter = meterByCycle.get(b.billing_cycle)
         const billBuildingId = b.building_id ?? currentRoomBuildingId
