@@ -4,7 +4,13 @@ import { createClient } from "@/lib/supabase/server"
 import type { RoomRef } from "@/features/room/utils"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
-import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "@/features/billing/utils"
+import { billKindRank, hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "@/features/billing/utils"
+
+/**
+ * เท่าที่ต้องใช้ในการเรียงบิลของห้องหนึ่ง — ไม่ต้องรู้ทั้งแถว
+ * (เขียนเป็น type แคบ ๆ แทน any เพื่อให้ถ้าชื่อคอลัมน์เปลี่ยน คอมไพเลอร์ฟ้องทันที)
+ */
+type BillOrderRow = { billing_cycle: string; bill_kind: string | null }
 import { calculateDepositProration, computeStandardDeposit } from "@/features/room/deposit-calculator"
 import { getFinanceSettings } from "@/features/finance/actions"
 
@@ -618,7 +624,13 @@ export async function getTenantPortalData() {
         const leaseStartCycle = tenant.lease_start ? tenant.lease_start.substring(0, 7) : ""
         const leaseEndCycle = tenant.lease_end ? tenant.lease_end.substring(0, 7) : ""
 
-        let filteredBills = bills
+        // บิลรอบปกติต้องมาก่อนใบปิดรอบเสมอ — ฝั่งจอหยิบ bills[0] เป็น "บิลรอบปัจจุบัน"
+        // เรียงด้วยตารางลำดับที่ประกาศชัด (billKindRank) ไม่พึ่งการเรียงตามตัวอักษรของ bill_kind
+        let filteredBills = [...bills].sort((a: BillOrderRow, b: BillOrderRow) =>
+          a.billing_cycle === b.billing_cycle
+            ? billKindRank(a.bill_kind) - billKindRank(b.bill_kind)
+            : (a.billing_cycle < b.billing_cycle ? 1 : -1)
+        )
         
         // 1. กรองด้วยประวัติชื่อผู้เช่า (ต้องตรงกัน) ป้องกันไม่ให้เห็นบิลของผู้เช่ารายอื่น
         if (tenant.tenant_name) {
@@ -713,6 +725,9 @@ export async function getTenantPortalData() {
             otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
             vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
             invoiceId: b.invoice_id,
+            // ชนิดบิล: regular = บิลรอบปกติ · transfer_closing = ใบปิดรอบตอนย้ายห้อง (เลิกออกใหม่แล้ว)
+            // ฝั่งจอใช้แยกป้ายในประวัติ ไม่ให้เห็นรอบเดียวกันสองบรรทัดแล้วงงว่าอันไหนของจริง
+            billKind: (b.bill_kind as string | null) ?? "regular",
             // เลขมิเตอร์: ใช้ค่าที่บันทึกไว้ในบิลก่อน ถอยไปอ่านสดจาก meter_records เฉพาะบิลเก่า
             // ที่ยังไม่มี snapshot — ไม่งั้นจะเห็นเลขมิเตอร์ชุดใหม่คู่กับจำนวนหน่วยชุดเก่า
             elecPrev: snap.elecPrev ?? meter?.elecPrev ?? null,
@@ -978,7 +993,13 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       const leaseStartCycle = tenant?.lease_start ? tenant.lease_start.substring(0, 7) : ""
       const leaseEndCycle = tenant?.lease_end ? tenant.lease_end.substring(0, 7) : ""
 
-      let filteredBills = bills
+      // บิลรอบปกติต้องมาก่อนใบปิดรอบเสมอ — ฝั่งจอหยิบ bills[0] เป็น "บิลรอบปัจจุบัน"
+      // เรียงด้วยตารางลำดับที่ประกาศชัด (billKindRank) ไม่พึ่งการเรียงตามตัวอักษรของ bill_kind
+      let filteredBills = [...bills].sort((a: BillOrderRow, b: BillOrderRow) =>
+        a.billing_cycle === b.billing_cycle
+          ? billKindRank(a.bill_kind) - billKindRank(b.bill_kind)
+          : (a.billing_cycle < b.billing_cycle ? 1 : -1)
+      )
       
       // 1. กรองด้วยประวัติชื่อผู้เช่า (ต้องตรงกัน) ป้องกันไม่ให้เห็นบิลของผู้เช่ารายอื่น
       if (tenant?.tenant_name) {
@@ -1072,6 +1093,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
           otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
           vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
           invoiceId: b.invoice_id,
+          // ชนิดบิล (ดูหมายเหตุเดียวกันในเส้นทางที่ล็อกอิน)
+          billKind: (b.bill_kind as string | null) ?? "regular",
           // เลขมิเตอร์: ใช้ค่าที่บันทึกไว้ในบิลก่อน (ดูหมายเหตุเดียวกันในเส้นทางไม่ล็อกอิน)
           elecPrev: snap.elecPrev ?? meter?.elecPrev ?? null,
           elecCurr: snap.elecCurr ?? meter?.elecCurr ?? null,
