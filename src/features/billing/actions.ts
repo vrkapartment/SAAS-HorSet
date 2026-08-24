@@ -837,6 +837,20 @@ export async function deleteBill(id: string) {
   }
 
   try {
+    // จำกัดสิทธิ์เฉพาะ Admin/Super Admin — การยกเลิกบิลคือการลบเอกสารการเงิน
+    //
+    // เดิมฟังก์ชันนี้ไม่เคยตรวจ role เลย (ตรวจแค่ subscription) เพราะยังไม่มีปุ่มไหนเรียกใช้
+    // ตอนนี้หน้าจัดการใบแจ้งหนี้มีปุ่ม "ยกเลิกบิล" แล้ว จึงต้องมีด่านเทียบเท่ากับ
+    // updateBillPenalty ที่กันไว้อยู่แล้ว — ไม่ปล่อยให้ RLS เป็นด่านเดียว
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || !profileRes.data) {
+      return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
+    }
+    const role = profileRes.data.role
+    if (role !== "admin" && role !== "super_admin") {
+      return { success: false, error: "⚠️ ขออภัย คุณไม่มีสิทธิ์ยกเลิกบิล (เฉพาะผู้ดูแลระบบเท่านั้น)" }
+    }
+
     // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนลบบิล (บล็อกถ้า read_only/cancelled)
     const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
     const subscriptionWorkspaceId = await getCurrentWorkspaceId()

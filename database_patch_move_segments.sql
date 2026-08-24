@@ -84,6 +84,9 @@ alter table public.tenant_room_transfers
   add column if not exists include_old_room_rent boolean not null default false,
   add column if not exists old_room_rent_amount numeric;
 
+comment on column public.tenant_room_transfers.closing_elec_min_applied is
+  'ช่วงห้องเดิมคิดขั้นต่ำหรือไม่ — ระบบเขียน false เสมอโดยเจตนา ไม่ให้ผู้เช่าโดนขั้นต่ำสองครั้งในเดือนที่ย้ายห้อง (บิลห้องใหม่คิดขั้นต่ำของตัวเองอยู่แล้ว)';
+
 comment on column public.tenant_room_transfers.include_old_room_rent is
   'true = รวมค่าเช่าห้องเดิม (ต้นเดือนถึงวันย้าย) ไว้ในบิลห้องใหม่ด้วย — ผู้ดูแลเลือกตอนย้าย';
 comment on column public.tenant_room_transfers.old_room_rent_amount is

@@ -26,7 +26,7 @@ import {
   Zap,
   Droplet
 } from "lucide-react"
-import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
+import { getBills, createBill, updateBillStatus, getBillingPageData, deleteBill } from "@/features/billing/actions"
 import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
 import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
@@ -320,6 +320,7 @@ function ManageBillsContent() {
   const [slipModalOpen, setSlipModalOpen] = useState(false)
   const [createBillModalOpen, setCreateBillModalOpen] = useState(false)
   const [savingRows, setSavingRows] = useState<Record<string, boolean>>({})
+  const [cancellingBillRoomId, setCancellingBillRoomId] = useState<RoomId | null>(null)
 
   // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ โดยระวังไม่ให้ต่ำกว่า registrationCycle เพื่อป้องกัน infinite loop ของการอัปเดต State
   useEffect(() => {
@@ -1330,6 +1331,46 @@ function ManageBillsContent() {
     }
   }
 
+  /**
+   * ยกเลิก (ลบ) บิลของห้องนั้น
+   *
+   * ทำไมต้องมี: การย้ายห้องจะถูกบล็อกถ้าห้องเดิมมีบิลของรอบนั้นออกไปแล้ว (กันเก็บเงินซ้ำ
+   * เพราะค่าน้ำ-ไฟห้องเดิมจะไปรวมในบิลห้องใหม่อีกที) ถ้าไม่มีทางยกเลิกบิลจากหน้าจอ
+   * ผู้ดูแลจะติดตายย้ายห้องไม่ได้เลย และหน้าคืนเงินประกันก็เตือนให้จัดการบิลซ้ำได้แต่ทำไม่ได้
+   *
+   * ฝั่ง server สำรองบิลลง bills_deleted ก่อนลบเสมอ และจำกัดสิทธิ์เฉพาะแอดมิน (ดู deleteBill)
+   */
+  const handleCancelBill = async (billId: string, roomId: RoomId) => {
+    if (!userPermissions.manage_bills_edit) {
+      showToast(t("daily_bills.no_permission_msg"))
+      return
+    }
+    const item = unifiedItems.find(i => i.roomId === roomId)
+    const roomLabel = item?.roomNumber ?? ""
+    const amount = Number(item?.billAmount || 0).toLocaleString()
+    if (!confirm(
+      t("billing.cancel_bill_confirm")
+        .replace("{room}", roomLabel)
+        .replace("{cycle}", billingCycle)
+        .replace("{amount}", amount)
+    )) return
+
+    setCancellingBillRoomId(roomId)
+    try {
+      const res = await deleteBill(billId)
+      if (!res.success) {
+        alert(res.error || t("manage_bills.err_update_bill_status"))
+        return
+      }
+      showToast(t("billing.cancel_bill_success").replace("{room}", roomLabel))
+      // โหลดใหม่ทั้งรอบ ไม่แก้ state เฉพาะแถว — การลบบิลกระทบยอดรวมหัวหน้า
+      // (จำนวนใบค้างชำระ/ยอดรวม) ที่คำนวณจากรายการทั้งหมด
+      await loadData(billingCycle, true)
+    } finally {
+      setCancellingBillRoomId(null)
+    }
+  }
+
   const handleSaveRow = async (roomId: RoomId, type: "electric" | "water" | "all" = "all") => {
     if (!userPermissions.manage_bills_edit) {
       showToast(t("daily_bills.no_permission_msg"))
@@ -2101,6 +2142,8 @@ function ManageBillsContent() {
         handleDownloadBillPdf={handleDownloadBillPdf}
         handleSendLine={handleSendLine}
         handleMarkAsPaid={handleMarkAsPaid}
+        handleCancelBill={handleCancelBill}
+        cancellingBillRoomId={cancellingBillRoomId}
         roomsList={roomsList}
         usageAverages={usageAverages}
         billingCycle={billingCycle}

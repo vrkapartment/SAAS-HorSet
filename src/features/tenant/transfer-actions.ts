@@ -259,10 +259,18 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     const elecUnitsUsed = Math.max(0, input.closingElecCurr - prevElec)
     const waterUnitsUsed = Math.max(0, input.closingWaterCurr - prevWater)
 
-    // คิดขั้นต่ำกับช่วงห้องเดิมเหมือนที่บิลปิดรอบแบบเดิมคิด — ยอดที่หอเก็บได้จึงไม่เปลี่ยนจากเดิม
-    // (baseRent/commonFee = 0 เพราะบรรทัดนี้คิดแค่ค่าน้ำ-ไฟ ค่าเช่าจัดการแยกด้านล่าง
-    //  และค่าส่วนกลางเก็บครั้งเดียวที่บิลห้องใหม่ ไม่เก็บซ้ำต่อห้อง)
-    const { elecCost, waterCost, elecMinApplied, waterMinApplied } = calculateBillTotal({
+    // ⚠️ ไม่คิดขั้นต่ำกับช่วงห้องเดิม (ตัดสินใจโดยเจ้าของระบบ)
+    //
+    // เหตุผล: ในเดือนที่ย้ายห้อง บิลห้องใหม่คิดขั้นต่ำของตัวเองอยู่แล้ว ถ้าช่วงห้องเดิมคิดด้วย
+    // ผู้เช่าคนเดียวจะโดนขั้นต่ำสองครั้งในเดือนเดียว ทั้งที่ขั้นต่ำมีไว้เป็นพื้นของ "ห้อง-เดือน"
+    // ไม่ใช่ของ "ช่วงการอยู่" — บิลปิดรอบแบบเดิม (-TRANSFER) คิดขั้นต่ำด้วย ซึ่งเป็นพฤติกรรมที่เลิกแล้ว
+    //
+    // ยังเรียกผ่าน calculateBillTotal ตัวเดียวกับการออกบิล (ปิดขั้นต่ำด้วย waive*) ไม่คูณเอง
+    // เพื่อให้ถ้าสูตรคิดค่าน้ำ-ไฟเปลี่ยนวันหลัง ช่วงห้องเดิมเปลี่ยนตามอัตโนมัติ
+    //
+    // baseRent/commonFee = 0 เพราะบรรทัดนี้คิดแค่ค่าน้ำ-ไฟ (ค่าเช่าจัดการแยกด้านล่าง
+    // และค่าส่วนกลางเก็บครั้งเดียวที่บิลห้องใหม่ ไม่เก็บซ้ำต่อห้อง)
+    const { elecCost, waterCost } = calculateBillTotal({
       baseRent: 0,
       electricUnitsUsed: elecUnitsUsed,
       waterUnitsUsed: waterUnitsUsed,
@@ -271,12 +279,12 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       commonFee: 0,
       otherServiceAmount: 0,
       extraExpensesSum: 0,
-      waiveWaterMin: !!oldRoom.waive_water_min,
-      waterMinChecked: settings.water_min_checked,
-      waterMinUnit: settings.water_min_unit,
-      waiveElectricMin: !!oldRoom.waive_electric_min,
-      electricMinChecked: settings.electric_min_checked,
-      electricMinUnit: settings.electric_min_unit
+      waiveWaterMin: true,
+      waterMinChecked: false,
+      waterMinUnit: 0,
+      waiveElectricMin: true,
+      electricMinChecked: false,
+      electricMinUnit: 0
     })
 
     // ค่าเช่าห้องเดิม: ผู้ดูแลเลือกว่าจะรวมหรือไม่ (ช่องแยกในฟอร์มย้ายห้อง)
@@ -370,11 +378,13 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
         closing_elec_units: elecUnitsUsed,
         closing_elec_rate: oldElecRate,
         closing_elec_amount: elecCost,
-        closing_elec_min_applied: elecMinApplied,
+        // ช่วงห้องเดิมไม่คิดขั้นต่ำ (ดูเหตุผลที่ขั้นที่ 5) — บันทึก false ไว้ให้ segment
+        // อธิบายตัวเองได้ว่ายอดนี้ไม่ได้ผ่านการคิดขั้นต่ำ ไม่ใช่ปล่อยว่างแล้วเดาทีหลัง
+        closing_elec_min_applied: false,
         closing_water_units: waterUnitsUsed,
         closing_water_rate: oldWaterRate,
         closing_water_amount: waterCost,
-        closing_water_min_applied: waterMinApplied,
+        closing_water_min_applied: false,
         include_old_room_rent: includeOldRoomRent,
         old_room_rent_amount: oldRoomRentAmount,
         // ไม่มีบิลให้แจ้งเตือนตอนย้ายแล้ว ผู้เช่าจะได้บิลรวมใบเดียวปลายเดือน
