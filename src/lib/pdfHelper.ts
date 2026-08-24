@@ -1,5 +1,6 @@
 import { PDFDocument, PDFName, PDFRef, PDFDict, rgb } from "pdf-lib"
 import fontkit from "@pdf-lib/fontkit"
+import { resolveBillLines } from "./billLines"
 import { calculateProgressiveTax, calculateMinimumTax, calculateFinalTaxDue, calculatePersonalDeduction } from "./thaiTax"
 
 // บาง template ที่ Super Admin อัปโหลดผ่านเครื่องมือแก้ไข PDF บางตัว มี form field ที่ "หลุด" ออกจากต้นไม้ AcroForm จริง
@@ -1254,58 +1255,23 @@ export async function generateBillPdf(data: BillPdfData) {
 
   // เนื้อหาในตาราง
   let y = 600
-  const commonFee = data.commonFee !== undefined ? data.commonFee : 50
-  
-  const waterMinChecked = data.waterMinChecked !== undefined ? data.waterMinChecked : true
-  const waterMinUnit = data.waterMinUnit !== undefined ? data.waterMinUnit : 3
-  const electricMinChecked = data.electricMinChecked !== undefined ? data.electricMinChecked : true
-  const electricMinUnit = data.electricMinUnit !== undefined ? data.electricMinUnit : 10
 
-  // ใบที่มี snapshot: ใช้ผลลัพธ์ที่บันทึกไว้ตอนออกบิล ห้ามคิดใหม่จากการตั้งค่าปัจจุบัน
-  // ไม่งั้นเปลี่ยนการตั้งค่าขั้นต่ำแล้วใบเดิมจะได้ "ยอดถูกแต่ป้ายผิด"
-  const isElecMin = data.hasSnapshot && data.elecMinApplied !== undefined
-    ? !!data.elecMinApplied
-    : (!data.waiveElectricMin && electricMinChecked && data.electricUnits <= electricMinUnit)
-  const isWaterMin = data.hasSnapshot && data.waterMinApplied !== undefined
-    ? !!data.waterMinApplied
-    : (!data.waiveWaterMin && waterMinChecked && data.waterUnits <= waterMinUnit)
-
-  // บิลที่มี snapshot: ใช้ยอดที่บันทึกไว้ตรง ๆ (รวมกรณีคิดขั้นต่ำแล้วตั้งแต่ตอนออกบิล)
-  // บิลเก่า: คำนวณจากอัตรา+การตั้งค่าขั้นต่ำปัจจุบันแบบเดิม
-  const elecAmount = data.hasSnapshot && data.electricAmount !== undefined
-    ? Number(data.electricAmount || 0)
-    : (isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate)
-  const waterAmount = data.hasSnapshot && data.waterAmount !== undefined
-    ? Number(data.waterAmount || 0)
-    : (isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate)
-  
-  const penaltyAmount = data.penaltyAmount !== undefined ? Number(data.penaltyAmount || 0) : 0
-  const otherServiceAmount = data.otherServiceAmount !== undefined ? Number(data.otherServiceAmount || 0) : 0
-  const vatAmount = data.vatAmount !== undefined ? Number(data.vatAmount || 0) : 0
-
+  // ตัวเลขที่จะพิมพ์ทุกบรรทัด ตัดสินที่ resolveBillLines ที่เดียว (lib/billLines.ts)
+  // ห้ามคิดสูตรซ้ำที่นี่ — เดิมตรรกะฝังอยู่ตรงนี้แล้วทดสอบไม่ได้ ต้องเปิดไฟล์ดูด้วยตาเท่านั้น
+  const lines = resolveBillLines(data)
+  const commonFee = lines.commonFee
+  const elecAmount = lines.elecAmount
+  const waterAmount = lines.waterAmount
+  const penaltyAmount = lines.penaltyAmount
+  const otherServiceAmount = lines.otherServiceAmount
+  const vatAmount = lines.vatAmount
   const extraExpenses = data.extraExpenses || []
-  const extraExpensesSum = extraExpenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
-  // ค่าเช่าที่จะพิมพ์บนใบ
-  //
-  // บิลที่มี snapshot: ใช้ค่าเช่าที่บันทึกไว้ตรง ๆ — เป็นตัวเลขที่คิดเงินไปจริง
-  //
-  // บิลเก่าที่ไม่มี snapshot: คำนวณย้อนจากยอดรวมแบบเดิม เพื่อบังคับให้ทุกบรรทัดบวกกันได้เท่า
-  // data.amount พอดี (หัก vatAmount ออกด้วยเพราะ data.amount รวม VAT ไว้แล้วตั้งแต่ออกบิล)
-  //
-  // ⚠️ วิธีคำนวณย้อนนี้ทำให้บรรทัด "ค่าเช่าห้องพัก" กลายเป็นเศษที่เหลือ ไม่ใช่ค่าเช่าจริงของห้อง
-  // ทันทีที่องค์ประกอบอื่นไม่ตรงกับตอนออกบิล (เช่น แก้มิเตอร์แล้วไม่ออกบิลใหม่) จึงคงไว้เฉพาะ
-  // บิลเก่าที่ไม่มีข้อมูลให้ใช้แล้วจริง ๆ — ห้ามใช้กับบิลใหม่
-  const adjustedBaseRent = data.hasSnapshot
-    ? Math.max(0, Number(data.baseRent || 0))
-    : Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount - extraExpensesSum - vatAmount)
+  // ค่าเช่าที่จะพิมพ์บนใบ — ตัดสินใน resolveBillLines แล้ว (ดูเหตุผลของกฎที่นั่น)
+  const adjustedBaseRent = lines.rent
 
-  const elecDesc = isElecMin 
-    ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 
-    : "2. ค่าไฟฟ้า (Electricity Bill)"
-  const waterDesc = isWaterMin 
-    ? `3. ค่าน้ำประปา (ขั้นต่ำ ${waterMinUnit} หน่วย)` 
-    : "3. ค่าน้ำประปา (Water Bill)"
+  const elecDesc = lines.elecDesc
+  const waterDesc = lines.waterDesc
 
   // รายการ 1: ค่าเช่าห้องพัก
   drawText("1. ค่าเช่าห้องพัก (Room Rent)", 50, y, 9, rgb(0.2, 0.2, 0.2))
@@ -1325,7 +1291,7 @@ export async function generateBillPdf(data: BillPdfData) {
   // รายการ 2: ค่าไฟฟ้า
   drawText(elecDesc, 50, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(data.electricUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(isElecMin ? "-" : data.electricRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(lines.elecRateDisplay, 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(elecAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
   if (elecMeterRange) {
     y -= 12
@@ -1336,7 +1302,7 @@ export async function generateBillPdf(data: BillPdfData) {
   // รายการ 3: ค่าน้ำประปา
   drawText(waterDesc, 50, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(data.waterUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
-  drawText(isWaterMin ? "-" : data.waterRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+  drawText(lines.waterRateDisplay, 380, y, 9, rgb(0.2, 0.2, 0.2))
   drawText(waterAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
   if (waterMeterRange) {
     y -= 12

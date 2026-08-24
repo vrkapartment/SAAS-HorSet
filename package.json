@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "qa:pdf": "tsx scripts/qa-render-bills.mts",
+    "qa:db": "tsx scripts/qa-verify-db.mts",
+    "build:sql": "node scripts/build-staging-sql.mjs",
+    "qa:sim": "tsx scripts/qa-simulate-bills.mts",
+    "qa:roundtrip": "tsx scripts/qa-roundtrip-bill.mts"
   },
   "dependencies": {
     "@google-cloud/translate": "^9.4.2",
@@ -35,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

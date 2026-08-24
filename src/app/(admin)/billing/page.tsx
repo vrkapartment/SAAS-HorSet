@@ -1380,58 +1380,52 @@ function UnifiedBillingContent() {
       return (10000 - prev) + curr
     }
 
+    // ⚠️ คิดหน่วยของ "ทั้งสองฝั่ง" เสมอ ไม่ว่าผู้ใช้กดปุ่มไหน
+    //
+    // type คุมแค่ว่า "ช่องไหนบังคับกรอกถึงจะบันทึกได้" ไม่ใช่ "คิดเงินฝั่งไหน" — เพราะ createBill
+    // เขียนทับบิลทั้งใบทุกครั้ง ถ้าคิดเฉพาะฝั่งที่กด อีกฝั่งจะถูกเขียนเป็น 0 หน่วยทั้งที่มิเตอร์มีค่าอยู่
+    //
+    // เคยเกิดจริง: โหมดจดแยกไฟ/น้ำ ทำให้เกิดลำดับ "กดบันทึกไฟ → กดบันทึกน้ำ" ครั้งที่สอง
+    // เขียนทับค่าไฟเป็น 0 หน่วย → ระบบตกไปคิดขั้นต่ำ แล้วเก็บเงินผู้เช่าขาดไป
+    // (ห้อง 112 รอบ 2026-09: มิเตอร์ขยับ 96 หน่วย แต่บิลเก็บ 0 หน่วย คิดขั้นต่ำ 70 แทน 672 บาท)
+    //
+    // /manage-bills แก้เรื่องนี้ไปแล้วด้วยการตั้งต้นจากหน่วยในบิลเดิม — ที่นี่คิดสดจากเลขมิเตอร์
+    // ซึ่งตรงกว่า เพราะเลขมิเตอร์คือสิ่งที่กำลังจะถูกบันทึกลง meter_records จริง
     let eUnits = 0
     let wUnits = 0
 
-    // ตรวจสอบเงื่อนไขตามประเภทปุ่มที่กดบันทึก
-    if (type === "electric" || type === "all") {
-      if (elecVal === "" || isNaN(elecVal as number)) {
-        if (type === "electric") {
-          alert(t("manage_bills.err_elec_required"))
-          return
-        }
-      } else {
-        if (isNaN(elecPrevVal)) {
-          alert(t("manage_bills.err_prev_invalid"))
-          return
-        }
-        if (repElec) {
-          const oldUnits = getUnits(repElec.oldFinalReading, elecPrevVal)
-          const newUnits = getUnits(Number(elecVal), repElec.newStartReading)
-          eUnits = oldUnits + newUnits
-        } else {
-          eUnits = getUnits(Number(elecVal), elecPrevVal)
-        }
-        if (eUnits > 3000) {
-          alert(t("manage_bills.err_units_exceed"))
-          return
-        }
+    if (elecVal !== "" && !isNaN(elecVal as number)) {
+      if (isNaN(elecPrevVal)) {
+        alert(t("manage_bills.err_prev_invalid"))
+        return
       }
+      eUnits = repElec
+        ? getUnits(repElec.oldFinalReading, elecPrevVal) + getUnits(Number(elecVal), repElec.newStartReading)
+        : getUnits(Number(elecVal), elecPrevVal)
+      if (eUnits > 3000) {
+        alert(t("manage_bills.err_units_exceed"))
+        return
+      }
+    } else if (type === "electric") {
+      alert(t("manage_bills.err_elec_required"))
+      return
     }
 
-    if (type === "water" || type === "all") {
-      if (waterVal === "" || isNaN(waterVal as number)) {
-        if (type === "water") {
-          alert(t("manage_bills.err_water_required"))
-          return
-        }
-      } else {
-        if (isNaN(waterPrevVal)) {
-          alert(t("manage_bills.err_prev_invalid"))
-          return
-        }
-        if (repWater) {
-          const oldUnits = getUnits(repWater.oldFinalReading, waterPrevVal)
-          const newUnits = getUnits(Number(waterVal), repWater.newStartReading)
-          wUnits = oldUnits + newUnits
-        } else {
-          wUnits = getUnits(Number(waterVal), waterPrevVal)
-        }
-        if (wUnits > 3000) {
-          alert(t("manage_bills.err_units_exceed"))
-          return
-        }
+    if (waterVal !== "" && !isNaN(waterVal as number)) {
+      if (isNaN(waterPrevVal)) {
+        alert(t("manage_bills.err_prev_invalid"))
+        return
       }
+      wUnits = repWater
+        ? getUnits(repWater.oldFinalReading, waterPrevVal) + getUnits(Number(waterVal), repWater.newStartReading)
+        : getUnits(Number(waterVal), waterPrevVal)
+      if (wUnits > 3000) {
+        alert(t("manage_bills.err_units_exceed"))
+        return
+      }
+    } else if (type === "water") {
+      alert(t("manage_bills.err_water_required"))
+      return
     }
 
     if (type === "all" && (elecVal === "" || waterVal === "")) {

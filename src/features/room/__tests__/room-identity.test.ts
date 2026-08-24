@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { findDuplicateRoomNumbers, formatRoomLabel, getRoomFloor } from "../utils"
-import { buildInvoiceId } from "../../billing/utils"
+import { findDuplicateRoomNumbers, formatRoomLabel, getRoomFloor } from "@/features/room/utils"
+import { buildInvoiceId } from "@/features/billing/utils"
 
 /**
  * กฎความปลอดภัยของ "เลขห้องซ้ำข้ามอาคาร"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "../utils"
-import { calculateBillTotal } from "../bill-calculator"
+import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "@/features/billing/utils"
+import { calculateBillTotal } from "@/features/billing/bill-calculator"
 
 /**
  * กฎค่าปรับล่าช้าที่ผู้เช่าเห็นในหน้า Portal
@@ -170,5 +170,41 @@ describe("calculateBillTotal — คืนผลการคิดขั้น�
     const r = calculateBillTotal({ ...base, electricUnitsUsed: 0, waterUnitsUsed: 0, electricMinChecked: false })
     expect(r.elecMinApplied).toBe(false)
     expect(r.elecCost).toBe(0)
+  })
+})
+
+describe("หน่วยที่คิดเงินต้องมาจากเลขมิเตอร์ทั้งสองฝั่ง ไม่ใช่แค่ฝั่งที่กดบันทึก", () => {
+  /**
+   * บั๊กที่เกิดจริง: handleSaveRow คิดหน่วยเฉพาะฝั่งที่ผู้ใช้กดปุ่ม (type = "electric" | "water")
+   * แต่ createBill เขียนทับบิลทั้งใบ → กด "บันทึกน้ำ" ทีหลังจะเขียนค่าไฟเป็น 0 หน่วย
+   *
+   * ห้อง 112 รอบ 2026-09: มิเตอร์ไฟ 7958 → 8054 = 96 หน่วย แต่บิลเก็บ 0 หน่วย
+   * ระบบจึงตกไปคิดขั้นต่ำ 70 บาท แทนที่จะเป็น 672 บาท → เก็บเงินขาด 602 บาท
+   *
+   * เทสต์นี้คุมสูตร: หน่วยที่ส่งเข้า calculateBillTotal ต้องเป็นหน่วยจริงของมิเตอร์
+   * (ตัวการตรวจว่าบิลใน DB ตรงกับมิเตอร์อยู่ใน qa:db — ที่นี่คุมว่าสูตรคิดถูกเมื่อได้หน่วยถูก)
+   */
+  const settings = {
+    baseRent: 6000, electricRate: 7, waterRate: 18, commonFee: 50,
+    otherServiceAmount: 0, extraExpensesSum: 0,
+    electricMinChecked: true, electricMinUnit: 10,
+    waterMinChecked: true, waterMinUnit: 3,
+    waiveElectricMin: false, waiveWaterMin: false
+  }
+
+  it("หน่วยไฟถูก (96) → คิดตามจริง 672 บาท", () => {
+    const r = calculateBillTotal({ ...settings, electricUnitsUsed: 96, waterUnitsUsed: 13 })
+    expect(r.elecMinApplied).toBe(false)
+    expect(r.elecCost).toBe(672)
+    expect(r.waterCost).toBe(234)
+    expect(r.total).toBe(6956)
+  })
+
+  it("หน่วยไฟหายเป็น 0 → ตกไปคิดขั้นต่ำ 70 บาท และยอดรวมขาด 602", () => {
+    const wrong = calculateBillTotal({ ...settings, electricUnitsUsed: 0, waterUnitsUsed: 13 })
+    const right = calculateBillTotal({ ...settings, electricUnitsUsed: 96, waterUnitsUsed: 13 })
+    expect(wrong.elecMinApplied).toBe(true)
+    expect(wrong.elecCost).toBe(70)
+    expect(right.total - wrong.total).toBe(602)
   })
 })
