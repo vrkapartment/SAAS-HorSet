@@ -1617,15 +1617,17 @@ function ManageBillsContent() {
         baseRent: item.hasBillSnapshot ? Number(item.billSnapshot?.baseRent || 0) : item.baseRent,
         electricAmount: item.billSnapshot?.electricAmount ?? undefined,
         waterAmount: item.billSnapshot?.waterAmount ?? undefined,
+        elecMinApplied: item.billSnapshot?.elecMinApplied ?? undefined,
+        waterMinApplied: item.billSnapshot?.waterMinApplied ?? undefined,
+        electricMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.electricMinUnit ?? electricMinUnit) : electricMinUnit,
+        waterMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.waterMinUnit ?? waterMinUnit) : waterMinUnit,
         electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,
         electricRate: item.hasBillSnapshot ? Number(item.billSnapshot?.electricRate || 0) : elecRate,
         waterUnits: item.hasBillSnapshot ? Number(item.waterUnits || 0) : waterUnitsUsed,
         waterRate: waterRate,
         commonFee: item.hasBillSnapshot ? Number(item.billSnapshot?.commonFee || 0) : commonFee,
         waterMinChecked,
-        waterMinUnit,
         electricMinChecked,
-        electricMinUnit,
         amount: item.billAmount || (() => {
           const roomInfo = roomsList?.find((r: any) => r.id === item.roomId)
           const extraExpenses = roomInfo?.extraExpenses || []
@@ -1729,15 +1731,17 @@ function ManageBillsContent() {
           baseRent: item.hasBillSnapshot ? Number(item.billSnapshot?.baseRent || 0) : item.baseRent,
           electricAmount: item.billSnapshot?.electricAmount ?? undefined,
           waterAmount: item.billSnapshot?.waterAmount ?? undefined,
+          elecMinApplied: item.billSnapshot?.elecMinApplied ?? undefined,
+          waterMinApplied: item.billSnapshot?.waterMinApplied ?? undefined,
+          electricMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.electricMinUnit ?? electricMinUnit) : electricMinUnit,
+          waterMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.waterMinUnit ?? waterMinUnit) : waterMinUnit,
           electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,
           electricRate: item.hasBillSnapshot ? Number(item.billSnapshot?.electricRate || 0) : elecRate,
           waterUnits: item.hasBillSnapshot ? Number(item.waterUnits || 0) : waterUnitsUsed,
           waterRate: waterRate,
           commonFee: item.hasBillSnapshot ? Number(item.billSnapshot?.commonFee || 0) : commonFee,
           waterMinChecked,
-          waterMinUnit,
           electricMinChecked,
-          electricMinUnit,
           amount: item.billAmount || (() => {
             const roomInfo = roomsList?.find((r: any) => r.id === item.roomId)
             const extraExpenses = roomInfo?.extraExpenses || []

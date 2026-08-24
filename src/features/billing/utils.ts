@@ -35,6 +35,11 @@ export type BillSnapshot = {
   waterPrev: number | null
   waterCurr: number | null
   extraExpenses: { name?: string; amount?: number }[] | null
+  /** ใบนี้คิดค่าไฟ/ค่าน้ำแบบขั้นต่ำหรือไม่ — ใช้เลือกข้อความป้ายบนใบแจ้งหนี้ */
+  elecMinApplied: boolean | null
+  waterMinApplied: boolean | null
+  electricMinUnit: number | null
+  waterMinUnit: number | null
 }
 
 const num = (v: unknown): number | null =>
@@ -62,7 +67,11 @@ export function readBillSnapshot(row: Record<string, unknown>): BillSnapshot {
     waterCurr: num(row.water_curr),
     extraExpenses: Array.isArray(row.extra_expenses)
       ? (row.extra_expenses as { name?: string; amount?: number }[])
-      : null
+      : null,
+    elecMinApplied: typeof row.elec_min_applied === "boolean" ? row.elec_min_applied : null,
+    waterMinApplied: typeof row.water_min_applied === "boolean" ? row.water_min_applied : null,
+    electricMinUnit: num(row.electric_min_unit),
+    waterMinUnit: num(row.water_min_unit)
   }
 }
 

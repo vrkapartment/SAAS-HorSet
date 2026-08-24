@@ -119,3 +119,33 @@ comment on column public.bills.extra_expenses is 'snapshot: ค่าใช้�
 --   from public.bills;
 --   → หลังรัน patch ทันที: มี_snapshot_แล้ว = 0
 --   → หลังออกบิลใบใหม่: ตัวเลขนี้จะเริ่มเพิ่มขึ้น
+
+-- =========================================================================
+-- 8. เพิ่มเติม: การคิดขั้นต่ำ ณ ตอนออกบิล
+-- =========================================================================
+-- คำอธิบายบนใบแจ้งหนี้ ("ค่าไฟฟ้า (ขั้นต่ำ 10 หน่วย)" และคอลัมน์อัตราที่แสดง "-" แทนอัตรา)
+-- เป็นข้อมูล ณ ตอนออกบิลเหมือนกับตัวเลขเงิน
+--
+-- เดิมฝั่งพิมพ์ใบคำนวณเงื่อนไขนี้ใหม่จากการตั้งค่าปัจจุบัน:
+--     isElecMin = !waiveElectricMin && electricMinChecked && electricUnits <= electricMinUnit
+-- ทำให้ถ้าเปลี่ยนการตั้งค่าขั้นต่ำหลังออกบิลไปแล้ว ใบเดิมจะได้ "ยอดถูกแต่ป้ายผิด"
+-- เช่นยอด 70 บาทที่มาจากขั้นต่ำ 10 หน่วย แต่ป้ายไม่ขึ้นคำว่าขั้นต่ำ หรือขึ้นเลขหน่วยผิด
+--
+-- เก็บ "ผลลัพธ์" (คิดขั้นต่ำหรือไม่) ไม่ใช่ "เงื่อนไขตั้งต้น" ทั้งชุด — ด้วยเหตุผลเดียวกับที่
+-- ข้อ 2 เก็บยอดที่คิดแทนอัตรา: ฝั่งอ่านไม่ต้องคิดสูตรซ้ำ จึงไม่มีทางคิดต่างจากตอนออกบิล
+-- (ค่า *_min_unit เก็บไว้ด้วยเพราะต้องใช้เติมตัวเลขในข้อความป้าย)
+alter table public.bills
+  add column if not exists elec_min_applied boolean,
+  add column if not exists water_min_applied boolean,
+  add column if not exists electric_min_unit numeric,
+  add column if not exists water_min_unit numeric;
+
+comment on column public.bills.elec_min_applied is 'snapshot: ใบนี้คิดค่าไฟแบบขั้นต่ำหรือไม่ (ใช้เลือกข้อความป้ายบนใบแจ้งหนี้)';
+comment on column public.bills.water_min_applied is 'snapshot: ใบนี้คิดค่าน้ำแบบขั้นต่ำหรือไม่';
+comment on column public.bills.electric_min_unit is 'snapshot: จำนวนหน่วยขั้นต่ำค่าไฟที่ใช้ตอนออกบิล (สำหรับข้อความ "ขั้นต่ำ N หน่วย")';
+comment on column public.bills.water_min_unit is 'snapshot: จำนวนหน่วยขั้นต่ำค่าน้ำที่ใช้ตอนออกบิล';
+
+-- ตรวจ (ต้องได้ 4 แถว ทุกแถว is_nullable = YES):
+--   select column_name, is_nullable from information_schema.columns
+--   where table_schema = 'public' and table_name = 'bills'
+--     and column_name in ('elec_min_applied','water_min_applied','electric_min_unit','water_min_unit');

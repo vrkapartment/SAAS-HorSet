@@ -258,7 +258,7 @@ export async function createBill(
     const vatResolved = resolveVatCharging(settings, billingCycle)
 
     // 4. Calculate total on Server
-    const { elecCost, waterCost, vatAmount, total: serverCalculatedTotal } = calculateBillTotal({
+    const { elecCost, waterCost, elecMinApplied, waterMinApplied, vatAmount, total: serverCalculatedTotal } = calculateBillTotal({
       baseRent,
       electricUnitsUsed: electricUnits,
       waterUnitsUsed: waterUnits,
@@ -308,7 +308,12 @@ export async function createBill(
       elec_curr: meterRow?.elec_curr ?? null,
       water_prev: meterRow?.water_prev ?? null,
       water_curr: meterRow?.water_curr ?? null,
-      extra_expenses: extraExpenses
+      extra_expenses: extraExpenses,
+      // การคิดขั้นต่ำ ณ ตอนออกบิล — ใช้เลือกข้อความป้ายบนใบแจ้งหนี้ ไม่ให้คิดใหม่จาก config ปัจจุบัน
+      elec_min_applied: elecMinApplied,
+      water_min_applied: waterMinApplied,
+      electric_min_unit: settings.electric_min_unit,
+      water_min_unit: settings.water_min_unit
     }
 
     // Check if a bill already exists for this room and cycle
@@ -1181,7 +1186,7 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const extraExpensesSum = (roomData.extra_expenses || []).reduce((a: number, c: any) => a + Number(c.amount || 0), 0)
 
       // ใช้ calculateBillTotal ตัวเดียวกับที่ createBill ใช้อยู่ (ห้ามเขียนสูตรซ้ำ)
-      const { elecCost, waterCost, total, vatAmount } = calculateBillTotal({
+      const { elecCost, waterCost, elecMinApplied, waterMinApplied, total, vatAmount } = calculateBillTotal({
         baseRent, electricUnitsUsed: eUnits, waterUnitsUsed: wUnits,
         electricRate: electricResolved.rate, waterRate: waterResolved.rate,
         commonFee: settings.common_fee, otherServiceAmount: item.otherServiceAmount,
@@ -1214,6 +1219,10 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         water_prev: item.waterPrev,
         water_curr: waterVal,
         extra_expenses: roomData.extra_expenses || [],
+        elec_min_applied: elecMinApplied,
+        water_min_applied: waterMinApplied,
+        electric_min_unit: settings.electric_min_unit,
+        water_min_unit: settings.water_min_unit,
         tenant_name: item.tenantName,
         amount: total + existingPenalty,
         status: item.status,

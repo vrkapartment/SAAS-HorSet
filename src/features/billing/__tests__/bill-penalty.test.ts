@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "../utils"
+import { calculateBillTotal } from "../bill-calculator"
 
 /**
  * กฎค่าปรับล่าช้าที่ผู้เช่าเห็นในหน้า Portal
@@ -112,5 +113,62 @@ describe("readBillSnapshot / hasBillSnapshot", () => {
   it("extra_expenses ที่ไม่ใช่ array ต้องกลายเป็น null ไม่ใช่ทำให้พัง", () => {
     expect(readBillSnapshot({ extra_expenses: "ขยะ" }).extraExpenses).toBeNull()
     expect(readBillSnapshot({ extra_expenses: null }).extraExpenses).toBeNull()
+  })
+})
+
+describe("snapshot การคิดขั้นต่ำ", () => {
+  it("อ่าน elec_min_applied / water_min_applied ออกมาถูก", () => {
+    const snap = readBillSnapshot({
+      base_rent: 6000,
+      elec_min_applied: true, water_min_applied: false,
+      electric_min_unit: 10, water_min_unit: 3
+    })
+    expect(snap.elecMinApplied).toBe(true)
+    expect(snap.waterMinApplied).toBe(false)
+    expect(snap.electricMinUnit).toBe(10)
+    expect(snap.waterMinUnit).toBe(3)
+  })
+
+  it("บิลเก่าที่ไม่มีคอลัมน์นี้ → null (ฝั่งพิมพ์ใบถอยไปคิดจากการตั้งค่าปัจจุบัน)", () => {
+    const snap = readBillSnapshot({ base_rent: 6000 })
+    expect(snap.elecMinApplied).toBeNull()
+    expect(snap.waterMinApplied).toBeNull()
+  })
+
+  it("false ต้องไม่ถูกตีเป็น null — 'ไม่คิดขั้นต่ำ' ต่างจาก 'ไม่มีข้อมูล'", () => {
+    const snap = readBillSnapshot({ base_rent: 6000, elec_min_applied: false })
+    expect(snap.elecMinApplied).toBe(false)
+    expect(snap.elecMinApplied).not.toBeNull()
+  })
+})
+
+describe("calculateBillTotal — คืนผลการคิดขั้นต่ำให้ฝั่งออกบิลบันทึก", () => {
+  const base = {
+    baseRent: 6000, electricRate: 7, waterRate: 18, commonFee: 50,
+    otherServiceAmount: 0, extraExpensesSum: 0,
+    electricMinChecked: true, electricMinUnit: 10,
+    waterMinChecked: true, waterMinUnit: 3,
+    waiveElectricMin: false, waiveWaterMin: false
+  }
+
+  it("ใช้น้อยกว่าขั้นต่ำ → คิดขั้นต่ำ และรายงานว่าคิดขั้นต่ำ", () => {
+    const r = calculateBillTotal({ ...base, electricUnitsUsed: 0, waterUnitsUsed: 7 })
+    expect(r.elecMinApplied).toBe(true)
+    expect(r.elecCost).toBe(70)          // 10 หน่วยขั้นต่ำ × 7
+    expect(r.waterMinApplied).toBe(false)
+    expect(r.waterCost).toBe(126)        // 7 หน่วยจริง × 18
+    expect(r.total).toBe(6246)           // ตรงกับเคสที่ QA เจอ
+  })
+
+  it("ห้องที่ยกเว้นขั้นต่ำ → ไม่คิดขั้นต่ำแม้ใช้น้อย", () => {
+    const r = calculateBillTotal({ ...base, electricUnitsUsed: 0, waterUnitsUsed: 0, waiveElectricMin: true })
+    expect(r.elecMinApplied).toBe(false)
+    expect(r.elecCost).toBe(0)
+  })
+
+  it("ปิดการคิดขั้นต่ำใน settings → ไม่คิดขั้นต่ำ", () => {
+    const r = calculateBillTotal({ ...base, electricUnitsUsed: 0, waterUnitsUsed: 0, electricMinChecked: false })
+    expect(r.elecMinApplied).toBe(false)
+    expect(r.elecCost).toBe(0)
   })
 })
