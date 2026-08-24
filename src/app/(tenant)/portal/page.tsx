@@ -607,7 +607,12 @@ export default function TenantPortal() {
         electricRate: useSnapshot ? Number(bill.electricRate || 0) : electricRate,
         waterUnits: waterUnits,
         waterRate: useSnapshot ? Number(bill.waterRate || 0) : waterRate,
-        commonFee,
+        commonFee: commonAreaFee,
+        // การคิดขั้นต่ำ: ใบที่มี snapshot ใช้ผลลัพธ์ที่บันทึกไว้ ไม่คิดใหม่จากการตั้งค่าปัจจุบัน
+        elecMinApplied: useSnapshot ? (bill.elecMinApplied ?? undefined) : undefined,
+        waterMinApplied: useSnapshot ? (bill.waterMinApplied ?? undefined) : undefined,
+        electricMinUnit: useSnapshot ? (bill.electricMinUnitSnapshot ?? electricMinUnit) : electricMinUnit,
+        waterMinUnit: useSnapshot ? (bill.waterMinUnitSnapshot ?? waterMinUnit) : waterMinUnit,
         amount: totalAmount,
         promptPayId,
         promptPayName,

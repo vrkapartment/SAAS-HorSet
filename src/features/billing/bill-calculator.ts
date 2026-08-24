@@ -28,19 +28,29 @@ export interface BillRateInput {
 export function calculateBillTotal(input: BillRateInput): {
   elecCost: number
   waterCost: number
+  /**
+   * true = ใบนี้คิดค่าไฟแบบ "ขั้นต่ำ" (ใช้น้อยกว่าขั้นต่ำจึงคิดตามขั้นต่ำ)
+   *
+   * คืนออกมาเพื่อให้ฝั่งออกบิลบันทึกลง snapshot ได้ตรง ๆ ไม่ต้องคิดสูตรซ้ำเอง —
+   * คำอธิบายบนใบแจ้งหนี้ ("ค่าไฟฟ้า (ขั้นต่ำ N หน่วย)" และคอลัมน์อัตราที่แสดง "-")
+   * เป็นข้อมูล ณ ตอนออกบิลเหมือนกับตัวเลขเงิน ถ้าไปคำนวณใหม่จากการตั้งค่าปัจจุบัน
+   * ใบเดิมจะได้ยอดถูกแต่ป้ายผิดเมื่อมีการเปลี่ยนการตั้งค่าขั้นต่ำภายหลัง
+   */
+  elecMinApplied: boolean
+  waterMinApplied: boolean
   /** ฐานที่ต้องเสีย VAT (ค่าน้ำ-ไฟ-ส่วนกลาง-บริการอื่น-ค่าใช้จ่ายเพิ่มเติม) ไม่รวมค่าเช่า (40(5) ยกเว้น VAT) */
   vatableBase: number
   /** VAT ที่บวกเพิ่มจากยอดเดิม — 0 เมื่อ vatApplies ไม่เป็น true */
   vatAmount: number
   total: number
 } {
-  const finalElecUnits = !input.waiveElectricMin && input.electricMinChecked && input.electricUnitsUsed <= input.electricMinUnit
-    ? input.electricMinUnit
-    : input.electricUnitsUsed
+  const elecMinApplied = !input.waiveElectricMin && !!input.electricMinChecked
+    && input.electricUnitsUsed <= input.electricMinUnit
+  const waterMinApplied = !input.waiveWaterMin && !!input.waterMinChecked
+    && input.waterUnitsUsed <= input.waterMinUnit
 
-  const finalWaterUnits = !input.waiveWaterMin && input.waterMinChecked && input.waterUnitsUsed <= input.waterMinUnit
-    ? input.waterMinUnit
-    : input.waterUnitsUsed
+  const finalElecUnits = elecMinApplied ? input.electricMinUnit : input.electricUnitsUsed
+  const finalWaterUnits = waterMinApplied ? input.waterMinUnit : input.waterUnitsUsed
 
   const elecCost = finalElecUnits * input.electricRate
   const waterCost = finalWaterUnits * input.waterRate
@@ -57,6 +67,8 @@ export function calculateBillTotal(input: BillRateInput): {
   return {
     elecCost,
     waterCost,
+    elecMinApplied,
+    waterMinApplied,
     vatableBase,
     vatAmount,
     total

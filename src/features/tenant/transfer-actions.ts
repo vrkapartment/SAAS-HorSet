@@ -169,7 +169,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     const elecUnitsUsed = Math.max(0, input.closingElecCurr - prevElec)
     const waterUnitsUsed = Math.max(0, input.closingWaterCurr - prevWater)
 
-    const { elecCost, waterCost, total: closingBillTotal } = calculateBillTotal({
+    const { elecCost, waterCost, elecMinApplied, waterMinApplied, total: closingBillTotal } = calculateBillTotal({
       baseRent: proratedRent,
       electricUnitsUsed: elecUnitsUsed,
       waterUnitsUsed: waterUnitsUsed,
@@ -219,6 +219,10 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
         water_prev: prevWater,
         water_curr: input.closingWaterCurr,
         extra_expenses: [],
+        elec_min_applied: elecMinApplied,
+        water_min_applied: waterMinApplied,
+        electric_min_unit: settings.electric_min_unit,
+        water_min_unit: settings.water_min_unit,
         invoice_id: closingInvoiceId
       }], { onConflict: "workspace_id,room_id,billing_cycle,bill_kind" })
       .select()

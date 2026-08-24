@@ -1118,6 +1118,9 @@ export interface BillPdfData {
   /** ยอดค่าไฟ/ค่าน้ำที่บันทึกไว้ในบิล (ใช้เมื่อ hasSnapshot) */
   electricAmount?: number
   waterAmount?: number
+  /** ใบนี้คิดขั้นต่ำหรือไม่ ตามที่บันทึกไว้ตอนออกบิล (ใช้เมื่อ hasSnapshot) */
+  elecMinApplied?: boolean
+  waterMinApplied?: boolean
   electricUnits: number
   electricRate: number
   waterUnits: number
@@ -1258,8 +1261,14 @@ export async function generateBillPdf(data: BillPdfData) {
   const electricMinChecked = data.electricMinChecked !== undefined ? data.electricMinChecked : true
   const electricMinUnit = data.electricMinUnit !== undefined ? data.electricMinUnit : 10
 
-  const isElecMin = !data.waiveElectricMin && electricMinChecked && data.electricUnits <= electricMinUnit
-  const isWaterMin = !data.waiveWaterMin && waterMinChecked && data.waterUnits <= waterMinUnit
+  // ใบที่มี snapshot: ใช้ผลลัพธ์ที่บันทึกไว้ตอนออกบิล ห้ามคิดใหม่จากการตั้งค่าปัจจุบัน
+  // ไม่งั้นเปลี่ยนการตั้งค่าขั้นต่ำแล้วใบเดิมจะได้ "ยอดถูกแต่ป้ายผิด"
+  const isElecMin = data.hasSnapshot && data.elecMinApplied !== undefined
+    ? !!data.elecMinApplied
+    : (!data.waiveElectricMin && electricMinChecked && data.electricUnits <= electricMinUnit)
+  const isWaterMin = data.hasSnapshot && data.waterMinApplied !== undefined
+    ? !!data.waterMinApplied
+    : (!data.waiveWaterMin && waterMinChecked && data.waterUnits <= waterMinUnit)
 
   // บิลที่มี snapshot: ใช้ยอดที่บันทึกไว้ตรง ๆ (รวมกรณีคิดขั้นต่ำแล้วตั้งแต่ตอนออกบิล)
   // บิลเก่า: คำนวณจากอัตรา+การตั้งค่าขั้นต่ำปัจจุบันแบบเดิม
