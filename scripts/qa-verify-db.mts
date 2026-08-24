@@ -147,6 +147,44 @@ const checks: Check[] = [
     }
   },
   {
+    name: "หน่วยน้ำ-ไฟในบิล ต้องตรงกับเลขมิเตอร์ที่บันทึกในบิลเดียวกัน",
+    why: "ถ้าไม่ตรง แปลว่าบิลคิดเงินจากจำนวนหน่วยที่ไม่ใช่ของมิเตอร์ใบนั้น = เก็บเงินผิดจำนวน",
+    run: async () => {
+      // ตรวจเฉพาะบิลที่มี snapshot เพราะบิลเก่าไม่ได้เก็บเลขมิเตอร์ไว้ให้เทียบ
+      const { data, error } = await db.from("bills")
+        .select("invoice_id, electric_units, water_units, elec_prev, elec_curr, water_prev, water_curr")
+        .not("base_rent", "is", null)
+      if (error) throw error
+      if (!data?.length) return { ok: true, detail: "ยังไม่มีบิลที่มี snapshot" }
+
+      // มิเตอร์หมุนครบรอบ (curr < prev) คิดแบบ (10000 - prev) + curr — ต้องยอมทั้งสองแบบ
+      const expected = (curr: number, prev: number) =>
+        curr >= prev ? curr - prev : (10000 - prev) + curr
+
+      const bad: string[] = []
+      for (const b of data) {
+        const pairs: [string, unknown, unknown, unknown][] = [
+          ["ไฟ", b.electric_units, b.elec_prev, b.elec_curr],
+          ["น้ำ", b.water_units, b.water_prev, b.water_curr]
+        ]
+        for (const [label, units, prev, curr] of pairs) {
+          if (prev === null || prev === undefined || curr === null || curr === undefined) continue
+          const exp = expected(Number(curr), Number(prev))
+          if (Number(units) !== exp) {
+            bad.push(`${b.invoice_id} (${label}): บิลเก็บ ${units} หน่วย แต่มิเตอร์ ${prev} → ${curr} = ${exp} หน่วย`)
+          }
+        }
+      }
+      const head = `ตรวจ ${data.length} ใบ`
+      return {
+        ok: bad.length === 0,
+        detail: bad.length === 0
+          ? `${head} หน่วยตรงกับเลขมิเตอร์ทุกใบ`
+          : `${head} ไม่ตรง ${bad.length} รายการ:\n      ` + bad.slice(0, 10).join("\n      ")
+      }
+    }
+  },
+  {
     name: "ผู้เช่าที่ยังอยู่ต้องผูกกับห้อง",
     why: "tenants.room_id เป็นตัวที่ RLS ใช้ตัดสินว่าผู้เช่าเห็นบิลใบไหนได้",
     run: async () => {
