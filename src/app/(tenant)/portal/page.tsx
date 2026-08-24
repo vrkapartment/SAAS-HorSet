@@ -41,6 +41,7 @@ import { updateBillStatus } from "@/features/billing/actions"
 import { createClient } from "@/lib/supabase/client"
 import PullToRefresh from "@/components/PullToRefresh"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import { parseUtilitySegments, formatSegmentRoomLabel } from "@/lib/billSegments"
 import { DynamicText } from "@/lib/translations/DynamicText"
 import { LanguageToggle } from "@/components/LanguageToggle"
 import { ThemeToggle } from "@/components/ThemeToggle"
@@ -464,6 +465,10 @@ export default function TenantPortal() {
     ? (bill.penaltyAmount !== null && bill.penaltyAmount !== undefined ? Number(bill.penaltyAmount) : (isDemo ? (lateDays * latePenaltyRate) : 0))
     : 0
 
+  // ส่วนของห้องเดิมที่ยกมารวมในใบนี้ (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+  // ยอดพวกนี้รวมอยู่ใน bill.amount แล้ว ที่แสดงคือการ "แยกให้เห็น" ไม่ใช่บวกเพิ่ม
+  const billUtilitySegments = parseUtilitySegments(bill?.utilitySegments)
+
   // ค่าใช้จ่ายเสริม — รายการที่คิดเงินไปจริงในใบนี้ ไม่ใช่รายการปัจจุบันของห้อง
   const billExtraExpenses = useSnapshot ? (bill.extraExpenses || []) : extraExpenses
   const extraExpensesSum = billExtraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
@@ -611,6 +616,8 @@ export default function TenantPortal() {
         // การคิดขั้นต่ำ: ใบที่มี snapshot ใช้ผลลัพธ์ที่บันทึกไว้ ไม่คิดใหม่จากการตั้งค่าปัจจุบัน
         elecMinApplied: useSnapshot ? (bill.elecMinApplied ?? undefined) : undefined,
         waterMinApplied: useSnapshot ? (bill.waterMinApplied ?? undefined) : undefined,
+        // รายการของห้องเดิมที่ยกมารวม (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+        utilitySegments: bill.utilitySegments ?? [],
         electricMinUnit: useSnapshot ? (bill.electricMinUnitSnapshot ?? electricMinUnit) : electricMinUnit,
         waterMinUnit: useSnapshot ? (bill.waterMinUnitSnapshot ?? waterMinUnit) : waterMinUnit,
         amount: totalAmount,
@@ -891,6 +898,67 @@ export default function TenantPortal() {
               </div>
               <span className="font-semibold text-slate-900 dark:text-slate-200">{commonAreaFee.toLocaleString()} {t("daily_bills.baht_unit")}</span>
             </div>
+
+            {/* ส่วนของห้องเดิม เมื่อย้ายห้องกลางเดือน (ว่างในบิลปกติทุกใบ)
+                แยกเป็นกล่องของตัวเองพร้อมกำกับเลขห้อง เพื่อให้ผู้เช่าเห็นชัดว่าส่วนไหนคือห้องเดิม
+                ส่วนไหนคือห้องที่อยู่ตอนนี้ — ตัวเลขเดียวกับที่พิมพ์ลง PDF (มาจาก bills.utility_segments) */}
+            {billUtilitySegments.length > 0 && (
+              <div className="pb-2.5 border-b border-slate-200 dark:border-slate-900 space-y-2">
+                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                  {t("tenant_portal.segment_header")}
+                </p>
+                {billUtilitySegments.map((seg, index) => (
+                  <div key={seg.transferId || index} className="pl-2 border-l-2 border-amber-300 dark:border-amber-700/60 space-y-1">
+                    <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                      {t("tenant_portal.segment_room").replace("{room}", formatSegmentRoomLabel(seg).replace("ห้อง ", ""))}
+                    </p>
+                    {(seg.elecAmount > 0 || seg.elecUnits > 0) && (
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                            <span>{t("tenant_portal.segment_electric")}{seg.elecMinApplied ? ` (${t("tenant_portal.segment_min_applied")})` : ""}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 pl-5">
+                            {t("tenant_portal.electric_meter_reading")
+                              .replace("{prev}", String(seg.elecPrev))
+                              .replace("{curr}", String(seg.elecCurr))
+                              .replace("{units}", String(seg.elecUnits))}
+                          </p>
+                        </div>
+                        <span className="font-semibold text-slate-900 dark:text-slate-200">{seg.elecAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+                      </div>
+                    )}
+                    {(seg.waterAmount > 0 || seg.waterUnits > 0) && (
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <Droplet className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                            <span>{t("tenant_portal.segment_water")}{seg.waterMinApplied ? ` (${t("tenant_portal.segment_min_applied")})` : ""}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 pl-5">
+                            {t("tenant_portal.water_meter_reading")
+                              .replace("{prev}", String(seg.waterPrev))
+                              .replace("{curr}", String(seg.waterCurr))
+                              .replace("{units}", String(seg.waterUnits))}
+                          </p>
+                        </div>
+                        <span className="font-semibold text-slate-900 dark:text-slate-200">{seg.waterAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+                      </div>
+                    )}
+                    {seg.rentIncluded && seg.rentAmount > 0 && (
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                          <Building className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          <span>{t("tenant_portal.segment_rent").replace("{date}", seg.toDate)}</span>
+                        </div>
+                        <span className="font-semibold text-slate-900 dark:text-slate-200">{seg.rentAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* ค่าใช้จ่ายเสริมรายเดือน (ถ้ามี) */}
             {billExtraExpenses && billExtraExpenses.length > 0 && billExtraExpenses.map((exp: any, index: number) => (

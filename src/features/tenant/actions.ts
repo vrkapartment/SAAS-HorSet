@@ -732,6 +732,8 @@ export async function getTenantPortalData() {
             waterMinApplied: snap.waterMinApplied,
             electricMinUnitSnapshot: snap.electricMinUnit,
             waterMinUnitSnapshot: snap.waterMinUnit,
+            // รายการของห้องเดิมที่ยกมารวมในบิลนี้ (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+            utilitySegments: snap.utilitySegments,
             electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
             electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
             waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
@@ -1087,6 +1089,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
           waterMinApplied: snap.waterMinApplied,
           electricMinUnitSnapshot: snap.electricMinUnit,
           waterMinUnitSnapshot: snap.waterMinUnit,
+          // รายการของห้องเดิมที่ยกมารวมในบิลนี้ (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+          utilitySegments: snap.utilitySegments,
           electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
           electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
           waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
@@ -1200,6 +1204,18 @@ export async function saveCancelledContract(workspaceId: string, contract: {
   isHistoricalBreach?: boolean
   historicalRentDeduction?: number
   historicalUtilitiesDeduction?: number
+
+  /**
+   * เลขมิเตอร์ตอนปิดห้อง — ที่มาของยอดหักค่าน้ำ-ไฟจากเงินประกัน
+   *
+   * ต้องเก็บไว้เพราะหลังย้ายออก แถว meter_records ของรอบนั้นถูกตั้งใหม่ให้เริ่มที่เลขปิด
+   * (เพื่อไม่ให้ผู้เช่ารายถัดไปถูกคิดหน่วยของคนเดิม) ถ้าไม่เก็บที่นี่ เลขที่ใช้คิดยอดหัก
+   * จะหายไปเลย ตรวจย้อนหลังไม่ได้ว่ายอดนั้นถูกหรือไม่
+   */
+  closingElecPrev?: number
+  closingElecCurr?: number
+  closingWaterPrev?: number
+  closingWaterCurr?: number
 }) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -1313,6 +1329,15 @@ export async function saveCancelledContract(workspaceId: string, contract: {
       deducted_rent_405: finalDeductedRent405,
       deducted_utilities_408: finalDeductedUtilities408,
       deducted_services_408: finalDeductedServices408
+    }
+
+    // เลขมิเตอร์ปิดห้อง: ใส่เฉพาะเมื่อผู้เรียกส่งมา — การแก้ประวัติย้อนหลังไม่ได้ส่งค่าเหล่านี้
+    // ถ้าใส่ undefined ลงไป upsert จะเขียน null ทับเลขที่บันทึกไว้ตอนย้ายออกจริง
+    if (contract.closingElecCurr !== undefined) {
+      insertData.closing_elec_prev = contract.closingElecPrev ?? null
+      insertData.closing_elec_curr = contract.closingElecCurr
+      insertData.closing_water_prev = contract.closingWaterPrev ?? null
+      insertData.closing_water_curr = contract.closingWaterCurr ?? null
     }
 
     if (contract.id) {

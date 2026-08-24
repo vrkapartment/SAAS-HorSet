@@ -666,12 +666,30 @@ function UnifiedBillingContent() {
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
         const hasPrevMeterWater = !!(prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
 
-        const elecPrev = hasPrevMeterElec
-          ? Number(prevMeter.elecCurr)
-          : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
-        const waterPrev = hasPrevMeterWater
-          ? Number(prevMeter.waterCurr)
-          : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
+        // หมุด "เลขตั้งต้นของผู้เช่าปัจจุบัน" — ชนะกฎ prev = curr ของรอบก่อน
+        //
+        // ถูกปักไว้ตอนมีเหตุการณ์ย้ายกลางรอบ (ย้ายออก / ย้ายห้อง) เท่านั้น
+        // ถ้าไม่ให้ชนะ ผู้เช่าที่ย้ายเข้าห้องกลางเดือนจะถูกคิดหน่วยตั้งแต่เลขของผู้เช่าคนก่อน
+        // ซึ่งคนก่อนจ่ายไปแล้ว (หักจากเงินประกัน หรือรวมในบิลห้องใหม่ของเขา) = เก็บซ้ำ
+        // และสตาฟแก้เองไม่ได้เพราะช่องเลขก่อนหน้าถูกล็อกไว้ตั้งใจ
+        // ดู database_patch_move_segments.sql ข้อ 4
+        const occStartElec = roomMeter && roomMeter.occupancyStartElec !== null && roomMeter.occupancyStartElec !== undefined
+          ? Number(roomMeter.occupancyStartElec)
+          : null
+        const occStartWater = roomMeter && roomMeter.occupancyStartWater !== null && roomMeter.occupancyStartWater !== undefined
+          ? Number(roomMeter.occupancyStartWater)
+          : null
+
+        const elecPrev = occStartElec !== null
+          ? occStartElec
+          : (hasPrevMeterElec
+            ? Number(prevMeter.elecCurr)
+            : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev)))
+        const waterPrev = occStartWater !== null
+          ? occStartWater
+          : (hasPrevMeterWater
+            ? Number(prevMeter.waterCurr)
+            : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev)))
         
         // กำหนดความสามารถในการแก้ไขเลขหน่วยครั้งก่อนหน้า (เฉพาะเดือนแรกที่สมัครใช้บริการเท่านั้น เดือนถัดไปจะถูกล็อกถาวร)
         const isFirstMonth = regCycleVal ? (cycle === regCycleVal) : true
@@ -1830,6 +1848,8 @@ function UnifiedBillingContent() {
         waterAmount: item.billSnapshot?.waterAmount ?? undefined,
         elecMinApplied: item.billSnapshot?.elecMinApplied ?? undefined,
         waterMinApplied: item.billSnapshot?.waterMinApplied ?? undefined,
+        // รายการของห้องเดิมที่ยกมารวม (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+        utilitySegments: item.billSnapshot?.utilitySegments ?? [],
         electricMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.electricMinUnit ?? electricMinUnit) : electricMinUnit,
         waterMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.waterMinUnit ?? waterMinUnit) : waterMinUnit,
         electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,
@@ -1925,6 +1945,8 @@ function UnifiedBillingContent() {
           waterAmount: item.billSnapshot?.waterAmount ?? undefined,
           elecMinApplied: item.billSnapshot?.elecMinApplied ?? undefined,
           waterMinApplied: item.billSnapshot?.waterMinApplied ?? undefined,
+        // รายการของห้องเดิมที่ยกมารวม (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+        utilitySegments: item.billSnapshot?.utilitySegments ?? [],
           electricMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.electricMinUnit ?? electricMinUnit) : electricMinUnit,
           waterMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.waterMinUnit ?? waterMinUnit) : waterMinUnit,
           electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,

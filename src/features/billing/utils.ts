@@ -1,3 +1,5 @@
+import { parseUtilitySegments, type BillUtilitySegment } from "@/lib/billSegments"
+
 /**
  * สร้างเลขใบกำกับ (invoice_id) — helper กลางตัวเดียวของทั้งระบบ
  *
@@ -12,6 +14,7 @@
  * ⚠️ ห้ามเขียนสูตรนี้ซ้ำที่อื่น — ถ้าฝั่งสร้างบิลกับฝั่งพิมพ์ PDF สร้างเลขไม่เหมือนกัน
  * ผู้เช่าจะได้ใบที่เลขบนกระดาษไม่ตรงกับในระบบ
  */
+
 export function buildInvoiceId(
   billingCycle: string,
   roomNumber: string,
@@ -40,6 +43,11 @@ export type BillSnapshot = {
   waterMinApplied: boolean | null
   electricMinUnit: number | null
   waterMinUnit: number | null
+  /**
+   * รายการค่าน้ำ-ไฟ-ค่าเช่าของ "ห้องเดิม" ที่ยกมารวมในบิลนี้ (ย้ายห้องกลางเดือน)
+   * ว่างในบิลปกติทุกใบ — ดู src/lib/billSegments.ts
+   */
+  utilitySegments: BillUtilitySegment[]
 }
 
 const num = (v: unknown): number | null =>
@@ -71,7 +79,8 @@ export function readBillSnapshot(row: Record<string, unknown>): BillSnapshot {
     elecMinApplied: typeof row.elec_min_applied === "boolean" ? row.elec_min_applied : null,
     waterMinApplied: typeof row.water_min_applied === "boolean" ? row.water_min_applied : null,
     electricMinUnit: num(row.electric_min_unit),
-    waterMinUnit: num(row.water_min_unit)
+    waterMinUnit: num(row.water_min_unit),
+    utilitySegments: parseUtilitySegments(row.utility_segments)
   }
 }
 
@@ -169,4 +178,23 @@ export function calculateLateDays(cycleStr: string): number {
 
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
   return diffDays > 0 ? diffDays : 0
+}
+
+/**
+ * รอบบิลถัดไปของ "YYYY-MM" (ข้ามปีให้ถูก)
+ *
+ * มีสองที่ที่ต้อง "ส่งเลขมิเตอร์ปิดห้องไปเป็นเลขตั้งต้นของรอบถัดไป" คือย้ายออกและย้ายห้อง
+ * เดิมเส้นทางย้ายออกคำนวณเองในหน้า UI ส่วนเส้นทางย้ายห้องไม่ได้ทำเลย (ห้องเดิมจึงไม่มี
+ * เลขตั้งต้นของเดือนถัดไป แล้วผู้เช่ารายใหม่เริ่มนับจาก 0) — รวมไว้ที่เดียวไม่ให้ลืมอีก
+ */
+export function nextBillingCycle(cycle: string): string {
+  const [yearStr, monthStr] = cycle.split("-")
+  let year = parseInt(yearStr, 10)
+  let month = parseInt(monthStr, 10) + 1
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return cycle
+  if (month > 12) {
+    month = 1
+    year += 1
+  }
+  return `${year}-${String(month).padStart(2, "0")}`
 }

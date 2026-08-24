@@ -35,7 +35,12 @@ export async function getMeterRecords(billingCycle: string, workspaceId?: string
       elecPrev: Number(m.elec_prev),
       elecCurr: m.elec_curr === null || m.elec_curr === undefined ? "" : Number(m.elec_curr),
       waterPrev: Number(m.water_prev),
-      waterCurr: m.water_curr === null || m.water_curr === undefined ? "" : Number(m.water_curr)
+      waterCurr: m.water_curr === null || m.water_curr === undefined ? "" : Number(m.water_curr),
+      // หมุดเลขตั้งต้นของผู้เช่ารายใหม่ เมื่อห้องเปลี่ยนผู้เช่ากลางรอบ (null = ไม่มีเหตุการณ์ย้าย)
+      // หน้าออกบิลต้องให้หมุดนี้ชนะกฎ "prev = curr ของรอบก่อน" ไม่งั้นผู้เช่าใหม่ถูกคิดหน่วยของคนเดิม
+      occupancyStartElec: m.occupancy_start_elec === null || m.occupancy_start_elec === undefined ? null : Number(m.occupancy_start_elec),
+      occupancyStartWater: m.occupancy_start_water === null || m.occupancy_start_water === undefined ? null : Number(m.occupancy_start_water),
+      occupancyStartReason: typeof m.occupancy_start_reason === "string" ? m.occupancy_start_reason : null
     }))
 
     return { success: true, data: formatted }
@@ -45,19 +50,45 @@ export async function getMeterRecords(billingCycle: string, workspaceId?: string
   }
 }
 
+/**
+ * เลขมิเตอร์ตั้งต้นของผู้เช่ารายใหม่ เมื่อห้องเปลี่ยนผู้เช่ากลางรอบบิล
+ *
+ * ส่งมาเฉพาะตอนมีเหตุการณ์ย้ายจริง (ย้ายออก / ย้ายห้อง) — ไม่ส่ง = ไม่แตะคอลัมน์หมุด
+ * ดูเหตุผลที่ต้องมีหมุดแยกจาก elec_prev ใน database_patch_move_segments.sql ข้อ 4
+ */
+export type OccupancyStart = {
+  elec: number
+  water: number
+  reason: "checkout" | "transfer_out" | "transfer_in"
+  /** วันที่เกิดเหตุการณ์ (YYYY-MM-DD) */
+  date: string
+}
+
 export async function saveMeterRecord(
   room: RoomRef,
   billingCycle: string,
   elecPrev: number,
   elecCurr: number | string,
   waterPrev: number,
-  waterCurr: number | string
+  waterCurr: number | string,
+  occupancyStart?: OccupancyStart
 ) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
   }
 
   const supabase = await createClient()
+
+  // เขียนคอลัมน์หมุดเฉพาะเมื่อผู้เรียกส่งมา — ไม่ส่งแล้วใส่ null จะเป็นการ "ล้างหมุด"
+  // ของห้องที่กำลังอยู่ในรอบที่มีการย้าย ทุกครั้งที่สตาฟกดบันทึกมิเตอร์ตามปกติ
+  const occupancyPayload = occupancyStart
+    ? {
+        occupancy_start_elec: occupancyStart.elec,
+        occupancy_start_water: occupancyStart.water,
+        occupancy_start_reason: occupancyStart.reason,
+        occupancy_start_date: occupancyStart.date
+      }
+    : {}
 
   // Helper function to perform the insert or update in Supabase
   // จับคู่แถวเดิมด้วย room_id (ตัวระบุห้องที่แท้จริง) — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วย
@@ -93,7 +124,8 @@ export async function saveMeterRecord(
           elec_prev: elecPrev,
           elec_curr: elecVal,
           water_prev: waterPrev,
-          water_curr: waterVal
+          water_curr: waterVal,
+          ...occupancyPayload
         })
         .eq("id", existing.id)
         .select()
@@ -107,7 +139,8 @@ export async function saveMeterRecord(
           elec_prev: elecPrev,
           elec_curr: elecVal,
           water_prev: waterPrev,
-          water_curr: waterVal
+          water_curr: waterVal,
+          ...occupancyPayload
         }])
         .select()
     }
@@ -354,5 +387,84 @@ export async function getLatestMeterRecord(room: RoomRef, workspaceId?: string) 
     }
   } catch (error: any) {
     return { success: false, error: error?.message || "เกิดข้อผิดพลาดในการดึงเลขมิเตอร์ล่าสุด" }
+  }
+}
+
+/**
+ * เลขมิเตอร์ "ตั้งต้น" ของผู้เช่าปัจจุบันในรอบบิลที่ระบุ
+ *
+ * ต่างจาก getLatestMeterRecord() ที่คืนแถวล่าสุดเสมอ ซึ่งใช้กับเหตุการณ์ปิดห้องไม่ได้:
+ * ถ้าสตาฟจดมิเตอร์รอบนี้ไปแล้ว แถวล่าสุดคือแถวของรอบนี้ แล้ว elecCurr ของมันคือ
+ * "เลขที่จดกลางเดือน" ไม่ใช่เลขตั้งต้นของรอบ — เอาไปเป็น prev ของบิลปิดห้องจะได้หน่วยน้อยกว่าจริง
+ *
+ * เคยเกิดจริง: ห้องที่ย้ายออกถูกคิดหน่วยไฟจากเลขกลางเดือนถึงเลขปิด แทนที่จะเป็นต้นเดือนถึงเลขปิด
+ * (ดู scripts/qa-known-unit-mismatches.ts — ใบของ VRK ที่ต้องไปแก้ใน DB เอง)
+ *
+ * กฎที่ใช้:
+ *   · มีแถวของรอบนี้แล้ว → ใช้ elec_prev/water_prev ของแถวนั้น (คือเลขต้นรอบ)
+ *   · ยังไม่มีแถวของรอบนี้ → ใช้ curr (ถ้าไม่มีใช้ prev) ของแถวก่อนหน้าที่ใกล้ที่สุด
+ */
+export async function getMeterStartForCycle(
+  room: RoomRef,
+  billingCycle: string,
+  workspaceId?: string
+) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true, data: null }
+  }
+  try {
+    const supabase = await createClient()
+
+    const scoped = (q: ReturnType<typeof buildBaseQuery>) => workspaceId ? q.eq("workspace_id", workspaceId) : q
+    function buildBaseQuery() {
+      return supabase
+        .from("meter_records")
+        .select("elec_prev, elec_curr, water_prev, water_curr, billing_cycle")
+        .eq("room_id", room.roomId)
+    }
+
+    const { data: thisCycle, error: thisErr } = await scoped(buildBaseQuery())
+      .eq("billing_cycle", billingCycle)
+      .maybeSingle()
+    if (thisErr) throw thisErr
+
+    if (thisCycle) {
+      return {
+        success: true,
+        data: {
+          elecStart: Number(thisCycle.elec_prev ?? 0),
+          waterStart: Number(thisCycle.water_prev ?? 0),
+          source: "current_cycle" as const,
+          sourceCycle: billingCycle
+        }
+      }
+    }
+
+    const { data: earlier, error: earlierErr } = await scoped(buildBaseQuery())
+      .lt("billing_cycle", billingCycle)
+      .order("billing_cycle", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (earlierErr) throw earlierErr
+
+    if (!earlier) {
+      return {
+        success: true,
+        data: { elecStart: 0, waterStart: 0, source: "none" as const, sourceCycle: null }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        elecStart: Number(earlier.elec_curr ?? earlier.elec_prev ?? 0),
+        waterStart: Number(earlier.water_curr ?? earlier.water_prev ?? 0),
+        source: "previous_cycle" as const,
+        sourceCycle: String(earlier.billing_cycle)
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงเลขมิเตอร์ตั้งต้น"
+    return { success: false, error: message, data: null }
   }
 }

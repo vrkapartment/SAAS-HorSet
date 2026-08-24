@@ -1453,15 +1453,22 @@ function RoomsContent() {
     setRefundDeposit(calculatedDeposit)
     
     try {
-      // ดึงเลขมิเตอร์น้ำไฟรอบล่าสุดเพื่อสืบทอด
-      const { getLatestMeterRecord } = await import("@/features/meter/actions")
-      const meterRes = await getLatestMeterRecord({ roomId: room.id }, getCookie("horset_current_workspace_id") || undefined)
-      
+      // เลขมิเตอร์ "ตั้งต้นของรอบที่ย้ายออก" — ไม่ใช่เลขที่จดล่าสุด
+      //
+      // เดิมใช้ getLatestMeterRecord() แล้วเอา elecCurr มาเป็นเลขครั้งก่อน ซึ่งถ้าสตาฟจดมิเตอร์
+      // รอบนี้ไปแล้ว เลขนั้นคือ "เลขกลางเดือน" → ค่าน้ำ-ไฟที่หักจากเงินประกันจะนับแค่ช่วง
+      // กลางเดือนถึงวันย้ายออก ไม่ใช่ต้นเดือนถึงวันย้ายออก (หักน้อยกว่าที่ผู้เช่าใช้จริง)
+      const { getMeterStartForCycle } = await import("@/features/meter/actions")
+      const checkoutCycle = new Date().toISOString().split("T")[0].substring(0, 7)
+      const meterRes = await getMeterStartForCycle(
+        { roomId: room.id },
+        checkoutCycle,
+        getCookie("horset_current_workspace_id") || undefined
+      )
+
       if (meterRes.success && meterRes.data) {
-        const record = meterRes.data
-        // ดึงเลขมิเตอร์น้ำไฟที่จดจริงล่าสุด
-        const pElec = record.elecCurr !== null && record.elecCurr !== undefined ? record.elecCurr : record.elecPrev
-        const pWater = record.waterCurr !== null && record.waterCurr !== undefined ? record.waterCurr : record.waterPrev
+        const pElec = meterRes.data.elecStart
+        const pWater = meterRes.data.waterStart
         setPrevElec(pElec)
         setPrevWater(pWater)
         setFinalElec(pElec)
@@ -1576,15 +1583,25 @@ function RoomsContent() {
         // 1. บันทึกเลขมิเตอร์ปลายงวดในรอบบิลปัจจุบัน และสืบทอดเป็น "เลขมิเตอร์ก่อนหน้า" ในรอบบิลถัดไป (สำหรับผู้เช่าคนใหม่)
         const { saveMeterRecord } = await import("@/features/meter/actions")
         
+        // ⚠️ แถวของรอบนี้ต้อง "เริ่มนับใหม่ที่เลขปิดห้อง" ไม่ใช่เก็บช่วงของผู้เช่าที่ย้ายออก
+        //
+        // ค่าน้ำ-ไฟของผู้เช่าที่ย้ายออกถูกหักจากเงินประกันไปแล้ว (ไม่ได้ออกเป็นบิล) ถ้าปล่อยให้
+        // แถวนี้ยังเป็น prevElec → fElec แล้วมีผู้เช่าใหม่ย้ายเข้าเดือนเดียวกัน ปลายเดือนบิลของ
+        // คนใหม่จะนับหน่วยตั้งแต่ prevElec = เก็บซ้ำหน่วยที่คนเดิมจ่ายไปแล้ว
+        //
+        // เลขของผู้เช่าเดิมไม่หาย — เก็บไว้ใน cancelled_contracts.closing_* (ขั้นที่ 3 ด้านล่าง)
+        // และต้องส่ง occupancyStart ด้วย ไม่งั้นหน้าออกบิลจะทับ prev กลับเป็น curr ของรอบก่อน
+        // (ดู database_patch_move_segments.sql ข้อ 4)
         const currentMeterRes = await saveMeterRecord(
           { roomId: refundingRoom.id },
           currentCycle,
-          prevElec,
           fElec,
-          prevWater,
-          fWater
+          "",
+          fWater,
+          "",
+          { elec: fElec, water: fWater, reason: "checkout", date: refundCheckoutDate }
         )
-        
+
         if (!currentMeterRes.success) {
           setRefundError(currentMeterRes.error || t("rooms.toasts.meter_save_error"))
           setRefundSubmitting(false)
@@ -1675,6 +1692,16 @@ function RoomsContent() {
         isHistoricalBreach,
         historicalRentDeduction,
         historicalUtilitiesDeduction
+      }
+
+      // เลขมิเตอร์ตอนปิดห้อง — เก็บไว้เป็นที่มาของยอดหักค่าน้ำ-ไฟ (เดิมตารางนี้เก็บแต่ตัวเลขเงิน
+      // จึงตรวจย้อนหลังไม่ได้ว่ายอดนั้นคิดจากเลขอะไร) และเป็นหลักฐานว่าผู้เช่ารายถัดไป
+      // ต้องเริ่มนับที่เลขไหน หลังแถวมิเตอร์ของรอบนี้ถูกตั้งใหม่ในขั้นที่ 1
+      if (!isHistoricalEdit) {
+        cancellationPayload.closingElecPrev = prevElec
+        cancellationPayload.closingElecCurr = fElec
+        cancellationPayload.closingWaterPrev = prevWater
+        cancellationPayload.closingWaterCurr = fWater
       }
       
       if (isHistoricalEdit) {
@@ -5333,6 +5360,9 @@ function RoomsContent() {
               depositPaid: selectedRoom.depositPaid
             }}
             vacantRooms={rooms.filter(r => r.status === "available").map(r => ({ id: r.id, roomNumber: r.roomNumber }))}
+            // ใช้แสดงยอดค่าเช่าห้องเดิมเริ่มต้นในฟอร์ม (ฝั่ง server คิดเองอีกครั้งเสมอ)
+            baseRent={selectedRoom.baseRent}
+            checkoutPolicy={financeSettings?.checkout_policy || "DAILY_PRORATE"}
             workspaceId={getCookie("horset_current_workspace_id") || undefined}
             onClose={() => setTransferModalOpen(false)}
             onSuccess={({ toRoomNumber }) => {
