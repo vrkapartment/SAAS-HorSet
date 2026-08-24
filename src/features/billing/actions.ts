@@ -135,6 +135,14 @@ export async function getBills(billingCycle?: string, year?: string, workspaceId
       roomNumber: b.room_number,
       // ตัวระบุห้องที่แท้จริง — ฝั่ง client ใช้ตัวนี้จับคู่ ไม่ใช่ roomNumber ที่ซ้ำกันได้ข้ามอาคาร
       roomId: b.room_id ?? null,
+      /**
+       * ชนิดของบิล: regular = บิลรอบปกติ · transfer_closing = บิลปิดรอบตอนย้ายห้อง (เลิกออกใหม่แล้ว)
+       *
+       * ต้องคืนออกมาให้ฝั่งจอ เพราะห้องเดียวในรอบเดียวมีได้ทั้งสองใบ ถ้าฝั่งจอจับบิลของห้อง
+       * โดยไม่ดูชนิด แถวนั้นอาจแสดงยอด/สถานะของใบปิดรอบแทนบิลรอบปกติ และปุ่มที่ทำงานกับ
+       * บิลใบนั้น (ยกเลิกบิล / รับเงินสด) จะไปทำกับใบผิด
+       */
+      billKind: (b.bill_kind as string | null) ?? "regular",
       tenantName: b.tenant_name,
       amount: Number(b.amount),
       status: b.status as "unpaid" | "pending" | "paid",

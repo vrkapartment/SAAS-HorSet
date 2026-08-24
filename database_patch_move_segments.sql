@@ -150,5 +150,7 @@ notify pgrst, 'reload schema';
 --          count(*) filter (where utility_segments = '[]'::jsonb) as ว่างถูกต้อง
 --   from public.bills;
 --
--- หมายเหตุ: default ใช้กับแถวใหม่เท่านั้น แถวเดิมจะเป็น null ซึ่งฝั่งโค้ดรับได้
--- (parseUtilitySegments คืน array ว่างเมื่อไม่ใช่ array) จึงไม่ต้อง backfill
+-- หมายเหตุ (ตรวจกับ production หลังรันจริงแล้ว): Postgres 11+ ใส่ default ให้ "แถวเดิม" ด้วย
+-- เมื่อ default เป็นค่าคงที่ จึงอ่านได้เป็น '[]' ทุกแถวโดยไม่ต้อง backfill และไม่ต้อง rewrite ตาราง
+-- ฝั่งโค้ดก็รับ null ได้อยู่แล้ว (parseUtilitySegments คืน array ว่างเมื่อไม่ใช่ array)
+-- จึงปลอดภัยทั้งสองทาง ไม่ว่าเวอร์ชัน Postgres จะทำแบบไหน

@@ -619,7 +619,10 @@ function ManageBillsContent() {
         // จับคู่ด้วย rooms.id — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้อง ห้อง 101 ของสองอาคาร
         // จะได้บิล/เลขมิเตอร์ของห้องเดียวกันมาแสดงทั้งคู่ แล้วการกดบันทึกจะเขียนทับกันเอง
         const roomId = asRoomId(r.id)
-        const roomBill = dbBills.find((b: any) => b.roomId === roomId)
+        // เฉพาะบิลรอบปกติ — ห้องเดียวในรอบเดียวมีใบปิดรอบตอนย้ายห้อง (transfer_closing) ได้อีกใบ
+        // ถ้าไม่กรอง find() จะคืนใบไหนก็ได้ตามลำดับที่ query ส่งมา แล้วแถวนี้อาจแสดงยอดของใบผิด
+        // และปุ่มที่ทำงานกับบิลใบนั้นจะไปทำกับใบผิดด้วย (เช่นปุ่มยกเลิกบิล)
+        const roomBill = dbBills.find((b: any) => b.roomId === roomId && (b.billKind ?? "regular") === "regular")
         const roomMeter = dbMeters.find((m: any) => m.roomId === roomId)
         const prevMeter = dbPrevMeters.find((m: any) => m.roomId === roomId)
         
