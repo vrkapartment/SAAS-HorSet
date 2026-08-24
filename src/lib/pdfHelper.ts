@@ -1109,6 +1109,15 @@ export interface BillPdfData {
   tenantName: string
   billingCycle: string
   baseRent: number
+  /**
+   * true = ตัวเลขทุกบรรทัดที่ส่งมาเป็นค่าที่บันทึกไว้ในบิลจริง (snapshot) ให้พิมพ์ตามนั้นตรง ๆ
+   * false/undefined = บิลเก่าที่ไม่มี snapshot ให้คำนวณค่าเช่าย้อนจากยอดรวมแบบเดิม
+   * ดู database_patch_add_bill_snapshot.sql
+   */
+  hasSnapshot?: boolean
+  /** ยอดค่าไฟ/ค่าน้ำที่บันทึกไว้ในบิล (ใช้เมื่อ hasSnapshot) */
+  electricAmount?: number
+  waterAmount?: number
   electricUnits: number
   electricRate: number
   waterUnits: number
@@ -1252,8 +1261,14 @@ export async function generateBillPdf(data: BillPdfData) {
   const isElecMin = !data.waiveElectricMin && electricMinChecked && data.electricUnits <= electricMinUnit
   const isWaterMin = !data.waiveWaterMin && waterMinChecked && data.waterUnits <= waterMinUnit
 
-  const elecAmount = isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate
-  const waterAmount = isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate
+  // บิลที่มี snapshot: ใช้ยอดที่บันทึกไว้ตรง ๆ (รวมกรณีคิดขั้นต่ำแล้วตั้งแต่ตอนออกบิล)
+  // บิลเก่า: คำนวณจากอัตรา+การตั้งค่าขั้นต่ำปัจจุบันแบบเดิม
+  const elecAmount = data.hasSnapshot && data.electricAmount !== undefined
+    ? Number(data.electricAmount || 0)
+    : (isElecMin ? (electricMinUnit * data.electricRate) : data.electricUnits * data.electricRate)
+  const waterAmount = data.hasSnapshot && data.waterAmount !== undefined
+    ? Number(data.waterAmount || 0)
+    : (isWaterMin ? (waterMinUnit * data.waterRate) : data.waterUnits * data.waterRate)
   
   const penaltyAmount = data.penaltyAmount !== undefined ? Number(data.penaltyAmount || 0) : 0
   const otherServiceAmount = data.otherServiceAmount !== undefined ? Number(data.otherServiceAmount || 0) : 0
@@ -1262,9 +1277,19 @@ export async function generateBillPdf(data: BillPdfData) {
   const extraExpenses = data.extraExpenses || []
   const extraExpensesSum = extraExpenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
-  // คำนวณค่าเช่าห้องพักที่หักส่วนลด (หรือรวมค่าปรับ/ค่าใช้จ่ายอื่นๆ เผื่อไว้) เพื่อให้ยอดรวมรวมกันเท่ากับ data.amount พอดี
-  // ต้องหัก vatAmount ออกด้วย เพราะ data.amount รวม VAT ไว้แล้วตั้งแต่ตอนออกบิล (ไม่งั้น VAT จะไปปนเข้าบรรทัดค่าเช่า)
-  const adjustedBaseRent = Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount - extraExpensesSum - vatAmount)
+  // ค่าเช่าที่จะพิมพ์บนใบ
+  //
+  // บิลที่มี snapshot: ใช้ค่าเช่าที่บันทึกไว้ตรง ๆ — เป็นตัวเลขที่คิดเงินไปจริง
+  //
+  // บิลเก่าที่ไม่มี snapshot: คำนวณย้อนจากยอดรวมแบบเดิม เพื่อบังคับให้ทุกบรรทัดบวกกันได้เท่า
+  // data.amount พอดี (หัก vatAmount ออกด้วยเพราะ data.amount รวม VAT ไว้แล้วตั้งแต่ออกบิล)
+  //
+  // ⚠️ วิธีคำนวณย้อนนี้ทำให้บรรทัด "ค่าเช่าห้องพัก" กลายเป็นเศษที่เหลือ ไม่ใช่ค่าเช่าจริงของห้อง
+  // ทันทีที่องค์ประกอบอื่นไม่ตรงกับตอนออกบิล (เช่น แก้มิเตอร์แล้วไม่ออกบิลใหม่) จึงคงไว้เฉพาะ
+  // บิลเก่าที่ไม่มีข้อมูลให้ใช้แล้วจริง ๆ — ห้ามใช้กับบิลใหม่
+  const adjustedBaseRent = data.hasSnapshot
+    ? Math.max(0, Number(data.baseRent || 0))
+    : Math.max(0, data.amount - elecAmount - waterAmount - commonFee - penaltyAmount - otherServiceAmount - extraExpensesSum - vatAmount)
 
   const elecDesc = isElecMin 
     ? `2. ค่าไฟฟ้า (ขั้นต่ำ ${electricMinUnit} หน่วย)` 

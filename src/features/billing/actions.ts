@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { verifyPortalToken, type PortalRoomRef } from "@/features/tenant/actions"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { calculateLateDays, buildInvoiceId } from "./utils"
+import { calculateLateDays, buildInvoiceId, hasBillSnapshot, readBillSnapshot } from "./utils"
 import type { RoomRef } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
 import { getMeterRecords, getMeterReplacements } from "@/features/meter/actions"
@@ -98,7 +98,11 @@ export async function getBills(billingCycle?: string, year?: string, workspaceId
       lateDays: b.late_days !== null && b.late_days !== undefined ? Number(b.late_days) : null,
       otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
       invoiceId: b.invoice_id,
-      vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0
+      vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
+      // องค์ประกอบที่บันทึกไว้ ณ ตอนออกบิล — ฝั่งแสดงผลต้องใช้ค่าเหล่านี้ ไม่ใช่ค่า config ปัจจุบัน
+      // (null ทั้งชุด = บิลเก่าที่ออกก่อนมี snapshot ให้ถอยไปพฤติกรรมเดิม)
+      snapshot: readBillSnapshot(b),
+      hasSnapshot: hasBillSnapshot(readBillSnapshot(b))
     }))
 
     return { success: true, data: formatted }
@@ -280,6 +284,33 @@ export async function createBill(
 
     const finalBillAmount = serverCalculatedTotal
 
+    // snapshot ขององค์ประกอบบิล ณ ตอนออก — ให้ใบแจ้งหนี้อธิบายที่มาของทุกตัวเลขได้เอง
+    // ไม่ต้องให้ฝั่งแสดงผลไปเดาจาก config ปัจจุบัน (ซึ่งเปลี่ยนได้ทุกเมื่อ)
+    // ดู database_patch_add_bill_snapshot.sql
+    //
+    // เลขมิเตอร์อ่านจาก meter_records ของรอบนี้ ไม่รับจากผู้เรียก เพื่อให้ตรงกับหน่วยที่ใช้คิดจริง
+    const { data: meterRow } = await supabase
+      .from("meter_records")
+      .select("elec_prev, elec_curr, water_prev, water_curr")
+      .eq("workspace_id", workspaceId)
+      .eq("room_id", room.roomId)
+      .eq("billing_cycle", billingCycle)
+      .maybeSingle()
+
+    const billSnapshot = {
+      base_rent: baseRent,
+      electric_amount: elecCost,
+      water_amount: waterCost,
+      electric_rate: electricResolved.rate,
+      water_rate: waterResolved.rate,
+      common_fee: settings.common_fee,
+      elec_prev: meterRow?.elec_prev ?? null,
+      elec_curr: meterRow?.elec_curr ?? null,
+      water_prev: meterRow?.water_prev ?? null,
+      water_curr: meterRow?.water_curr ?? null,
+      extra_expenses: extraExpenses
+    }
+
     // Check if a bill already exists for this room and cycle
     // จับด้วย room_id — เลขห้องซ้ำกันได้ข้ามอาคาร (ดูหมายเหตุเดียวกันใน saveMeterRecord)
     // ยังกรอง workspace_id ด้วย ไม่พึ่ง RLS อย่างเดียว — super_admin ที่ถือ support grant หลายหอ
@@ -318,7 +349,8 @@ export async function createBill(
           // ที่ซ้ำกันได้ข้ามตึก — ดู database_patch_add_room_id_to_meters_bills.sql
           room_id: roomData.id,
           building_id: roomData.building_id ?? null,
-          vat_amount: vatAmount
+          vat_amount: vatAmount,
+          ...billSnapshot
         })
         .eq("id", existing.id)
         .select()
@@ -341,7 +373,8 @@ export async function createBill(
           penalty_amount: null,
           invoice_id: buildInvoiceId(billingCycle, roomNumber, buildingCode),
           building_id: roomData.building_id ?? null,
-          vat_amount: vatAmount
+          vat_amount: vatAmount,
+          ...billSnapshot
         }])
         .select()
     }
@@ -1148,7 +1181,7 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const extraExpensesSum = (roomData.extra_expenses || []).reduce((a: number, c: any) => a + Number(c.amount || 0), 0)
 
       // ใช้ calculateBillTotal ตัวเดียวกับที่ createBill ใช้อยู่ (ห้ามเขียนสูตรซ้ำ)
-      const { total, vatAmount } = calculateBillTotal({
+      const { elecCost, waterCost, total, vatAmount } = calculateBillTotal({
         baseRent, electricUnitsUsed: eUnits, waterUnitsUsed: wUnits,
         electricRate: electricResolved.rate, waterRate: waterResolved.rate,
         commonFee: settings.common_fee, otherServiceAmount: item.otherServiceAmount,
@@ -1168,6 +1201,19 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         // เขียน room_id ควบคู่ไปด้วย (ดูหมายเหตุที่ meterRows ด้านบน)
         room_id: roomData.id,
         bill_kind: "regular",
+        // snapshot ขององค์ประกอบบิล ณ ตอนออก (ดู createBill และ database_patch_add_bill_snapshot.sql)
+        // เลขมิเตอร์ใช้ค่าเดียวกับที่เพิ่งเขียนลง meter_records ในรอบนี้ จึงตรงกับหน่วยที่คิดเงินแน่นอน
+        base_rent: baseRent,
+        electric_amount: elecCost,
+        water_amount: waterCost,
+        electric_rate: electricResolved.rate,
+        water_rate: waterResolved.rate,
+        common_fee: settings.common_fee,
+        elec_prev: item.elecPrev,
+        elec_curr: elecVal,
+        water_prev: item.waterPrev,
+        water_curr: waterVal,
+        extra_expenses: roomData.extra_expenses || [],
         tenant_name: item.tenantName,
         amount: total + existingPenalty,
         status: item.status,

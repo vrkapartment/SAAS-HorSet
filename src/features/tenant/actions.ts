@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import type { RoomRef } from "@/features/room/utils"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
-import { resolveBillPenalty } from "@/features/billing/utils"
+import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "@/features/billing/utils"
 import { calculateDepositProration, computeStandardDeposit } from "@/features/room/deposit-calculator"
 import { getFinanceSettings } from "@/features/finance/actions"
 
@@ -680,6 +680,8 @@ export async function getTenantPortalData() {
         }
 
         formattedBills = filteredBills.map((b: any) => {
+          const snap = readBillSnapshot(b)
+
           // ค่าปรับล่าช้า — กฎอยู่ใน resolveBillPenalty ที่เดียว (ห้ามเขียนซ้ำที่นี่)
           const { lateDays, penaltyAmount, amount } = resolveBillPenalty({
             savedPenaltyAmount: b.penalty_amount,
@@ -711,10 +713,21 @@ export async function getTenantPortalData() {
             otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
             vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
             invoiceId: b.invoice_id,
-            elecPrev: meter?.elecPrev ?? null,
-            elecCurr: meter?.elecCurr ?? null,
-            waterPrev: meter?.waterPrev ?? null,
-            waterCurr: meter?.waterCurr ?? null,
+            // เลขมิเตอร์: ใช้ค่าที่บันทึกไว้ในบิลก่อน ถอยไปอ่านสดจาก meter_records เฉพาะบิลเก่า
+            // ที่ยังไม่มี snapshot — ไม่งั้นจะเห็นเลขมิเตอร์ชุดใหม่คู่กับจำนวนหน่วยชุดเก่า
+            elecPrev: snap.elecPrev ?? meter?.elecPrev ?? null,
+            elecCurr: snap.elecCurr ?? meter?.elecCurr ?? null,
+            waterPrev: snap.waterPrev ?? meter?.waterPrev ?? null,
+            waterCurr: snap.waterCurr ?? meter?.waterCurr ?? null,
+            // องค์ประกอบที่บันทึกไว้ ณ ตอนออกบิล (null = บิลเก่า ฝั่งหน้าเว็บถอยไปใช้ค่า config ปัจจุบัน)
+            hasSnapshot: hasBillSnapshot(snap),
+            baseRent: snap.baseRent,
+            electricAmount: snap.electricAmount,
+            waterAmount: snap.waterAmount,
+            electricRate: snap.electricRate,
+            waterRate: snap.waterRate,
+            commonFee: snap.commonFee,
+            extraExpenses: snap.extraExpenses,
             electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
             electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
             waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
@@ -1019,6 +1032,8 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
       }
 
       formattedBills = filteredBills.map((b: any) => {
+        const snap = readBillSnapshot(b)
+
         // ค่าปรับล่าช้า — กฎอยู่ใน resolveBillPenalty ที่เดียว (ห้ามเขียนซ้ำที่นี่)
         // เดิมตรรกะนี้ถูกคัดลอกไว้สองที่ ซึ่งเสี่ยงให้ผู้เช่าที่ล็อกอินกับที่กดลิงก์เห็นยอดต่างกัน
         const { lateDays, penaltyAmount, amount } = resolveBillPenalty({
@@ -1051,10 +1066,19 @@ export async function getTenantPortalDataNoLoginAction(workspaceId: string, room
           otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
           vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
           invoiceId: b.invoice_id,
-          elecPrev: meter?.elecPrev ?? null,
-          elecCurr: meter?.elecCurr ?? null,
-          waterPrev: meter?.waterPrev ?? null,
-          waterCurr: meter?.waterCurr ?? null,
+          // เลขมิเตอร์: ใช้ค่าที่บันทึกไว้ในบิลก่อน (ดูหมายเหตุเดียวกันในเส้นทางไม่ล็อกอิน)
+          elecPrev: snap.elecPrev ?? meter?.elecPrev ?? null,
+          elecCurr: snap.elecCurr ?? meter?.elecCurr ?? null,
+          waterPrev: snap.waterPrev ?? meter?.waterPrev ?? null,
+          waterCurr: snap.waterCurr ?? meter?.waterCurr ?? null,
+          hasSnapshot: hasBillSnapshot(snap),
+          baseRent: snap.baseRent,
+          electricAmount: snap.electricAmount,
+          waterAmount: snap.waterAmount,
+          electricRate: snap.electricRate,
+          waterRate: snap.waterRate,
+          commonFee: snap.commonFee,
+          extraExpenses: snap.extraExpenses,
           electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
           electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
           waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,

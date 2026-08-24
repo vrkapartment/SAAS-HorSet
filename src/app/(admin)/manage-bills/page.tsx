@@ -27,7 +27,7 @@ import {
   Droplet
 } from "lucide-react"
 import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
-import { buildInvoiceId } from "@/features/billing/utils"
+import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
 import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
 import { getBuildings } from "@/features/building/actions"
@@ -79,6 +79,9 @@ interface UnifiedRoomBillingItem {
   lateDays?: number
   otherServiceAmount?: number
 
+  /** องค์ประกอบที่บันทึกไว้ในบิล ณ ตอนออก — ใช้พิมพ์ใบแจ้งหนี้ให้ตรงกับที่คิดเงินไปจริง */
+  billSnapshot?: BillSnapshot | null
+  hasBillSnapshot?: boolean
   isEdited?: boolean
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
@@ -728,7 +731,9 @@ function ManageBillsContent() {
           vatAmount: roomBill ? Number(roomBill.vatAmount || 0) : 0,
           waiveElectricMin: !!r.waive_electric_min || !!r.waiveElectricMin,
           waiveWaterMin: !!r.waive_water_min || !!r.waiveWaterMin,
-          invoiceId: roomBill?.invoiceId || undefined
+          invoiceId: roomBill?.invoiceId || undefined,
+          billSnapshot: roomBill?.snapshot ?? null,
+          hasBillSnapshot: !!roomBill?.hasSnapshot
         }
       })
       // refresh เบื้องหลัง (silent) ห้ามเขียนทับแถวที่ผู้ใช้กำลังพิมพ์ค้างอยู่ — คำขอถูกยิงตอนที่ยังไม่มี
@@ -1607,12 +1612,16 @@ function ManageBillsContent() {
         roomNumber: roomLabelOf(item),
         tenantName: item.tenantName || "ผู้เช่า",
         billingCycle: formatBillingCycleThai(billingCycle),
-        baseRent: item.baseRent,
-        electricUnits: elecUnitsUsed,
-        electricRate: elecRate,
-        waterUnits: waterUnitsUsed,
+        // ใบที่มี snapshot พิมพ์ตัวเลขที่บันทึกไว้ตรง ๆ ทุกบรรทัด (ดู adjustedBaseRent ใน pdfHelper)
+        hasSnapshot: !!item.hasBillSnapshot,
+        baseRent: item.hasBillSnapshot ? Number(item.billSnapshot?.baseRent || 0) : item.baseRent,
+        electricAmount: item.billSnapshot?.electricAmount ?? undefined,
+        waterAmount: item.billSnapshot?.waterAmount ?? undefined,
+        electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,
+        electricRate: item.hasBillSnapshot ? Number(item.billSnapshot?.electricRate || 0) : elecRate,
+        waterUnits: item.hasBillSnapshot ? Number(item.waterUnits || 0) : waterUnitsUsed,
         waterRate: waterRate,
-        commonFee,
+        commonFee: item.hasBillSnapshot ? Number(item.billSnapshot?.commonFee || 0) : commonFee,
         waterMinChecked,
         waterMinUnit,
         electricMinChecked,
@@ -1642,7 +1651,10 @@ function ManageBillsContent() {
           })
           return total
         })(),
-        extraExpenses: roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || [],
+        // ค่าส่วนกลาง/ค่าใช้จ่ายเสริม: ของใบที่มี snapshot ใช้ค่าที่คิดไปจริง ไม่ใช่ค่าปัจจุบันของห้อง
+        extraExpenses: item.hasBillSnapshot
+          ? (item.billSnapshot?.extraExpenses || [])
+          : (roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || []),
         waiveElectricMin: item.waiveElectricMin,
         waiveWaterMin: item.waiveWaterMin,
         promptPayId,
@@ -1713,12 +1725,15 @@ function ManageBillsContent() {
           roomNumber: roomLabelOf(item),
           tenantName: item.tenantName || "ผู้เช่า",
           billingCycle: formatBillingCycleThai(billingCycle),
-          baseRent: item.baseRent,
-          electricUnits: elecUnitsUsed,
-          electricRate: elecRate,
-          waterUnits: waterUnitsUsed,
+          hasSnapshot: !!item.hasBillSnapshot,
+          baseRent: item.hasBillSnapshot ? Number(item.billSnapshot?.baseRent || 0) : item.baseRent,
+          electricAmount: item.billSnapshot?.electricAmount ?? undefined,
+          waterAmount: item.billSnapshot?.waterAmount ?? undefined,
+          electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,
+          electricRate: item.hasBillSnapshot ? Number(item.billSnapshot?.electricRate || 0) : elecRate,
+          waterUnits: item.hasBillSnapshot ? Number(item.waterUnits || 0) : waterUnitsUsed,
           waterRate: waterRate,
-          commonFee,
+          commonFee: item.hasBillSnapshot ? Number(item.billSnapshot?.commonFee || 0) : commonFee,
           waterMinChecked,
           waterMinUnit,
           electricMinChecked,
@@ -1748,7 +1763,10 @@ function ManageBillsContent() {
             })
             return total
           })(),
-          extraExpenses: roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || [],
+          // ค่าส่วนกลาง/ค่าใช้จ่ายเสริม: ของใบที่มี snapshot ใช้ค่าที่คิดไปจริง ไม่ใช่ค่าปัจจุบันของห้อง
+        extraExpenses: item.hasBillSnapshot
+          ? (item.billSnapshot?.extraExpenses || [])
+          : (roomsList?.find((r: any) => r.id === item.roomId)?.extraExpenses || []),
           waiveElectricMin: item.waiveElectricMin,
           waiveWaterMin: item.waiveWaterMin,
           promptPayId,
