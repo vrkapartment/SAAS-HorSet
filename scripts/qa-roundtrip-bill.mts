@@ -15,27 +15,15 @@
  * ทำไมต้องมี: qa:sim ยืนยันได้แค่ว่าสูตรถูก แต่ยืนยันไม่ได้ว่าคอลัมน์ snapshot 15 ช่อง
  * เขียนลงฐานข้อมูลได้จริงและอ่านกลับมาครบ — ชื่อคอลัมน์ผิดตัวเดียวก็หายไปเงียบ ๆ ทั้งช่อง
  */
-import { readFileSync } from "node:fs"
-import { createClient } from "@supabase/supabase-js"
 import { calculateBillTotal } from "../src/features/billing/bill-calculator"
 import { resolveBillLines } from "../src/lib/billLines"
 import { readBillSnapshot, hasBillSnapshot, buildInvoiceId } from "../src/features/billing/utils"
+import { qaClient } from "./qa-db"
 
 /** รอบบิลที่สคริปต์นี้แตะได้เท่านั้น — ห้ามเปลี่ยนเป็นรอบจริงเด็ดขาด */
 const TEST_CYCLE = "2099-12"
 
-for (const f of [".env.local", ".env"]) {
-  try {
-    for (const l of readFileSync(f, "utf8").split(/\r?\n/)) {
-      const m = l.match(/^([A-Z0-9_]+)\s*=\s*(.*)$/)
-      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "")
-    }
-  } catch { /* ไม่มีไฟล์ก็ข้าม */ }
-}
-const url = process.env.QA_DB_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const key = process.env.QA_DB_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-if (!url || !key) { console.error("ไม่พบ SUPABASE URL/KEY"); process.exit(1) }
-const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+const { db, label: dbLabel } = qaClient()
 
 function assertTestCycle(cycle: string) {
   if (cycle !== TEST_CYCLE) throw new Error(`ปฏิเสธ: สคริปต์นี้แตะได้แค่รอบ ${TEST_CYCLE} (ได้ ${cycle})`)

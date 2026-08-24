@@ -9,28 +9,10 @@
  * ใช้ SUPABASE_SERVICE_ROLE_KEY ซึ่ง bypass RLS จึงเห็นข้อมูลทุก workspace
  * ตั้ง QA_DB_URL / QA_DB_KEY ใน env เพื่อชี้ไปฐานข้อมูลอื่น (เช่น staging) แทน production ได้
  */
-import { readFileSync } from "node:fs"
-import { createClient } from "@supabase/supabase-js"
 
-function loadEnv() {
-  for (const file of [".env.local", ".env"]) {
-    try {
-      for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
-        const m = line.match(/^([A-Z0-9_]+)\s*=\s*(.*)$/)
-        if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "")
-      }
-    } catch { /* ไม่มีไฟล์ก็ข้าม */ }
-  }
-}
-loadEnv()
+import { qaClient, meterUnits } from "./qa-db"
 
-const url = process.env.QA_DB_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const key = process.env.QA_DB_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-if (!url || !key) {
-  console.error("ไม่พบ SUPABASE URL/KEY — ตั้งใน .env หรือส่ง QA_DB_URL / QA_DB_KEY มา")
-  process.exit(1)
-}
-const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+const { db, label: dbLabel } = qaClient()
 
 type Check = { name: string; why: string; run: () => Promise<{ ok: boolean; detail: string }> }
 
@@ -157,9 +139,8 @@ const checks: Check[] = [
       if (error) throw error
       if (!data?.length) return { ok: true, detail: "ยังไม่มีบิลที่มี snapshot" }
 
-      // มิเตอร์หมุนครบรอบ (curr < prev) คิดแบบ (10000 - prev) + curr — ต้องยอมทั้งสองแบบ
-      const expected = (curr: number, prev: number) =>
-        curr >= prev ? curr - prev : (10000 - prev) + curr
+      // มิเตอร์หมุนครบรอบ (curr < prev) ใช้สูตรเดียวกับฝั่งแอปผ่าน meterUnits()
+      const expected = meterUnits
 
       const bad: string[] = []
       for (const b of data) {
@@ -196,7 +177,8 @@ const checks: Check[] = [
   }
 ]
 
-console.log(`ตรวจฐานข้อมูล: ${url.replace(/https:\/\/([^.]+)\..*/, "$1")}  (อ่านอย่างเดียว)\n`)
+console.log(`ตรวจฐานข้อมูล: ${dbLabel}  (อ่านอย่างเดียว)
+`)
 
 let failed = 0
 for (const c of checks) {

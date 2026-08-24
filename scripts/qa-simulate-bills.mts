@@ -12,24 +12,12 @@
  *   2. ป้าย "ขั้นต่ำ" ขึ้นตรงกับที่คิดเงินจริง
  *   3. snapshot ที่จะถูกบันทึกครบทุกช่อง
  */
-import { readFileSync } from "node:fs"
-import { createClient } from "@supabase/supabase-js"
 import { calculateBillTotal } from "../src/features/billing/bill-calculator"
 import { resolveBillLines } from "../src/lib/billLines"
+import { qaClient, meterUnits } from "./qa-db"
 
-for (const f of [".env.local", ".env"]) {
-  try {
-    for (const l of readFileSync(f, "utf8").split(/\r?\n/)) {
-      const m = l.match(/^([A-Z0-9_]+)\s*=\s*(.*)$/)
-      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "")
-    }
-  } catch { /* ไม่มีไฟล์ก็ข้าม */ }
-}
 
-const url = process.env.QA_DB_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const key = process.env.QA_DB_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-if (!url || !key) { console.error("ไม่พบ SUPABASE URL/KEY"); process.exit(1) }
-const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+const { db, label: dbLabel } = qaClient()
 
 const cycle = process.argv[2] || new Date().toISOString().slice(0, 7)
 console.log(`จำลองการออกบิลรอบ ${cycle} ด้วยข้อมูลจริง (อ่านอย่างเดียว)\n`)
@@ -67,8 +55,7 @@ for (const ws of workspaces ?? []) {
 
     const units = (curr: unknown, prev: unknown) => {
       if (curr === null || curr === undefined || curr === "") return 0
-      const c = Number(curr), p = Number(prev || 0)
-      return c >= p ? c - p : (10000 - p) + c
+      return meterUnits(Number(curr), Number(prev || 0))
     }
     const eUnits = units(m.elec_curr, m.elec_prev)
     const wUnits = units(m.water_curr, m.water_prev)
