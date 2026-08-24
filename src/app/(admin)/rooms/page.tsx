@@ -291,6 +291,17 @@ function RoomsContent() {
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [refundingRoom, setRefundingRoom] = useState<RoomItem | null>(null)
   const [loadingMeter, setLoadingMeter] = useState(false)
+  /**
+   * คำเตือน "ห้องนี้มีบิลของรอบที่ย้ายออกอยู่แล้ว"
+   *
+   * การคืนเงินประกันหักค่าเช่า+ค่าน้ำ-ไฟจากเงินประกัน แต่ไม่รู้เลยว่าห้องนั้นมีบิลของรอบ
+   * เดียวกันออกไปแล้วหรือยัง → ผู้เช่าคนเดียวถูกเรียกเก็บสองทางในรอบเดียว
+   * ตรวจ production แล้วเจอของจริง 3 ราย (ดู npm run qa:move-impact)
+   *
+   * เตือนไม่บล็อก เพราะบางหอตั้งใจให้บิลเป็นตัวเก็บ แล้วหักจากเงินประกันแค่ส่วนที่เหลือ
+   * ระบบไม่รู้เจตนา คนที่รู้คือผู้ดูแล
+   */
+  const [existingBillWarning, setExistingBillWarning] = useState<string | null>(null)
   const [refundCheckoutDate, setRefundCheckoutDate] = useState("")
   const [refundDeposit, setRefundDeposit] = useState(0)
   const [finalElec, setFinalElec] = useState<number | string>("")
@@ -1483,10 +1494,32 @@ function RoomsContent() {
       console.error("Failed to load meter records:", err)
       setPrevElec(0)
       setPrevWater(0)
-    } finally {
-      setLoadingMeter(false)
-      setRefundModalOpen(true)
     }
+
+    // ห้องนี้มีบิลของรอบที่จะย้ายออกอยู่แล้วหรือไม่ (ดูเหตุผลที่ต้องเตือนใน state ด้านบน)
+    setExistingBillWarning(null)
+    try {
+      const cycle = new Date().toISOString().split("T")[0].substring(0, 7)
+      const { getBills } = await import("@/features/billing/actions")
+      const billsRes = await getBills(cycle, undefined, getCookie("horset_current_workspace_id") || undefined)
+      if (billsRes.success && billsRes.data) {
+        const mine = billsRes.data.filter((b: { roomId?: string | null }) => b.roomId === room.id)
+        if (mine.length > 0) {
+          const total = mine.reduce((sum: number, b: { amount?: number }) => sum + Number(b.amount || 0), 0)
+          const anyUnpaid = mine.some((b: { status?: string }) => b.status !== "paid")
+          setExistingBillWarning(
+            `ห้องนี้มีบิลรอบ ${cycle} ออกไปแล้ว ${mine.length} ใบ รวม ${total.toLocaleString()} บาท`
+            + `${anyUnpaid ? " (ยังไม่ชำระ)" : " (ชำระแล้ว)"} — ค่าเช่าและค่าน้ำ-ไฟที่หักจากเงินประกันด้านล่าง`
+            + ` อาจเป็นการเรียกเก็บซ้ำกับบิลใบนั้น กรุณาตรวจก่อนยืนยัน`
+          )
+        }
+      }
+    } catch (err) {
+      console.warn("ตรวจบิลของรอบที่ย้ายออกไม่สำเร็จ (ไม่บล็อกการคืนเงินประกัน):", err)
+    }
+
+    setLoadingMeter(false)
+    setRefundModalOpen(true)
   }
 
   const handleEditCancelledContract = (c: any) => {
@@ -4465,6 +4498,14 @@ function RoomsContent() {
                 <div className="p-3.5 bg-red-500/10 border border-red-500/25 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2 shrink-0 mt-3">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{refundError}</span>
+                </div>
+              )}
+
+              {/* เตือน (ไม่บล็อก) ว่าห้องนี้มีบิลของรอบที่ย้ายออกอยู่แล้ว — กันเรียกเก็บสองทางกับคนเดียว */}
+              {existingBillWarning && editingCancelledContractId === null && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2 shrink-0 mt-3">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{existingBillWarning}</span>
                 </div>
               )}
 

@@ -13,7 +13,8 @@
     "build:sql": "node scripts/build-staging-sql.mjs",
     "qa:sim": "tsx scripts/qa-simulate-bills.mts",
     "qa:roundtrip": "tsx scripts/qa-roundtrip-bill.mts",
-    "qa:audit-units": "tsx scripts/qa-audit-bill-units.mts"
+    "qa:audit-units": "tsx scripts/qa-audit-bill-units.mts",
+    "qa:move-impact": "tsx scripts/qa-past-move-impact.mts"
   },
   "dependencies": {
     "@google-cloud/translate": "^9.4.2",
