@@ -142,3 +142,40 @@ describe("ข้อความป้ายและคอลัมน์อั�
     expect(lines.elecDesc).not.toContain("20 หน่วย")
   })
 })
+
+describe("ค่าเช่าต้องมาจาก snapshot ไม่ใช่การคำนวณย้อนจากยอดรวม", () => {
+  /**
+   * เคสนี้แยกสองวิธีคิดออกจากกันได้จริง — ต่างจากเคสอื่นในไฟล์นี้
+   *
+   * เมื่อบิล "สมดุลในตัวเอง" (ยอดรวม = ผลบวกองค์ประกอบ) การคำนวณย้อนกับการอ่าน snapshot
+   * ให้ค่าเช่าเท่ากันพอดี เทสต์ที่ใช้บิลสมดุลจึงไม่มีทางจับได้ว่าโค้ดใช้วิธีไหน
+   *
+   * เคสนี้จงใจให้ไม่สมดุล: ยอดรวมเป็นของตอนที่คิดค่าไฟขั้นต่ำ 70 แต่ช่อง electric_amount
+   * ถูกอัปเดตเป็น 511 แล้ว (สภาพที่เกิดได้เมื่อมีการแก้ข้อมูลบางส่วน)
+   *   · อ่านจาก snapshot   → ค่าเช่า 6,000  (ถูก — เป็นค่าเช่าจริงของห้อง)
+   *   · คำนวณย้อนจากยอดรวม → ค่าเช่า 5,559  (คือตัวเลขที่ QA เจอบนใบจริง)
+   */
+  const inconsistent: BillLineInput = {
+    hasSnapshot: true,
+    amount: 6246,          // ยอดรวมจากตอนที่ค่าไฟเป็นขั้นต่ำ 70
+    baseRent: 6000,
+    electricUnits: 73, electricRate: 7, electricAmount: 511,
+    waterUnits: 7, waterRate: 18, waterAmount: 126,
+    commonFee: 50
+  }
+
+  it("ค่าเช่าต้องเป็น 6,000 จาก snapshot ไม่ใช่ 5,559 จากการคำนวณย้อน", () => {
+    expect(resolveBillLines(inconsistent).rent).toBe(6000)
+  })
+
+  it("บิลเก่าที่ไม่มี snapshot ยังคำนวณย้อนเหมือนเดิม (ได้ 5,559)", () => {
+    // บิลเก่าไม่มีคอลัมน์ snapshot เลย จึงไม่มี hasSnapshot/electricAmount/waterAmount
+    const legacy: BillLineInput = {
+      amount: 6246, baseRent: 6000,
+      electricUnits: 73, electricRate: 7,
+      waterUnits: 7, waterRate: 18,
+      commonFee: 50
+    }
+    expect(resolveBillLines(legacy).rent).toBe(5559)
+  })
+})

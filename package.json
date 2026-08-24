@@ -10,7 +10,8 @@
     "test": "vitest run",
     "qa:pdf": "tsx scripts/qa-render-bills.mts",
     "qa:db": "tsx scripts/qa-verify-db.mts",
-    "build:sql": "node scripts/build-staging-sql.mjs"
+    "build:sql": "node scripts/build-staging-sql.mjs",
+    "qa:sim": "tsx scripts/qa-simulate-bills.mts"
   },
   "dependencies": {
     "@google-cloud/translate": "^9.4.2",
