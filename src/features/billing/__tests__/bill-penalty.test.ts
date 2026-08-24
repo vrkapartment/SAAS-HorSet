@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "../utils"
-import { calculateBillTotal } from "../bill-calculator"
+import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "@/features/billing/utils"
+import { calculateBillTotal } from "@/features/billing/bill-calculator"
 
 /**
  * กฎค่าปรับล่าช้าที่ผู้เช่าเห็นในหน้า Portal
