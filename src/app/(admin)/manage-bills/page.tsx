@@ -26,7 +26,7 @@ import {
   Zap,
   Droplet
 } from "lucide-react"
-import { getBills, createBill, updateBillStatus, getBillingPageData } from "@/features/billing/actions"
+import { getBills, createBill, updateBillStatus, getBillingPageData, deleteBill } from "@/features/billing/actions"
 import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
 import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
@@ -320,6 +320,7 @@ function ManageBillsContent() {
   const [slipModalOpen, setSlipModalOpen] = useState(false)
   const [createBillModalOpen, setCreateBillModalOpen] = useState(false)
   const [savingRows, setSavingRows] = useState<Record<string, boolean>>({})
+  const [cancellingBillRoomId, setCancellingBillRoomId] = useState<RoomId | null>(null)
 
   // ซิงค์รอบบิลตาม Query Parameter cycle อัตโนมัติ โดยระวังไม่ให้ต่ำกว่า registrationCycle เพื่อป้องกัน infinite loop ของการอัปเดต State
   useEffect(() => {
@@ -618,7 +619,10 @@ function ManageBillsContent() {
         // จับคู่ด้วย rooms.id — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้อง ห้อง 101 ของสองอาคาร
         // จะได้บิล/เลขมิเตอร์ของห้องเดียวกันมาแสดงทั้งคู่ แล้วการกดบันทึกจะเขียนทับกันเอง
         const roomId = asRoomId(r.id)
-        const roomBill = dbBills.find((b: any) => b.roomId === roomId)
+        // เฉพาะบิลรอบปกติ — ห้องเดียวในรอบเดียวมีใบปิดรอบตอนย้ายห้อง (transfer_closing) ได้อีกใบ
+        // ถ้าไม่กรอง find() จะคืนใบไหนก็ได้ตามลำดับที่ query ส่งมา แล้วแถวนี้อาจแสดงยอดของใบผิด
+        // และปุ่มที่ทำงานกับบิลใบนั้นจะไปทำกับใบผิดด้วย (เช่นปุ่มยกเลิกบิล)
+        const roomBill = dbBills.find((b: any) => b.roomId === roomId && (b.billKind ?? "regular") === "regular")
         const roomMeter = dbMeters.find((m: any) => m.roomId === roomId)
         const prevMeter = dbPrevMeters.find((m: any) => m.roomId === roomId)
         
@@ -662,12 +666,26 @@ function ManageBillsContent() {
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)
         const hasPrevMeterWater = !!(prevMeter && prevMeter.waterCurr !== "" && prevMeter.waterCurr !== null && prevMeter.waterCurr !== undefined)
 
-        const elecPrev = hasPrevMeterElec
-          ? Number(prevMeter.elecCurr)
-          : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev))
-        const waterPrev = hasPrevMeterWater
-          ? Number(prevMeter.waterCurr)
-          : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev))
+        // หมุด "เลขตั้งต้นของผู้เช่าปัจจุบัน" ชนะกฎ prev = curr ของรอบก่อน
+        // (ตรรกะเดียวกับหน้าออกบิล — สองหน้านี้ต้องได้ prev ตัวเดียวกันเสมอ ไม่งั้นยอดจะต่างกัน
+        //  ตามว่าสตาฟกดบันทึกจากหน้าไหน) ดู database_patch_move_segments.sql ข้อ 4
+        const occStartElec = roomMeter && roomMeter.occupancyStartElec !== null && roomMeter.occupancyStartElec !== undefined
+          ? Number(roomMeter.occupancyStartElec)
+          : null
+        const occStartWater = roomMeter && roomMeter.occupancyStartWater !== null && roomMeter.occupancyStartWater !== undefined
+          ? Number(roomMeter.occupancyStartWater)
+          : null
+
+        const elecPrev = occStartElec !== null
+          ? occStartElec
+          : (hasPrevMeterElec
+            ? Number(prevMeter.elecCurr)
+            : (roomMeter ? Number(roomMeter.elecPrev) : (prevMeter ? Number(prevMeter.elecPrev) : fallbacks.elecPrev)))
+        const waterPrev = occStartWater !== null
+          ? occStartWater
+          : (hasPrevMeterWater
+            ? Number(prevMeter.waterCurr)
+            : (roomMeter ? Number(roomMeter.waterPrev) : (prevMeter ? Number(prevMeter.waterPrev) : fallbacks.waterPrev)))
         
         const isFirstMonth = regCycleVal ? (cycle === regCycleVal) : true
         const isElecPrevEditable = isFirstMonth
@@ -1316,6 +1334,46 @@ function ManageBillsContent() {
     }
   }
 
+  /**
+   * ยกเลิก (ลบ) บิลของห้องนั้น
+   *
+   * ทำไมต้องมี: การย้ายห้องจะถูกบล็อกถ้าห้องเดิมมีบิลของรอบนั้นออกไปแล้ว (กันเก็บเงินซ้ำ
+   * เพราะค่าน้ำ-ไฟห้องเดิมจะไปรวมในบิลห้องใหม่อีกที) ถ้าไม่มีทางยกเลิกบิลจากหน้าจอ
+   * ผู้ดูแลจะติดตายย้ายห้องไม่ได้เลย และหน้าคืนเงินประกันก็เตือนให้จัดการบิลซ้ำได้แต่ทำไม่ได้
+   *
+   * ฝั่ง server สำรองบิลลง bills_deleted ก่อนลบเสมอ และจำกัดสิทธิ์เฉพาะแอดมิน (ดู deleteBill)
+   */
+  const handleCancelBill = async (billId: string, roomId: RoomId) => {
+    if (!userPermissions.manage_bills_edit) {
+      showToast(t("daily_bills.no_permission_msg"))
+      return
+    }
+    const item = unifiedItems.find(i => i.roomId === roomId)
+    const roomLabel = item?.roomNumber ?? ""
+    const amount = Number(item?.billAmount || 0).toLocaleString()
+    if (!confirm(
+      t("billing.cancel_bill_confirm")
+        .replace("{room}", roomLabel)
+        .replace("{cycle}", billingCycle)
+        .replace("{amount}", amount)
+    )) return
+
+    setCancellingBillRoomId(roomId)
+    try {
+      const res = await deleteBill(billId)
+      if (!res.success) {
+        alert(res.error || t("manage_bills.err_update_bill_status"))
+        return
+      }
+      showToast(t("billing.cancel_bill_success").replace("{room}", roomLabel))
+      // โหลดใหม่ทั้งรอบ ไม่แก้ state เฉพาะแถว — การลบบิลกระทบยอดรวมหัวหน้า
+      // (จำนวนใบค้างชำระ/ยอดรวม) ที่คำนวณจากรายการทั้งหมด
+      await loadData(billingCycle, true)
+    } finally {
+      setCancellingBillRoomId(null)
+    }
+  }
+
   const handleSaveRow = async (roomId: RoomId, type: "electric" | "water" | "all" = "all") => {
     if (!userPermissions.manage_bills_edit) {
       showToast(t("daily_bills.no_permission_msg"))
@@ -1619,6 +1677,8 @@ function ManageBillsContent() {
         waterAmount: item.billSnapshot?.waterAmount ?? undefined,
         elecMinApplied: item.billSnapshot?.elecMinApplied ?? undefined,
         waterMinApplied: item.billSnapshot?.waterMinApplied ?? undefined,
+        // รายการของห้องเดิมที่ยกมารวม (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+        utilitySegments: item.billSnapshot?.utilitySegments ?? [],
         electricMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.electricMinUnit ?? electricMinUnit) : electricMinUnit,
         waterMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.waterMinUnit ?? waterMinUnit) : waterMinUnit,
         electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,
@@ -1733,6 +1793,8 @@ function ManageBillsContent() {
           waterAmount: item.billSnapshot?.waterAmount ?? undefined,
           elecMinApplied: item.billSnapshot?.elecMinApplied ?? undefined,
           waterMinApplied: item.billSnapshot?.waterMinApplied ?? undefined,
+        // รายการของห้องเดิมที่ยกมารวม (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+        utilitySegments: item.billSnapshot?.utilitySegments ?? [],
           electricMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.electricMinUnit ?? electricMinUnit) : electricMinUnit,
           waterMinUnit: item.hasBillSnapshot ? (item.billSnapshot?.waterMinUnit ?? waterMinUnit) : waterMinUnit,
           electricUnits: item.hasBillSnapshot ? Number(item.electricUnits || 0) : elecUnitsUsed,
@@ -2083,6 +2145,8 @@ function ManageBillsContent() {
         handleDownloadBillPdf={handleDownloadBillPdf}
         handleSendLine={handleSendLine}
         handleMarkAsPaid={handleMarkAsPaid}
+        handleCancelBill={handleCancelBill}
+        cancellingBillRoomId={cancellingBillRoomId}
         roomsList={roomsList}
         usageAverages={usageAverages}
         billingCycle={billingCycle}

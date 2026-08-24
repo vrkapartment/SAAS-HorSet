@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
-import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, AlertTriangle, MessageSquare, Edit3, Lock, Wrench, Link } from "lucide-react"
+import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, AlertTriangle, MessageSquare, Edit3, Lock, Wrench, Link, Trash2 } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
 import { findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
@@ -83,6 +83,15 @@ interface MeterReadingTableProps {
   handleDownloadBillPdf: (item: any) => Promise<void>
   handleSendLine: (roomId: RoomId) => void | Promise<void>
   handleMarkAsPaid: (billId: string, roomId: RoomId) => Promise<void>
+  /**
+   * ยกเลิก (ลบ) บิลของห้องนั้น — ไม่ส่งมา = ไม่แสดงปุ่ม
+   *
+   * แยกเป็น prop ไม่บังคับ เพราะหน้าจดมิเตอร์ใช้ตารางเดียวกันแต่ไม่ควรมีปุ่มลบบิล
+   * (คนละงาน คนละความเสี่ยง) ฝั่ง server จำกัดสิทธิ์เฉพาะ Admin อีกชั้น
+   */
+  handleCancelBill?: (billId: string, roomId: RoomId) => Promise<void>
+  /** roomId ที่กำลังยกเลิกบิลอยู่ — ใช้ขึ้น spinner ที่ปุ่มนั้นปุ่มเดียว */
+  cancellingBillRoomId?: RoomId | null
   // roomIds = ขอบเขตที่มองเห็นจริง ต้องส่งไปด้วยเสมอ ไม่เช่นนั้น page จะบันทึกทับห้องนอกขอบเขต
   handleSaveAll?: (type: "electric" | "water" | "both", roomIds?: RoomId[]) => Promise<void>
   // New props for bulk LINE OA feature
@@ -128,6 +137,8 @@ export default function MeterReadingTable({
   handleDownloadBillPdf,
   handleSendLine,
   handleMarkAsPaid,
+  handleCancelBill,
+  cancellingBillRoomId,
   handleSaveAll,
   roomsList,
   usageAverages = {},
@@ -2242,6 +2253,39 @@ Thank you 🙏`
                                         <>
                                           <Edit3 className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
                                           <span>{t("billing.edit_bill")}</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+
+                                  {/* ยกเลิกบิล — แสดงเฉพาะหน้าที่ส่ง handleCancelBill มา (ไม่ใช่หน้าจดมิเตอร์)
+                                      จำกัดสิทธิ์เฉพาะแอดมินทั้งฝั่งจอและฝั่ง server (ดู deleteBill)
+                                      จำเป็นเพราะการย้ายห้องจะถูกบล็อกถ้าห้องเดิมมีบิลของรอบนั้นอยู่แล้ว
+                                      ถ้าไม่มีทางลบบิล ผู้ดูแลจะย้ายห้องไม่ได้เลย */}
+                                  {handleCancelBill && item.billId && (
+                                    <button
+                                      onClick={() => handleCancelBill(item.billId!, item.roomId)}
+                                      disabled={currentUserRole === "staff" || cancellingBillRoomId !== null}
+                                      className={`px-2.5 py-1 xl:py-1.5 border rounded transition-colors text-xs xl:text-sm 2xl:text-base font-medium flex items-center gap-1 xl:gap-1.5 ${
+                                        currentUserRole === "staff" || cancellingBillRoomId !== null
+                                          ? "opacity-40 cursor-not-allowed"
+                                          : "cursor-pointer"
+                                      } ${
+                                        isDark
+                                          ? "bg-slate-900 border-slate-800 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30"
+                                          : "bg-white border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
+                                      }`}
+                                      title={currentUserRole === "staff" ? t("billing.admin_only_cancel_bill") : t("billing.cancel_bill")}
+                                    >
+                                      {cancellingBillRoomId === item.roomId ? (
+                                        <>
+                                          <div className="w-3.5 h-3.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                          <span>{t("billing.cancelling_bill")}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Trash2 className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                                          <span>{t("billing.cancel_bill")}</span>
                                         </>
                                       )}
                                     </button>

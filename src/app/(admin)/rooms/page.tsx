@@ -291,6 +291,17 @@ function RoomsContent() {
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [refundingRoom, setRefundingRoom] = useState<RoomItem | null>(null)
   const [loadingMeter, setLoadingMeter] = useState(false)
+  /**
+   * คำเตือน "ห้องนี้มีบิลของรอบที่ย้ายออกอยู่แล้ว"
+   *
+   * การคืนเงินประกันหักค่าเช่า+ค่าน้ำ-ไฟจากเงินประกัน แต่ไม่รู้เลยว่าห้องนั้นมีบิลของรอบ
+   * เดียวกันออกไปแล้วหรือยัง → ผู้เช่าคนเดียวถูกเรียกเก็บสองทางในรอบเดียว
+   * ตรวจ production แล้วเจอของจริง 3 ราย (ดู npm run qa:move-impact)
+   *
+   * เตือนไม่บล็อก เพราะบางหอตั้งใจให้บิลเป็นตัวเก็บ แล้วหักจากเงินประกันแค่ส่วนที่เหลือ
+   * ระบบไม่รู้เจตนา คนที่รู้คือผู้ดูแล
+   */
+  const [existingBillWarning, setExistingBillWarning] = useState<string | null>(null)
   const [refundCheckoutDate, setRefundCheckoutDate] = useState("")
   const [refundDeposit, setRefundDeposit] = useState(0)
   const [finalElec, setFinalElec] = useState<number | string>("")
@@ -1453,15 +1464,22 @@ function RoomsContent() {
     setRefundDeposit(calculatedDeposit)
     
     try {
-      // ดึงเลขมิเตอร์น้ำไฟรอบล่าสุดเพื่อสืบทอด
-      const { getLatestMeterRecord } = await import("@/features/meter/actions")
-      const meterRes = await getLatestMeterRecord({ roomId: room.id }, getCookie("horset_current_workspace_id") || undefined)
-      
+      // เลขมิเตอร์ "ตั้งต้นของรอบที่ย้ายออก" — ไม่ใช่เลขที่จดล่าสุด
+      //
+      // เดิมใช้ getLatestMeterRecord() แล้วเอา elecCurr มาเป็นเลขครั้งก่อน ซึ่งถ้าสตาฟจดมิเตอร์
+      // รอบนี้ไปแล้ว เลขนั้นคือ "เลขกลางเดือน" → ค่าน้ำ-ไฟที่หักจากเงินประกันจะนับแค่ช่วง
+      // กลางเดือนถึงวันย้ายออก ไม่ใช่ต้นเดือนถึงวันย้ายออก (หักน้อยกว่าที่ผู้เช่าใช้จริง)
+      const { getMeterStartForCycle } = await import("@/features/meter/actions")
+      const checkoutCycle = new Date().toISOString().split("T")[0].substring(0, 7)
+      const meterRes = await getMeterStartForCycle(
+        { roomId: room.id },
+        checkoutCycle,
+        getCookie("horset_current_workspace_id") || undefined
+      )
+
       if (meterRes.success && meterRes.data) {
-        const record = meterRes.data
-        // ดึงเลขมิเตอร์น้ำไฟที่จดจริงล่าสุด
-        const pElec = record.elecCurr !== null && record.elecCurr !== undefined ? record.elecCurr : record.elecPrev
-        const pWater = record.waterCurr !== null && record.waterCurr !== undefined ? record.waterCurr : record.waterPrev
+        const pElec = meterRes.data.elecStart
+        const pWater = meterRes.data.waterStart
         setPrevElec(pElec)
         setPrevWater(pWater)
         setFinalElec(pElec)
@@ -1476,10 +1494,32 @@ function RoomsContent() {
       console.error("Failed to load meter records:", err)
       setPrevElec(0)
       setPrevWater(0)
-    } finally {
-      setLoadingMeter(false)
-      setRefundModalOpen(true)
     }
+
+    // ห้องนี้มีบิลของรอบที่จะย้ายออกอยู่แล้วหรือไม่ (ดูเหตุผลที่ต้องเตือนใน state ด้านบน)
+    setExistingBillWarning(null)
+    try {
+      const cycle = new Date().toISOString().split("T")[0].substring(0, 7)
+      const { getBills } = await import("@/features/billing/actions")
+      const billsRes = await getBills(cycle, undefined, getCookie("horset_current_workspace_id") || undefined)
+      if (billsRes.success && billsRes.data) {
+        const mine = billsRes.data.filter((b: { roomId?: string | null }) => b.roomId === room.id)
+        if (mine.length > 0) {
+          const total = mine.reduce((sum: number, b: { amount?: number }) => sum + Number(b.amount || 0), 0)
+          const anyUnpaid = mine.some((b: { status?: string }) => b.status !== "paid")
+          setExistingBillWarning(
+            `ห้องนี้มีบิลรอบ ${cycle} ออกไปแล้ว ${mine.length} ใบ รวม ${total.toLocaleString()} บาท`
+            + `${anyUnpaid ? " (ยังไม่ชำระ)" : " (ชำระแล้ว)"} — ค่าเช่าและค่าน้ำ-ไฟที่หักจากเงินประกันด้านล่าง`
+            + ` อาจเป็นการเรียกเก็บซ้ำกับบิลใบนั้น กรุณาตรวจก่อนยืนยัน`
+          )
+        }
+      }
+    } catch (err) {
+      console.warn("ตรวจบิลของรอบที่ย้ายออกไม่สำเร็จ (ไม่บล็อกการคืนเงินประกัน):", err)
+    }
+
+    setLoadingMeter(false)
+    setRefundModalOpen(true)
   }
 
   const handleEditCancelledContract = (c: any) => {
@@ -1570,52 +1610,6 @@ function RoomsContent() {
     try {
       const wsId = getCookie("horset_current_workspace_id") || ""
       
-      if (!isHistoricalEdit) {
-        const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
-        
-        // 1. บันทึกเลขมิเตอร์ปลายงวดในรอบบิลปัจจุบัน และสืบทอดเป็น "เลขมิเตอร์ก่อนหน้า" ในรอบบิลถัดไป (สำหรับผู้เช่าคนใหม่)
-        const { saveMeterRecord } = await import("@/features/meter/actions")
-        
-        const currentMeterRes = await saveMeterRecord(
-          { roomId: refundingRoom.id },
-          currentCycle,
-          prevElec,
-          fElec,
-          prevWater,
-          fWater
-        )
-        
-        if (!currentMeterRes.success) {
-          setRefundError(currentMeterRes.error || t("rooms.toasts.meter_save_error"))
-          setRefundSubmitting(false)
-          return
-        }
-        
-        // คำนวณรอบถัดไป
-        const [yearStr, monthStr] = currentCycle.split("-")
-        let nextYear = parseInt(yearStr, 10)
-        let nextMonth = parseInt(monthStr, 10) + 1
-        if (nextMonth > 12) {
-          nextMonth = 1
-          nextYear += 1
-        }
-        const nextCycle = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
-        
-        const nextMeterRes = await saveMeterRecord(
-          { roomId: refundingRoom.id },
-          nextCycle,
-          fElec,
-          "", // current value is empty for next tenant to write later
-          fWater,
-          ""
-        )
-        
-        if (!nextMeterRes.success) {
-          setRefundError(nextMeterRes.error || t("rooms.toasts.meter_carry_over_error"))
-          setRefundSubmitting(false)
-          return
-        }
-      }
       
       // 2. สรุปการแบ่งประเภทรายได้หักภาษีปลายงวด
       let totalUtilities408 = 0
@@ -1676,6 +1670,16 @@ function RoomsContent() {
         historicalRentDeduction,
         historicalUtilitiesDeduction
       }
+
+      // เลขมิเตอร์ตอนปิดห้อง — เก็บไว้เป็นที่มาของยอดหักค่าน้ำ-ไฟ (เดิมตารางนี้เก็บแต่ตัวเลขเงิน
+      // จึงตรวจย้อนหลังไม่ได้ว่ายอดนั้นคิดจากเลขอะไร) และเป็นหลักฐานว่าผู้เช่ารายถัดไป
+      // ต้องเริ่มนับที่เลขไหน หลังแถวมิเตอร์ของรอบนี้ถูกตั้งใหม่ในขั้นที่ 1
+      if (!isHistoricalEdit) {
+        cancellationPayload.closingElecPrev = prevElec
+        cancellationPayload.closingElecCurr = fElec
+        cancellationPayload.closingWaterPrev = prevWater
+        cancellationPayload.closingWaterCurr = fWater
+      }
       
       if (isHistoricalEdit) {
         cancellationPayload.id = editingCancelledContractId
@@ -1687,9 +1691,69 @@ function RoomsContent() {
         setRefundSubmitting(false)
         return
       }
+
+      // 4. เขียนเลขมิเตอร์ — ทำ "หลัง" บันทึกสัญญายกเลิกโดยเจตนา
+      //
+      // ⚠️ ลำดับนี้สำคัญกับเงิน: การตั้งแถวมิเตอร์ของรอบนี้ให้เริ่มที่เลขปิดห้อง ทำให้
+      // ครั้งต่อไปที่เปิดหน้าคืนเงินประกันของห้องนี้ เลข "ครั้งก่อน" จะกลายเป็นเลขปิด
+      // ถ้าเขียนมิเตอร์ก่อนแล้วบันทึกสัญญาล้ม พอผู้ดูแลเปิดทำใหม่จะได้ 0 หน่วยแบบเงียบ ๆ
+      // (หักค่าน้ำ-ไฟจากเงินประกันขาดโดยไม่มีอะไรฟ้อง)
+      //
+      // ตอนนี้ยอดหักถูกบันทึกลง cancelled_contracts พร้อมเลขมิเตอร์ที่ใช้คิดไปแล้ว
+      // ล้มที่ขั้นนี้จึงกู้ได้จากข้อมูลที่มีอยู่ ไม่ใช่คิดใหม่จากศูนย์
+      if (!isHistoricalEdit) {
+        const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
+        
+        const { saveMeterRecord } = await import("@/features/meter/actions")
+        const { nextBillingCycle } = await import("@/features/billing/utils")
+        
+        // ⚠️ แถวของรอบนี้ต้อง "เริ่มนับใหม่ที่เลขปิดห้อง" ไม่ใช่เก็บช่วงของผู้เช่าที่ย้ายออก
+        //
+        // ค่าน้ำ-ไฟของผู้เช่าที่ย้ายออกถูกหักจากเงินประกันไปแล้ว (ไม่ได้ออกเป็นบิล) ถ้าปล่อยให้
+        // แถวนี้ยังเป็น prevElec → fElec แล้วมีผู้เช่าใหม่ย้ายเข้าเดือนเดียวกัน ปลายเดือนบิลของ
+        // คนใหม่จะนับหน่วยตั้งแต่ prevElec = เก็บซ้ำหน่วยที่คนเดิมจ่ายไปแล้ว
+        //
+        // เลขของผู้เช่าเดิมไม่หาย — เก็บไว้ใน cancelled_contracts.closing_* (บันทึกไปแล้วด้านบน)
+        // และต้องส่ง occupancyStart ด้วย ไม่งั้นหน้าออกบิลจะทับ prev กลับเป็น curr ของรอบก่อน
+        // (ดู database_patch_move_segments.sql ข้อ 4)
+        const currentMeterRes = await saveMeterRecord(
+          { roomId: refundingRoom.id },
+          currentCycle,
+          fElec,
+          "",
+          fWater,
+          "",
+          { elec: fElec, water: fWater, reason: "checkout", date: refundCheckoutDate }
+        )
+
+        if (!currentMeterRes.success) {
+          setRefundError(currentMeterRes.error || t("rooms.toasts.meter_save_error"))
+          setRefundSubmitting(false)
+          return
+        }
+        
+        // รอบถัดไป: ส่งเลขปิดไปเป็นเลขตั้งต้นของเดือนหน้า (สำหรับผู้เช่าคนใหม่)
+        // ใช้ helper กลางตัวเดียวกับเส้นทางย้ายห้อง ไม่คำนวณข้ามปีเองซ้ำ
+        const nextCycle = nextBillingCycle(currentCycle)
+
+        const nextMeterRes = await saveMeterRecord(
+          { roomId: refundingRoom.id },
+          nextCycle,
+          fElec,
+          "", // current value is empty for next tenant to write later
+          fWater,
+          ""
+        )
+        
+        if (!nextMeterRes.success) {
+          setRefundError(nextMeterRes.error || t("rooms.toasts.meter_carry_over_error"))
+          setRefundSubmitting(false)
+          return
+        }
+      }
       
       if (!isHistoricalEdit) {
-        // 4. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
+        // 5. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
         const deleteRes = await deleteTenant(refundingRoom.tenantId, refundingRoom.roomNumber)
         if (!deleteRes.success) {
           setRefundError(deleteRes.error || t("rooms.toasts.close_tenant_system_error"))
@@ -4437,6 +4501,14 @@ function RoomsContent() {
                 </div>
               )}
 
+              {/* เตือน (ไม่บล็อก) ว่าห้องนี้มีบิลของรอบที่ย้ายออกอยู่แล้ว — กันเรียกเก็บสองทางกับคนเดียว */}
+              {existingBillWarning && editingCancelledContractId === null && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2 shrink-0 mt-3">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{existingBillWarning}</span>
+                </div>
+              )}
+
               {/* Scrollable Content Form */}
               <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                 
@@ -5333,6 +5405,9 @@ function RoomsContent() {
               depositPaid: selectedRoom.depositPaid
             }}
             vacantRooms={rooms.filter(r => r.status === "available").map(r => ({ id: r.id, roomNumber: r.roomNumber }))}
+            // ใช้แสดงยอดค่าเช่าห้องเดิมเริ่มต้นในฟอร์ม (ฝั่ง server คิดเองอีกครั้งเสมอ)
+            baseRent={selectedRoom.baseRent}
+            checkoutPolicy={financeSettings?.checkout_policy || "DAILY_PRORATE"}
             workspaceId={getCookie("horset_current_workspace_id") || undefined}
             onClose={() => setTransferModalOpen(false)}
             onSuccess={({ toRoomNumber }) => {

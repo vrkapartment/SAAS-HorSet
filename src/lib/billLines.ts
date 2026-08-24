@@ -8,6 +8,7 @@
  * ตอนนี้ pdfHelper เรียกฟังก์ชันนี้แล้ววาดตามผลลัพธ์ เทสต์เรียกฟังก์ชันเดียวกันแล้วตรวจตัวเลข
  * → ตัวเลขบนใบจริงกับตัวเลขที่เทสต์ตรวจ มาจากที่เดียวกันเสมอ
  */
+import { parseUtilitySegments, sumSegments, type BillUtilitySegment } from "./billSegments"
 
 export type BillLineInput = {
   /** true = ตัวเลขที่ส่งมาเป็น snapshot ที่บันทึกไว้ในบิลจริง ให้ใช้ตามนั้นตรง ๆ */
@@ -36,6 +37,13 @@ export type BillLineInput = {
   electricMinUnit?: number
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
+  /**
+   * ค่าน้ำ-ไฟ-ค่าเช่าของ "ห้องเดิม" ที่ยกมารวมในบิลนี้ (คอลัมน์ bills.utility_segments)
+   *
+   * รับเป็น unknown เพราะมาจาก jsonb ตรง ๆ — ให้ parseUtilitySegments() คัดของเสียออกที่นี่
+   * ที่เดียว ผู้เรียกทุกคนจึงไม่ต้องจำว่าต้อง parse ก่อน (ลืมแล้วรายการย่อยหายเงียบ)
+   */
+  utilitySegments?: unknown
 }
 
 export type BillLines = {
@@ -60,6 +68,12 @@ export type BillLines = {
   /** ข้อความในคอลัมน์ "อัตราหน่วยละ" — ใบที่คิดขั้นต่ำแสดง "-" เพราะอัตราต่อหน่วยไม่มีความหมาย */
   elecRateDisplay: string
   waterRateDisplay: string
+  /** รายการของห้องเดิมที่ยกมารวม (ว่างในบิลปกติทุกใบ) */
+  segments: BillUtilitySegment[]
+  /** ค่าเช่าห้องเดิมรวม */
+  segmentRentSum: number
+  /** ค่าน้ำ+ค่าไฟห้องเดิมรวม */
+  segmentUtilitySum: number
   /** ผลบวกทุกบรรทัด — ต้องเท่า amount ที่เก็บไว้ ไม่งั้นใบอธิบายที่มาของยอดไม่ได้ */
   lineSum: number
 }
@@ -93,6 +107,9 @@ export function resolveBillLines(data: BillLineInput): BillLines {
   const vatAmount = data.vatAmount !== undefined ? Number(data.vatAmount || 0) : 0
   const extraExpensesSum = (data.extraExpenses || []).reduce((acc, c) => acc + Number(c.amount || 0), 0)
 
+  const segments = parseUtilitySegments(data.utilitySegments)
+  const segTotals = sumSegments(segments)
+
   // ค่าเช่าที่จะพิมพ์
   //
   // มี snapshot  → ใช้ค่าเช่าที่บันทึกไว้ตรง ๆ (ตัวเลขที่คิดเงินไปจริง)
@@ -103,7 +120,8 @@ export function resolveBillLines(data: BillLineInput): BillLines {
   const rent = data.hasSnapshot
     ? Math.max(0, Number(data.baseRent || 0))
     : Math.max(0, data.amount - elecAmount - waterAmount - commonFee
-        - penaltyAmount - otherServiceAmount - extraExpensesSum - vatAmount)
+        - penaltyAmount - otherServiceAmount - extraExpensesSum - vatAmount
+        - segTotals.total)
 
   return {
     rent,
@@ -126,7 +144,11 @@ export function resolveBillLines(data: BillLineInput): BillLines {
     otherServiceAmount,
     vatAmount,
     extraExpensesSum,
+    segments,
+    segmentRentSum: segTotals.rent,
+    segmentUtilitySum: segTotals.utility,
     lineSum: rent + elecAmount + waterAmount + commonFee
       + penaltyAmount + otherServiceAmount + extraExpensesSum + vatAmount
+      + segTotals.total
   }
 }

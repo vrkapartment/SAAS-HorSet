@@ -12,32 +12,14 @@ import { getFinanceSettings, type FinanceSettings } from "@/features/finance/act
 
 import { calculateBillTotal } from "./bill-calculator"
 import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "./building-utility-actions"
+import { resolveUtilityRate } from "./rate-utils"
+import {
+  groupSegmentsByBillRoom,
+  parseUtilitySegments,
+  sumSegments,
+  type BillUtilitySegment
+} from "@/lib/billSegments"
 
-/**
- * Resolve อัตราไฟฟ้า/น้ำที่จะใช้จริงสำหรับห้องหนึ่งในรอบบิลหนึ่ง ตามโหมดที่ workspace ตั้งไว้
- * (fixed_rate = อัตราคงที่เดิม, building_total = ยอดบิลจริงทั้งอาคาร ÷ หน่วยรวม ที่กรอกไว้ล่วงหน้า)
- * คืน error ชัดเจนถ้าเปิดโหมด building_total แล้วยังไม่ได้กรอกยอดของอาคารนั้นในรอบบิลนี้
- */
-function resolveUtilityRate(
-  utilityType: "electric" | "water",
-  mode: "fixed_rate" | "building_total" | undefined,
-  fixedRate: number,
-  buildingId: string | null | undefined,
-  buildingBillsMap: Map<string, BuildingUtilityBill>
-): { rate: number; error?: string } {
-  if (mode !== "building_total") {
-    return { rate: fixedRate }
-  }
-  const utilityLabel = utilityType === "electric" ? "ไฟฟ้า" : "น้ำประปา"
-  if (!buildingId) {
-    return { rate: 0, error: `ห้องนี้ยังไม่ได้กำหนดอาคาร กรุณาตั้งค่าอาคารให้ห้องนี้ก่อนออกบิลค่า${utilityLabel}แบบหารตามสัดส่วน` }
-  }
-  const row = buildingBillsMap.get(`${buildingId}:${utilityType}`)
-  if (!row) {
-    return { rate: 0, error: `ยังไม่ได้กรอกยอดค่า${utilityLabel}รวมทั้งอาคารของรอบบิลนี้ กรุณากรอกที่หน้าออกบิลก่อน` }
-  }
-  return { rate: row.ratePerUnit }
-}
 
 /**
  * Resolve ว่าบิลของรอบเดือนนี้ต้องคิด VAT หรือไม่ + อัตราเท่าไร ตามกฎเดียวกับ lib/tax/vat.ts's vatStatus():
@@ -57,8 +39,74 @@ function resolveVatCharging(
 }
 
 const isSupabaseConfigured =
-  process.env.NEXT_PUBLIC_SUPABASE_URL && 
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
   process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co"
+
+/**
+ * ดึง "ส่วนของห้องเดิม" ที่ต้องยกมารวมในบิลของห้องปลายทาง ในรอบบิลนี้
+ *
+ * คีย์ของผลลัพธ์คือ rooms.id ของห้องที่บิลจะออก
+ *
+ * ⚠️ ต้องไล่โซ่การย้าย ไม่ใช่ผูก segment ไว้กับ to_room_id ตรง ๆ
+ *
+ * ผู้เช่าย้าย A→B→C ในเดือนเดียวกันได้ ถ้าผูกตรง ๆ ส่วนของ A จะไปอยู่กับบิลห้อง B
+ * ซึ่งปลายเดือน "ไม่มีผู้เช่าแล้วจึงไม่มีบิล" → ค่าน้ำ-ไฟของห้อง A หายไปทั้งก้อนแบบเงียบ ๆ
+ * ทุก segment ของผู้เช่าคนเดียวกันในรอบเดียวกัน ต้องไปรวมที่ "ห้องสุดท้ายที่เขาอยู่" ห้องเดียว
+ *
+ * เรียงตามวันที่ย้ายเพื่อให้รายการย่อยบนใบเรียงตามเวลาที่ผู้เช่าอยู่จริง
+ *
+ * ⚠️ อ่านอย่างเดียว ไม่เขียนอะไร — ยอดถูกคิดเสร็จไว้ตอนย้ายแล้ว (ดู transferTenantRoom)
+ *    การออกบิลซ้ำจึงได้ยอดเท่าเดิมทุกครั้ง
+ */
+async function fetchTransferSegments(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  billingCycle: string,
+  toRoomIds: string[]
+): Promise<Map<string, BillUtilitySegment[]>> {
+  const result = new Map<string, BillUtilitySegment[]>()
+  if (toRoomIds.length === 0) return result
+
+  // ดึงการย้ายทั้งรอบ (ไม่กรองด้วย to_room_id) เพราะต้องเห็นทั้งโซ่จึงจะรู้ว่าห้องสุดท้ายคือห้องไหน
+  // ถ้ากรองแต่ห้องที่ถาม จะมองไม่เห็นขาแรกของโซ่ที่ปลายทางเป็นห้องกลางทาง
+  const { data: transfers, error } = await supabase
+    .from("tenant_room_transfers")
+    .select(`
+      id, tenant_id, from_room_id, from_room_number, to_room_id, transfer_date,
+      closing_elec_prev, closing_elec_curr, closing_elec_units, closing_elec_rate,
+      closing_elec_amount, closing_elec_min_applied,
+      closing_water_prev, closing_water_curr, closing_water_units, closing_water_rate,
+      closing_water_amount, closing_water_min_applied,
+      include_old_room_rent, old_room_rent_amount
+    `)
+    .eq("workspace_id", workspaceId)
+    .eq("billing_cycle", billingCycle)
+    .order("transfer_date", { ascending: true })
+
+  // ตารางหรือคอลัมน์ยังไม่มี (ยังไม่ได้รัน patch) → ไม่มี segment ให้รวม ออกบิลต่อได้ปกติ
+  // ไม่ throw เพราะจะทำให้ออกบิลทั้งหอไม่ได้เลย ซึ่งกระทบหนักกว่าการไม่มีรายการย่อย
+  if (error) {
+    console.warn("[fetchTransferSegments] อ่าน tenant_room_transfers ไม่ได้ (ข้ามการรวมส่วนห้องเดิม):", error.message)
+    return result
+  }
+  if (!transfers || transfers.length === 0) return result
+
+  // รหัสอาคารของห้องเดิม — ใช้กำกับบนใบเมื่อเลขห้องซ้ำข้ามอาคาร
+  const fromRoomIds = [...new Set(transfers.map(t => t.from_room_id).filter((v): v is string => typeof v === "string"))]
+  const codeByRoomId = new Map<string, string | null>()
+  if (fromRoomIds.length > 0) {
+    const { data: fromRooms } = await supabase
+      .from("rooms")
+      .select("id, buildings ( code )")
+      .in("id", fromRoomIds)
+    for (const r of fromRooms ?? []) {
+      codeByRoomId.set(r.id as string, (r.buildings as { code?: string | null } | null)?.code ?? null)
+    }
+  }
+
+  // ตรรกะไล่โซ่อยู่ใน groupSegmentsByBillRoom (โมดูลบริสุทธิ์ ทดสอบได้) — ฟังก์ชันนี้ทำแค่ query
+  return groupSegmentsByBillRoom(transfers, codeByRoomId, toRoomIds)
+}
 
 export async function getBills(billingCycle?: string, year?: string, workspaceId?: string) {
   if (!isSupabaseConfigured) {
@@ -87,6 +135,14 @@ export async function getBills(billingCycle?: string, year?: string, workspaceId
       roomNumber: b.room_number,
       // ตัวระบุห้องที่แท้จริง — ฝั่ง client ใช้ตัวนี้จับคู่ ไม่ใช่ roomNumber ที่ซ้ำกันได้ข้ามอาคาร
       roomId: b.room_id ?? null,
+      /**
+       * ชนิดของบิล: regular = บิลรอบปกติ · transfer_closing = บิลปิดรอบตอนย้ายห้อง (เลิกออกใหม่แล้ว)
+       *
+       * ต้องคืนออกมาให้ฝั่งจอ เพราะห้องเดียวในรอบเดียวมีได้ทั้งสองใบ ถ้าฝั่งจอจับบิลของห้อง
+       * โดยไม่ดูชนิด แถวนั้นอาจแสดงยอด/สถานะของใบปิดรอบแทนบิลรอบปกติ และปุ่มที่ทำงานกับ
+       * บิลใบนั้น (ยกเลิกบิล / รับเงินสด) จะไปทำกับใบผิด
+       */
+      billKind: (b.bill_kind as string | null) ?? "regular",
       tenantName: b.tenant_name,
       amount: Number(b.amount),
       status: b.status as "unpaid" | "pending" | "paid",
@@ -257,6 +313,11 @@ export async function createBill(
     // 3.6 Resolve ว่าต้องคิด VAT กับบิลนี้หรือไม่ (workspace จด VAT แล้ว + ถึงเดือนที่มีผล)
     const vatResolved = resolveVatCharging(settings, billingCycle)
 
+    // 3.7 ส่วนของห้องเดิมที่ต้องยกมารวม (ผู้เช่าย้ายห้องมาที่ห้องนี้กลางเดือน)
+    const segmentsByRoom = await fetchTransferSegments(supabase, workspaceId, billingCycle, [room.roomId])
+    const segments = segmentsByRoom.get(room.roomId) ?? []
+    const segTotals = sumSegments(segments)
+
     // 4. Calculate total on Server
     const { elecCost, waterCost, elecMinApplied, waterMinApplied, vatAmount, total: serverCalculatedTotal } = calculateBillTotal({
       baseRent,
@@ -274,7 +335,9 @@ export async function createBill(
       electricMinChecked: settings.electric_min_checked,
       electricMinUnit: settings.electric_min_unit,
       vatRate: vatResolved.rate,
-      vatApplies: vatResolved.applies
+      vatApplies: vatResolved.applies,
+      transferUtilitySum: segTotals.utility,
+      transferRentSum: segTotals.rent
     })
 
     // Log warning if client is sending different amount
@@ -313,7 +376,10 @@ export async function createBill(
       elec_min_applied: elecMinApplied,
       water_min_applied: waterMinApplied,
       electric_min_unit: settings.electric_min_unit,
-      water_min_unit: settings.water_min_unit
+      water_min_unit: settings.water_min_unit,
+      // รายการย่อยของห้องเดิม — เขียนลงบิลด้วยเพื่อให้ใบแจ้งหนี้อธิบายที่มาของยอดได้เองทั้งใบ
+      // โดยไม่ต้องกลับไป join tenant_room_transfers ตอนแสดงผล (ซึ่ง Portal ผู้เช่าทำไม่ได้ตาม RLS)
+      utility_segments: segments
     }
 
     // Check if a bill already exists for this room and cycle
@@ -779,6 +845,20 @@ export async function deleteBill(id: string) {
   }
 
   try {
+    // จำกัดสิทธิ์เฉพาะ Admin/Super Admin — การยกเลิกบิลคือการลบเอกสารการเงิน
+    //
+    // เดิมฟังก์ชันนี้ไม่เคยตรวจ role เลย (ตรวจแค่ subscription) เพราะยังไม่มีปุ่มไหนเรียกใช้
+    // ตอนนี้หน้าจัดการใบแจ้งหนี้มีปุ่ม "ยกเลิกบิล" แล้ว จึงต้องมีด่านเทียบเท่ากับ
+    // updateBillPenalty ที่กันไว้อยู่แล้ว — ไม่ปล่อยให้ RLS เป็นด่านเดียว
+    const profileRes = await getCurrentUserProfileAction()
+    if (!profileRes.success || !profileRes.data) {
+      return { success: false, error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" }
+    }
+    const role = profileRes.data.role
+    if (role !== "admin" && role !== "super_admin") {
+      return { success: false, error: "⚠️ ขออภัย คุณไม่มีสิทธิ์ยกเลิกบิล (เฉพาะผู้ดูแลระบบเท่านั้น)" }
+    }
+
     // ตรวจสอบสิทธิ์การใช้งาน subscription ของ workspace ก่อนลบบิล (บล็อกถ้า read_only/cancelled)
     const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
     const subscriptionWorkspaceId = await getCurrentWorkspaceId()
@@ -948,6 +1028,13 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
     const extraExpenses = roomData.extra_expenses || []
     const extraExpensesSum = extraExpenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
 
+    // ส่วนของห้องเดิมที่ยกมารวมไว้ในใบนี้ตอนออกบิล (ย้ายห้องกลางเดือน)
+    //
+    // ⚠️ ต้องบวกกลับเข้าไปด้วย เพราะฟังก์ชันนี้คำนวณยอดรวมใหม่ทั้งใบ ไม่ได้แก้แค่ช่องค่าปรับ
+    // ถ้าไม่บวก การที่แอดมินไปแตะค่าปรับของบิลใบนั้น จะลบค่าน้ำ-ไฟของห้องเดิมออกจากยอด
+    // ทั้งก้อนแบบเงียบ ๆ (ผู้เช่าได้ส่วนลดฟรี และรายการย่อยบนใบจะบวกไม่เท่ายอดรวมอีกต่อไป)
+    const penaltySegTotals = sumSegments(parseUtilitySegments(billData.utility_segments))
+
     // 6. Recalculate bill total (excluding penalty) and then add calculated penalty
     const { total: baseBillTotal } = calculateBillTotal({
       baseRent,
@@ -963,7 +1050,9 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
       waterMinUnit: settings.water_min_unit,
       waiveElectricMin,
       electricMinChecked: settings.electric_min_checked,
-      electricMinUnit: settings.electric_min_unit
+      electricMinUnit: settings.electric_min_unit,
+      transferUtilitySum: penaltySegTotals.utility,
+      transferRentSum: penaltySegTotals.rent
     })
 
     const finalAmount = baseBillTotal + calculatedPenaltyAmount
@@ -1143,6 +1232,12 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
     // 1.6 Resolve ว่าต้องคิด VAT กับรอบบิลนี้หรือไม่ — ค่าเดียวกันทุกห้อง (ขึ้นกับ settings+billingCycle เท่านั้น)
     const vatResolved = resolveVatCharging(settings, billingCycle)
 
+    // 1.8 ส่วนของห้องเดิมที่ต้องยกมารวม — ดึงครั้งเดียวสำหรับทุกห้องในรอบนี้ (ไม่มี await ในลูป)
+    const segmentsByRoom = await fetchTransferSegments(
+      supabase, workspaceId, billingCycle,
+      items.map(i => i.roomId).filter((v): v is string => typeof v === "string" && v !== "")
+    )
+
     // 2. คำนวณทุกห้องใน memory (ไม่มี await ในลูปนี้เลย)
     const meterRows: any[] = []
     const billRows: any[] = []
@@ -1185,6 +1280,10 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const baseRent = roomData.room_types ? Number(roomData.room_types.default_rent) : Number(roomData.base_rent || 0)
       const extraExpensesSum = (roomData.extra_expenses || []).reduce((a: number, c: any) => a + Number(c.amount || 0), 0)
 
+      // ส่วนของห้องเดิมที่ยกมารวมในบิลห้องนี้ (ว่างเกือบทุกห้อง — มีเฉพาะห้องที่มีคนย้ายเข้ามากลางเดือน)
+      const segments = segmentsByRoom.get(roomData.id as string) ?? []
+      const segTotals = sumSegments(segments)
+
       // ใช้ calculateBillTotal ตัวเดียวกับที่ createBill ใช้อยู่ (ห้ามเขียนสูตรซ้ำ)
       const { elecCost, waterCost, elecMinApplied, waterMinApplied, total, vatAmount } = calculateBillTotal({
         baseRent, electricUnitsUsed: eUnits, waterUnitsUsed: wUnits,
@@ -1193,7 +1292,8 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         extraExpensesSum,
         waiveWaterMin: !!roomData.waive_water_min, waterMinChecked: settings.water_min_checked, waterMinUnit: settings.water_min_unit,
         waiveElectricMin: !!roomData.waive_electric_min, electricMinChecked: settings.electric_min_checked, electricMinUnit: settings.electric_min_unit,
-        vatRate: vatResolved.rate, vatApplies: vatResolved.applies
+        vatRate: vatResolved.rate, vatApplies: vatResolved.applies,
+        transferUtilitySum: segTotals.utility, transferRentSum: segTotals.rent
       })
 
       // ป้องกันยอดเงินรวม/ค่าปรับล่าช้าโดนทับ หากห้องนี้มีบิลของรอบนี้อยู่แล้ว (ตรงกับ logic เดียวกับ createBill)
@@ -1223,6 +1323,8 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
         water_min_applied: waterMinApplied,
         electric_min_unit: settings.electric_min_unit,
         water_min_unit: settings.water_min_unit,
+        // รายการย่อยของห้องเดิม (ดูหมายเหตุเดียวกันใน createBill)
+        utility_segments: segments,
         tenant_name: item.tenantName,
         amount: total + existingPenalty,
         status: item.status,

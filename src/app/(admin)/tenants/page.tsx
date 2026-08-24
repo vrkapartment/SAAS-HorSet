@@ -2158,6 +2158,8 @@ export default function TenantsPage() {
             depositPaid: transferTenant.depositPaid
           }}
           vacantRooms={vacantRoomsForTransfer.map(r => ({ id: r.id, roomNumber: r.roomNumber }))}
+          // หน้านี้ไม่มีค่าเช่าของห้องในมือ ส่งแค่ policy — ฟอร์มจะบอกให้เว้นว่างแล้วให้ server คิด
+          checkoutPolicy={financeSettings?.checkout_policy || "DAILY_PRORATE"}
           workspaceId={getCookie("horset_current_workspace_id") || undefined}
           onClose={() => {
             setTransferModalOpen(false)

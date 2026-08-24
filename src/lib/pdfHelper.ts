@@ -1162,6 +1162,13 @@ export interface BillPdfData {
   // ภาษีมูลค่าเพิ่ม (VAT) ที่บวกเพิ่มเข้า amount แล้วตอนออกบิล — ดูฟีเจอร์ VAT ใน src/features/tax/
   // ไม่บังคับ, ค่า 0/undefined = ไม่แสดงบรรทัดนี้เลย (workspace ยังไม่จด VAT หรือบิลนี้ออกก่อนเดือนที่มีผล)
   vatAmount?: number
+  /**
+   * รายการค่าน้ำ-ไฟ-ค่าเช่าของ "ห้องเดิม" ที่ยกมารวมในบิลนี้ (ผู้เช่าย้ายห้องกลางเดือน)
+   *
+   * รับเป็น unknown เพราะมาจากคอลัมน์ jsonb — resolveBillLines() จะ parse ให้เอง
+   * ไม่มี/ว่าง = บิลปกติ ใบหน้าตาเหมือนเดิมทุกอย่าง
+   */
+  utilitySegments?: unknown
 }
 
 // แปลงรอบบิล "YYYY-MM" เป็น "เดือน ปี" ภาษาไทย (ซ้ำกับ helper ในหน้า admin billing/manage-bills
@@ -1317,6 +1324,58 @@ export async function generateBillPdf(data: BillPdfData) {
   drawText(commonFee.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
 
   let itemIndex = 5
+
+  // รายการของ "ห้องเดิม" เมื่อผู้เช่าย้ายห้องกลางเดือน (ว่างในบิลปกติทุกใบ)
+  //
+  // วางไว้หลังรายการ 1-4 ของห้องปัจจุบัน และกำกับเลขห้องเดิมทุกบรรทัด เพื่อให้ผู้เช่าเห็นชัดว่า
+  // ส่วนไหนคือห้องที่อยู่ตอนนี้ ส่วนไหนคือห้องเดิมที่ย้ายออกมากลางเดือน
+  for (const seg of lines.segments) {
+    const segLabel = seg.buildingCode ? `ห้อง ${seg.roomNumber} (${seg.buildingCode})` : `ห้อง ${seg.roomNumber}`
+
+    if (seg.elecAmount > 0 || seg.elecUnits > 0) {
+      y -= 25
+      const desc = seg.elecMinApplied
+        ? `${itemIndex}. ค่าไฟฟ้า ${segLabel} [ห้องเดิม] (ขั้นต่ำ)`
+        : `${itemIndex}. ค่าไฟฟ้า ${segLabel} [ห้องเดิม]`
+      drawText(desc, 50, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.elecUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.elecMinApplied ? "-" : seg.elecRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.elecAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+      y -= 12
+      drawText(
+        `${seg.elecPrev.toLocaleString()} - ${seg.elecCurr.toLocaleString()} จำนวน ${seg.elecUnits} หน่วย (ถึงวันย้ายห้อง ${seg.toDate})`,
+        55, y, 8, rgb(0.4, 0.4, 0.4)
+      )
+      itemIndex++
+    }
+
+    if (seg.waterAmount > 0 || seg.waterUnits > 0) {
+      y -= 25
+      const desc = seg.waterMinApplied
+        ? `${itemIndex}. ค่าน้ำประปา ${segLabel} [ห้องเดิม] (ขั้นต่ำ)`
+        : `${itemIndex}. ค่าน้ำประปา ${segLabel} [ห้องเดิม]`
+      drawText(desc, 50, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.waterUnits.toString(), 280, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.waterMinApplied ? "-" : seg.waterRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.waterAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+      y -= 12
+      drawText(
+        `${seg.waterPrev.toLocaleString()} - ${seg.waterCurr.toLocaleString()} จำนวน ${seg.waterUnits} หน่วย (ถึงวันย้ายห้อง ${seg.toDate})`,
+        55, y, 8, rgb(0.4, 0.4, 0.4)
+      )
+      itemIndex++
+    }
+
+    if (seg.rentIncluded && seg.rentAmount > 0) {
+      y -= 25
+      drawText(`${itemIndex}. ค่าเช่า ${segLabel} [ห้องเดิม ถึง ${seg.toDate}]`, 50, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText("1", 280, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.rentAmount.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
+      drawText(seg.rentAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
+      itemIndex++
+    }
+  }
+
   // รายการค่าใช้จ่ายเสริมรายเดือน
   if (extraExpenses && extraExpenses.length > 0) {
     extraExpenses.forEach((exp) => {

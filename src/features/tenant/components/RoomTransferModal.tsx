@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { X, ArrowRightLeft, RefreshCw, AlertTriangle } from "lucide-react"
 import { transferTenantRoom } from "@/features/tenant/transfer-actions"
-import { getLatestMeterRecord } from "@/features/meter/actions"
+import { getMeterStartForCycle } from "@/features/meter/actions"
+import { computeMidMonthRent } from "@/features/room/deposit-calculator"
 
 export interface RoomTransferModalTenant {
   id: string
@@ -24,11 +25,18 @@ interface RoomTransferModalProps {
   vacantRooms: RoomTransferModalVacantRoom[]
   /** ใช้จำกัดขอบเขตการอ่านเลขมิเตอร์ครั้งก่อนหน้าให้อยู่ในหอนี้เท่านั้น */
   workspaceId?: string
+  /**
+   * ค่าเช่าเต็มเดือนของห้องเดิม + นโยบายย้ายออกกลางเดือนของหอ
+   * ใช้แค่ "แสดงยอดเริ่มต้น" ให้ผู้ดูแลเห็นในฟอร์ม — ไม่ส่งมาก็ยังย้ายได้
+   * ฝั่ง server คำนวณยอดเริ่มต้นเองอยู่แล้วเมื่อไม่ได้ส่ง oldRoomRentAmount มา
+   */
+  baseRent?: number | null
+  checkoutPolicy?: "DAILY_PRORATE" | "FULL_MONTH"
   onClose: () => void
   onSuccess: (result: { toRoomNumber: string }) => void
 }
 
-export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, onClose, onSuccess }: RoomTransferModalProps) {
+export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, baseRent, checkoutPolicy, onClose, onSuccess }: RoomTransferModalProps) {
   const today = new Date().toISOString().split("T")[0]
 
   const [toRoomId, setToRoomId] = useState("")
@@ -41,6 +49,10 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, on
   const [startingElecReading, setStartingElecReading] = useState("0")
   const [startingWaterReading, setStartingWaterReading] = useState("0")
   const [note, setNote] = useState("")
+  // รวมค่าเช่าห้องเดิมในบิลห้องใหม่หรือไม่ — ค่าเริ่มต้น "ไม่รวม" เพราะบิลห้องใหม่คิดค่าเช่า
+  // เต็มเดือนอยู่แล้ว ช่วงเวลาจึงทับกัน ต้องให้ผู้ดูแลตัดสินใจเอง ไม่ใช่ระบบเก็บเพิ่มให้เงียบ ๆ
+  const [includeOldRoomRent, setIncludeOldRoomRent] = useState(false)
+  const [oldRoomRentAmount, setOldRoomRentAmount] = useState("")
 
   const [loadingMeter, setLoadingMeter] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -51,11 +63,14 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, on
     async function loadMeter() {
       setLoadingMeter(true)
       try {
-        const res = await getLatestMeterRecord({ roomId: tenant.roomId }, workspaceId)
+        // เลขตั้งต้นของ "รอบที่ย้าย" — ไม่ใช่เลขที่จดล่าสุด
+        // ถ้าสตาฟจดมิเตอร์รอบนี้ไปแล้ว เลขล่าสุดคือเลขกลางเดือน เอามาเป็นเลขครั้งก่อน
+        // จะทำให้คิดหน่วยแค่ช่วงกลางเดือนถึงวันย้าย (เก็บเงินขาด — เกิดขึ้นจริงมาแล้ว)
+        const res = await getMeterStartForCycle({ roomId: tenant.roomId }, transferDate.substring(0, 7), workspaceId)
         if (cancelled) return
         if (res.success && res.data) {
-          const pElec = res.data.elecCurr !== null && res.data.elecCurr !== undefined ? res.data.elecCurr : res.data.elecPrev
-          const pWater = res.data.waterCurr !== null && res.data.waterCurr !== undefined ? res.data.waterCurr : res.data.waterPrev
+          const pElec = res.data.elecStart
+          const pWater = res.data.waterStart
           setPrevElec(pElec)
           setPrevWater(pWater)
           setClosingElecCurr(String(pElec))
@@ -72,7 +87,13 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, on
     }
     loadMeter()
     return () => { cancelled = true }
-  }, [tenant.roomId, workspaceId])
+  }, [tenant.roomId, workspaceId, transferDate])
+
+  // ยอดค่าเช่าห้องเดิมตามนโยบายของหอ — แสดงเป็น placeholder ให้ผู้ดูแลเห็นว่าถ้าไม่กรอกจะได้เท่าไร
+  // ใช้สูตรเดียวกับที่ฝั่ง server ใช้ (computeMidMonthRent) จะได้ไม่มีทางแสดงเลขคนละตัวกับที่คิดจริง
+  const defaultOldRoomRent = baseRent !== null && baseRent !== undefined && baseRent > 0
+    ? computeMidMonthRent(Number(baseRent), transferDate, checkoutPolicy || "DAILY_PRORATE")
+    : null
 
   const depositBefore = tenant.depositPaid ?? null
   const topupNum = Number(depositTopupAmount || 0)
@@ -112,7 +133,13 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, on
         closingWaterCurr: closingWaterNum,
         startingElecReading: Number(startingElecReading || 0),
         startingWaterReading: Number(startingWaterReading || 0),
-        note: note.trim() || undefined
+        note: note.trim() || undefined,
+        includeOldRoomRent,
+        // ไม่กรอกตัวเลข = ให้ฝั่ง server ใช้ยอดตามนโยบายของหอ (ไม่ส่ง 0 ไปแทน
+        //  ไม่งั้นเลือก "รวม" แล้วเว้นช่องไว้จะกลายเป็นรวม 0 บาทแบบเงียบ ๆ)
+        oldRoomRentAmount: includeOldRoomRent && oldRoomRentAmount.trim() !== ""
+          ? Number(oldRoomRentAmount)
+          : undefined
       })
 
       if (res.success && res.data) {
@@ -274,6 +301,67 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, on
                 />
               </div>
             </div>
+          </div>
+
+          {/* ค่าเช่าห้องเดิม: รวม / ไม่รวม */}
+          <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
+            <p className="text-xs md:text-sm font-bold text-slate-750 dark:text-slate-300">
+              ค่าเช่าห้องเดิม (ห้อง {tenant.roomNumber}) ช่วงต้นเดือนถึงวันย้าย
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIncludeOldRoomRent(false)}
+                className={`px-3 py-2.5 rounded-lg text-xs md:text-sm font-bold border transition-all ${
+                  !includeOldRoomRent
+                    ? "bg-teal-50 dark:bg-teal-900/30 border-teal-500 text-teal-700 dark:text-teal-300"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                ไม่รวม
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncludeOldRoomRent(true)}
+                className={`px-3 py-2.5 rounded-lg text-xs md:text-sm font-bold border transition-all ${
+                  includeOldRoomRent
+                    ? "bg-teal-50 dark:bg-teal-900/30 border-teal-500 text-teal-700 dark:text-teal-300"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                รวม
+              </button>
+            </div>
+
+            {includeOldRoomRent && (
+              <div className="space-y-1 pt-1">
+                <label className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 font-semibold block">
+                  ยอดค่าเช่าห้องเดิมที่จะคิด (บาท) — แก้ได้
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={oldRoomRentAmount}
+                  onChange={(e) => setOldRoomRentAmount(e.target.value)}
+                  placeholder={defaultOldRoomRent !== null ? String(defaultOldRoomRent) : "เว้นว่างเพื่อใช้ยอดตามนโยบายของหอ"}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono font-semibold outline-none focus:border-blue-500"
+                />
+                <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                  {defaultOldRoomRent !== null ? (
+                    <>ยอดตามนโยบายของหอ: <span className="font-bold">{defaultOldRoomRent.toLocaleString()}</span> บาท
+                      {" "}({checkoutPolicy === "FULL_MONTH" ? "คิดเต็มเดือน" : `เฉลี่ยรายวัน ${new Date(transferDate).getDate()} วัน`})</>
+                  ) : (
+                    <>เว้นว่างไว้ ระบบจะคิดตามนโยบายที่ตั้งไว้ใน ตั้งค่า → ข้อมูลหอพัก (การหักเงินประกันกรณีย้ายออกกลางเดือน)</>
+                  )}
+                </p>
+              </div>
+            )}
+
+            <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+              ค่าน้ำ-ค่าไฟของห้องเดิมจะถูกยกไปรวมใน<span className="font-bold">บิลของห้องใหม่</span> รอบ {transferDate.substring(0, 7)} โดยแยกบรรทัดให้เห็นชัดว่าเป็นของห้องเดิม
+              — ผู้เช่าจ่ายทีเดียวปลายเดือน ไม่มีบิลแยกใบตอนย้าย
+            </p>
           </div>
 
           {/* Note */}

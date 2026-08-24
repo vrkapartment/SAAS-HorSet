@@ -41,6 +41,31 @@ export function computeStandardDeposit(
   return (baseRent || 0) * (depositAmount || 0)
 }
 
+/**
+ * ค่าเช่าของช่วง "ต้นเดือนถึงวันที่ออก" ตามนโยบายที่หอตั้งไว้
+ * (/settings?tab=property → การหักเงินประกันห้องพัก กรณีย้ายออกกลางเดือน)
+ *
+ * แยกออกมาเป็นฟังก์ชันเพราะมีสองที่ที่ต้องใช้สูตรเดียวกันเป๊ะ:
+ *   1. หักค่าเช่าจากเงินประกันตอนย้ายออก (calculateDepositProration ด้านล่าง)
+ *   2. ค่าเช่าห้องเดิมที่ยกไปรวมในบิลห้องใหม่ตอนย้ายห้อง (transferTenantRoom)
+ *
+ * เดิมข้อ 2 เขียนสูตร /30 ของตัวเองแบบ hardcode จึงไม่เคยเคารพนโยบาย FULL_MONTH เลย —
+ * หอที่ตั้งเป็นคิดเต็มเดือนจะได้ยอดย้ายห้องแบบเฉลี่ยรายวันโดยที่ไม่มีใครเห็น
+ *
+ * หมายเหตุ: ตัวหารเป็น 30 คงที่ (ไม่ใช่จำนวนวันจริงของเดือน) เพื่อคงพฤติกรรมเดิม
+ * ที่ใช้คิดเงินให้ผู้เช่าไปแล้วจริง — เปลี่ยนตัวหารคือเปลี่ยนยอดเก็บเงินย้อนหลัง
+ */
+export function computeMidMonthRent(
+  baseRent: number,
+  checkoutDate: string,
+  policy: "DAILY_PRORATE" | "FULL_MONTH"
+): number {
+  const rent = Number(baseRent || 0)
+  if (policy !== "DAILY_PRORATE") return rent
+  const daysStayed = new Date(checkoutDate).getDate()
+  return Math.round((rent / 30) * daysStayed * 100) / 100
+}
+
 export function checkIfBreakContract(checkoutDateStr: string, leaseEndStr: string | null | undefined): boolean {
   if (!leaseEndStr || !checkoutDateStr) return false
   const checkDate = new Date(checkoutDateStr)
@@ -73,11 +98,7 @@ export function calculateDepositProration(input: DepositProrationInput): Deposit
   } else {
     totalUtilities408 = Number(input.totalUtilities408 || 0)
     if (!isRentWaived) {
-      if (input.checkoutPolicy === "DAILY_PRORATE") {
-        calcRentDeduction = Math.round((input.baseRent / 30) * daysStayed * 100) / 100
-      } else {
-        calcRentDeduction = input.baseRent
-      }
+      calcRentDeduction = computeMidMonthRent(input.baseRent, input.checkoutDate, input.checkoutPolicy)
     }
   }
 

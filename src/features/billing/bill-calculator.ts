@@ -23,6 +23,19 @@ export interface BillRateInput {
   vatRate?: number
   /** false (ค่าเริ่มต้น) = ไม่คิด VAT เลย บวก VAT เพิ่มจากยอดเดิมเมื่อเป็น true เท่านั้น ไม่ถอดจากยอดเดิม */
   vatApplies?: boolean
+  /**
+   * ค่าน้ำ-ค่าไฟของ "ห้องเดิม" ที่ยกมารวมในบิลนี้ เมื่อผู้เช่าย้ายห้องกลางเดือน
+   * (ดู src/lib/billSegments.ts) เข้าฐาน VAT เหมือนค่าน้ำ-ไฟปกติ
+   *
+   * ยอดนี้คิดเสร็จมาแล้วตั้งแต่ตอนย้ายห้อง จึงไม่เอาไปเข้าสูตรขั้นต่ำซ้ำที่นี่ —
+   * ขั้นต่ำของช่วงห้องเดิมถูกคิดไปแล้วด้วยการตั้งค่า ณ วันที่ย้าย
+   */
+  transferUtilitySum?: number
+  /**
+   * ค่าเช่าห้องเดิมที่ยกมารวมในบิลนี้ (0 เมื่อผู้ใช้เลือก "ไม่รวม")
+   * แยกจาก transferUtilitySum เพราะค่าเช่าเป็นเงินได้ 40(5) ไม่เข้าฐาน VAT
+   */
+  transferRentSum?: number
 }
 
 export function calculateBillTotal(input: BillRateInput): {
@@ -57,12 +70,18 @@ export function calculateBillTotal(input: BillRateInput): {
 
   const penalty = input.penaltyAmount || 0
 
+  // ส่วนของห้องเดิมที่ยกมารวม (0 ในบิลปกติทุกใบ จึงไม่กระทบยอดเดิมของใครเลย)
+  const transferUtilitySum = input.transferUtilitySum || 0
+  const transferRentSum = input.transferRentSum || 0
+
   const vatableBase = elecCost + waterCost + input.commonFee + input.otherServiceAmount + input.extraExpensesSum
+    + transferUtilitySum
   const vatAmount = input.vatApplies && input.vatRate
     ? Math.round(vatableBase * input.vatRate * 100) / 100
     : 0
 
   const total = input.baseRent + elecCost + waterCost + input.commonFee + input.otherServiceAmount + penalty + input.extraExpensesSum + vatAmount
+    + transferUtilitySum + transferRentSum
 
   return {
     elecCost,
