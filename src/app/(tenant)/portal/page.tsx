@@ -413,12 +413,23 @@ export default function TenantPortal() {
 
   // ค่าใช้จ่ายต่างๆ (ใช้ค่าของบิลจริง หรือค่าจำลองหากยังไม่มีบิลในระบบ)
   // ถ้าใช้ไม่ถึงขั้นต่ำที่ตั้งไว้ (และห้องนี้ไม่ได้ยกเว้นขั้นต่ำ) ให้คิดค่าไฟ/น้ำตามขั้นต่ำแทนยอดใช้จริง
+  // บิลที่มี snapshot = อ่านองค์ประกอบจากตัวบิลตรง ๆ ห้ามคำนวณใหม่จากค่า config ปัจจุบัน
+  // เพราะค่าเช่า/อัตรา/ค่าส่วนกลาง/การตั้งค่าขั้นต่ำ เปลี่ยนได้หลังออกบิลไปแล้ว ใบที่ผู้เช่าถืออยู่
+  // ต้องแสดงตัวเลขเดิมและบวกกันได้เท่ายอดรวมเสมอ (ดู database_patch_add_bill_snapshot.sql)
+  //
+  // บิลเก่าที่ยังไม่มี snapshot (hasSnapshot = false) ถอยไปคำนวณแบบเดิมทุกบรรทัด
+  const useSnapshot = !!bill?.hasSnapshot
+
   const elecUnits = bill ? bill.electricUnits : 0
   const finalElecUnits = !waiveElectricMin && electricMinChecked && elecUnits <= electricMinUnit ? electricMinUnit : elecUnits
-  const elecAmount = finalElecUnits * electricRate
+  const elecAmount = useSnapshot
+    ? Number(bill.electricAmount || 0)
+    : finalElecUnits * electricRate
   const waterUnits = bill ? bill.waterUnits : 0
   const finalWaterUnits = !waiveWaterMin && waterMinChecked && waterUnits <= waterMinUnit ? waterMinUnit : waterUnits
-  const waterAmount = finalWaterUnits * waterRate
+  const waterAmount = useSnapshot
+    ? Number(bill.waterAmount || 0)
+    : finalWaterUnits * waterRate
 
   // ช่วงเลขมิเตอร์ก่อนหน้า-ปัจจุบัน (แสดงเฉพาะเมื่อมีข้อมูลมิเตอร์จริงของรอบบิลนี้)
   const elecPrev = bill && bill.elecPrev !== null && bill.elecPrev !== undefined ? bill.elecPrev : null
@@ -437,12 +448,12 @@ export default function TenantPortal() {
   const hasWaterDisclosure = waterBillingMode === "building_total" && waterBuildingTotalAmount !== null && waterBuildingTotalUnits !== null
   const disclosureCycleThai = bill ? formatCycleThai(bill.billingCycle) : ""
 
-  const commonAreaFee = commonFee
+  const commonAreaFee = useSnapshot ? Number(bill.commonFee || 0) : commonFee
   const otherServiceAmount = bill ? (bill.otherServiceAmount || 0) : 0
   const vatAmount = bill ? (bill.vatAmount || 0) : 0
 
-  // ค่าเช่าห้องพักหลัก
-  const rentPrice = baseRent
+  // ค่าเช่าห้องพักหลัก — จากบิล ไม่ใช่จาก config ห้องปัจจุบัน
+  const rentPrice = useSnapshot ? Number(bill.baseRent || 0) : baseRent
 
   // คำนวณจำนวนวันและค่าปรับล่าช้า (ทำบน Backend ทั้งหมดแล้วสำหรับข้อมูลจริง / มี Fallback สำหรับ Demo เท่านั้น)
   const lateDays = bill 
@@ -453,10 +464,12 @@ export default function TenantPortal() {
     ? (bill.penaltyAmount !== null && bill.penaltyAmount !== undefined ? Number(bill.penaltyAmount) : (isDemo ? (lateDays * latePenaltyRate) : 0))
     : 0
 
-  const extraExpensesSum = extraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
+  // ค่าใช้จ่ายเสริม — รายการที่คิดเงินไปจริงในใบนี้ ไม่ใช่รายการปัจจุบันของห้อง
+  const billExtraExpenses = useSnapshot ? (bill.extraExpenses || []) : extraExpenses
+  const extraExpensesSum = billExtraExpenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0
   const totalAmount = bill 
     ? Number(bill.amount) 
-    : (baseRent + elecAmount + waterAmount + commonAreaFee + otherServiceAmount + extraExpensesSum)
+    : (rentPrice + elecAmount + waterAmount + commonAreaFee + otherServiceAmount + extraExpensesSum)
 
   useEffect(() => {
     if (!promptPayId) return
@@ -585,10 +598,15 @@ export default function TenantPortal() {
         tenantName,
         billingCycle,
         baseRent: rentPrice,
+        // ส่งสัญญาณว่าตัวเลขเป็น snapshot ของบิลจริง เพื่อให้ PDF พิมพ์ตามนั้น
+        // ไม่ต้องคำนวณค่าเช่าย้อนจากยอดรวม (ดู adjustedBaseRent ใน pdfHelper)
+        hasSnapshot: useSnapshot,
+        electricAmount: elecAmount,
+        waterAmount: waterAmount,
         electricUnits: elecUnits,
-        electricRate,
+        electricRate: useSnapshot ? Number(bill.electricRate || 0) : electricRate,
         waterUnits: waterUnits,
-        waterRate,
+        waterRate: useSnapshot ? Number(bill.waterRate || 0) : waterRate,
         commonFee,
         amount: totalAmount,
         promptPayId,
@@ -605,7 +623,7 @@ export default function TenantPortal() {
         waiveElectricMin,
         waiveWaterMin,
         invoiceId: bill ? (bill.invoiceId || bill.invoice_id) : `INV-${(bill?.billingCycle || '2026-06').replace('-', '')}-${roomNumber}`,
-        extraExpenses: extraExpenses,
+        extraExpenses: billExtraExpenses,
         elecPrev,
         elecCurr,
         waterPrev,
@@ -870,7 +888,7 @@ export default function TenantPortal() {
             </div>
 
             {/* ค่าใช้จ่ายเสริมรายเดือน (ถ้ามี) */}
-            {extraExpenses && extraExpenses.length > 0 && extraExpenses.map((exp: any, index: number) => (
+            {billExtraExpenses && billExtraExpenses.length > 0 && billExtraExpenses.map((exp: any, index: number) => (
               <div key={index} className="flex justify-between items-center pb-2.5 border-b border-slate-200 dark:border-slate-900">
                 <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />

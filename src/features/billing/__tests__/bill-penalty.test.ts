@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { resolveBillPenalty } from "../utils"
+import { hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "../utils"
 
 /**
  * กฎค่าปรับล่าช้าที่ผู้เช่าเห็นในหน้า Portal
@@ -66,5 +66,51 @@ describe("resolveBillPenalty — บิลที่แอดมินบัน�
     const r = resolveBillPenalty({ ...base, savedPenaltyAmount: 300, billingCycle: "2999-01" })
     expect(r.penaltyAmount).toBe(300)
     expect(r.amount).toBe(5000)
+  })
+})
+
+describe("readBillSnapshot / hasBillSnapshot", () => {
+  it("บิลเก่าที่ยังไม่มี snapshot → hasBillSnapshot = false (ฝั่งแสดงผลถอยไปพฤติกรรมเดิม)", () => {
+    const snap = readBillSnapshot({ amount: 5000, electric_units: 10 })
+    expect(hasBillSnapshot(snap)).toBe(false)
+    expect(snap.baseRent).toBeNull()
+    expect(snap.extraExpenses).toBeNull()
+  })
+
+  it("ค่าเช่า 0 ที่ตั้งใจบันทึก ต้องนับว่ามี snapshot (ไม่ใช่ถือว่าไม่มีข้อมูล)", () => {
+    const snap = readBillSnapshot({ base_rent: 0 })
+    expect(hasBillSnapshot(snap)).toBe(true)
+    expect(snap.baseRent).toBe(0)
+  })
+
+  it("อ่านค่าครบทุกช่อง และแปลงเป็นตัวเลข", () => {
+    const snap = readBillSnapshot({
+      base_rent: "6000", electric_amount: "511", water_amount: "126",
+      electric_rate: "7", water_rate: "18", common_fee: "50",
+      elec_prev: "30", elec_curr: "103", water_prev: "30", water_curr: "37",
+      extra_expenses: [{ name: "ค่าล้างแอร์", amount: 500 }]
+    })
+    expect(hasBillSnapshot(snap)).toBe(true)
+    expect(snap.baseRent).toBe(6000)
+    expect(snap.electricAmount).toBe(511)
+    expect(snap.electricRate).toBe(7)
+    expect(snap.elecPrev).toBe(30)
+    expect(snap.elecCurr).toBe(103)
+    expect(snap.extraExpenses).toEqual([{ name: "ค่าล้างแอร์", amount: 500 }])
+  })
+
+  it("รายการย่อยจาก snapshot ต้องบวกกันได้เท่ายอดรวมที่เก็บไว้", () => {
+    // เคสที่ QA เจอ: ออกบิลตอนค่าไฟยังเป็นขั้นต่ำ 70 → ยอดรวม 6,246
+    const snap = readBillSnapshot({
+      base_rent: 6000, electric_amount: 70, water_amount: 126, common_fee: 50
+    })
+    const sum = (snap.baseRent ?? 0) + (snap.electricAmount ?? 0)
+      + (snap.waterAmount ?? 0) + (snap.commonFee ?? 0)
+    expect(sum).toBe(6246)
+  })
+
+  it("extra_expenses ที่ไม่ใช่ array ต้องกลายเป็น null ไม่ใช่ทำให้พัง", () => {
+    expect(readBillSnapshot({ extra_expenses: "ขยะ" }).extraExpenses).toBeNull()
+    expect(readBillSnapshot({ extra_expenses: null }).extraExpenses).toBeNull()
   })
 })

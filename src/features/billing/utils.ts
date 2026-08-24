@@ -22,6 +22,63 @@ export function buildInvoiceId(
   return code ? `INV-${cycle}-${code}-${roomNumber}` : `INV-${cycle}-${roomNumber}`
 }
 
+/** องค์ประกอบของบิลที่บันทึกไว้ ณ ตอนออก — null ทุกช่องแปลว่าบิลเก่าที่ยังไม่มี snapshot */
+export type BillSnapshot = {
+  baseRent: number | null
+  electricAmount: number | null
+  waterAmount: number | null
+  electricRate: number | null
+  waterRate: number | null
+  commonFee: number | null
+  elecPrev: number | null
+  elecCurr: number | null
+  waterPrev: number | null
+  waterCurr: number | null
+  extraExpenses: { name?: string; amount?: number }[] | null
+}
+
+const num = (v: unknown): number | null =>
+  v === null || v === undefined ? null : Number(v)
+
+/**
+ * อ่าน snapshot ออกจากแถว bills
+ *
+ * ใช้ที่เดียวกันทุกฝั่งที่แสดงบิล (PDF / Portal ทั้งสองทางเข้า) เพื่อให้ตัวเลขบนใบเดียวกัน
+ * ตรงกันเสมอ ไม่ว่าผู้เช่าจะเปิดจากช่องทางไหน
+ *
+ * ดู database_patch_add_bill_snapshot.sql สำหรับที่มาของแต่ละคอลัมน์
+ */
+export function readBillSnapshot(row: Record<string, unknown>): BillSnapshot {
+  return {
+    baseRent: num(row.base_rent),
+    electricAmount: num(row.electric_amount),
+    waterAmount: num(row.water_amount),
+    electricRate: num(row.electric_rate),
+    waterRate: num(row.water_rate),
+    commonFee: num(row.common_fee),
+    elecPrev: num(row.elec_prev),
+    elecCurr: num(row.elec_curr),
+    waterPrev: num(row.water_prev),
+    waterCurr: num(row.water_curr),
+    extraExpenses: Array.isArray(row.extra_expenses)
+      ? (row.extra_expenses as { name?: string; amount?: number }[])
+      : null
+  }
+}
+
+/**
+ * บิลใบนี้มี snapshot ให้ใช้หรือไม่
+ *
+ * ใช้ base_rent เป็นตัวชี้ขาดเพราะทุกบิลต้องมีค่าเช่า (แม้เป็น 0 ก็เป็นค่าที่ตั้งใจบันทึก)
+ * ต่างจากค่าไฟ/ค่าน้ำที่เป็น 0 ได้ตามธรรมชาติ
+ *
+ * false = บิลที่ออกก่อน patch snapshot → ฝั่งแสดงผลต้องถอยไปใช้พฤติกรรมเดิม
+ * ห้าม "เดา" องค์ประกอบย้อนหลังจาก config ปัจจุบันลงในเอกสารการเงิน
+ */
+export function hasBillSnapshot(snapshot: BillSnapshot): boolean {
+  return snapshot.baseRent !== null
+}
+
 /**
  * ตัดสินว่าบิลใบนี้จะแสดง "ค่าปรับล่าช้า" เท่าไร และยอดรวมที่ผู้เช่าต้องจ่ายเป็นเท่าไร
  *

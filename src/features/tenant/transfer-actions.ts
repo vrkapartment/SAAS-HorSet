@@ -205,6 +205,20 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
         water_units: waterUnitsUsed,
         other_service_amount: 0,
         bill_kind: "transfer_closing",
+        // snapshot ขององค์ประกอบบิล ณ ตอนออก (ดู database_patch_add_bill_snapshot.sql)
+        // ค่าเช่าเป็นยอด prorate ตามจำนวนวันที่อยู่จริง ไม่ใช่ค่าเช่าเต็มเดือนของห้อง —
+        // ถ้าไม่บันทึกไว้ ใบ PDF จะคำนวณค่าเช่าย้อนจากยอดรวมแล้วได้ตัวเลขที่อธิบายไม่ได้
+        base_rent: proratedRent,
+        electric_amount: elecCost,
+        water_amount: waterCost,
+        electric_rate: settings.electric_rate,
+        water_rate: settings.water_rate,
+        common_fee: settings.common_fee,
+        elec_prev: prevElec,
+        elec_curr: input.closingElecCurr,
+        water_prev: prevWater,
+        water_curr: input.closingWaterCurr,
+        extra_expenses: [],
         invoice_id: closingInvoiceId
       }], { onConflict: "workspace_id,room_id,billing_cycle,bill_kind" })
       .select()
