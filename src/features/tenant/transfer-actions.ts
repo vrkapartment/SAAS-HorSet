@@ -211,6 +211,33 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       }
     }
 
+    // 4.6 กันบันทึกซ้ำ (กดปุ่มย้ายสองครั้ง / เน็ตหลุดแล้วกดใหม่)
+    //
+    // แถวใน tenant_room_transfers เป็นตัวกำหนดยอดที่จะไปโผล่ในบิลห้องใหม่ ถ้ามีสองแถว
+    // ของการย้ายครั้งเดียวกัน บิลจะขึ้นรายการย่อยสองก้อนเหมือนกัน = เก็บเงินซ้ำ
+    // (เดิมไม่มีปัญหานี้เพราะบิล -TRANSFER upsert ทับกันเองด้วย unique key)
+    const { data: duplicateTransfer, error: duplicateError } = await supabase
+      .from("tenant_room_transfers")
+      .select("id, created_at")
+      .eq("workspace_id", workspaceId)
+      .eq("tenant_id", input.tenantId)
+      .eq("from_room_id", oldRoom.id)
+      .eq("to_room_id", toRoom.id)
+      .eq("billing_cycle", billingCycle)
+      .eq("transfer_date", input.transferDate)
+      .maybeSingle()
+    if (duplicateError && duplicateError.code !== "42P01") {
+      return { success: false, error: `ตรวจประวัติการย้ายซ้ำไม่สำเร็จ: ${duplicateError.message}` }
+    }
+    if (duplicateTransfer) {
+      return {
+        success: false,
+        error: `การย้ายจากห้อง ${oldRoom.room_number} ไปห้อง ${toRoom.room_number} วันที่ ${input.transferDate} `
+          + `ถูกบันทึกไว้แล้ว ถ้าต้องการแก้ไข ให้ลบประวัติการย้ายรายการนั้นก่อน `
+          + `(บันทึกซ้ำจะทำให้ค่าน้ำ-ค่าไฟห้องเดิมถูกเก็บสองครั้งในบิลใบเดียว)`
+      }
+    }
+
     // 5. คิดค่าน้ำ-ไฟของห้องเดิม "ให้เสร็จตรงนี้" แล้วเก็บเป็น segment ไปรวมในบิลห้องใหม่
     //
     // ต้องคิดตอนนี้ ไม่ใช่ตอนออกบิลปลายเดือน เพราะระหว่างนั้นอัตราค่าไฟ/การตั้งค่าขั้นต่ำ
@@ -267,47 +294,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
           ? defaultOldRoomRent
           : Math.max(0, Number(input.oldRoomRentAmount)))
 
-    // 6. เขียนเลขมิเตอร์ของทั้งสองห้อง
-    //
-    // ห้องเดิม: ตั้งแถวของรอบนี้ให้ "เริ่มนับใหม่ที่เลขปิดห้อง" และเว้น curr ไว้
-    //   → ผู้เช่ารายถัดไปที่ย้ายเข้าห้องนี้ในเดือนเดียวกัน ถูกคิดหน่วยตั้งแต่เลขปิด
-    //     ไม่ใช่เลขตั้งต้นของผู้เช่าคนเดิม (ซึ่งเป็นบั๊กเดิมที่ทำให้เก็บเงินซ้ำหน่วยของคนก่อน)
-    //   เลขที่ผู้เช่าเดิมใช้จริงไม่หาย — อยู่ทั้งใน tenant_room_transfers และใน segment ของบิล
-    //   ต้องส่ง occupancyStart ไปด้วย ไม่งั้นหน้าออกบิลจะทับ prev กลับเป็น curr ของรอบก่อน
-    //   (ดู database_patch_move_segments.sql ข้อ 4)
-    const oldRoomRebaseRes = await saveMeterRecord(
-      { roomId: oldRoom.id }, billingCycle,
-      input.closingElecCurr, "", input.closingWaterCurr, "",
-      { elec: input.closingElecCurr, water: input.closingWaterCurr, reason: "transfer_out", date: input.transferDate }
-    )
-    if (!oldRoomRebaseRes.success) {
-      return { success: false, error: `ตั้งเลขมิเตอร์ตั้งต้นใหม่ของห้อง ${oldRoom.room_number} ไม่สำเร็จ: ${oldRoomRebaseRes.error || "unknown error"}` }
-    }
-
-    // ห้องเดิม (รอบถัดไป): ส่งเลขปิดไปเป็นเลขตั้งต้นของเดือนหน้า
-    // เส้นทางย้ายออกทำข้อนี้อยู่แล้ว แต่เส้นทางย้ายห้องไม่เคยทำ — ห้องที่ถูกย้ายออกจึงไม่มี
-    // เลขตั้งต้นของเดือนถัดไป แล้วผู้เช่ารายใหม่เริ่มนับจาก 0 (เก็บเงินขาดทั้งเดือน)
-    await saveMeterRecord(
-      { roomId: oldRoom.id }, nextBillingCycle(billingCycle),
-      input.closingElecCurr, "", input.closingWaterCurr, ""
-    )
-
-    // 7. ตั้งมิเตอร์เริ่มต้นห้องใหม่ (ยังไม่จดรอบนี้ — elecCurr/waterCurr ปล่อยว่างตาม convention เดิม)
-    //
-    // ต้องปักหมุด occupancyStart ที่ห้องปลายทางด้วย ไม่ใช่แค่ห้องเดิม:
-    // ถ้าห้องปลายทางเคยมีผู้เช่าและมีเลขมิเตอร์ของ "รอบก่อนหน้า" อยู่ หน้าออกบิลจะเอา curr
-    // ของรอบก่อนมาเป็น prev แล้วทับเลขเริ่มต้นที่กรอกไว้ตอนย้ายทิ้ง — ผู้เช่าที่ย้ายเข้ามา
-    // จะถูกคิดหน่วยตั้งแต่เลขของผู้เช่าคนก่อนในห้องนั้น
-    const toRoomStartRes = await saveMeterRecord(
-      { roomId: toRoom.id }, billingCycle,
-      input.startingElecReading, "", input.startingWaterReading, "",
-      { elec: input.startingElecReading, water: input.startingWaterReading, reason: "transfer_in", date: input.transferDate }
-    )
-    if (!toRoomStartRes.success) {
-      return { success: false, error: `ตั้งเลขมิเตอร์เริ่มต้นของห้อง ${toRoom.room_number} ไม่สำเร็จ: ${toRoomStartRes.error || "unknown error"}` }
-    }
-
-    // 8. คำนวณเงินประกันใหม่
+    // 6. คำนวณเงินประกันใหม่
     const depositTopup = Number(input.depositTopupAmount || 0)
     let depositBefore = tenant.deposit_paid !== null && tenant.deposit_paid !== undefined ? Number(tenant.deposit_paid) : null
     if (depositBefore === null) {
@@ -321,7 +308,7 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     }
     const depositAfter = depositBefore + depositTopup
 
-    // 9. อัปเดต tenant row — เซ็ตแค่ room_id/deposit_paid/updated_at เท่านั้น ไม่แตะฟิลด์อื่นเลย
+    // 7. อัปเดต tenant row — เซ็ตแค่ room_id/deposit_paid/updated_at เท่านั้น ไม่แตะฟิลด์อื่นเลย
     //    (ตัด line_user_id/tenant_name/tenant_phone/lease_start/lease_end ออกจาก payload ไปเลย
     //    ไม่ใช่ pass-through) เพื่อรับประกันว่า LINE ไม่มีทางหลุดจาก action นี้
     const { error: updateTenantError } = await supabase
@@ -340,11 +327,11 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       }
     }
 
-    // 10. สลับสถานะห้อง
+    // 8. สลับสถานะห้อง
     await updateRoomStatus(oldRoom.id, "available")
     await updateRoomStatus(toRoom.id, "occupied")
 
-    // 11. บันทึกประวัติการย้ายห้อง + ยอดที่คิดไว้ของห้องเดิม
+    // 9. บันทึกประวัติการย้ายห้อง + ยอดที่คิดไว้ของห้องเดิม
     //
     // ⚠️ แถวนี้ไม่ใช่ "ประวัติ" อย่างเดียวแล้ว — เป็นที่เดียวที่เก็บยอดค่าน้ำ-ไฟของห้องเดิม
     // ที่ยังไม่ได้เรียกเก็บ ถ้าเขียนไม่สำเร็จแล้วปล่อยผ่าน ค่าน้ำ-ไฟก้อนนี้จะหายไปเงียบ ๆ
@@ -406,6 +393,65 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
         error: `ย้ายห้องสำเร็จแล้ว แต่บันทึกยอดค่าน้ำ-ไฟของห้อง ${oldRoom.room_number} ไม่สำเร็จ: ${historyError.message} `
           + `(${hint}) — ยอดก้อนนี้จะไม่ถูกนำไปรวมในบิลห้อง ${toRoom.room_number} `
           + `กรุณาแก้แล้วบันทึกค่าน้ำ-ไฟส่วนนี้เข้าบิลเอง`
+      }
+    }
+
+    // 10. เขียนเลขมิเตอร์ — ทำเป็นขั้นสุดท้ายโดยเจตนา
+    //
+    // ⚠️ ลำดับนี้สำคัญกับเงิน: การตั้งเลขมิเตอร์ห้องเดิมให้ "เริ่มนับใหม่ที่เลขปิดห้อง"
+    // ทำให้ getMeterStartForCycle() ครั้งต่อไปคืนเลขปิดเป็นเลขตั้งต้น
+    // ถ้าทำขั้นนี้ก่อนแล้วขั้นอื่นล้ม พอผู้ดูแลกดย้ายใหม่ ระบบจะคิดได้ 0 หน่วยแบบเงียบ ๆ
+    // (เก็บเงินขาดโดยไม่มีอะไรฟ้อง) — วางไว้ท้ายสุดจึงไม่มีทางเกิดเส้นทางนั้น
+    //
+    // ล้มที่ขั้นนี้แทน = ย้ายห้องสำเร็จแล้วและยอดถูกบันทึกไว้ครบ เหลือแค่เลขมิเตอร์ที่ต้องแก้
+    // ซึ่งบอกผู้ดูแลตรง ๆ ได้ว่าต้องใส่เลขอะไร
+    //
+    // ห้องเดิม: ตั้งแถวของรอบนี้ให้ "เริ่มนับใหม่ที่เลขปิดห้อง" และเว้น curr ไว้
+    //   → ผู้เช่ารายถัดไปที่ย้ายเข้าห้องนี้ในเดือนเดียวกัน ถูกคิดหน่วยตั้งแต่เลขปิด
+    //     ไม่ใช่เลขตั้งต้นของผู้เช่าคนเดิม (ซึ่งเป็นบั๊กเดิมที่ทำให้เก็บเงินซ้ำหน่วยของคนก่อน)
+    //   เลขที่ผู้เช่าเดิมใช้จริงไม่หาย — อยู่ทั้งใน tenant_room_transfers และใน segment ของบิล
+    //   ต้องส่ง occupancyStart ไปด้วย ไม่งั้นหน้าออกบิลจะทับ prev กลับเป็น curr ของรอบก่อน
+    //   (ดู database_patch_move_segments.sql ข้อ 4)
+    const oldRoomRebaseRes = await saveMeterRecord(
+      { roomId: oldRoom.id }, billingCycle,
+      input.closingElecCurr, "", input.closingWaterCurr, "",
+      { elec: input.closingElecCurr, water: input.closingWaterCurr, reason: "transfer_out", date: input.transferDate }
+    )
+    if (!oldRoomRebaseRes.success) {
+      return {
+        success: false,
+        error: `ย้ายห้องสำเร็จแล้ว (ยอดค่าน้ำ-ไฟห้องเดิมถูกบันทึกไว้ครบ) แต่ตั้งเลขมิเตอร์ตั้งต้นใหม่ของ`
+          + ` ห้อง ${oldRoom.room_number} ไม่สำเร็จ: ${oldRoomRebaseRes.error || "unknown error"} — `
+          + `ถ้ามีผู้เช่าใหม่เข้าห้อง ${oldRoom.room_number} ในเดือนนี้ ให้ตั้งเลขมิเตอร์ตั้งต้นเป็น`
+          + ` ไฟ ${input.closingElecCurr} / น้ำ ${input.closingWaterCurr} ก่อนออกบิล`
+      }
+    }
+
+    // ห้องเดิม (รอบถัดไป): ส่งเลขปิดไปเป็นเลขตั้งต้นของเดือนหน้า
+    // เส้นทางย้ายออกทำข้อนี้อยู่แล้ว แต่เส้นทางย้ายห้องไม่เคยทำ — ห้องที่ถูกย้ายออกจึงไม่มี
+    // เลขตั้งต้นของเดือนถัดไป แล้วผู้เช่ารายใหม่เริ่มนับจาก 0 (เก็บเงินขาดทั้งเดือน)
+    await saveMeterRecord(
+      { roomId: oldRoom.id }, nextBillingCycle(billingCycle),
+      input.closingElecCurr, "", input.closingWaterCurr, ""
+    )
+
+    // ห้องปลายทาง: ตั้งเลขเริ่มต้น (ยังไม่จดรอบนี้ — elecCurr/waterCurr ปล่อยว่างตาม convention เดิม)
+    //
+    // ต้องปักหมุด occupancyStart ที่ห้องปลายทางด้วย ไม่ใช่แค่ห้องเดิม:
+    // ถ้าห้องปลายทางเคยมีผู้เช่าและมีเลขมิเตอร์ของ "รอบก่อนหน้า" อยู่ หน้าออกบิลจะเอา curr
+    // ของรอบก่อนมาเป็น prev แล้วทับเลขเริ่มต้นที่กรอกไว้ตอนย้ายทิ้ง — ผู้เช่าที่ย้ายเข้ามา
+    // จะถูกคิดหน่วยตั้งแต่เลขของผู้เช่าคนก่อนในห้องนั้น
+    const toRoomStartRes = await saveMeterRecord(
+      { roomId: toRoom.id }, billingCycle,
+      input.startingElecReading, "", input.startingWaterReading, "",
+      { elec: input.startingElecReading, water: input.startingWaterReading, reason: "transfer_in", date: input.transferDate }
+    )
+    if (!toRoomStartRes.success) {
+      return {
+        success: false,
+        error: `ย้ายห้องสำเร็จแล้ว แต่ตั้งเลขมิเตอร์เริ่มต้นของห้อง ${toRoom.room_number} ไม่สำเร็จ: `
+          + `${toRoomStartRes.error || "unknown error"} — ให้ตั้งเลขตั้งต้นเป็น ไฟ ${input.startingElecReading} / `
+          + `น้ำ ${input.startingWaterReading} ก่อนออกบิลรอบนี้`
       }
     }
 

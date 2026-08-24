@@ -1577,62 +1577,6 @@ function RoomsContent() {
     try {
       const wsId = getCookie("horset_current_workspace_id") || ""
       
-      if (!isHistoricalEdit) {
-        const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
-        
-        // 1. บันทึกเลขมิเตอร์ปลายงวดในรอบบิลปัจจุบัน และสืบทอดเป็น "เลขมิเตอร์ก่อนหน้า" ในรอบบิลถัดไป (สำหรับผู้เช่าคนใหม่)
-        const { saveMeterRecord } = await import("@/features/meter/actions")
-        
-        // ⚠️ แถวของรอบนี้ต้อง "เริ่มนับใหม่ที่เลขปิดห้อง" ไม่ใช่เก็บช่วงของผู้เช่าที่ย้ายออก
-        //
-        // ค่าน้ำ-ไฟของผู้เช่าที่ย้ายออกถูกหักจากเงินประกันไปแล้ว (ไม่ได้ออกเป็นบิล) ถ้าปล่อยให้
-        // แถวนี้ยังเป็น prevElec → fElec แล้วมีผู้เช่าใหม่ย้ายเข้าเดือนเดียวกัน ปลายเดือนบิลของ
-        // คนใหม่จะนับหน่วยตั้งแต่ prevElec = เก็บซ้ำหน่วยที่คนเดิมจ่ายไปแล้ว
-        //
-        // เลขของผู้เช่าเดิมไม่หาย — เก็บไว้ใน cancelled_contracts.closing_* (ขั้นที่ 3 ด้านล่าง)
-        // และต้องส่ง occupancyStart ด้วย ไม่งั้นหน้าออกบิลจะทับ prev กลับเป็น curr ของรอบก่อน
-        // (ดู database_patch_move_segments.sql ข้อ 4)
-        const currentMeterRes = await saveMeterRecord(
-          { roomId: refundingRoom.id },
-          currentCycle,
-          fElec,
-          "",
-          fWater,
-          "",
-          { elec: fElec, water: fWater, reason: "checkout", date: refundCheckoutDate }
-        )
-
-        if (!currentMeterRes.success) {
-          setRefundError(currentMeterRes.error || t("rooms.toasts.meter_save_error"))
-          setRefundSubmitting(false)
-          return
-        }
-        
-        // คำนวณรอบถัดไป
-        const [yearStr, monthStr] = currentCycle.split("-")
-        let nextYear = parseInt(yearStr, 10)
-        let nextMonth = parseInt(monthStr, 10) + 1
-        if (nextMonth > 12) {
-          nextMonth = 1
-          nextYear += 1
-        }
-        const nextCycle = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
-        
-        const nextMeterRes = await saveMeterRecord(
-          { roomId: refundingRoom.id },
-          nextCycle,
-          fElec,
-          "", // current value is empty for next tenant to write later
-          fWater,
-          ""
-        )
-        
-        if (!nextMeterRes.success) {
-          setRefundError(nextMeterRes.error || t("rooms.toasts.meter_carry_over_error"))
-          setRefundSubmitting(false)
-          return
-        }
-      }
       
       // 2. สรุปการแบ่งประเภทรายได้หักภาษีปลายงวด
       let totalUtilities408 = 0
@@ -1714,9 +1658,69 @@ function RoomsContent() {
         setRefundSubmitting(false)
         return
       }
+
+      // 4. เขียนเลขมิเตอร์ — ทำ "หลัง" บันทึกสัญญายกเลิกโดยเจตนา
+      //
+      // ⚠️ ลำดับนี้สำคัญกับเงิน: การตั้งแถวมิเตอร์ของรอบนี้ให้เริ่มที่เลขปิดห้อง ทำให้
+      // ครั้งต่อไปที่เปิดหน้าคืนเงินประกันของห้องนี้ เลข "ครั้งก่อน" จะกลายเป็นเลขปิด
+      // ถ้าเขียนมิเตอร์ก่อนแล้วบันทึกสัญญาล้ม พอผู้ดูแลเปิดทำใหม่จะได้ 0 หน่วยแบบเงียบ ๆ
+      // (หักค่าน้ำ-ไฟจากเงินประกันขาดโดยไม่มีอะไรฟ้อง)
+      //
+      // ตอนนี้ยอดหักถูกบันทึกลง cancelled_contracts พร้อมเลขมิเตอร์ที่ใช้คิดไปแล้ว
+      // ล้มที่ขั้นนี้จึงกู้ได้จากข้อมูลที่มีอยู่ ไม่ใช่คิดใหม่จากศูนย์
+      if (!isHistoricalEdit) {
+        const currentCycle = refundCheckoutDate.substring(0, 7) // e.g., "2026-07"
+        
+        const { saveMeterRecord } = await import("@/features/meter/actions")
+        const { nextBillingCycle } = await import("@/features/billing/utils")
+        
+        // ⚠️ แถวของรอบนี้ต้อง "เริ่มนับใหม่ที่เลขปิดห้อง" ไม่ใช่เก็บช่วงของผู้เช่าที่ย้ายออก
+        //
+        // ค่าน้ำ-ไฟของผู้เช่าที่ย้ายออกถูกหักจากเงินประกันไปแล้ว (ไม่ได้ออกเป็นบิล) ถ้าปล่อยให้
+        // แถวนี้ยังเป็น prevElec → fElec แล้วมีผู้เช่าใหม่ย้ายเข้าเดือนเดียวกัน ปลายเดือนบิลของ
+        // คนใหม่จะนับหน่วยตั้งแต่ prevElec = เก็บซ้ำหน่วยที่คนเดิมจ่ายไปแล้ว
+        //
+        // เลขของผู้เช่าเดิมไม่หาย — เก็บไว้ใน cancelled_contracts.closing_* (บันทึกไปแล้วด้านบน)
+        // และต้องส่ง occupancyStart ด้วย ไม่งั้นหน้าออกบิลจะทับ prev กลับเป็น curr ของรอบก่อน
+        // (ดู database_patch_move_segments.sql ข้อ 4)
+        const currentMeterRes = await saveMeterRecord(
+          { roomId: refundingRoom.id },
+          currentCycle,
+          fElec,
+          "",
+          fWater,
+          "",
+          { elec: fElec, water: fWater, reason: "checkout", date: refundCheckoutDate }
+        )
+
+        if (!currentMeterRes.success) {
+          setRefundError(currentMeterRes.error || t("rooms.toasts.meter_save_error"))
+          setRefundSubmitting(false)
+          return
+        }
+        
+        // รอบถัดไป: ส่งเลขปิดไปเป็นเลขตั้งต้นของเดือนหน้า (สำหรับผู้เช่าคนใหม่)
+        // ใช้ helper กลางตัวเดียวกับเส้นทางย้ายห้อง ไม่คำนวณข้ามปีเองซ้ำ
+        const nextCycle = nextBillingCycle(currentCycle)
+
+        const nextMeterRes = await saveMeterRecord(
+          { roomId: refundingRoom.id },
+          nextCycle,
+          fElec,
+          "", // current value is empty for next tenant to write later
+          fWater,
+          ""
+        )
+        
+        if (!nextMeterRes.success) {
+          setRefundError(nextMeterRes.error || t("rooms.toasts.meter_carry_over_error"))
+          setRefundSubmitting(false)
+          return
+        }
+      }
       
       if (!isHistoricalEdit) {
-        // 4. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
+        // 5. ลบ/เก็บบันทึกสัญญาผู้เช่าเก่า และปรับสถานะห้องว่าง (Vacant)
         const deleteRes = await deleteTenant(refundingRoom.tenantId, refundingRoom.roomNumber)
         if (!deleteRes.success) {
           setRefundError(deleteRes.error || t("rooms.toasts.close_tenant_system_error"))
