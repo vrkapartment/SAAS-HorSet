@@ -468,3 +468,57 @@ export async function getMeterStartForCycle(
     return { success: false, error: message, data: null }
   }
 }
+
+/**
+ * เลขมิเตอร์ "ล่าสุดที่เคยบันทึกไว้" ของห้องหนึ่ง นับถึงรอบบิลที่ระบุ
+ *
+ * ใช้เป็นพื้นขั้นต่ำของเลขมิเตอร์เริ่มต้นตอนย้ายผู้เช่าเข้าห้องนั้น — มิเตอร์เดินหน้าอย่างเดียว
+ * เลขเริ่มต้นของผู้เช่ารายใหม่จึงต้องไม่ต่ำกว่าเลขล่าสุดของห้อง ไม่งั้นหน่วยที่ผู้เช่าคนก่อน
+ * ใช้ไปจะถูกยกมาให้คนใหม่จ่าย หรือหายไปเฉย ๆ แล้วแต่ทิศทางที่พิมพ์ผิด
+ *
+ * ⚠️ ตัดเฉพาะรอบ <= รอบที่ย้ายโดยเจตนา ไม่ใช่ "แถวล่าสุดในตาราง"
+ * เพราะแถวของรอบอนาคตอาจมีอยู่ก่อนแล้วจากการทดลองออกบิลล่วงหน้า และเลขในนั้น
+ * ไม่ใช่สภาพจริงของมิเตอร์ ณ วันที่ย้าย (เกิดขึ้นจริงกับห้อง 113 ที่มีแถว 2026-09 ค้างอยู่)
+ */
+export async function getLatestMeterReadingUpTo(
+  room: RoomRef,
+  billingCycle: string,
+  workspaceId?: string
+) {
+  if (!isSupabaseConfigured) {
+    return { success: false, fallback: true, data: null }
+  }
+  try {
+    const supabase = await createClient()
+    let query = supabase
+      .from("meter_records")
+      .select("billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
+      .eq("room_id", room.roomId)
+      .lte("billing_cycle", billingCycle)
+    if (workspaceId) {
+      query = query.eq("workspace_id", workspaceId)
+    }
+    const { data, error } = await query
+      .order("billing_cycle", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) {
+      // ห้องที่ไม่เคยมีมิเตอร์เลย (ห้องใหม่) — ไม่มีพื้นให้เทียบ กรอกเลขอะไรก็ได้
+      return { success: true, data: null }
+    }
+
+    const elec = data.elec_curr === null || data.elec_curr === undefined
+      ? Number(data.elec_prev ?? 0)
+      : Number(data.elec_curr)
+    const water = data.water_curr === null || data.water_curr === undefined
+      ? Number(data.water_prev ?? 0)
+      : Number(data.water_curr)
+
+    return { success: true, data: { elec, water, cycle: String(data.billing_cycle) } }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงเลขมิเตอร์ล่าสุดของห้อง"
+    return { success: false, error: message, data: null }
+  }
+}
