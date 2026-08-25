@@ -552,6 +552,7 @@
     "segment_water": "Water",
     "segment_rent": "Rent (until {date})",
     "segment_min_applied": "minimum charge",
+    "segment_meter_rollover": "meter rolled over",
     "item_other_services": "Other Services",
     "item_penalty": "5. Penalty / Fine",
     "late_days_note": "Paid late past the 5th of the following month by: {days} day(s) ({rate} THB/day penalty)",

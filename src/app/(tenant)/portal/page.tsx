@@ -924,6 +924,7 @@ export default function TenantPortal() {
                               .replace("{prev}", String(seg.elecPrev))
                               .replace("{curr}", String(seg.elecCurr))
                               .replace("{units}", String(seg.elecUnits))}
+                            {seg.elecCurr < seg.elecPrev ? ` (${t("tenant_portal.segment_meter_rollover")})` : ""}
                           </p>
                         </div>
                         <span className="font-semibold text-slate-900 dark:text-slate-200">{seg.elecAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>
@@ -941,6 +942,7 @@ export default function TenantPortal() {
                               .replace("{prev}", String(seg.waterPrev))
                               .replace("{curr}", String(seg.waterCurr))
                               .replace("{units}", String(seg.waterUnits))}
+                            {seg.waterCurr < seg.waterPrev ? ` (${t("tenant_portal.segment_meter_rollover")})` : ""}
                           </p>
                         </div>
                         <span className="font-semibold text-slate-900 dark:text-slate-200">{seg.waterAmount.toLocaleString()} {t("daily_bills.baht_unit")}</span>

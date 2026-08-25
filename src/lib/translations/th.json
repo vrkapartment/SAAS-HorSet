@@ -552,6 +552,7 @@
     "segment_water": "ค่าน้ำประปา",
     "segment_rent": "ค่าเช่า (ถึงวันย้าย {date})",
     "segment_min_applied": "คิดขั้นต่ำ",
+    "segment_meter_rollover": "มิเตอร์หมุนครบรอบ",
     "item_other_services": "ค่าบริการอื่น ๆ (Other Services)",
     "item_penalty": "5. ค่าปรับ (Penalty / Fine)",
     "late_days_note": "จ่ายล่าช้าเกินวันที่ 5 ของเดือนถัดไป เป็นเวลา: {days} วัน (ปรับวันละ {rate} บาท)",
