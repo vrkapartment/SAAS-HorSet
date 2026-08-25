@@ -31,6 +31,7 @@ import {
 import { createBill, updateBillStatus, getBillingPageData, saveAllBillsForCycle, type BulkBillItem } from "@/features/billing/actions"
 import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
 import { getRooms } from "@/features/room/actions"
+import { meterUnitsUsed } from "@/features/meter/utils"
 import { saveMeterRecord } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings, saveMeterEntryModeAction } from "@/features/finance/actions"
@@ -1396,10 +1397,9 @@ function UnifiedBillingContent() {
     const repElec = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "electric")
     const repWater = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "water")
 
-    const getUnits = (curr: number, prev: number) => {
-      if (curr >= prev) return curr - prev
-      return (10000 - prev) + curr
-    }
+    // ใช้สูตรกลาง (รองรับมิเตอร์หมุนครบรอบ) — ต้องเป็นตัวเดียวกับที่ฝั่ง server ใช้ตอนบันทึก
+    // ไม่งั้นหน่วยบนจอกับหน่วยในบิลจะคนละตัวกัน (เคยเกิดจริงกับปุ่ม "บันทึกทั้งหมด")
+    const getUnits = meterUnitsUsed
 
     // ⚠️ คิดหน่วยของ "ทั้งสองฝั่ง" เสมอ ไม่ว่าผู้ใช้กดปุ่มไหน
     //
@@ -1540,10 +1540,9 @@ function UnifiedBillingContent() {
   // พร้อมกันเสมอ) ถ้าส่งห้องที่อยู่นอกขอบเขตไปด้วย ค่าของห้องนั้นจะถูกเขียนตามสิ่งที่ค้างอยู่ใน state
   // เดิมส่ง unifiedItems ทั้งก้อนตลอด ทำให้กรองอาคาร A แล้วกดบันทึกไปโดนห้องอาคาร B ด้วย
   const handleSaveAll = async (type: "electric" | "water" | "both", roomIds?: RoomId[]) => {
-    const getUnits = (curr: number, prev: number) => {
-      if (curr >= prev) return curr - prev
-      return (10000 - prev) + curr
-    }
+    // ใช้สูตรกลาง (รองรับมิเตอร์หมุนครบรอบ) — ต้องเป็นตัวเดียวกับที่ฝั่ง server ใช้ตอนบันทึก
+    // ไม่งั้นหน่วยบนจอกับหน่วยในบิลจะคนละตัวกัน (เคยเกิดจริงกับปุ่ม "บันทึกทั้งหมด")
+    const getUnits = meterUnitsUsed
 
     const scopeSet = roomIds ? new Set<string>(roomIds) : null
     const scopedItems = scopeSet ? unifiedItems.filter(i => scopeSet.has(i.roomId)) : unifiedItems

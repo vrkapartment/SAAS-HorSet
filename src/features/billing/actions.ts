@@ -13,6 +13,7 @@ import { getFinanceSettings, type FinanceSettings } from "@/features/finance/act
 import { calculateBillTotal } from "./bill-calculator"
 import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "./building-utility-actions"
 import { resolveUtilityRate } from "./rate-utils"
+import { meterUnitsUsed } from "@/features/meter/utils"
 import {
   groupSegmentsByBillRoom,
   parseUtilitySegments,
@@ -1275,8 +1276,18 @@ export async function saveAllBillsForCycle(billingCycle: string, items: BulkBill
       const waterResolved = resolveUtilityRate("water", settings.water_billing_mode, settings.water_rate, roomData.building_id, buildingBillsMap)
       if (electricResolved.error || waterResolved.error) { skippedRooms.push(item.roomNumber); continue }
 
-      const eUnits = elecVal !== null ? Math.max(0, elecVal - item.elecPrev) : 0
-      const wUnits = waterVal !== null ? Math.max(0, waterVal - item.waterPrev) : 0
+      // ⚠️ ต้องใช้สูตรกลางที่รองรับมิเตอร์หมุนครบรอบ (ดู features/meter/utils.ts)
+      //
+      // เดิมใช้ Math.max(0, curr - prev) ซึ่งได้ 0 หน่วยเมื่อมิเตอร์วนกลับเป็น 0
+      // แล้วบิลตกไปคิดขั้นต่ำ = เก็บเงินขาดทั้งเดือน และไม่มีอะไรฟ้อง
+      //
+      // ที่แย่กว่านั้น: ตารางบนหน้าจอแสดงหน่วยด้วยสูตรที่รองรับการวนรอบอยู่แล้ว
+      // สตาฟจึงเห็น "102 หน่วย" บนจอ กดบันทึก แล้วบิลเก็บ 0 หน่วย — จอกับบิลคนละเรื่องกัน
+      //
+      // เจอของจริงจาก qa:db: ห้อง 131 ไฟ 9,995 → 97 เก็บขาด 644 บาท
+      // และห้อง 132 น้ำ 9,997 → 9 เก็บขาด 162 บาท
+      const eUnits = elecVal !== null ? meterUnitsUsed(elecVal, item.elecPrev) : 0
+      const wUnits = waterVal !== null ? meterUnitsUsed(waterVal, item.waterPrev) : 0
       const baseRent = roomData.room_types ? Number(roomData.room_types.default_rent) : Number(roomData.base_rent || 0)
       const extraExpensesSum = (roomData.extra_expenses || []).reduce((a: number, c: any) => a + Number(c.amount || 0), 0)
 

@@ -30,6 +30,7 @@ import { getBills, createBill, updateBillStatus, getBillingPageData, deleteBill 
 import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
 import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
+import { meterUnitsUsed } from "@/features/meter/utils"
 import { getBuildings } from "@/features/building/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
@@ -1393,10 +1394,9 @@ function ManageBillsContent() {
     const repElec = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "electric")
     const repWater = meterReplacements?.find(r => r.roomId === roomId && r.meterType === "water")
 
-    const getUnits = (curr: number, prev: number) => {
-      if (curr >= prev) return curr - prev
-      return (10000 - prev) + curr
-    }
+    // ใช้สูตรกลาง (รองรับมิเตอร์หมุนครบรอบ) — ต้องเป็นตัวเดียวกับที่ฝั่ง server ใช้ตอนบันทึก
+    // ไม่งั้นหน่วยบนจอกับหน่วยในบิลจะคนละตัวกัน (เคยเกิดจริงกับปุ่ม "บันทึกทั้งหมด")
+    const getUnits = meterUnitsUsed
 
     // เริ่มต้นด้วยหน่วยที่บันทึกไว้เดิมในบิล (ถ้ามี) ไม่ใช่ 0 เสมอ
     // เพราะถ้ากดบันทึกแค่ไฟหรือแค่น้ำอย่างเดียว จะได้ไม่ไปเขียนทับอีกค่าที่เคยบันทึกไว้แล้วให้กลายเป็น 0
