@@ -5,6 +5,7 @@ import { X, ArrowRightLeft, RefreshCw, AlertTriangle } from "lucide-react"
 import { transferTenantRoom } from "@/features/tenant/transfer-actions"
 import { getMeterStartForCycle, getLatestMeterReadingUpTo } from "@/features/meter/actions"
 import { computeMidMonthRent } from "@/features/room/deposit-calculator"
+import { meterUnitsUsed, isPlausibleRollover } from "@/features/meter/utils"
 
 export interface RoomTransferModalTenant {
   id: string
@@ -62,6 +63,13 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
    */
   const [toRoomFloor, setToRoomFloor] = useState<{ elec: number; water: number; cycle: string } | null>(null)
   const [loadingToRoomMeter, setLoadingToRoomMeter] = useState(false)
+
+  // ผู้ดูแลยืนยันว่ามิเตอร์หมุนครบรอบ (9,999 → 0,000) จึงกรอกเลขต่ำกว่าเลขเดิมได้
+  // ช่องยืนยันจะโผล่เฉพาะตอนที่เลขที่กรอก "ต่ำกว่าจริง" เท่านั้น ฟอร์มปกติจึงไม่รก
+  const [closingElecRolledOver, setClosingElecRolledOver] = useState(false)
+  const [closingWaterRolledOver, setClosingWaterRolledOver] = useState(false)
+  const [startingElecRolledOver, setStartingElecRolledOver] = useState(false)
+  const [startingWaterRolledOver, setStartingWaterRolledOver] = useState(false)
 
   const [loadingMeter, setLoadingMeter] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -132,17 +140,76 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
 
   const toRoom = vacantRooms.find(r => r.id === toRoomId) ?? null
 
+  // ---- เลขปิดห้องเดิม: ต่ำกว่าเลขตั้งต้นของรอบหรือไม่ ----
+  const closingElecNumLive = closingElecCurr === "" ? null : Number(closingElecCurr)
+  const closingWaterNumLive = closingWaterCurr === "" ? null : Number(closingWaterCurr)
+  const closingElecBelow = closingElecNumLive !== null && !isNaN(closingElecNumLive) && closingElecNumLive < prevElec
+  const closingWaterBelow = closingWaterNumLive !== null && !isNaN(closingWaterNumLive) && closingWaterNumLive < prevWater
+  const closingElecRolloverOk = closingElecNumLive !== null && isPlausibleRollover(closingElecNumLive, prevElec)
+  const closingWaterRolloverOk = closingWaterNumLive !== null && isPlausibleRollover(closingWaterNumLive, prevWater)
+
+  // ---- เลขเริ่มต้นห้องใหม่: ต่ำกว่าเลขล่าสุดของห้องนั้นหรือไม่ ----
+  const startingElecNumLive = startingElecReading === "" ? null : Number(startingElecReading)
+  const startingWaterNumLive = startingWaterReading === "" ? null : Number(startingWaterReading)
+  const startingElecBelow = toRoomFloor !== null && startingElecNumLive !== null
+    && !isNaN(startingElecNumLive) && startingElecNumLive < toRoomFloor.elec
+  const startingWaterBelow = toRoomFloor !== null && startingWaterNumLive !== null
+    && !isNaN(startingWaterNumLive) && startingWaterNumLive < toRoomFloor.water
+  const startingElecRolloverOk = toRoomFloor !== null && startingElecNumLive !== null
+    && isPlausibleRollover(startingElecNumLive, toRoomFloor.elec)
+  const startingWaterRolloverOk = toRoomFloor !== null && startingWaterNumLive !== null
+    && isPlausibleRollover(startingWaterNumLive, toRoomFloor.water)
+
   // เลขเริ่มต้นต่ำกว่าเลขล่าสุดของห้องปลายทางหรือยัง — ใช้ทั้งขอบสีแดงของช่อง
   // และปิดปุ่มยืนยัน เพื่อให้ผู้ใช้เห็นตั้งแต่ตอนพิมพ์ ไม่ใช่รู้ตอนกดแล้วโดนปฏิเสธ
-  const startingElecTooLow = toRoomFloor !== null
-    && startingElecReading !== ""
-    && !isNaN(Number(startingElecReading))
-    && Number(startingElecReading) < toRoomFloor.elec
-  const startingWaterTooLow = toRoomFloor !== null
-    && startingWaterReading !== ""
-    && !isNaN(Number(startingWaterReading))
-    && Number(startingWaterReading) < toRoomFloor.water
-  const startingReadingBlocked = startingElecTooLow || startingWaterTooLow
+  const startingElecTooLow = startingElecBelow && !(startingElecRolledOver && startingElecRolloverOk)
+  const startingWaterTooLow = startingWaterBelow && !(startingWaterRolledOver && startingWaterRolloverOk)
+  const closingElecTooLow = closingElecBelow && !(closingElecRolledOver && closingElecRolloverOk)
+  const closingWaterTooLow = closingWaterBelow && !(closingWaterRolledOver && closingWaterRolloverOk)
+  const startingReadingBlocked = startingElecTooLow || startingWaterTooLow || closingElecTooLow || closingWaterTooLow
+
+  /**
+   * ช่องยืนยัน "มิเตอร์หมุนครบรอบ" — โผล่เฉพาะตอนที่เลขที่กรอกต่ำกว่าเลขเดิมจริง
+   *
+   * แสดงจำนวนหน่วยที่จะถูกคิดด้วย เพื่อให้ผู้ดูแลเห็นผลของการติ๊กก่อนติ๊ก
+   * (มิเตอร์วนจริงกับพิมพ์เลขผิด ต่างกันเป็นพันบาท และดูจากตัวเลขอย่างเดียวแยกไม่ออก)
+   */
+  const renderRolloverConfirm = (opts: {
+    show: boolean
+    plausible: boolean
+    checked: boolean
+    onChange: (v: boolean) => void
+    label: string
+    from: number
+    to: number
+  }) => {
+    if (!opts.show) return null
+    if (!opts.plausible) {
+      return (
+        <p className="text-[11px] md:text-xs font-semibold text-red-600 dark:text-red-400 leading-relaxed">
+          {opts.label}: เลข {opts.to.toLocaleString()} ต่ำกว่า {opts.from.toLocaleString()} และอธิบายด้วยมิเตอร์หมุนครบรอบไม่ได้
+          {" "}(ต้องอยู่ในช่วง 0–9,999) กรุณาตรวจเลขอีกครั้ง
+        </p>
+      )
+    }
+    return (
+      <label className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={opts.checked}
+          onChange={(e) => opts.onChange(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-amber-600 cursor-pointer"
+        />
+        <span className="text-[11px] md:text-xs font-semibold text-amber-800 dark:text-amber-300 leading-relaxed">
+          {opts.label}: มิเตอร์หมุนครบรอบ ({opts.from.toLocaleString()} → {opts.to.toLocaleString()})
+          {" "}<span className="font-mono">= {meterUnitsUsed(opts.to, opts.from).toLocaleString()} หน่วย</span>
+          <span className="block font-normal text-amber-700/80 dark:text-amber-400/70">
+            ติ๊กเมื่อมิเตอร์วนกลับเป็น 0 จริงเท่านั้น ถ้าพิมพ์เลขผิดให้แก้เลขแทน
+          </span>
+        </span>
+      </label>
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -158,12 +225,27 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
     }
     const closingElecNum = Number(closingElecCurr)
     const closingWaterNum = Number(closingWaterCurr)
-    if (closingElecCurr === "" || isNaN(closingElecNum) || closingElecNum < prevElec) {
-      setError("เลขมิเตอร์ไฟปิดห้องเดิมต้องไม่น้อยกว่าเลขมิเตอร์ครั้งก่อนหน้า")
+    if (closingElecCurr === "" || isNaN(closingElecNum)) {
+      setError("กรุณากรอกเลขมิเตอร์ไฟปิดห้องเดิม")
       return
     }
-    if (closingWaterCurr === "" || isNaN(closingWaterNum) || closingWaterNum < prevWater) {
-      setError("เลขมิเตอร์น้ำปิดห้องเดิมต้องไม่น้อยกว่าเลขมิเตอร์ครั้งก่อนหน้า")
+    if (closingWaterCurr === "" || isNaN(closingWaterNum)) {
+      setError("กรุณากรอกเลขมิเตอร์น้ำปิดห้องเดิม")
+      return
+    }
+    // ต่ำกว่าเลขตั้งต้นได้เฉพาะเมื่อยืนยันว่ามิเตอร์หมุนครบรอบ
+    if (closingElecTooLow) {
+      setError(
+        `เลขมิเตอร์ไฟปิดห้องเดิม (${closingElecNum.toLocaleString()}) ต่ำกว่าเลขตั้งต้นของรอบนี้ `
+        + `(${prevElec.toLocaleString()}) — ถ้ามิเตอร์หมุนครบรอบจริง ให้ติ๊กยืนยันก่อน`
+      )
+      return
+    }
+    if (closingWaterTooLow) {
+      setError(
+        `เลขมิเตอร์น้ำปิดห้องเดิม (${closingWaterNum.toLocaleString()}) ต่ำกว่าเลขตั้งต้นของรอบนี้ `
+        + `(${prevWater.toLocaleString()}) — ถ้ามิเตอร์หมุนครบรอบจริง ให้ติ๊กยืนยันก่อน`
+      )
       return
     }
 
@@ -214,7 +296,13 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
         //  ไม่งั้นเลือก "รวม" แล้วเว้นช่องไว้จะกลายเป็นรวม 0 บาทแบบเงียบ ๆ)
         oldRoomRentAmount: includeOldRoomRent && oldRoomRentAmount.trim() !== ""
           ? Number(oldRoomRentAmount)
-          : undefined
+          : undefined,
+        // ส่งเฉพาะธงที่ "ใช้จริง" — ติ๊กค้างไว้แล้วแก้เลขจนไม่ต่ำกว่าแล้ว ต้องไม่ส่งไป
+        // ไม่งั้นฝั่ง server จะได้ธงที่ไม่ตรงกับสภาพข้อมูล
+        closingElecRolledOver: closingElecBelow && closingElecRolledOver,
+        closingWaterRolledOver: closingWaterBelow && closingWaterRolledOver,
+        startingElecRolledOver: startingElecBelow && startingElecRolledOver,
+        startingWaterRolledOver: startingWaterBelow && startingWaterRolledOver
       })
 
       if (res.success && res.data) {
@@ -334,7 +422,9 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
                     required
                     value={closingElecCurr}
                     onChange={(e) => setClosingElecCurr(e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono font-semibold outline-none focus:border-blue-500"
+                    className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-sm font-mono font-semibold outline-none focus:border-blue-500 ${
+                      closingElecTooLow ? "border-red-400 dark:border-red-500/60" : "border-slate-200 dark:border-slate-800"
+                    }`}
                   />
                 </div>
                 <div className="space-y-1">
@@ -344,11 +434,31 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
                     required
                     value={closingWaterCurr}
                     onChange={(e) => setClosingWaterCurr(e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono font-semibold outline-none focus:border-blue-500"
+                    className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-sm font-mono font-semibold outline-none focus:border-blue-500 ${
+                      closingWaterTooLow ? "border-red-400 dark:border-red-500/60" : "border-slate-200 dark:border-slate-800"
+                    }`}
                   />
                 </div>
               </div>
             )}
+            {renderRolloverConfirm({
+              show: closingElecBelow,
+              plausible: closingElecRolloverOk,
+              checked: closingElecRolledOver,
+              onChange: setClosingElecRolledOver,
+              label: "ไฟฟ้า",
+              from: prevElec,
+              to: closingElecNumLive ?? 0
+            })}
+            {renderRolloverConfirm({
+              show: closingWaterBelow,
+              plausible: closingWaterRolloverOk,
+              checked: closingWaterRolledOver,
+              onChange: setClosingWaterRolledOver,
+              label: "น้ำ",
+              from: prevWater,
+              to: closingWaterNumLive ?? 0
+            })}
           </div>
 
           {/* Starting Meter */}
@@ -367,7 +477,7 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
                   <input
                     type="number"
                     required
-                    min={toRoomFloor ? toRoomFloor.elec : undefined}
+                    min={toRoomFloor && !startingElecRolledOver ? toRoomFloor.elec : undefined}
                     value={startingElecReading}
                     onChange={(e) => setStartingElecReading(e.target.value)}
                     className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-sm font-mono font-semibold outline-none focus:border-blue-500 ${
@@ -384,7 +494,7 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
                   <input
                     type="number"
                     required
-                    min={toRoomFloor ? toRoomFloor.water : undefined}
+                    min={toRoomFloor && !startingWaterRolledOver ? toRoomFloor.water : undefined}
                     value={startingWaterReading}
                     onChange={(e) => setStartingWaterReading(e.target.value)}
                     className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-sm font-mono font-semibold outline-none focus:border-blue-500 ${
@@ -396,6 +506,24 @@ export default function RoomTransferModal({ tenant, vacantRooms, workspaceId, ba
                 </div>
               </div>
             )}
+            {toRoomFloor && renderRolloverConfirm({
+              show: startingElecBelow,
+              plausible: startingElecRolloverOk,
+              checked: startingElecRolledOver,
+              onChange: setStartingElecRolledOver,
+              label: "ไฟฟ้า",
+              from: toRoomFloor.elec,
+              to: startingElecNumLive ?? 0
+            })}
+            {toRoomFloor && renderRolloverConfirm({
+              show: startingWaterBelow,
+              plausible: startingWaterRolloverOk,
+              checked: startingWaterRolledOver,
+              onChange: setStartingWaterRolledOver,
+              label: "น้ำ",
+              from: toRoomFloor.water,
+              to: startingWaterNumLive ?? 0
+            })}
             {(startingElecTooLow || startingWaterTooLow) && toRoomFloor && (
               <p className="text-[11px] md:text-xs font-semibold text-red-600 dark:text-red-400 leading-relaxed">
                 เลขเริ่มต้นต้องไม่ต่ำกว่าเลขล่าสุดของห้องนี้ (ไฟ {toRoomFloor.elec.toLocaleString()} / น้ำ {toRoomFloor.water.toLocaleString()} จากรอบ {toRoomFloor.cycle})

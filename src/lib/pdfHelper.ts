@@ -1342,8 +1342,11 @@ export async function generateBillPdf(data: BillPdfData) {
       drawText(seg.elecMinApplied ? "-" : seg.elecRate.toLocaleString(), 380, y, 9, rgb(0.2, 0.2, 0.2))
       drawText(seg.elecAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
       y -= 12
+      // มิเตอร์หมุนครบรอบ (เลขปิดต่ำกว่าเลขตั้งต้น) ต้องบอกไว้ ไม่งั้นผู้เช่าเห็นช่วงเลขที่ดูเหมือนผิด
       drawText(
-        `${seg.elecPrev.toLocaleString()} - ${seg.elecCurr.toLocaleString()} จำนวน ${seg.elecUnits} หน่วย (ถึงวันย้ายห้อง ${seg.toDate})`,
+        `${seg.elecPrev.toLocaleString()} - ${seg.elecCurr.toLocaleString()} จำนวน ${seg.elecUnits} หน่วย`
+        + `${seg.elecCurr < seg.elecPrev ? " (มิเตอร์หมุนครบรอบ)" : ""}`
+        + ` (ถึงวันย้ายห้อง ${seg.toDate})`,
         55, y, 8, rgb(0.4, 0.4, 0.4)
       )
       itemIndex++
@@ -1360,7 +1363,9 @@ export async function generateBillPdf(data: BillPdfData) {
       drawText(seg.waterAmount.toLocaleString(), 475, y, 9, rgb(0.2, 0.2, 0.2))
       y -= 12
       drawText(
-        `${seg.waterPrev.toLocaleString()} - ${seg.waterCurr.toLocaleString()} จำนวน ${seg.waterUnits} หน่วย (ถึงวันย้ายห้อง ${seg.toDate})`,
+        `${seg.waterPrev.toLocaleString()} - ${seg.waterCurr.toLocaleString()} จำนวน ${seg.waterUnits} หน่วย`
+        + `${seg.waterCurr < seg.waterPrev ? " (มิเตอร์หมุนครบรอบ)" : ""}`
+        + ` (ถึงวันย้ายห้อง ${seg.toDate})`,
         55, y, 8, rgb(0.4, 0.4, 0.4)
       )
       itemIndex++

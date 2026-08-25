@@ -7,6 +7,7 @@ import { calculateBillTotal } from "@/features/billing/bill-calculator"
 import { resolveUtilityRate } from "@/features/billing/rate-utils"
 import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "@/features/billing/building-utility-actions"
 import { saveMeterRecord, getMeterStartForCycle, getLatestMeterReadingUpTo } from "@/features/meter/actions"
+import { meterUnitsUsed, isPlausibleRollover } from "@/features/meter/utils"
 import { updateRoomStatus } from "@/features/room/actions"
 import { nextBillingCycle } from "@/features/billing/utils"
 
@@ -61,6 +62,17 @@ export interface TransferTenantRoomInput {
    * ที่ตั้งไว้ใน /settings?tab=property
    */
   oldRoomRentAmount?: number
+  /**
+   * ผู้ดูแลยืนยันว่ามิเตอร์ "หมุนครบรอบ" (9,999 → 0,000) จึงกรอกเลขที่ต่ำกว่าเลขเดิมได้
+   *
+   * ต้องเป็นการยืนยันโดยเจตนา ไม่ใช่ระบบเดาให้เอง เพราะ "เลขใหม่ต่ำกว่าเลขเดิม"
+   * เป็นได้ทั้งมิเตอร์วนจริง กับคนพิมพ์เลขผิด ซึ่งสองอย่างนี้ต่างกันเป็นพันบาท
+   * และไม่มีข้อมูลอะไรในระบบแยกมันออกจากกันได้
+   */
+  closingElecRolledOver?: boolean
+  closingWaterRolledOver?: boolean
+  startingElecRolledOver?: boolean
+  startingWaterRolledOver?: boolean
 }
 
 /**
@@ -182,8 +194,24 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     const prevElec = startRes.data.elecStart
     const prevWater = startRes.data.waterStart
 
-    if (input.closingElecCurr < prevElec || input.closingWaterCurr < prevWater) {
-      return { success: false, error: `เลขมิเตอร์ปิดห้องเดิมต้องไม่น้อยกว่าเลขตั้งต้นของรอบนี้ (ไฟ ${prevElec} / น้ำ ${prevWater})` }
+    // เลขปิดที่ต่ำกว่าเลขตั้งต้น ยอมได้เฉพาะเมื่อผู้ดูแลยืนยันว่ามิเตอร์หมุนครบรอบ
+    // ถ้าไม่ยืนยันแล้วปล่อยผ่าน หน่วยจะถูกคิดเป็น 0 (เก็บเงินขาดทั้งช่วง) แบบเงียบ ๆ
+    const elecRolled = input.closingElecRolledOver === true && isPlausibleRollover(input.closingElecCurr, prevElec)
+    const waterRolled = input.closingWaterRolledOver === true && isPlausibleRollover(input.closingWaterCurr, prevWater)
+
+    if (input.closingElecCurr < prevElec && !elecRolled) {
+      return {
+        success: false,
+        error: `เลขมิเตอร์ไฟปิดห้องเดิม (${input.closingElecCurr}) ต่ำกว่าเลขตั้งต้นของรอบนี้ (${prevElec}) `
+          + `ถ้ามิเตอร์หมุนครบรอบจริง ให้ติ๊กยืนยัน "มิเตอร์หมุนครบรอบ" ในฟอร์มก่อน`
+      }
+    }
+    if (input.closingWaterCurr < prevWater && !waterRolled) {
+      return {
+        success: false,
+        error: `เลขมิเตอร์น้ำปิดห้องเดิม (${input.closingWaterCurr}) ต่ำกว่าเลขตั้งต้นของรอบนี้ (${prevWater}) `
+          + `ถ้ามิเตอร์หมุนครบรอบจริง ให้ติ๊กยืนยัน "มิเตอร์หมุนครบรอบ" ในฟอร์มก่อน`
+      }
     }
 
     // 4.5 กันเก็บเงินซ้ำ
@@ -226,11 +254,17 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     }
     const toRoomFloor = toRoomFloorRes.data
     if (toRoomFloor) {
+      // ยอมให้ต่ำกว่าพื้นได้เฉพาะเมื่อผู้ดูแลยืนยันว่ามิเตอร์ห้องนั้นหมุนครบรอบ
+      const startElecRolled = input.startingElecRolledOver === true
+        && isPlausibleRollover(input.startingElecReading, toRoomFloor.elec)
+      const startWaterRolled = input.startingWaterRolledOver === true
+        && isPlausibleRollover(input.startingWaterReading, toRoomFloor.water)
+
       const tooLow: string[] = []
-      if (input.startingElecReading < toRoomFloor.elec) {
+      if (input.startingElecReading < toRoomFloor.elec && !startElecRolled) {
         tooLow.push(`ไฟ ${input.startingElecReading} < ${toRoomFloor.elec}`)
       }
-      if (input.startingWaterReading < toRoomFloor.water) {
+      if (input.startingWaterReading < toRoomFloor.water && !startWaterRolled) {
         tooLow.push(`น้ำ ${input.startingWaterReading} < ${toRoomFloor.water}`)
       }
       if (tooLow.length > 0) {
@@ -238,7 +272,8 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
           success: false,
           error: `เลขมิเตอร์เริ่มต้นของห้อง ${toRoom.room_number} ต่ำกว่าเลขล่าสุดของห้องนั้น (${tooLow.join(" · ")}) `
             + `เลขล่าสุดมาจากรอบ ${toRoomFloor.cycle} — มิเตอร์เดินหน้าอย่างเดียว `
-            + `ถ้ากรอกต่ำกว่านี้ ผู้เช่ารายใหม่จะถูกคิดหน่วยที่คนก่อนใช้ไปแล้ว กรุณาตรวจเลขอีกครั้ง`
+            + `ถ้ากรอกต่ำกว่านี้ ผู้เช่ารายใหม่จะถูกคิดหน่วยที่คนก่อนใช้ไปแล้ว `
+            + `ถ้ามิเตอร์หมุนครบรอบจริง ให้ติ๊กยืนยัน "มิเตอร์หมุนครบรอบ" ในฟอร์มก่อน`
         }
       }
     }
@@ -288,8 +323,10 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
     const oldElecRate = elecRateRes.error ? Number(settings.electric_rate) : elecRateRes.rate
     const oldWaterRate = waterRateRes.error ? Number(settings.water_rate) : waterRateRes.rate
 
-    const elecUnitsUsed = Math.max(0, input.closingElecCurr - prevElec)
-    const waterUnitsUsed = Math.max(0, input.closingWaterCurr - prevWater)
+    // ใช้สูตรกลางที่รองรับมิเตอร์หมุนครบรอบ (ดู features/meter/utils.ts)
+    // เดิมใช้ Math.max(0, curr - prev) ซึ่งได้ 0 หน่วยเมื่อมิเตอร์วน = เก็บเงินขาดทั้งช่วง
+    const elecUnitsUsed = meterUnitsUsed(input.closingElecCurr, prevElec)
+    const waterUnitsUsed = meterUnitsUsed(input.closingWaterCurr, prevWater)
 
     // ⚠️ ไม่คิดขั้นต่ำกับช่วงห้องเดิม (ตัดสินใจโดยเจ้าของระบบ)
     //
