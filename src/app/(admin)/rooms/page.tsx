@@ -1432,6 +1432,44 @@ function RoomsContent() {
     }
   }
 
+  /**
+   * ยกเลิกการแจ้งย้ายออก — พาห้องกลับเป็น "มีผู้เช่า" ตามเดิม
+   *
+   * ทำไมต้องมี: การแจ้งย้ายออกเปลี่ยนแค่สถานะห้องเป็น Pending_Refund แต่เดิมไม่มีทางถอย
+   * ทางเดียวคือเดินหน้าคืนเงินประกันจนจบ ซึ่งปิดสัญญาผู้เช่าถาวร
+   * กดผิดห้องทีเดียวจึงแก้ไม่ได้เลย
+   *
+   * และมีผลกับเงินด้วย: หน้าออกบิลข้ามห้องที่แจ้งย้ายออกโดยตั้งใจ ถ้าห้องนั้นเป็น
+   * ห้องปลายทางของการย้ายห้อง ค่าน้ำ-ไฟของห้องเดิมจะไม่ถูกยกเข้าบิลใบไหนเลย
+   * (qa:db จับได้ แต่กันตั้งแต่ต้นทางดีกว่า)
+   *
+   * ปลอดภัยเพราะการแจ้งย้ายออกไม่ได้เขียนอะไรนอกจากสถานะห้อง — ไม่มีบิล ไม่มีสัญญายกเลิก
+   * ไม่มีเลขมิเตอร์ถูกบันทึก จนกว่าจะกดยืนยันในหน้าคืนเงินประกัน
+   */
+  const handleCancelPendingRefund = async (room: RoomItem) => {
+    if (!hasEditPermission) {
+      showToast(t("rooms.toasts.permission_denied"), "error")
+      return
+    }
+    if (!confirm(
+      `ยกเลิกการแจ้งย้ายออกของห้อง ${room.roomNumber}?` +
+      `
+
+ห้องจะกลับไปเป็นสถานะมีผู้เช่าตามเดิม และออกบิลได้ตามปกติ` +
+      `
+ข้อมูลผู้เช่าและเงินประกันไม่ถูกแตะต้อง`
+    )) return
+
+    const { updateRoomStatus } = await import("@/features/room/actions")
+    const res = await updateRoomStatus(room.id, "occupied")
+    if (res.success) {
+      showToast(`ยกเลิกการแจ้งย้ายออกของห้อง ${room.roomNumber} แล้ว`, "success")
+      await loadData(true)
+    } else {
+      showToast(res.error || t("rooms.toasts.update_room_status_error"), "error")
+    }
+  }
+
   // ฟังก์ชันช่วยเหลือสำหรับกระบวนการจัดการคืนเงินประกัน (Task 3)
   const handleOpenRefundModal = async (room: RoomItem) => {
     setEditingCancelledContractId(null)
@@ -2455,6 +2493,15 @@ function RoomsContent() {
                           >
                             <Coins className="w-4 h-4" />
                             จัดการคืนเงินประกัน
+                          </button>
+
+                          {/* ทางถอย — กดแจ้งย้ายออกผิดห้องแล้วต้องแก้ได้ ไม่ใช่ต้องเดินหน้าปิดสัญญาจนจบ */}
+                          <button
+                            onClick={() => handleCancelPendingRefund(room)}
+                            className="mt-2 w-full h-9 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 border border-slate-250 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-[0.97] cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            ยกเลิกการแจ้งย้ายออก
                           </button>
                         </div>
                       ))}
