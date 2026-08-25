@@ -9,6 +9,7 @@ import {
   type BillUtilitySegment
 } from "@/lib/billSegments"
 import { resolveBillLines } from "@/lib/billLines"
+import { billKindRank } from "@/features/billing/utils"
 import { calculateBillTotal } from "@/features/billing/bill-calculator"
 import { computeMidMonthRent } from "@/features/room/deposit-calculator"
 
@@ -335,5 +336,30 @@ describe("computeMidMonthRent", () => {
 
   it("ห้องที่ไม่ได้ตั้งค่าเช่าไว้ ต้องได้ 0 ไม่ใช่ NaN", () => {
     expect(computeMidMonthRent(0, "2026-08-15", "DAILY_PRORATE")).toBe(0)
+  })
+})
+
+describe("billKindRank — บิลใบไหนคือ \"บิลรอบปัจจุบัน\"", () => {
+  /**
+   * ห้องเดียวในรอบเดียวมีได้หลายใบ ฝั่งที่แสดงบิลใบเดียว (Portal ผู้เช่า) หยิบ bills[0]
+   * ถ้าลำดับไม่แน่นอน ผู้เช่าจะเห็นใบผิดและ QR พร้อมเพย์จะฝังยอดผิดตามไปด้วย
+   */
+  const sortSameCycle = (kinds: (string | null)[]) =>
+    [...kinds].sort((a, b) => billKindRank(a) - billKindRank(b))
+
+  it("บิลรอบปกติต้องมาก่อนใบปิดรอบตอนย้ายห้อง ไม่ว่าจะเรียงมาแบบไหน", () => {
+    expect(sortSameCycle(["transfer_closing", "regular"])[0]).toBe("regular")
+    expect(sortSameCycle(["regular", "transfer_closing"])[0]).toBe("regular")
+  })
+
+  it("บิลเก่าที่ bill_kind เป็น null ต้องนับเป็นบิลรอบปกติ (ข้อมูลก่อนมีคอลัมน์นี้)", () => {
+    expect(billKindRank(null)).toBe(billKindRank("regular"))
+    expect(billKindRank(undefined)).toBe(0)
+  })
+
+  it("ชนิดใหม่ที่ยังไม่รู้จักต้องไม่แย่งที่บิลรอบปกติ แม้ตัวอักษรจะมาก่อน", () => {
+    // "adjustment" < "regular" ตามตัวอักษร — ถ้าเรียงด้วย .order() ตรง ๆ ใบนี้จะขึ้นเป็นบิลปัจจุบัน
+    expect(sortSameCycle(["adjustment", "regular"])[0]).toBe("regular")
+    expect(billKindRank("adjustment")).toBeGreaterThan(billKindRank("regular"))
   })
 })
