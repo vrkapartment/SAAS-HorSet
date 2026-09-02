@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Building,
@@ -1218,7 +1219,13 @@ export default function SuperAdminPage() {
                         className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700/80 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                       >
                         <div className="space-y-1.5 min-w-0">
-                          <h4 className="text-sm md:text-sm font-semibold text-slate-900 dark:text-slate-200 truncate">{ws.name}</h4>
+                          <Link
+                            href={`/super-admin/workspaces/${ws.id}`}
+                            className="block text-sm md:text-sm font-semibold text-slate-900 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 truncate transition-colors"
+                            title="เปิดหน้าจัดการรายหอ"
+                          >
+                            {ws.name}
+                          </Link>
                           <div className="flex items-center gap-4 text-[11px] md:text-[10px] text-slate-500">
                             <span className="font-mono">ID: {ws.id.substring(0, 8)}...</span>
                             <span className="flex items-center gap-1">
@@ -1256,6 +1263,15 @@ export default function SuperAdminPage() {
                               </span>
                             )
                           )}
+
+                          {/* หน้าจัดการรายหอ: ดู admin/staff, ข้อมูลติดต่อ, subscription, Export และลบหอถาวรได้ในที่เดียว */}
+                          <Link
+                            href={`/super-admin/workspaces/${ws.id}`}
+                            className="p-3 py-2.5 md:p-2 md:py-1.5 text-xs md:text-[11px] font-bold md:font-semibold bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl md:rounded-lg flex items-center justify-center gap-1.5 md:gap-1 transition-all flex-1 md:flex-none"
+                            aria-label="เปิดหน้าจัดการรายหอ" title="เปิดหน้าจัดการรายหอ"
+                          >
+                            <Gauge className="w-3.5 h-3.5" /> <span className="md:inline">จัดการ</span>
+                          </Link>
 
                           <button
                             onClick={() => {
