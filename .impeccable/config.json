@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "11px",
+        "createdAt": "2026-09-02T15:40:54.314Z",
+        "reason": "codebase convention: 582 existing text-[10px]/text-[11px] usages across src, including sibling /super-admin and /super-admin/plans pages; DESIGN.md documents no type ramp"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "createdAt": "2026-09-02T15:40:54.379Z",
+        "reason": "codebase convention: 582 existing text-[10px]/text-[11px] usages across src, including sibling /super-admin and /super-admin/plans pages; DESIGN.md documents no type ramp"
+      }
+    ]
+  }
+}

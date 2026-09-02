@@ -1,10 +1,24 @@
 "use server"
 
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { encryptText, decryptText } from "@/lib/encryption"
 import { generateSecurePassword } from "@/lib/password"
-import { updateGoogleDriveFolderNameAction as updateGoogleDriveFolderNameImpl } from "@/lib/googleDrive"
+import {
+  updateGoogleDriveFolderNameAction as updateGoogleDriveFolderNameImpl,
+  uploadFileToGoogleDriveAction
+} from "@/lib/googleDrive"
+import {
+  MISSING_RELATION_CODES,
+  TABLES_WITHOUT_WORKSPACE_FK,
+  WORKSPACE_STORAGE_BUCKET,
+  buildExportTimestamp,
+  buildWorkspaceExportZip,
+  collectWorkspaceStoragePaths,
+  sanitizeDriveName,
+  type ExportedTable,
+  type WorkspaceMember
+} from "./workspace-purge"
 
 // Wrapper บาง ๆ เพื่อให้ Client Component (หน้า Super Admin) import ผ่าน server action file นี้แทน
 // ไม่ import "@/lib/googleDrive" ตรงๆ จาก client component เด็ดขาด เพราะไฟล์นั้นดึง google-auth-library/gaxios
@@ -1221,5 +1235,453 @@ export async function getTaxFormMappingCoverageAction(templateId: string, formTy
     }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตรวจสอบความครบถ้วนของ mapping" }
+  }
+}
+
+// =========================================================================
+// หน้าจัดการรายหอแบบรวดเร็ว (/super-admin/workspaces/[id])
+// =========================================================================
+
+/**
+ * สร้าง Supabase Admin Client (Service Role) สำหรับ action ในกลุ่มหน้าจัดการรายหอ
+ * รวมการเช็คสิทธิ์ super_admin + การเช็คว่ามี Service Role Key ไว้ในที่เดียว ไม่ต้องเขียนซ้ำทุก action
+ */
+async function requireSuperAdminClient(): Promise<
+  { ok: true; client: SupabaseClient; actorId: string; actorEmail: string }
+  | { ok: false; error: string }
+> {
+  const profileRes = await getCurrentUserProfileAction()
+  if (!profileRes.success || profileRes.data?.role !== "super_admin") {
+    return { ok: false, error: "คุณไม่มีสิทธิ์เข้าถึงหรือทำรายการในส่วนนี้" }
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || url.includes("placeholder")) {
+    return { ok: false, error: "ยังไม่ได้ตั้งค่า NEXT_PUBLIC_SUPABASE_URL — หน้านี้ใช้งานในโหมด Demo ไม่ได้" }
+  }
+  if (!serviceKey || serviceKey.includes("placeholder")) {
+    return { ok: false, error: "กรุณาตั้งค่า SUPABASE_SERVICE_ROLE_KEY" }
+  }
+
+  const client = createSupabaseClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  })
+
+  return {
+    ok: true,
+    client,
+    actorId: profileRes.data.id as string,
+    actorEmail: (profileRes.data.email as string) || ""
+  }
+}
+
+/**
+ * ดึงข้อมูลรวมของหอเดียวสำหรับหน้าจัดการรายหอ: รายชื่อ admin/staff/tenant, ข้อมูลติดต่อ,
+ * รายละเอียด subscription + ประวัติการจ่ายเงิน และตัวเลขการใช้งาน (ห้อง/ตึก/ผู้เช่า/บิล)
+ */
+export async function getWorkspaceDetailAction(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    const guard = await requireSuperAdminClient()
+    if (!guard.ok) return { success: false, error: guard.error }
+    const supabaseAdmin = guard.client
+
+    // 1. ข้อมูลหอ
+    const { data: workspace, error: wsError } = await supabaseAdmin
+      .from("workspaces")
+      .select("*")
+      .eq("id", workspaceId)
+      .maybeSingle()
+
+    if (wsError) throw wsError
+    if (!workspace) return { success: false, error: "ไม่พบหอพักนี้ในระบบ (อาจถูกลบไปแล้ว)" }
+
+    // 2. รายชื่อผู้ใช้ในหอ
+    const { data: profiles, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, email, role, full_name, phone, tfa_enabled, created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: true })
+
+    if (profileError) throw profileError
+
+    // 2.1 สถานะยืนยันอีเมล + เวลาเข้าสู่ระบบล่าสุด อยู่ใน auth.users เท่านั้น ต้องดึงผ่าน Admin API
+    // (query แบบ .from("profiles") ไม่มีคอลัมน์เหล่านี้ให้ดึง)
+    const authInfoMap = new Map<string, { emailConfirmedAt: string | null; lastSignInAt: string | null }>()
+    const perPage = 1000
+    for (let page = 1; ; page++) {
+      const { data: authUsersPage, error: authListError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+      if (authListError) throw authListError
+      for (const authUser of authUsersPage.users) {
+        authInfoMap.set(authUser.id, {
+          emailConfirmedAt: authUser.email_confirmed_at ?? null,
+          lastSignInAt: authUser.last_sign_in_at ?? null
+        })
+      }
+      if (authUsersPage.users.length < perPage) break
+    }
+
+    const members: WorkspaceMember[] = (profiles || []).map((p) => ({
+      id: p.id as string,
+      email: p.email as string,
+      role: p.role as WorkspaceMember["role"],
+      full_name: (p.full_name as string | null) ?? null,
+      phone: (p.phone as string | null) ?? null,
+      tfa_enabled: Boolean(p.tfa_enabled),
+      created_at: p.created_at as string,
+      email_confirmed_at: authInfoMap.get(p.id as string)?.emailConfirmedAt ?? null,
+      last_sign_in_at: authInfoMap.get(p.id as string)?.lastSignInAt ?? null
+    }))
+
+    // 3. Subscription + แผนที่ใช้อยู่
+    const { data: subscription, error: subError } = await supabaseAdmin
+      .from("workspace_subscriptions")
+      .select("*, saas_plans (*)")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (subError && !MISSING_RELATION_CODES.has(subError.code)) throw subError
+
+    // 4. ประวัติการชำระค่าบริการ (ล่าสุด 10 รายการ)
+    const { data: payments, error: paymentError } = await supabaseAdmin
+      .from("saas_payments")
+      .select("*, saas_plans (name)")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(10)
+
+    if (paymentError && !MISSING_RELATION_CODES.has(paymentError.code)) throw paymentError
+
+    // 5. ตัวเลขการใช้งานจริง เทียบกับโควตาของแผน
+    const countRows = async (table: string) => {
+      const { count, error } = await supabaseAdmin
+        .from(table)
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+      if (error) return null
+      return count ?? 0
+    }
+
+    const [roomCount, buildingCount, tenantCount, billCount, expenseCount] = await Promise.all([
+      countRows("rooms"),
+      countRows("buildings"),
+      countRows("tenants"),
+      countRows("bills"),
+      countRows("expenses")
+    ])
+
+    // 6. สถานะสิทธิ์เข้าช่วยเหลือ (support access) ของหอนี้
+    const { data: grant } = await supabaseAdmin
+      .from("support_access_grants")
+      .select("status")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    return {
+      success: true,
+      data: JSON.parse(JSON.stringify({
+        workspace,
+        members,
+        subscription: subscription || null,
+        payments: payments || [],
+        usage: {
+          rooms: roomCount,
+          buildings: buildingCount,
+          tenants: tenantCount,
+          bills: billCount,
+          expenses: expenseCount
+        },
+        supportStatus: (grant as { status?: string } | null)?.status || "none"
+      }))
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการดึงข้อมูลหอพัก" }
+  }
+}
+
+/**
+ * อัปเดตอีเมลของผู้ใช้ผ่าน Auth Admin API (ต้องแก้ทั้ง auth.users และ public.profiles ให้ตรงกัน)
+ * แยกจาก updateUserProfileAdminAction เพราะการเปลี่ยนอีเมลกระทบ credential ที่ใช้ล็อกอิน
+ */
+export async function updateUserEmailAdminAction(profileId: string, newEmail: string) {
+  try {
+    const trimmedEmail = newEmail.trim().toLowerCase()
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return { success: false, error: "รูปแบบอีเมลไม่ถูกต้อง" }
+    }
+
+    const guard = await requireSuperAdminClient()
+    if (!guard.ok) return { success: false, error: guard.error }
+    const supabaseAdmin = guard.client
+
+    // เปลี่ยนใน auth ก่อน เพราะเป็นชั้นที่ยืนยันความไม่ซ้ำของอีเมล ถ้าซ้ำจะ error ตั้งแต่ตรงนี้
+    // แล้วค่อย sync ลง profiles ทีหลัง (ถ้าสลับลำดับกัน profiles จะเพี้ยนไปก่อนโดยที่ auth ยังไม่เปลี่ยน)
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(profileId, {
+      email: trimmedEmail,
+      email_confirm: true
+    })
+    if (authError) throw authError
+
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({ email: trimmedEmail, updated_at: new Date().toISOString() })
+      .eq("id", profileId)
+    if (profileError) throw profileError
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเปลี่ยนอีเมลผู้ใช้" }
+  }
+}
+
+/**
+ * ตั้งรหัสผ่านใหม่ให้ผู้ใช้ในหอ (กรณีเจ้าของหอลืมรหัสผ่านตัวเอง)
+ * ถ้าไม่ส่ง newPassword มา ระบบจะสุ่มรหัสผ่านที่ปลอดภัยให้ แล้วคืนค่ากลับไปให้ Super Admin คัดลอกส่งต่อ
+ */
+export async function resetUserPasswordAdminAction(profileId: string, newPassword?: string) {
+  try {
+    if (newPassword && newPassword.length < 8) {
+      return { success: false, error: "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร" }
+    }
+
+    const guard = await requireSuperAdminClient()
+    if (!guard.ok) return { success: false, error: guard.error }
+
+    const finalPassword = newPassword || generateSecurePassword()
+    const { error } = await guard.client.auth.admin.updateUserById(profileId, { password: finalPassword })
+    if (error) throw error
+
+    return { success: true, data: { password: finalPassword } }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการตั้งรหัสผ่านใหม่" }
+  }
+}
+
+/**
+ * Export ข้อมูลทุกตารางของหอเป็นไฟล์ ZIP แล้วอัปโหลดขึ้น Google Drive กลางของ HorSet
+ * โดยเก็บไว้ในโฟลเดอร์ย่อยที่ตั้งชื่อตามชื่อหอ เพื่อให้ย้อนหาข้อมูลของหอนั้นได้ภายหลัง
+ */
+export async function exportWorkspaceDataToDriveAction(workspaceId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+
+    const guard = await requireSuperAdminClient()
+    if (!guard.ok) return { success: false, error: guard.error }
+
+    return await runWorkspaceExport(guard.client, workspaceId)
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการ Export ข้อมูลหอพัก" }
+  }
+}
+
+type WorkspaceExportResult = {
+  success: boolean
+  error?: string
+  data?: {
+    fileName: string
+    folderName: string
+    webViewLink: string
+    tables: ExportedTable[]
+    totalRows: number
+  }
+}
+
+/**
+ * ตัวจริงที่ทำงาน Export — แยกเป็นฟังก์ชันภายในเพราะถูกเรียกซ้ำจาก purgeWorkspaceAction
+ * (บังคับ Export ให้สำเร็จก่อนเสมอ ห้ามลบหอโดยไม่มีข้อมูลสำรอง)
+ */
+async function runWorkspaceExport(
+  supabaseAdmin: SupabaseClient,
+  workspaceId: string
+): Promise<WorkspaceExportResult> {
+  const { data: workspace, error: wsError } = await supabaseAdmin
+    .from("workspaces")
+    .select("id, name")
+    .eq("id", workspaceId)
+    .maybeSingle()
+
+  if (wsError) throw wsError
+  if (!workspace) return { success: false, error: "ไม่พบหอพักนี้ในระบบ (อาจถูกลบไปแล้ว)" }
+
+  const workspaceName = (workspace as { name: string }).name
+  const generatedAt = new Date()
+  const folderName = sanitizeDriveName(workspaceName, workspaceId)
+  const fileName = `horset-backup_${folderName}_${buildExportTimestamp(generatedAt)}.zip`
+
+  const { buffer, tables } = await buildWorkspaceExportZip(supabaseAdmin, workspaceId, workspaceName, generatedAt)
+
+  const uploadRes = await uploadFileToGoogleDriveAction(buffer, fileName, "application/zip", folderName)
+  if (!uploadRes.success) {
+    return { success: false, error: `อัปโหลดไฟล์สำรองขึ้น Google Drive ไม่สำเร็จ: ${uploadRes.error}` }
+  }
+
+  return {
+    success: true,
+    data: {
+      fileName,
+      folderName,
+      webViewLink: uploadRes.webViewLink,
+      tables,
+      totalRows: tables.reduce((sum, item) => sum + item.rowCount, 0)
+    }
+  }
+}
+
+/**
+ * ลบหอพักถาวรพร้อมข้อมูลทั้งหมด (DB + บัญชี Auth + ไฟล์ใน Storage)
+ *
+ * ขั้นตอนความปลอดภัย (ทุกข้อบังคับผ่านฝั่งเซิร์ฟเวอร์ ไม่เชื่อค่าที่ client ส่งมาว่าผ่านแล้ว):
+ * 1. ต้องเป็น super_admin
+ * 2. ต้องพิมพ์ชื่อหอให้ตรงเป๊ะ
+ * 3. ต้องกรอกรหัสผ่านของบัญชี super_admin ที่กำลังล็อกอินอยู่ แล้วยืนยันซ้ำกับ Supabase Auth
+ * 4. ต้อง Export ข้อมูลขึ้น Google Drive สำเร็จก่อนเสมอ ถ้า Export ล้มเหลวจะไม่ลบอะไรเลย
+ *
+ * ⚠️ การลบนี้เป็น hard delete โดยตั้งใจ (ต่างจากกฎ soft delete ทั่วไปของระบบ) เพราะเป็นการ
+ * ปิดบัญชีลูกค้าตามคำขอ — ข้อมูลสำรองอยู่บน Google Drive แทน
+ */
+export async function purgeWorkspaceAction(input: {
+  workspaceId: string
+  password: string
+  confirmName: string
+}) {
+  try {
+    const { workspaceId, password, confirmName } = input
+
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+    if (!password) {
+      return { success: false, error: "กรุณากรอกรหัสผ่านของบัญชี Super Admin เพื่อยืนยัน" }
+    }
+
+    const guard = await requireSuperAdminClient()
+    if (!guard.ok) return { success: false, error: guard.error }
+    const supabaseAdmin = guard.client
+
+    // --- ขั้นที่ 1: ตรวจว่าชื่อหอที่พิมพ์มาตรงกับชื่อจริง ---
+    const { data: workspace, error: wsError } = await supabaseAdmin
+      .from("workspaces")
+      .select("id, name")
+      .eq("id", workspaceId)
+      .maybeSingle()
+
+    if (wsError) throw wsError
+    if (!workspace) return { success: false, error: "ไม่พบหอพักนี้ในระบบ (อาจถูกลบไปแล้ว)" }
+
+    const workspaceName = (workspace as { name: string }).name
+    if (confirmName.trim() !== workspaceName.trim()) {
+      return { success: false, error: `ชื่อหอที่พิมพ์ไม่ตรงกับ "${workspaceName}" กรุณาพิมพ์ให้ตรงทุกตัวอักษร` }
+    }
+
+    // --- ขั้นที่ 2: ยืนยันรหัสผ่านของ Super Admin ที่ล็อกอินอยู่ ---
+    // ใช้ client ชั่วคราวที่ไม่เก็บ session เพื่อไม่ให้ไปทับ cookie ของ session ปัจจุบัน
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!anonKey || anonKey.includes("placeholder")) {
+      return { success: false, error: "ยังไม่ได้ตั้งค่า NEXT_PUBLIC_SUPABASE_ANON_KEY จึงยืนยันรหัสผ่านไม่ได้" }
+    }
+    if (!guard.actorEmail) {
+      return { success: false, error: "ไม่พบอีเมลของบัญชี Super Admin ปัจจุบัน จึงยืนยันรหัสผ่านไม่ได้" }
+    }
+
+    const verifyClient = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
+    const { error: signInError } = await verifyClient.auth.signInWithPassword({
+      email: guard.actorEmail,
+      password
+    })
+    if (signInError) {
+      return { success: false, error: "รหัสผ่านไม่ถูกต้อง — ยกเลิกการลบหอพักแล้ว" }
+    }
+
+    // --- ขั้นที่ 3: บังคับ Export ข้อมูลขึ้น Google Drive ให้สำเร็จก่อน ---
+    const exportRes = await runWorkspaceExport(supabaseAdmin, workspaceId)
+    if (!exportRes.success || !exportRes.data) {
+      return {
+        success: false,
+        error: `ยกเลิกการลบ เพราะสำรองข้อมูลขึ้น Google Drive ไม่สำเร็จ: ${exportRes.error || "ไม่ทราบสาเหตุ"}`
+      }
+    }
+
+    // --- ขั้นที่ 4: ลบไฟล์ใน Storage (ต้องทำก่อนลบ DB เพราะ path ของไฟล์อ้างอิงจากคอลัมน์ใน DB) ---
+    let deletedFiles = 0
+    const storageWarnings: string[] = []
+    try {
+      const paths = await collectWorkspaceStoragePaths(supabaseAdmin, workspaceId)
+      const BATCH = 100
+      for (let i = 0; i < paths.length; i += BATCH) {
+        const chunk = paths.slice(i, i + BATCH)
+        const { data: removed, error: removeError } = await supabaseAdmin.storage
+          .from(WORKSPACE_STORAGE_BUCKET)
+          .remove(chunk)
+        if (removeError) {
+          storageWarnings.push(removeError.message)
+        } else {
+          deletedFiles += removed?.length || 0
+        }
+      }
+    } catch (storageErr) {
+      storageWarnings.push(storageErr instanceof Error ? storageErr.message : "อ่านรายการไฟล์ใน Storage ไม่สำเร็จ")
+    }
+
+    // --- ขั้นที่ 5: ลบบัญชีผู้ใช้ทั้งหมดของหอ (auth.users + profiles) ---
+    // profiles.workspace_id เป็น "on delete set null" ไม่ใช่ cascade จึงต้องเก็บรายชื่อและลบเองก่อนลบหอ
+    // ไม่งั้นบัญชีจะกลายเป็นผู้ใช้กำพร้าที่ยังล็อกอินเข้าระบบได้อยู่
+    const { data: memberRows, error: memberError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, role")
+      .eq("workspace_id", workspaceId)
+    if (memberError) throw memberError
+
+    // กันไม่ให้ลบบัญชีตัวเอง และไม่ลบ super_admin คนอื่นที่บังเอิญมี workspace_id ชี้มาที่หอนี้
+    const deletableIds = (memberRows || [])
+      .filter((row) => row.role !== "super_admin" && row.id !== guard.actorId)
+      .map((row) => row.id as string)
+
+    let deletedUsers = 0
+    const userWarnings: string[] = []
+    for (const memberId of deletableIds) {
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(memberId)
+      if (authDeleteError) {
+        userWarnings.push(`${memberId}: ${authDeleteError.message}`)
+        continue
+      }
+      deletedUsers += 1
+    }
+
+    // profiles.id อ้าง auth.users แบบ on delete cascade อยู่แล้ว แต่กวาดซ้ำเผื่อบัญชีที่ลบ auth ไม่ผ่าน
+    await supabaseAdmin.from("profiles").delete().eq("workspace_id", workspaceId).neq("role", "super_admin")
+
+    // --- ขั้นที่ 6: ลบตัวหอ (ตารางลูกทั้งหมดหายตาม FK cascade) ---
+    const { error: deleteWsError } = await supabaseAdmin.from("workspaces").delete().eq("id", workspaceId)
+    if (deleteWsError) throw deleteWsError
+
+    // --- ขั้นที่ 7: กวาดแถวกำพร้าในตารางที่ workspace_id ไม่มี FK ผูกกับ workspaces โดยตรง ---
+    for (const table of TABLES_WITHOUT_WORKSPACE_FK) {
+      await supabaseAdmin.from(table).delete().eq("workspace_id", workspaceId)
+    }
+
+    return {
+      success: true,
+      data: {
+        workspaceName,
+        backupFileName: exportRes.data.fileName,
+        backupFolderName: exportRes.data.folderName,
+        backupLink: exportRes.data.webViewLink,
+        backupTotalRows: exportRes.data.totalRows,
+        deletedUsers,
+        deletedFiles,
+        warnings: [...storageWarnings, ...userWarnings]
+      }
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบหอพัก" }
   }
 }
