@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { DEFAULT_BOT_BASIC_ID, DEFAULT_BOT_DISPLAY_NAME, DEFAULT_LIFF_ID } from "@/lib/lineLiff"
 
 // In-memory cache for bot information to prevent excessive LINE API calls
 const botCache = new Map<string, { botBasicId: string; botDisplayName: string; timestamp: number }>()
@@ -29,9 +30,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const workspaceId = searchParams.get("workspace_id")
-    const defaultLiffId = "2010442620-H4josaDy"
-    const defaultBotBasicId = "@423xmlwo"
-    const defaultBotDisplayName = "แชทบิลอัตโนมัติ"
+    const defaultLiffId = DEFAULT_LIFF_ID
+    const defaultBotBasicId = DEFAULT_BOT_BASIC_ID
+    const defaultBotDisplayName = DEFAULT_BOT_DISPLAY_NAME
 
     if (!workspaceId || !UUID_RE.test(workspaceId)) {
       return NextResponse.json({
@@ -129,9 +130,9 @@ export async function GET(request: NextRequest) {
     console.error("Workspace LIFF API Exception:", error)
     return NextResponse.json({
       success: true,
-      liffId: "2010442620-H4josaDy",
-      botBasicId: "@423xmlwo",
-      botDisplayName: "แชทบิลอัตโนมัติ"
+      liffId: DEFAULT_LIFF_ID,
+      botBasicId: DEFAULT_BOT_BASIC_ID,
+      botDisplayName: DEFAULT_BOT_DISPLAY_NAME
     })
   }
 }

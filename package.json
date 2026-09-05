@@ -14,7 +14,9 @@
     "qa:sim": "tsx scripts/qa-simulate-bills.mts",
     "qa:roundtrip": "tsx scripts/qa-roundtrip-bill.mts",
     "qa:audit-units": "tsx scripts/qa-audit-bill-units.mts",
-    "qa:move-impact": "tsx scripts/qa-past-move-impact.mts"
+    "qa:move-impact": "tsx scripts/qa-past-move-impact.mts",
+    "line:richmenu": "tsx scripts/install-line-richmenu.mts",
+    "line:menuimg": "node scripts/build-line-richmenu-images.mjs"
   },
   "dependencies": {
     "@google-cloud/translate": "^9.4.2",

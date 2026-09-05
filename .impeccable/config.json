@@ -14,6 +14,42 @@
         "value": "10px",
         "createdAt": "2026-09-02T15:40:54.379Z",
         "reason": "codebase convention: 582 existing text-[10px]/text-[11px] usages across src, including sibling /super-admin and /super-admin/plans pages; DESIGN.md documents no type ramp"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          "docs/line-rich-menu/images/tenant-menu.html"
+        ],
+        "createdAt": "2026-09-04T16:33:13.023Z",
+        "reason": "ต้นฉบับภาพ LINE rich menu ขนาด 2500px ไม่ใช่ UI ของแอป: type 88-112px จำเป็นเพราะ LINE ย่อภาพลงราว 1/3 บนมือถือ และสีมาจาก APP_CI_BRAND_GUIDELINES.md ไม่ใช่ token ของ DESIGN.md"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          "docs/line-rich-menu/images/tenant-menu.html"
+        ],
+        "createdAt": "2026-09-04T16:33:13.084Z",
+        "reason": "ต้นฉบับภาพ LINE rich menu ขนาด 2500px ไม่ใช่ UI ของแอป: type 88-112px จำเป็นเพราะ LINE ย่อภาพลงราว 1/3 บนมือถือ และสีมาจาก APP_CI_BRAND_GUIDELINES.md ไม่ใช่ token ของ DESIGN.md"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          "docs/line-rich-menu/images/super-admin-menu.html"
+        ],
+        "createdAt": "2026-09-04T16:33:13.147Z",
+        "reason": "ต้นฉบับภาพ LINE rich menu ขนาด 2500px ไม่ใช่ UI ของแอป: type 88-112px จำเป็นเพราะ LINE ย่อภาพลงราว 1/3 บนมือถือ และสีมาจาก APP_CI_BRAND_GUIDELINES.md ไม่ใช่ token ของ DESIGN.md"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          "docs/line-rich-menu/images/super-admin-menu.html"
+        ],
+        "createdAt": "2026-09-04T16:33:13.212Z",
+        "reason": "ต้นฉบับภาพ LINE rich menu ขนาด 2500px ไม่ใช่ UI ของแอป: type 88-112px จำเป็นเพราะ LINE ย่อภาพลงราว 1/3 บนมือถือ และสีมาจาก APP_CI_BRAND_GUIDELINES.md ไม่ใช่ token ของ DESIGN.md"
       }
     ]
   }

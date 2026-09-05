@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>HorSet — Rich Menu ผู้เช่า (2500x1686)</title>
+<!--
+  ต้นฉบับภาพ rich menu ฝั่งผู้เช่า — แก้ไฟล์นี้แล้วสั่ง render ใหม่ด้วย
+      node scripts/build-line-richmenu-images.mjs
+
+  ⚠️ ขนาดและตำแหน่งของทุกช่องต้องตรงกับ areas[].bounds ใน tenant-oa-richmenu.json เป๊ะ ๆ
+     ไม่งั้นภาพที่ผู้เช่าเห็นจะไม่ตรงกับปุ่มที่กดได้จริง
+       แถวบน  y 0    สูง 843 : 0-1250 | 1250-2500
+       แถวล่าง y 843  สูง 843 : 0-833 | 833-1667 | 1667-2500
+-->
+<style>
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-SemiBold.ttf") format("truetype");
+    font-weight: 600;
+  }
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-Bold.ttf") format("truetype");
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-Medium.ttf") format("truetype");
+    font-weight: 500;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 2500px;
+    height: 1686px;
+    overflow: hidden;
+    font-family: "Prompt", "Leelawadee UI", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .menu {
+    position: relative;
+    width: 2500px;
+    height: 1686px;
+    background: #ffffff;
+  }
+
+  .cell {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* ---- แถวบน: 2 ปุ่มหลัก ---- */
+  .cell-bill  { left: 0;      top: 0; width: 1250px; height: 843px; background: #ffffff; }
+  .cell-qr    { left: 1250px; top: 0; width: 1250px; height: 843px; background: #ffffff; }
+
+  /* ---- แถวล่าง: 3 ปุ่มรอง ---- */
+  .cell-slip    { left: 0;      top: 843px; width: 833px; height: 843px; background: #f8fafc; }
+  .cell-history { left: 833px;  top: 843px; width: 834px; height: 843px; background: #f8fafc; }
+  .cell-contact { left: 1667px; top: 843px; width: 833px; height: 843px; background: #f8fafc; }
+
+  /* ---- เส้นแบ่งช่อง (หนา 4px ให้เห็นขอบปุ่มชัดตอนย่อลงจอมือถือ) ----
+         ทุกช่องใช้สีพื้นอ่อนเหมือนกันหมด เส้นพวกนี้จึงเป็นตัวเดียวที่บอกขอบปุ่ม ห้ามเอาออก */
+  .rule { position: absolute; background: #e2e8f0; }
+  .rule-h        { left: 0;      top: 841px;  width: 2500px; height: 4px; }
+  .rule-v-top    { left: 1248px; top: 0;      width: 4px;    height: 841px; }
+  .rule-v-left   { left: 831px;  top: 845px;  width: 4px;    height: 841px; }
+  .rule-v-right  { left: 1665px; top: 845px;  width: 4px;    height: 841px; }
+
+  .icon-lg { width: 190px; height: 190px; margin-bottom: 48px; }
+  .icon-sm { width: 128px; height: 128px; margin-bottom: 36px; }
+
+  .title-lg   { font-size: 112px; font-weight: 700; line-height: 1.05; letter-spacing: -1px; }
+  .title-sm   { font-size: 84px;  font-weight: 700; line-height: 1.1;  letter-spacing: -0.5px; }
+  .subtitle   { font-size: 56px;  font-weight: 500; margin-top: 22px; }
+
+  .on-light .title-lg,
+  .on-light .title-sm { color: #0f172a; }
+  .on-light .subtitle { color: #64748b; }
+
+  .ink-blue    { color: #2563eb; }
+  .ink-emerald { color: #059669; }
+  .ink-indigo  { color: #4f46e5; }
+  .ink-slate   { color: #475569; }
+</style>
+</head>
+<body>
+<div class="menu">
+
+  <!-- ปุ่ม 1 : บิลเดือนนี้ -->
+  <div class="cell cell-bill on-light">
+    <svg class="icon-lg ink-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 3h14v18l-2.3-1.6L14.4 21l-2.4-1.6L9.6 21l-2.3-1.6L5 21V3z"/>
+      <path d="M8.5 8.2h7"/><path d="M8.5 12h7"/><path d="M8.5 15.8h4"/>
+    </svg>
+    <div class="title-lg">บิลเดือนนี้</div>
+    <div class="subtitle">ดูยอด • มิเตอร์ • ใบแจ้งหนี้ PDF</div>
+  </div>
+
+  <!-- ปุ่ม 2 : QR พร้อมเพย์ -->
+  <div class="cell cell-qr on-light">
+    <svg class="icon-lg ink-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.2"/>
+      <rect x="14" y="3" width="7" height="7" rx="1.2"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.2"/>
+      <path d="M14.2 14.2h3v3h-3z"/>
+      <path d="M20.2 14.2h.8"/><path d="M14.2 20.2h.8"/>
+      <path d="M18 20.2h3"/><path d="M20.2 17.2h.8"/>
+    </svg>
+    <div class="title-lg">QR พร้อมเพย์</div>
+    <div class="subtitle">สแกนจ่ายได้ทันที ยอดกรอกให้แล้ว</div>
+  </div>
+
+  <!-- ปุ่ม 3 : ส่งสลิป -->
+  <div class="cell cell-slip on-light">
+    <svg class="icon-sm ink-emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 15v3.2A2.8 2.8 0 006.8 21h10.4A2.8 2.8 0 0020 18.2V15"/>
+      <path d="M12 16.2V4"/>
+      <path d="M7.4 8.6L12 4l4.6 4.6"/>
+    </svg>
+    <div class="title-sm">ส่งสลิป</div>
+  </div>
+
+  <!-- ปุ่ม 4 : ประวัติบิล -->
+  <div class="cell cell-history on-light">
+    <svg class="icon-sm ink-indigo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.6"/>
+      <path d="M12 7.4V12l3.4 2.1"/>
+    </svg>
+    <div class="title-sm">ประวัติบิล</div>
+  </div>
+
+  <!-- ปุ่ม 5 : ติดต่อเจ้าหน้าที่ -->
+  <div class="cell cell-contact on-light">
+    <svg class="icon-sm ink-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6.8" y="2.4" width="10.4" height="19.2" rx="2.6"/>
+      <path d="M10.6 5.4h2.8"/>
+      <circle cx="12" cy="18.2" r="0.95"/>
+    </svg>
+    <div class="title-sm">ติดต่อหอพัก</div>
+  </div>
+
+  <div class="rule rule-h"></div>
+  <div class="rule rule-v-top"></div>
+  <div class="rule rule-v-left"></div>
+  <div class="rule rule-v-right"></div>
+
+</div>
+</body>
+</html>

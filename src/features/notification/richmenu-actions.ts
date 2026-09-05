@@ -1,0 +1,530 @@
+"use server"
+
+import { createClient } from "@/lib/supabase/server"
+import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js"
+import { assertWorkspaceFeatureEnabled } from "@/features/subscription/actions"
+import { DEFAULT_LIFF_ID } from "@/lib/lineLiff"
+import {
+  DEFAULT_TENANT_MENU_IMAGE_PATH,
+  buildTenantRichMenu,
+  checkRichMenuImage,
+  phoneToContactUri,
+  TENANT_RICHMENU_TEMPLATE
+} from "./richmenu"
+
+/**
+ * จัดการ LINE Rich Menu ของแต่ละหอพักจากหน้าตั้งค่า › LINE OA
+ *
+ * ⚠️ LINE ไม่มี API แก้ rich menu ที่สร้างแล้ว มีแค่สร้างใหม่กับลบ ดังนั้น "อัปเดตเมนู" ทุกครั้ง
+ * คือการสร้างใบใหม่ → อัปโหลดภาพใส่ใบใหม่ → สลับให้ผู้ติดตามทุกคน → ลบใบเก่า
+ * ค่าที่ฝังลงเมนู (เบอร์ติดต่อ, LIFF ID) จึงเป็นค่า ณ วินาทีที่กดติดตั้ง ไม่ใช่ค่าสดจาก DB
+ * เราจึงเก็บค่าที่ฝังไปไว้ใน workspace_line_settings เพื่อเตือนได้ว่าเมนูใน LINE ล้าสมัยแล้ว
+ */
+
+type RichMenuSettingsRow = {
+  channel_access_token: string | null
+  liff_id: string | null
+  richmenu_id: string | null
+  richmenu_image_url: string | null
+  richmenu_installed_at: string | null
+  richmenu_contact_uri: string | null
+  richmenu_liff_id: string | null
+  richmenu_enabled: boolean | null
+}
+
+export type RichMenuStatus = {
+  /** หอพักเปิดใช้งานเมนูล่างอยู่หรือไม่ (ปิด = ผู้เช่าไม่เห็นปุ่ม แต่ตัวเมนูกับภาพยังถูกเก็บไว้) */
+  enabled: boolean
+  installed: boolean
+  installedAt: string | null
+  /** ภาพที่หอพักอัปโหลดเอง (ว่าง = ใช้ภาพต้นแบบของระบบ) */
+  customImageUrl: string
+  /** ภาพที่จะถูกใช้จริงตอนติดตั้ง */
+  effectiveImageUrl: string
+  requiredWidth: number
+  requiredHeight: number
+  /** เบอร์ติดต่อที่ระบบจะฝังลงเมนูถ้ากดติดตั้งเดี๋ยวนี้ */
+  currentContactUri: string
+  /** เบอร์ติดต่อที่ฝังลงเมนูที่ใช้อยู่จริงใน LINE */
+  installedContactUri: string
+  /** true = ข้อมูลในระบบเปลี่ยนไปแล้วแต่เมนูใน LINE ยังเป็นของเก่า */
+  outdated: boolean
+  /** true = หอพักยังไม่ได้กรอกเบอร์โทร ติดตั้งไม่ได้ */
+  contactMissing: boolean
+  channelReady: boolean
+}
+
+const COLUMN_MISSING_HINT =
+  "ตารางฐานข้อมูลยังไม่มีคอลัมน์สำหรับ Rich Menu กรุณารัน database_patch_add_line_richmenu.sql ใน Supabase SQL Editor ก่อน"
+
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return error.code === "42703" || (error.message || "").includes("richmenu_")
+}
+
+/** สร้าง client ที่ bypass RLS ได้ — เรียกได้เฉพาะหลังตรวจสิทธิ์ด้วยโค้ดแล้วเท่านั้น */
+function getServiceClient(fallback: Awaited<ReturnType<typeof createClient>>) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (url && key && !key.includes("placeholder")) {
+    return createSupabaseServiceClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
+  }
+  return fallback
+}
+
+/**
+ * ตรวจว่าผู้เรียกเป็นแอดมินของหอพักนี้จริง
+ *
+ * ใช้ pattern เดียวกับ savePropertyLogoUrl — ตรวจ role กับ workspace ด้วยโค้ดก่อน
+ * แล้วจึงเขียนด้วย service role client
+ */
+async function assertWorkspaceAdmin(workspaceId: string) {
+  if (!workspaceId) {
+    return { ok: false as const, error: "ไม่พบรหัสหอพัก (workspace)" }
+  }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { ok: false as const, error: "ไม่ได้เข้าสู่ระบบหรือเซสชันหมดอายุ" }
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role, workspace_id")
+    .eq("id", user.id)
+    .single()
+
+  if (profileError || !profile) {
+    return { ok: false as const, error: "ไม่พบข้อมูลสิทธิ์ผู้ใช้งาน" }
+  }
+
+  const isAdmin = profile.role === "admin" || profile.role === "super_admin"
+  const isSameWorkspace = profile.workspace_id === workspaceId || profile.role === "super_admin"
+  if (!isAdmin || !isSameWorkspace) {
+    return { ok: false as const, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการเมนู LINE" }
+  }
+
+  return { ok: true as const, supabase, db: getServiceClient(supabase) }
+}
+
+function resolveAppUrl(): string {
+  let appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").trim()
+  while (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1)
+  if (!appUrl) return ""
+  return appUrl.startsWith("http://") || appUrl.startsWith("https://") ? appUrl : `https://${appUrl}`
+}
+
+async function readSettings(
+  db: ReturnType<typeof getServiceClient>,
+  workspaceId: string
+): Promise<{ row: RichMenuSettingsRow | null; error?: string }> {
+  const { data, error } = await db
+    .from("workspace_line_settings")
+    .select(
+      "channel_access_token, liff_id, richmenu_id, richmenu_image_url, richmenu_installed_at, richmenu_contact_uri, richmenu_liff_id, richmenu_enabled"
+    )
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingColumnError(error)) return { row: null, error: COLUMN_MISSING_HINT }
+    return { row: null, error: error.message }
+  }
+  return { row: (data as RichMenuSettingsRow | null) ?? null }
+}
+
+/** อ่านสถานะเมนูปัจจุบันสำหรับแสดงในหน้าตั้งค่า */
+export async function getRichMenuStatusAction(workspaceId: string) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    const { row, error } = await readSettings(auth.db, workspaceId)
+    if (error) return { success: false, error }
+
+    const { data: ws } = await auth.db
+      .from("workspaces")
+      .select("tax_phone")
+      .eq("id", workspaceId)
+      .maybeSingle()
+
+    const currentContactUri = phoneToContactUri(ws?.tax_phone)
+    const currentLiffId = row?.liff_id?.trim() || DEFAULT_LIFF_ID
+    const customImageUrl = row?.richmenu_image_url?.trim() || ""
+    const appUrl = resolveAppUrl()
+    const installed = !!row?.richmenu_id
+
+    const status: RichMenuStatus = {
+      // คอลัมน์เพิ่งเพิ่มทีหลัง แถวเก่าที่ยังเป็น null ให้ถือว่าเปิดอยู่ (ตรงกับ default ของคอลัมน์)
+      enabled: row?.richmenu_enabled !== false,
+      installed,
+      installedAt: row?.richmenu_installed_at || null,
+      customImageUrl,
+      effectiveImageUrl: customImageUrl || `${appUrl}${DEFAULT_TENANT_MENU_IMAGE_PATH}`,
+      requiredWidth: TENANT_RICHMENU_TEMPLATE.size.width,
+      requiredHeight: TENANT_RICHMENU_TEMPLATE.size.height,
+      currentContactUri,
+      installedContactUri: row?.richmenu_contact_uri || "",
+      outdated:
+        installed &&
+        (row?.richmenu_contact_uri !== currentContactUri || row?.richmenu_liff_id !== currentLiffId),
+      contactMissing: !currentContactUri,
+      channelReady: !!row?.channel_access_token?.trim() && row.channel_access_token !== "placeholder"
+    }
+
+    return { success: true, data: status }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอ่านสถานะเมนู LINE"
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * บันทึก URL ภาพเมนูที่เจ้าหออัปโหลดขึ้น Storage แล้ว
+ *
+ * ตัวไฟล์อัปโหลดจากเบราว์เซอร์ตรงเข้า bucket (pattern เดียวกับโลโก้หอพัก) แล้วส่งแค่ URL
+ * มาที่นี่ — ฝั่งนี้ดึงไบต์กลับมาตรวจซ้ำเสมอ ไม่เชื่อผลตรวจจากเบราว์เซอร์
+ * ส่งค่าว่างมาเพื่อกลับไปใช้ภาพต้นแบบของระบบ
+ */
+export async function saveRichMenuImageAction(workspaceId: string, imageUrl: string) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    const trimmed = (imageUrl || "").trim()
+
+    if (trimmed) {
+      if (!/^https?:\/\//i.test(trimmed)) {
+        return { success: false, error: "ลิงก์ภาพไม่ถูกต้อง" }
+      }
+      const check = await fetchAndCheckImage(trimmed)
+      if (!check.ok) return { success: false, error: check.error }
+    }
+
+    const { error } = await auth.db
+      .from("workspace_line_settings")
+      .update({ richmenu_image_url: trimmed || null, updated_at: new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+
+    if (error) {
+      if (isMissingColumnError(error)) return { success: false, error: COLUMN_MISSING_HINT }
+      throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกภาพเมนู"
+    return { success: false, error: message }
+  }
+}
+
+type FetchedImage = { ok: true; buffer: Buffer; type: "image/png" | "image/jpeg" } | { ok: false; error: string }
+
+async function fetchAndCheckImage(url: string): Promise<FetchedImage> {
+  let res: Response
+  try {
+    res = await fetch(url, { cache: "no-store" })
+  } catch {
+    return { ok: false, error: "ดาวน์โหลดไฟล์ภาพไม่สำเร็จ กรุณาลองอัปโหลดใหม่" }
+  }
+  if (!res.ok) {
+    return { ok: false, error: `ดาวน์โหลดไฟล์ภาพไม่สำเร็จ (HTTP ${res.status})` }
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer())
+  const check = checkRichMenuImage(buffer, TENANT_RICHMENU_TEMPLATE)
+  if (!check.ok) return { ok: false, error: check.error }
+
+  return { ok: true, buffer, type: check.type }
+}
+
+async function lineRequest(
+  url: string,
+  token: string,
+  init: RequestInit = {}
+): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; error: string }> {
+  let res: Response
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) }
+    })
+  } catch {
+    return { ok: false, error: "เชื่อมต่อ LINE API ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" }
+  }
+
+  const text = await res.text()
+  if (!res.ok) {
+    console.error(`LINE richmenu API ${init.method || "GET"} ${url} → ${res.status} ${text}`)
+    return { ok: false, error: `LINE ตอบกลับว่าไม่สำเร็จ (HTTP ${res.status}) — ${text.slice(0, 200)}` }
+  }
+
+  try {
+    return { ok: true, body: text ? (JSON.parse(text) as Record<string, unknown>) : {} }
+  } catch {
+    return { ok: true, body: {} }
+  }
+}
+
+/**
+ * เปิด/ปิดการใช้งานเมนูล่างของหอพักนี้
+ *
+ * ปิด = ยกเลิกเมนูเริ่มต้นของ channel เท่านั้น ตัวเมนูยังอยู่บน LINE และภาพที่อัปโหลดไว้ยังอยู่
+ * จึงกดเปิดกลับได้ทันทีโดยไม่ต้องสร้างเมนูใหม่และไม่ต้องอัปโหลดภาพซ้ำ
+ * (ต่างจาก removeRichMenuAction ที่ลบตัวเมนูทิ้งจริง)
+ */
+export async function setRichMenuEnabledAction(workspaceId: string, enabled: boolean) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    const { row, error: readError } = await readSettings(auth.db, workspaceId)
+    if (readError) return { success: false, error: readError }
+
+    const channelAccessToken = row?.channel_access_token?.trim() || ""
+    const hasToken = !!channelAccessToken && channelAccessToken !== "placeholder"
+    const richMenuId = row?.richmenu_id || null
+
+    // แตะ LINE เฉพาะเมื่อมีเมนูติดตั้งอยู่จริง — ถ้ายังไม่เคยติดตั้งก็แค่จำค่าสวิตช์ไว้เฉย ๆ
+    if (richMenuId && hasToken) {
+      if (enabled) {
+        const applied = await lineRequest(
+          `https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`,
+          channelAccessToken,
+          { method: "POST" }
+        )
+        if (!applied.ok) {
+          // เมนูอาจถูกลบไปแล้วจากฝั่ง LINE (เช่นลบมือใน OA Manager) — ล้างค่าที่จำไว้
+          // แล้วบอกให้ติดตั้งใหม่ ดีกว่าปล่อยให้สวิตช์เปิดค้างโดยไม่มีเมนูจริง
+          await auth.db
+            .from("workspace_line_settings")
+            .update({ richmenu_id: null, richmenu_installed_at: null, richmenu_enabled: true })
+            .eq("workspace_id", workspaceId)
+          return {
+            success: false,
+            error: "ไม่พบเมนูเดิมบน LINE แล้ว (อาจถูกลบไปก่อนหน้านี้) กรุณากดติดตั้งเมนูใหม่อีกครั้ง"
+          }
+        }
+      } else {
+        const unset = await lineRequest(
+          "https://api.line.me/v2/bot/user/all/richmenu",
+          channelAccessToken,
+          { method: "DELETE" }
+        )
+        if (!unset.ok) return { success: false, error: unset.error }
+      }
+    }
+
+    const { error: saveError } = await auth.db
+      .from("workspace_line_settings")
+      .update({ richmenu_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+
+    if (saveError) {
+      if (isMissingColumnError(saveError)) return { success: false, error: COLUMN_MISSING_HINT }
+      throw saveError
+    }
+
+    return { success: true, data: { enabled, appliedToLine: !!richMenuId && hasToken } }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเปลี่ยนสถานะเมนู LINE"
+    return { success: false, error: message }
+  }
+}
+
+/** สร้างเมนูใบใหม่จากค่าปัจจุบัน สลับให้ผู้ติดตามทุกคน แล้วลบใบเก่า */
+export async function installRichMenuAction(workspaceId: string) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const { row, error: readError } = await readSettings(auth.db, workspaceId)
+    if (readError) return { success: false, error: readError }
+
+    if (row?.richmenu_enabled === false) {
+      return {
+        success: false,
+        error: "หอพักนี้ปิดการใช้งานเมนูล่างอยู่ กรุณาเปิดสวิตช์ก่อนติดตั้งเมนู"
+      }
+    }
+
+    const channelAccessToken = row?.channel_access_token?.trim() || ""
+    if (!channelAccessToken || channelAccessToken === "placeholder") {
+      return {
+        success: false,
+        error: "ยังไม่ได้ตั้งค่า Channel Access Token ของหอพักนี้ กรุณาเชื่อมต่อ LINE OA ให้เสร็จก่อน"
+      }
+    }
+
+    const { data: ws } = await auth.db
+      .from("workspaces")
+      .select("tax_phone")
+      .eq("id", workspaceId)
+      .maybeSingle()
+
+    const contactUri = phoneToContactUri(ws?.tax_phone)
+    if (!contactUri) {
+      return {
+        success: false,
+        error:
+          "เมนูมีปุ่ม \"ติดต่อหอพัก\" แต่ยังไม่ได้กรอกเบอร์โทรศัพท์ติดต่อ " +
+          "กรุณากรอกที่หน้า ตั้งค่า › การเงิน/ภาษี ก่อนติดตั้งเมนู"
+      }
+    }
+
+    const liffId = row?.liff_id?.trim() || DEFAULT_LIFF_ID
+    const appUrl = resolveAppUrl()
+    const imageUrl = row?.richmenu_image_url?.trim() || `${appUrl}${DEFAULT_TENANT_MENU_IMAGE_PATH}`
+    if (!row?.richmenu_image_url?.trim() && !appUrl) {
+      return {
+        success: false,
+        error: "ระบบยังไม่ได้ตั้งค่า NEXT_PUBLIC_APP_URL จึงหาภาพต้นแบบไม่ได้ กรุณาอัปโหลดภาพเมนูเอง"
+      }
+    }
+
+    const image = await fetchAndCheckImage(imageUrl)
+    if (!image.ok) return { success: false, error: image.error }
+
+    let menu
+    try {
+      menu = buildTenantRichMenu({ liffId, workspaceId, contactUri })
+    } catch (buildError) {
+      const message = buildError instanceof Error ? buildError.message : "สร้างผังเมนูไม่สำเร็จ"
+      return { success: false, error: message }
+    }
+
+    // 1. สร้างเมนูใบใหม่
+    const created = await lineRequest("https://api.line.me/v2/bot/richmenu", channelAccessToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(menu)
+    })
+    if (!created.ok) return { success: false, error: created.error }
+
+    const richMenuId = typeof created.body.richMenuId === "string" ? created.body.richMenuId : ""
+    if (!richMenuId) {
+      return { success: false, error: "LINE ไม่ได้คืนรหัสเมนูกลับมา กรุณาลองใหม่อีกครั้ง" }
+    }
+
+    // 2. อัปโหลดภาพใส่เมนูใบใหม่ (เมนูที่ไม่มีภาพใช้งานไม่ได้ ถ้าพลาดตรงนี้ต้องลบใบใหม่ทิ้ง)
+    const uploaded = await lineRequest(
+      `https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`,
+      channelAccessToken,
+      { method: "POST", headers: { "Content-Type": image.type }, body: new Uint8Array(image.buffer) }
+    )
+    if (!uploaded.ok) {
+      await lineRequest(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, channelAccessToken, {
+        method: "DELETE"
+      })
+      return { success: false, error: uploaded.error }
+    }
+
+    // 3. สลับให้ผู้ติดตามทุกคนใน channel เห็นเมนูใบใหม่
+    const applied = await lineRequest(
+      `https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`,
+      channelAccessToken,
+      { method: "POST" }
+    )
+    if (!applied.ok) {
+      await lineRequest(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, channelAccessToken, {
+        method: "DELETE"
+      })
+      return { success: false, error: applied.error }
+    }
+
+    // 4. ลบใบเก่าที่ระบบเคยสร้างไว้ (1 channel เก็บได้ 1,000 เมนู ถ้าไม่ลบจะบวมจนติดตั้งไม่ได้)
+    //    ลบเฉพาะใบที่ระบบเราสร้าง ไม่ไปแตะเมนูที่เจ้าหอสร้างเองไว้ใน LINE OA Manager
+    if (row?.richmenu_id && row.richmenu_id !== richMenuId) {
+      const removed = await lineRequest(
+        `https://api.line.me/v2/bot/richmenu/${row.richmenu_id}`,
+        channelAccessToken,
+        { method: "DELETE" }
+      )
+      if (!removed.ok) {
+        console.warn(`ลบ rich menu ใบเก่า ${row.richmenu_id} ไม่สำเร็จ: ${removed.error}`)
+      }
+    }
+
+    const installedAt = new Date().toISOString()
+    const { error: saveError } = await auth.db
+      .from("workspace_line_settings")
+      .update({
+        richmenu_id: richMenuId,
+        richmenu_installed_at: installedAt,
+        richmenu_contact_uri: contactUri,
+        richmenu_liff_id: liffId,
+        updated_at: installedAt
+      })
+      .eq("workspace_id", workspaceId)
+
+    if (saveError) {
+      if (isMissingColumnError(saveError)) return { success: false, error: COLUMN_MISSING_HINT }
+      throw saveError
+    }
+
+    return { success: true, data: { richMenuId, installedAt } }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการติดตั้งเมนู LINE"
+    return { success: false, error: message }
+  }
+}
+
+/** เอาเมนูออกจาก LINE OA (ผู้ติดตามจะกลับไปไม่มีเมนูล่าง) */
+export async function removeRichMenuAction(workspaceId: string) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    const { row, error: readError } = await readSettings(auth.db, workspaceId)
+    if (readError) return { success: false, error: readError }
+
+    const channelAccessToken = row?.channel_access_token?.trim() || ""
+    if (!row?.richmenu_id) {
+      return { success: false, error: "ยังไม่มีเมนูที่ติดตั้งไว้ในระบบ" }
+    }
+    if (!channelAccessToken || channelAccessToken === "placeholder") {
+      return { success: false, error: "ยังไม่ได้ตั้งค่า Channel Access Token ของหอพักนี้" }
+    }
+
+    // ยกเลิกเมนูเริ่มต้นก่อน แล้วจึงลบตัวเมนู — สลับลำดับจะลบไม่ได้เพราะยังถูกใช้เป็น default อยู่
+    const unset = await lineRequest("https://api.line.me/v2/bot/user/all/richmenu", channelAccessToken, {
+      method: "DELETE"
+    })
+    if (!unset.ok) return { success: false, error: unset.error }
+
+    const deleted = await lineRequest(
+      `https://api.line.me/v2/bot/richmenu/${row.richmenu_id}`,
+      channelAccessToken,
+      { method: "DELETE" }
+    )
+    if (!deleted.ok) {
+      console.warn(`ลบ rich menu ${row.richmenu_id} ไม่สำเร็จ: ${deleted.error}`)
+    }
+
+    const { error: saveError } = await auth.db
+      .from("workspace_line_settings")
+      .update({
+        richmenu_id: null,
+        richmenu_installed_at: null,
+        richmenu_contact_uri: null,
+        richmenu_liff_id: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("workspace_id", workspaceId)
+
+    if (saveError) {
+      if (isMissingColumnError(saveError)) return { success: false, error: COLUMN_MISSING_HINT }
+      throw saveError
+    }
+
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการนำเมนูออกจาก LINE"
+    return { success: false, error: message }
+  }
+}

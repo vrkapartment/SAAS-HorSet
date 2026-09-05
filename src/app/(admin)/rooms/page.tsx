@@ -80,6 +80,7 @@ import { calculateDepositProration, checkIfBreakContract, computeStandardDeposit
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
 import { packWorkspaceAndRoom } from "@/lib/urlPacker"
+import { DEFAULT_LIFF_ID } from "@/lib/lineLiff"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
 
@@ -231,7 +232,7 @@ function RoomsContent() {
   const [disconnectSubmitting, setDisconnectSubmitting] = useState(false)
   
   const [selectedRoom, setSelectedRoom] = useState<RoomItem | null>(null)
-  const [workspaceLiffId, setWorkspaceLiffId] = useState("2010442620-H4josaDy")
+  const [workspaceLiffId, setWorkspaceLiffId] = useState(DEFAULT_LIFF_ID)
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
     type: "room" | "type" | "tenant"

@@ -2,8 +2,112 @@
 
 import { useState, useEffect, Suspense } from "react"
 import Script from "next/script"
-import { Sparkles, MessageSquare, Phone, Home, Loader2, CheckCircle2, AlertCircle, User } from "lucide-react"
+import { Sparkles, MessageSquare, Phone, Home, Loader2, CheckCircle2, AlertCircle, User, Building, ChevronRight } from "lucide-react"
 import { unpackWorkspaceAndRoom } from "@/lib/urlPacker"
+import { getLiffUrlParam } from "@/lib/liffUrlParams"
+import { DEFAULT_BOT_BASIC_ID, DEFAULT_BOT_DISPLAY_NAME, DEFAULT_LIFF_ID } from "@/lib/lineLiff"
+import {
+  buildPortalUrl,
+  normalizePortalAction,
+  type PortalResolveResponse,
+  type PortalRoomOption
+} from "@/lib/portalLiff"
+
+/**
+ * หน้านี้รับสองหน้าที่ เพราะเป็น LIFF Endpoint URL ของ channel
+ *
+ *   1. ค่าเริ่มต้น — ฟอร์มลงทะเบียนผู้เช่า (ผูก LINE UID เข้ากับห้อง) ตามลิงก์ที่แอดมินส่งให้
+ *   2. `?to=portal` — ตัวจ่ายงานของ rich menu: หาห้องของผู้เช่าแล้วเด้งไปหน้า /portal
+ *
+ * ที่ต้องอยู่หน้าเดียวกันเพราะ LIFF บังคับว่าหน้าที่เรียก liff.login() ต้องอยู่ใต้ Endpoint URL
+ * ที่ตั้งไว้ใน LINE Developers Console เท่านั้น ถ้าแยกเป็นอีก route ผู้เช่าจะ login ไม่ผ่าน
+ * (ปลายทาง /portal ไม่ติดกฎนี้ เพราะยืนยันตัวตนด้วย signed token ไม่ได้ใช้ LIFF)
+ */
+
+/** สถานะพิเศษของโหมด rich menu — null คือแสดงฟอร์มลงทะเบียนตามปกติ */
+type PortalView =
+  | { kind: "redirecting" }
+  | { kind: "choose"; rooms: { room: PortalRoomOption; url: string }[] }
+  | { kind: "not_registered" }
+  | { kind: "error"; message: string }
+
+/** จอของโหมด rich menu (เลือกห้อง / ยังไม่ลงทะเบียน / ผิดพลาด) — ใช้ดีไซน์เดียวกับฟอร์มลงทะเบียน */
+function PortalStateCard({ view }: { view: Exclude<PortalView, { kind: "redirecting" }> }) {
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden font-sans">
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[320px] h-[320px] bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/3 w-[260px] h-[260px] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
+
+      <div className="w-full max-w-md z-10">
+        <div className="bg-slate-900/40 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-2xl shadow-emerald-950/5 space-y-6">
+          {view.kind === "choose" && (
+            <>
+              <div className="space-y-1.5">
+                <h2 className="text-xl font-black text-slate-100 flex items-center gap-2">
+                  <Building className="w-5 h-5 text-emerald-400" />
+                  เลือกห้องที่ต้องการดู
+                </h2>
+                <p className="text-xs text-slate-400 font-semibold">
+                  บัญชี LINE ของคุณผูกไว้กับ {view.rooms.length} ห้อง กรุณาเลือกห้องที่ต้องการ
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                {view.rooms.map(({ room, url }) => (
+                  <a
+                    key={`${room.workspaceId}:${room.roomId}`}
+                    href={url}
+                    className="flex items-center justify-between gap-3 p-4 bg-slate-950/50 border border-slate-900/80 rounded-2xl hover:border-emerald-500/50 transition-colors active:scale-[0.99]"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-sm font-bold text-slate-100 truncate">ห้อง {room.roomNumber}</p>
+                      <p className="text-[11px] text-slate-400 truncate">{room.workspaceName}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
+
+          {view.kind === "not_registered" && (
+            <div className="text-center space-y-5">
+              <div className="inline-flex items-center justify-center p-4 bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20">
+                <MessageSquare className="w-12 h-12" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-black text-slate-100">ยังไม่พบห้องพักที่ผูกกับบัญชี LINE นี้</h2>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  บัญชี LINE ที่คุณใช้อยู่ยังไม่ได้ลงทะเบียนเป็นผู้เช่าในระบบ
+                  กรุณาขอ &quot;ลิงก์ลงทะเบียนผู้เช่า&quot; จากผู้ดูแลหอพัก
+                  เนื่องจากลิงก์ลงทะเบียนต้องระบุห้องพักของคุณมาด้วย
+                </p>
+              </div>
+            </div>
+          )}
+
+          {view.kind === "error" && (
+            <div className="text-center space-y-5">
+              <div className="inline-flex items-center justify-center p-4 bg-rose-500/10 text-rose-400 rounded-full border border-rose-500/20">
+                <AlertCircle className="w-12 h-12" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-black text-slate-100">เปิดหน้าบิลไม่สำเร็จ</h2>
+                <p className="text-xs text-slate-400 leading-relaxed">{view.message}</p>
+              </div>
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-colors active:scale-[0.98]"
+              >
+                ลองใหม่อีกครั้ง
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function TenantRegisterContent() {
   const [liffLoaded, setLiffLoaded] = useState(false)
@@ -19,8 +123,9 @@ function TenantRegisterContent() {
   const [error, setError] = useState("")
   const [alreadyRegistered, setAlreadyRegistered] = useState(false)
   const [pageInitializing, setPageInitializing] = useState(true)
-  const [botBasicId, setBotBasicId] = useState("@423xmlwo")
-  const [botDisplayName, setBotDisplayName] = useState("แชทบิลอัตโนมัติ")
+  const [botBasicId, setBotBasicId] = useState(DEFAULT_BOT_BASIC_ID)
+  const [botDisplayName, setBotDisplayName] = useState(DEFAULT_BOT_DISPLAY_NAME)
+  const [portalView, setPortalView] = useState<PortalView | null>(null)
 
   // ฟังก์ชันล้างเบอร์โทรศัพท์ให้อยู่ในฟอร์แมตตัวเลข 10 หลัก
   const handlePhoneChange = (val: string) => {
@@ -28,64 +133,8 @@ function TenantRegisterContent() {
     setPhone(clean)
   }
 
-  // ฟังก์ชันสากลสำหรับดักจับพารามิเตอร์จาก URL ค้นหาทั้งใน Search และ Hash (สำหรับ LINE LIFF State)
-  const getUrlParam = (name: string): string => {
-    if (typeof window === "undefined") return ""
-
-    // 1. ดักจับจาก URL Search ปกติ
-    const searchParams = new URLSearchParams(window.location.search)
-    let val = searchParams.get(name)
-    if (val) return val
-
-    // 2. ดึงค่า liff.state จาก URL Search หรือ Hash
-    let liffState = searchParams.get("liff.state")
-    if (!liffState) {
-      const hash = window.location.hash
-      if (hash) {
-        // ค้นหา liff.state= ใน hash เช่น #liff.state=... หรือ #/path?liff.state=...
-        const stateMatch = hash.match(/liff\.state=([^&]+)/)
-        if (stateMatch) {
-          liffState = stateMatch[1]
-        }
-      }
-    }
-
-    // 3. ถ้าเจอ liff.state ให้ทำการแกะพารามิเตอร์ข้างใน
-    if (liffState) {
-      try {
-        const decodedState = decodeURIComponent(liffState)
-        // กรณีเป็น query string เช่น /tenant-register?workspace_id=...&room_number=...
-        if (decodedState.includes("?")) {
-          const innerQuery = decodedState.substring(decodedState.indexOf("?"))
-          const innerParams = new URLSearchParams(innerQuery)
-          const innerVal = innerParams.get(name)
-          if (innerVal) return innerVal
-        } else if (decodedState.includes(`${name}=`)) {
-          // เผื่อไม่มีเครื่องหมายคำถามแต่มีคีย์-ค่า คั่นด้วย &
-          const innerParams = new URLSearchParams(decodedState)
-          const innerVal = innerParams.get(name)
-          if (innerVal) return innerVal
-        } else {
-          // กรณีเป็น JSON String
-          const parsed = JSON.parse(decodedState)
-          if (parsed[name]) return String(parsed[name])
-        }
-      } catch (e) {
-        console.error(`Error parsing liff.state for ${name}:`, e)
-      }
-    }
-
-    // 4. ดักจับเพิ่มเติมหากมี ? ปนใน hash ทั่วไป
-    const hash = window.location.hash
-    if (hash && hash.includes("?")) {
-      const hashQuery = hash.substring(hash.indexOf("?"))
-      const hashParams = new URLSearchParams(hashQuery)
-      const hashVal = hashParams.get(name)
-      if (hashVal) return hashVal
-    }
-
-    return ""
-  }
+  // ดักจับพารามิเตอร์จาก URL/liff.state (ดู src/lib/liffUrlParams.ts)
+  const getUrlParam = getLiffUrlParam
 
   const initLiff = async () => {
     if (liffLoaded) return
@@ -118,7 +167,7 @@ function TenantRegisterContent() {
       setRoomNumber(rNum)
 
       // เรียกดึง LIFF ID ที่ถูกต้องจากตารางฐานข้อมูลแยกราย Workspace
-      const defaultLiffId = "2010442620-H4josaDy"
+      const defaultLiffId = DEFAULT_LIFF_ID
       let activeLiffId = defaultLiffId // default fallback
       
       if (wsId) {
@@ -167,6 +216,60 @@ function TenantRegisterContent() {
       const userProfile = await liff.getProfile()
       setProfile(userProfile)
       setLineUserId(userProfile.userId)
+
+      // โหมด rich menu — ไม่ต้องลงทะเบียน แค่หาห้องของผู้เช่าแล้วเด้งไปหน้าบิล
+      if (getUrlParam("to") === "portal") {
+        const requestedAction = normalizePortalAction(getUrlParam("action"))
+        const accessToken = liff.getAccessToken()
+
+        if (!accessToken) {
+          setPortalView({
+            kind: "error",
+            message: "ไม่สามารถยืนยันตัวตนกับ LINE ได้ กรุณาปิดหน้านี้แล้วกดปุ่มในเมนูใหม่อีกครั้ง"
+          })
+          return
+        }
+
+        const resolveRes = await fetch("/api/portal-resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspaceId: wsId, accessToken })
+        })
+        const resolveData = (await resolveRes.json()) as PortalResolveResponse
+
+        if (!resolveData?.success) {
+          setPortalView({
+            kind: "error",
+            message: resolveData?.error || "ไม่สามารถตรวจสอบข้อมูลผู้เช่าได้ กรุณาลองใหม่อีกครั้ง"
+          })
+          return
+        }
+
+        if (resolveData.status === "resolved" && resolveData.room) {
+          // คงจอโหลดไว้จนกว่าจะย้ายหน้าเสร็จ ไม่ให้ฟอร์มลงทะเบียนแวบขึ้นมาให้เห็น
+          setPortalView({ kind: "redirecting" })
+          window.location.replace(buildPortalUrl(resolveData.room, requestedAction))
+          return
+        }
+
+        if (resolveData.status === "multiple" && Array.isArray(resolveData.rooms)) {
+          setPortalView({
+            kind: "choose",
+            rooms: resolveData.rooms.map(room => ({
+              room,
+              url: buildPortalUrl(room, requestedAction)
+            }))
+          })
+          return
+        }
+
+        // ยังไม่เคยลงทะเบียน — ถ้าลิงก์พาข้อมูลห้องมาด้วยก็ให้ตกไปใช้ฟอร์มลงทะเบียนตามปกติ
+        // ส่วนปุ่มจาก rich menu ที่ไม่รู้ว่าห้องไหน ต้องบอกให้ไปขอลิงก์จากแอดมิน
+        if (!(wsId && (rId || rNum))) {
+          setPortalView({ kind: "not_registered" })
+          return
+        }
+      }
 
       // ตรวจสอบว่าลิงก์นี้เปิดลงทะเบียนได้อีกหรือไม่ (สมัครได้ครั้งเดียวเท่านั้น)
       if (wsId && (rId || rNum)) {
@@ -281,7 +384,9 @@ function TenantRegisterContent() {
         onLoad={initLiff}
       />
 
-      {pageInitializing ? (
+      {portalView && portalView.kind !== "redirecting" ? (
+        <PortalStateCard view={portalView} />
+      ) : pageInitializing || portalView?.kind === "redirecting" ? (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden font-sans">
           {/* แสงวิบวับพรีเมียมรอบตัวหลังบ้าน (Ambient Glow Background) */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
