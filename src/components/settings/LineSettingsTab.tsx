@@ -43,6 +43,7 @@ import {
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
 import PricingModal from "@/features/subscription/components/PricingModal"
+import RichMenuPanel from "@/components/settings/RichMenuPanel"
 
 export default function LineSettingsTab() {
   const { t, locale } = useLanguage()
@@ -1099,6 +1100,11 @@ export default function LineSettingsTab() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Card: Rich Menu (แสดงเฉพาะเมื่อเชื่อมต่อ LINE OA แล้ว เพราะต้องมี channel access token ถึงจะติดตั้งเมนูได้) */}
+          {isConfigured && workspaceId && (
+            <RichMenuPanel workspaceId={workspaceId} channelConfigured={isConfigured} />
           )}
 
           {/* Card: Configuration Settings */}

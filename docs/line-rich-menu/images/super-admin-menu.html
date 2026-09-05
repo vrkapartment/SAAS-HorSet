@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>HorSet — Rich Menu ทีมงาน (2500x843)</title>
+<!--
+  ต้นฉบับภาพ rich menu ของ LINE OA ทีมงาน HorSet — แก้ไฟล์นี้แล้วสั่ง render ใหม่ด้วย
+      node scripts/build-line-richmenu-images.mjs
+
+  ใช้ชุดสีสว่างชุดเดียวกับเมนูผู้เช่า (คนละ OA กันอยู่แล้ว จึงไม่ต้องแยกด้วยสีพื้น)
+
+  ⚠️ ขนาดและตำแหน่งของทุกช่องต้องตรงกับ areas[].bounds ใน super-admin-oa-richmenu.json เป๊ะ ๆ
+       แถวเดียว y 0 สูง 843 : 0-833 | 833-1667 | 1667-2500
+-->
+<style>
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-SemiBold.ttf") format("truetype");
+    font-weight: 600;
+  }
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-Bold.ttf") format("truetype");
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-Medium.ttf") format("truetype");
+    font-weight: 500;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 2500px;
+    height: 843px;
+    overflow: hidden;
+    font-family: "Prompt", "Leelawadee UI", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .menu {
+    position: relative;
+    width: 2500px;
+    height: 843px;
+    background: #ffffff;
+  }
+
+  .cell {
+    position: absolute;
+    top: 0;
+    height: 843px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .cell-console { left: 0;      width: 833px; }
+  .cell-props   { left: 833px;  width: 834px; }
+  .cell-uid     { left: 1667px; width: 833px; }
+
+  /* ทุกช่องพื้นสีเดียวกัน เส้นพวกนี้จึงเป็นตัวเดียวที่บอกขอบปุ่ม ห้ามเอาออก */
+  .rule { position: absolute; top: 0; width: 4px; height: 843px; background: #e2e8f0; }
+  .rule-left  { left: 831px; }
+  .rule-right { left: 1665px; }
+
+  .icon { width: 150px; height: 150px; margin-bottom: 40px; }
+
+  .title    { font-size: 88px; font-weight: 700; line-height: 1.05; letter-spacing: -0.5px; color: #0f172a; }
+  .subtitle { font-size: 46px; font-weight: 500; margin-top: 18px; color: #64748b; }
+
+  .ink-blue    { color: #2563eb; }
+  .ink-emerald { color: #059669; }
+  .ink-indigo  { color: #4f46e5; }
+</style>
+</head>
+<body>
+<div class="menu">
+
+  <!-- ปุ่ม 1 : คอนโซลทีมงาน -->
+  <div class="cell cell-console">
+    <svg class="icon ink-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2.6" y="4" width="18.8" height="16" rx="2.2"/>
+      <path d="M2.6 9.2h18.8"/>
+      <circle cx="6" cy="6.6" r="0.75"/>
+      <circle cx="8.6" cy="6.6" r="0.75"/>
+    </svg>
+    <div class="title">ภาพรวมระบบ</div>
+    <div class="subtitle">คอนโซลทีมงาน HorSet</div>
+  </div>
+
+  <!-- ปุ่ม 2 : จัดการหอพัก -->
+  <div class="cell cell-props">
+    <svg class="icon ink-emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 21V5.2A2.2 2.2 0 016.2 3h7.6A2.2 2.2 0 0116 5.2V21"/>
+      <path d="M16 10.4h2.8A2.2 2.2 0 0121 12.6V21"/>
+      <path d="M3 21h18"/>
+      <path d="M7.6 7.4h1.4"/><path d="M11 7.4h1.4"/>
+      <path d="M7.6 11.4h1.4"/><path d="M11 11.4h1.4"/>
+      <path d="M7.6 15.4h1.4"/><path d="M11 15.4h1.4"/>
+    </svg>
+    <div class="title">จัดการหอพัก</div>
+    <div class="subtitle">ลูกค้าทุกหอในระบบ</div>
+  </div>
+
+  <!-- ปุ่ม 3 : ขอ LINE User ID (ส่งข้อความ #MYID ให้ webhook ตอบกลับ) -->
+  <div class="cell cell-uid">
+    <svg class="icon ink-indigo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2.6" y="5" width="18.8" height="14" rx="2.2"/>
+      <circle cx="8.6" cy="10.8" r="2.3"/>
+      <path d="M5 16.4c.85-1.6 2.1-2.4 3.6-2.4s2.75.8 3.6 2.4"/>
+      <path d="M15.2 10h3.4"/>
+      <path d="M15.2 13.6h3.4"/>
+    </svg>
+    <div class="title">ขอ LINE ID</div>
+    <div class="subtitle">ผูกบัญชีรับแจ้งเตือน</div>
+  </div>
+
+  <div class="rule rule-left"></div>
+  <div class="rule rule-right"></div>
+
+</div>
+</body>
+</html>

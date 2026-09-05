@@ -42,6 +42,7 @@ import { createClient } from "@/lib/supabase/client"
 import PullToRefresh from "@/components/PullToRefresh"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { parseUtilitySegments, formatSegmentRoomLabel } from "@/lib/billSegments"
+import { parsePortalFocusAction, type PortalFocusAction } from "@/lib/portalLiff"
 import { DynamicText } from "@/lib/translations/DynamicText"
 import { LanguageToggle } from "@/components/LanguageToggle"
 import { ThemeToggle } from "@/components/ThemeToggle"
@@ -52,6 +53,9 @@ interface BillHistoryItem {
   amount: number
   status: "paid" | "unpaid" | "pending"
 }
+
+/** การ์ดที่ ?action= จาก rich menu ชี้ให้เลื่อนไปหา (null = ไม่ได้เจาะจง ให้อยู่หัวหน้าบิลตามปกติ) */
+type PortalFocusSection = PortalFocusAction | null
 
 const optimizeImage = (file: File): Promise<Blob> => {
   return new Promise((resolve, reject) => {
@@ -109,7 +113,18 @@ export default function TenantPortal() {
   const { t } = useLanguage()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  
+
+  // ปุ่มใน rich menu ของ LINE ส่ง ?action= มาบอกว่าผู้เช่ากดปุ่มอะไรเข้ามา (ดู src/lib/portalLiff.ts)
+  // เพื่อเลื่อนจอไปที่การ์ดนั้นให้ทันที ไม่ต้องให้ผู้เช่าเลื่อนหาเองในหน้าที่ยาวมาก
+  const qrSectionRef = useRef<HTMLDivElement | null>(null)
+  const uploadSectionRef = useRef<HTMLDivElement | null>(null)
+  const historySectionRef = useRef<HTMLDivElement | null>(null)
+  const didFocusActionRef = useRef(false)
+  const [focusSection, setFocusSection] = useState<PortalFocusSection>(null)
+
+  /** ห้องนี้ยังไม่เคยมีบิลออกมาเลย (คนละเรื่องกับบิลที่จ่ายครบแล้ว) */
+  const [noBillYet, setNoBillYet] = useState(false)
+
   const [isDemo, setIsDemo] = useState(false)
   const [roomNumber, setRoomNumber] = useState("")
   const [tenantName, setTenantName] = useState("")
@@ -302,12 +317,17 @@ export default function TenantPortal() {
             status: b.status === "paid" ? "paid" : b.status === "pending" ? "pending" : "unpaid"
           }))
           setHistory(hist)
+          setNoBillYet(false)
         } else {
           setBill(null)
           setBillStatus("paid") // default to clean state if no bills
           setUploadedSlip(null)
           setBillingCycle(t("tenant_portal.no_cycle_yet"))
           setHistory([])
+          // ห้องนี้ยังไม่เคยมีบิลออกมาเลย — ต้องแยกจาก "จ่ายครบแล้ว" ให้ชัด ไม่งั้นผู้เช่าที่เพิ่ง
+          // ลงทะเบียนแล้วกดปุ่มใน rich menu จะเจอข้อความ "ยอดชำระของคุณเสร็จเรียบร้อย!"
+          // ทั้งที่ยังไม่เคยมีบิลให้จ่าย (ยอดในการ์ดบิลก็จะเป็นค่าตั้งต้นของหอ ไม่ใช่ยอดจริง)
+          setNoBillYet(true)
         }
       } else if ((res as any).fallback) {
         setIsDemo(true)
@@ -375,7 +395,40 @@ export default function TenantPortal() {
     }
   }, [])
 
+  // เลื่อนจอไปยังการ์ดที่ปุ่มใน rich menu ระบุมา แล้วขึ้นขอบเรืองแสงสั้น ๆ ให้เห็นว่าคือกล่องไหน
+  //
+  // ทำครั้งเดียวต่อการเปิดหน้า (didFocusActionRef) เพราะ poll ทุก 30 วินาทีจะทำให้ billStatus
+  // เปลี่ยนค่าได้เรื่อย ๆ — ถ้าไม่กันไว้ ผู้เช่าจะถูกดึงจอกลับมาที่การ์ดเดิมกลางทางที่กำลังอ่านอยู่
+  //
+  // ไม่เรียก fileInputRef.click() ให้อัตโนมัติ เพราะเบราว์เซอร์บล็อกการเปิดตัวเลือกไฟล์
+  // ที่ไม่ได้เกิดจากการกดของผู้ใช้ (หน้านี้มาจากการ redirect จึงไม่มี user gesture ติดมา)
+  useEffect(() => {
+    if (pageLoading || didFocusActionRef.current) return
+    if (typeof window === "undefined") return
 
+    const raw = new URLSearchParams(window.location.search).get("action") || ""
+    const target: PortalFocusSection = parsePortalFocusAction(raw)
+    if (!target) {
+      didFocusActionRef.current = true
+      return
+    }
+
+    // การ์ด QR/อัปโหลดไม่ถูก render เมื่อบิลจ่ายครบแล้ว และกล่องอัปโหลดหายไปตอนสลิปรอตรวจสอบ
+    // — กรณีนั้นถอยไปเลื่อนที่การ์ด QR (ซึ่งมีสถานะ "รอตรวจสอบ" อยู่) แทน
+    const node =
+      target === "history"
+        ? historySectionRef.current
+        : target === "slip"
+          ? uploadSectionRef.current || qrSectionRef.current
+          : qrSectionRef.current
+    if (!node) return
+
+    didFocusActionRef.current = true
+    node.scrollIntoView({ behavior: "smooth", block: "center" })
+    setFocusSection(target)
+    const highlightTimer = setTimeout(() => setFocusSection(null), 2600)
+    return () => clearTimeout(highlightTimer)
+  }, [pageLoading, billStatus])
 
   // Helper to calculate late days
   const calculateLateDays = (cycleStr: string): number => {
@@ -766,20 +819,27 @@ export default function TenantPortal() {
 
   if (pageLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center p-4">
-        <div className="relative flex flex-col items-center max-w-sm w-full text-center space-y-6">
-          <div className="absolute w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl -top-12 animate-pulse pointer-events-none" />
-          <div className="absolute w-48 h-48 bg-blue-500/10 rounded-full blur-3xl -bottom-12 animate-pulse pointer-events-none" />
-          <div className="relative flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full border-4 border-slate-300 dark:border-slate-900 border-t-emerald-500 animate-spin" />
-            <Building className="absolute w-6 h-6 text-emerald-500 animate-bounce" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-lg font-bold tracking-wide text-slate-900 dark:text-slate-100 animate-pulse">{t("tenant_portal.loading_bill")}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{t("tenant_portal.loading_wait")}</p>
-          </div>
-          <div className="text-[10px] text-slate-500 tracking-wider uppercase border border-slate-300/60 dark:border-slate-900/60 rounded-full px-3 py-1 bg-slate-100/40 dark:bg-slate-950/40">
-            Secure Connection • SAAS HorSet
+      <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 font-sans flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute bottom-1/4 left-1/3 w-[260px] h-[260px] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
+
+        {/* จัดทรงการ์ดให้ตรงกับจอโหลดของหน้า /tenant-register ที่พาผู้เช่ามาที่นี่ตอนกดปุ่มใน rich menu
+            (กรอบไอคอน + หัวข้อ + คำอธิบาย ตำแหน่งเดียวกัน) เพื่อให้สองจอต่อกันแล้วไม่กระตุก */}
+        <div className="w-full max-w-md z-10">
+          <div className="glass-panel border border-slate-200/60 dark:border-slate-900/60 rounded-3xl p-8 flex flex-col items-center gap-6 text-center">
+            <div className="relative flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full border-4 border-slate-300 dark:border-slate-900 border-t-emerald-500 animate-spin" />
+              <Building className="absolute w-6 h-6 text-emerald-500" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-lg font-bold tracking-wide text-slate-900 dark:text-slate-100">{t("tenant_portal.loading_bill")}</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t("tenant_portal.loading_wait")}</p>
+            </div>
+
+            <div className="text-[10px] text-slate-500 tracking-wider uppercase border border-slate-300/60 dark:border-slate-900/60 rounded-full px-3 py-1 bg-slate-100/40 dark:bg-slate-950/40">
+              Secure Connection • SAAS HorSet
+            </div>
           </div>
         </div>
       </div>
@@ -819,7 +879,23 @@ export default function TenantPortal() {
 
       {/* กล่องเนื้อหาแบบโมบาย (Mobile Layout Wrapper) */}
       <main className="max-w-md mx-auto px-4 pt-6 space-y-6">
-        
+
+        {noBillYet ? (
+          /* ยังไม่เคยมีบิลของห้องนี้ — แสดงการ์ดนี้แทนทั้งหน้า เพราะการ์ดบิล/QR/ประวัติ
+             จะโชว์แต่ค่าตั้งต้นของหอกับกล่องเปล่า ซึ่งทำให้ผู้เช่าเข้าใจผิดว่ามีบิลอยู่ */
+          <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <Calendar className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{t("tenant_portal.no_bill_title")}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
+                {t("tenant_portal.no_bill_desc")}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* บิลหลักประจำเดือน */}
         <div className="glass-panel rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/5 rounded-full blur-xl pointer-events-none" />
@@ -1068,7 +1144,14 @@ export default function TenantPortal() {
 
         {/* หน้าจอโอนเงินสแกน QR พร้อมเพย์ (แสดงเฉพาะเมื่อยังไม่จ่าย หรือรอยืนยัน) */}
         {billStatus !== "paid" && (
-          <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-5">
+          <div
+            ref={qrSectionRef}
+            className={`glass-card rounded-2xl border p-6 space-y-5 transition-shadow duration-500 ${
+              focusSection === "qr"
+                ? "border-blue-500/60 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/10"
+                : "border-slate-200/60 dark:border-slate-900/60"
+            }`}
+          >
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
               <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400" /> {t("tenant_portal.scan_promptpay_title")}
             </h3>
@@ -1124,7 +1207,7 @@ export default function TenantPortal() {
 
             {/* ฟอร์มอัปโหลดส่งสลิป */}
             {billStatus === "unpaid" ? (
-              <div className="space-y-3.5 pt-2">
+              <div ref={uploadSectionRef} className="space-y-3.5 pt-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2">
                     <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -1147,7 +1230,11 @@ export default function TenantPortal() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="w-full py-8 bg-gradient-to-b from-blue-50 to-slate-100 dark:from-blue-950/20 dark:to-slate-950/40 border border-dashed border-blue-500/35 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-3 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all shadow-lg hover:shadow-blue-500/5 group cursor-pointer"
+                  className={`w-full py-8 bg-gradient-to-b from-blue-50 to-slate-100 dark:from-blue-950/20 dark:to-slate-950/40 border border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all shadow-lg hover:shadow-blue-500/5 group cursor-pointer ${
+                    focusSection === "slip"
+                      ? "border-blue-500 ring-2 ring-blue-500/40 shadow-blue-500/15"
+                      : "border-blue-500/35 hover:border-blue-400"
+                  }`}
                 >
                   {uploading ? (
                     <div className="flex flex-col items-center gap-2">
@@ -1201,7 +1288,14 @@ export default function TenantPortal() {
         )}
 
         {/* ประวัติการรับบิลย้อนหลัง */}
-        <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-4">
+        <div
+          ref={historySectionRef}
+          className={`glass-card rounded-2xl border p-6 space-y-4 transition-shadow duration-500 ${
+            focusSection === "history"
+              ? "border-indigo-500/60 ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-500/10"
+              : "border-slate-200/60 dark:border-slate-900/60"
+          }`}
+        >
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
             <History className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> {t("tenant_portal.history_title")}
           </h3>
@@ -1227,6 +1321,8 @@ export default function TenantPortal() {
             ))}
           </div>
         </div>
+          </>
+        )}
 
       </main>
       </div>

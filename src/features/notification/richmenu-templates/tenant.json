@@ -1,0 +1,48 @@
+{
+  "size": { "width": 2500, "height": 1686 },
+  "selected": true,
+  "name": "HorSet Tenant Menu v1",
+  "chatBarText": "เมนูผู้เช่า",
+  "areas": [
+    {
+      "bounds": { "x": 0, "y": 0, "width": 1250, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "บิลเดือนนี้",
+        "uri": "https://liff.line.me/{{LIFF_ID}}?to=portal&workspace_id={{WORKSPACE_ID}}"
+      }
+    },
+    {
+      "bounds": { "x": 1250, "y": 0, "width": 1250, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "QR พร้อมเพย์",
+        "uri": "https://liff.line.me/{{LIFF_ID}}?to=portal&workspace_id={{WORKSPACE_ID}}&action=qr"
+      }
+    },
+    {
+      "bounds": { "x": 0, "y": 843, "width": 833, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "ส่งสลิป",
+        "uri": "https://liff.line.me/{{LIFF_ID}}?to=portal&workspace_id={{WORKSPACE_ID}}&action=slip"
+      }
+    },
+    {
+      "bounds": { "x": 833, "y": 843, "width": 834, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "ประวัติบิล",
+        "uri": "https://liff.line.me/{{LIFF_ID}}?to=portal&workspace_id={{WORKSPACE_ID}}&action=history"
+      }
+    },
+    {
+      "bounds": { "x": 1667, "y": 843, "width": 833, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "ติดต่อเจ้าหน้าที่",
+        "uri": "{{CONTACT_URI}}"
+      }
+    }
+  ]
+}
