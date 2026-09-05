@@ -12,7 +12,8 @@
     "search": "ค้นหา...",
     "thai": "ไทย",
     "english": "อังกฤษ",
-    "profile_settings": "ตั้งค่าโปรไฟล์ & รหัสผ่าน"
+    "profile_settings": "ตั้งค่าโปรไฟล์ & รหัสผ่าน",
+    "back": "ย้อนกลับ"
   },
   "cookie_consent": {
     "message": "เว็บไซต์นี้ใช้คุกกี้เพื่อจดจำการตั้งค่าและวิเคราะห์การใช้งาน เพื่อพัฒนาประสบการณ์การใช้งานของคุณ",
@@ -583,7 +584,19 @@
     "status_pending_history": "รอตรวจสอบ",
     "share_title": "QR ชำระเงิน ห้อง {room}",
     "share_text_full": "QR Code สำหรับชำระเงินค่าเช่าห้องพักห้อง {room} ยอดชำระ {amount} บาท",
-    "share_text_fallback": "QR Code ชำระเงิน ห้อง {room} ยอดชำระ {amount} บาท"
+    "share_text_fallback": "QR Code ชำระเงิน ห้อง {room} ยอดชำระ {amount} บาท",
+    "history_empty_title": "ยังไม่มีประวัติบิล",
+    "history_empty_desc": "เมื่อหอพักออกบิลให้ห้องของคุณ ประวัติย้อนหลังทุกเดือนจะแสดงที่นี่ พร้อมเลขมิเตอร์ไฟและน้ำของแต่ละรอบ",
+    "history_view_all": "ดูประวัติทั้งหมด",
+    "unit_short": "หน่วย",
+    "per_unit_short": "บาท/หน่วย",
+    "min_charge_note": "คิดขั้นต่ำ {units} หน่วย",
+    "penalty_label": "ค่าปรับชำระล่าช้า",
+    "day_short": "วัน",
+    "vat_label": "ภาษีมูลค่าเพิ่ม",
+    "total_label": "ยอดรวมทั้งสิ้น",
+    "history_error_title": "เปิดประวัติบิลไม่สำเร็จ",
+    "history_error_desc": "ลิงก์อาจหมดอายุหรือไม่ถูกต้อง กรุณากดปุ่มในเมนู LINE ใหม่อีกครั้ง หรือติดต่อผู้ดูแลหอพักเพื่อขอลิงก์ใหม่"
   },
   "permissions_tab": {
     "err_login_required": "กรุณาเข้าสู่ระบบก่อนใช้งานหน้านี้",

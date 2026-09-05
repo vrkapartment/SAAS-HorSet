@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState, useEffect, useMemo, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined
@@ -36,7 +37,8 @@ import {
   Share2
 } from "lucide-react"
 import { generatePromptPayPayload } from "@/lib/promptpay"
-import { getTenantPortalData, getTenantPortalDataNoLoginAction } from "@/features/tenant/actions"
+import { usePortalData } from "./PortalDataProvider"
+import PortalLoadingScreen from "./PortalLoadingScreen"
 import { updateBillStatus } from "@/features/billing/actions"
 import { createClient } from "@/lib/supabase/client"
 import PullToRefresh from "@/components/PullToRefresh"
@@ -109,18 +111,31 @@ const optimizeImage = (file: File): Promise<Blob> => {
   });
 };
 
-export default function TenantPortal() {
+function TenantPortalContent() {
   const { t } = useLanguage()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // ปุ่มใน rich menu ของ LINE ส่ง ?action= มาบอกว่าผู้เช่ากดปุ่มอะไรเข้ามา (ดู src/lib/portalLiff.ts)
   // เพื่อเลื่อนจอไปที่การ์ดนั้นให้ทันที ไม่ต้องให้ผู้เช่าเลื่อนหาเองในหน้าที่ยาวมาก
   const qrSectionRef = useRef<HTMLDivElement | null>(null)
   const uploadSectionRef = useRef<HTMLDivElement | null>(null)
-  const historySectionRef = useRef<HTMLDivElement | null>(null)
   const didFocusActionRef = useRef(false)
   const [focusSection, setFocusSection] = useState<PortalFocusSection>(null)
+
+  /**
+   * ลิงก์ไปหน้าประวัติบิล โดยพา workspace_id/room_id/token เดิมไปด้วย
+   *
+   * อ่านผ่าน useSearchParams ไม่ใช่ window.location เพราะ window ไม่มีตอน SSR
+   * ถ้าแยกสองทางจะได้ href คนละค่าระหว่าง server กับ client แล้ว hydration ไม่ตรงกัน
+   */
+  const historyHref = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("action")
+    const qs = params.toString()
+    return qs ? `/portal/history?${qs}` : "/portal/history"
+  }, [searchParams])
 
   /** ห้องนี้ยังไม่เคยมีบิลออกมาเลย (คนละเรื่องกับบิลที่จ่ายครบแล้ว) */
   const [noBillYet, setNoBillYet] = useState(false)
@@ -129,7 +144,8 @@ export default function TenantPortal() {
   const [roomNumber, setRoomNumber] = useState("")
   const [tenantName, setTenantName] = useState("")
   const [billingCycle, setBillingCycle] = useState("")
-  const [isLoginFree, setIsLoginFree] = useState(false)
+  // ข้อมูลบิลทั้งหมดโหลดที่ layout ครั้งเดียว (ดู PortalDataProvider) หน้านี้แค่หยิบมาแปลงลงจอ
+  const { result, loading: pageLoading, isLoginFree, reload } = usePortalData()
   
   const [bill, setBill] = useState<any>(null)
   const [billStatus, setBillStatus] = useState<"unpaid" | "pending" | "paid">("unpaid")
@@ -144,7 +160,6 @@ export default function TenantPortal() {
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [history, setHistory] = useState<BillHistoryItem[]>([])
   const [baseRent, setBaseRent] = useState(4500)
-  const [pageLoading, setPageLoading] = useState(true)
   const [commonFee, setCommonFee] = useState(50)
   const [waterRate, setWaterRate] = useState(18)
   const [electricRate, setElectricRate] = useState(7)
@@ -201,199 +216,146 @@ export default function TenantPortal() {
     return cycleStr
   }
 
-  const loadPortalData = async (isInitial = false) => {
-    if (isInitial) {
-      setPageLoading(true)
-    }
-    let wsId = ""
-    let rId = ""
-    let rNum = ""
-    let token = ""
-
-    if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search)
-      wsId = searchParams.get("workspace_id") || ""
-      rId = searchParams.get("room_id") || ""
-      // room_number = ลิงก์รูปแบบเก่าที่ยังค้างอยู่ใน LINE ของผู้เช่า ยังรับไว้ให้เปิดได้
-      // (ฝั่ง server จะปฏิเสธเองถ้าเลขห้องนั้นซ้ำกันหลายอาคารจนระบุไม่ได้ว่าห้องไหน)
-      rNum = searchParams.get("room_number") || ""
-      token = searchParams.get("token") || ""
-    }
-
-    try {
-      let res
-      if (wsId && (rId || rNum)) {
-        setIsLoginFree(true)
-        res = await getTenantPortalDataNoLoginAction(wsId, rId ? { roomId: rId } : { roomNumber: rNum }, token)
+  // แปลงผลดิบจาก PortalDataProvider (layout) ลง state ของหน้านี้
+  //
+  // การโหลดจริงย้ายไปอยู่ที่ layout แล้ว เพื่อให้ /portal กับ /portal/history ใช้ข้อมูลชุดเดียวกัน
+  // ไม่ต้องยิง server action ซ้ำตอนสลับหน้า — ที่นี่เหลือแค่หน้าที่ "แปลงค่าลงจอ" เท่านั้น
+  useEffect(() => {
+    if (!result) return
+    const res = result
+    if (res.success && res.data) {
+      setIsDemo(false)
+      const data = res.data
+      setRoomNumber(data.roomNumber || t("tenant_portal.room_fallback"))
+      setTenantName(data.tenantName)
+      setBaseRent(data.baseRent)
+      if (data.promptPayId) {
+        setPromptPayId(data.promptPayId)
+      }
+      if (data.promptPayName) {
+        setPromptPayName(data.promptPayName)
+      }
+      if (data.workspaceName) {
+        setWorkspaceName(data.workspaceName)
+      }
+      if (data.workspaceAddress) {
+        setWorkspaceAddress(data.workspaceAddress)
+      }
+      if (data.workspacePhone) {
+        setWorkspacePhone(data.workspacePhone)
+      }
+      if (data.workspaceTaxId) {
+        setWorkspaceTaxId(data.workspaceTaxId)
+      }
+      if (data.commonFee !== undefined) {
+        setCommonFee(data.commonFee)
+      }
+      if (data.waterRate !== undefined) {
+        setWaterRate(data.waterRate)
+      }
+      if (data.electricRate !== undefined) {
+        setElectricRate(data.electricRate)
+      }
+      if (data.latePenaltyRate !== undefined) {
+        setLatePenaltyRate(data.latePenaltyRate)
+      }
+      if (data.waiveElectricMin !== undefined) {
+        setWaiveElectricMin(!!data.waiveElectricMin)
+      }
+      if (data.waiveWaterMin !== undefined) {
+        setWaiveWaterMin(!!data.waiveWaterMin)
+      }
+      if (data.waterMinChecked !== undefined) {
+        setWaterMinChecked(!!data.waterMinChecked)
+      }
+      if (data.waterMinUnit !== undefined) {
+        setWaterMinUnit(Number(data.waterMinUnit))
+      }
+      if (data.electricMinChecked !== undefined) {
+        setElectricMinChecked(!!data.electricMinChecked)
+      }
+      if (data.electricMinUnit !== undefined) {
+        setElectricMinUnit(Number(data.electricMinUnit))
+      }
+      setExtraExpenses(data.extraExpenses || [])
+      if (data.electricBillingMode === "building_total") {
+        setElectricBillingMode("building_total")
       } else {
-        setIsLoginFree(false)
-        res = await getTenantPortalData()
+        setElectricBillingMode("fixed_rate")
+      }
+      if (data.waterBillingMode === "building_total") {
+        setWaterBillingMode("building_total")
+      } else {
+        setWaterBillingMode("fixed_rate")
+      }
+      if (data.workspaceLogo) {
+        setWorkspaceLogo(data.workspaceLogo)
+      } else {
+        setWorkspaceLogo("")
       }
 
-      if (res.success && res.data) {
-        setIsDemo(false)
-        const data = res.data
-        setRoomNumber(data.roomNumber || t("tenant_portal.room_fallback"))
-        setTenantName(data.tenantName)
-        setBaseRent(data.baseRent)
-        if (data.promptPayId) {
-          setPromptPayId(data.promptPayId)
-        }
-        if (data.promptPayName) {
-          setPromptPayName(data.promptPayName)
-        }
-        if (data.workspaceName) {
-          setWorkspaceName(data.workspaceName)
-        }
-        if (data.workspaceAddress) {
-          setWorkspaceAddress(data.workspaceAddress)
-        }
-        if (data.workspacePhone) {
-          setWorkspacePhone(data.workspacePhone)
-        }
-        if (data.workspaceTaxId) {
-          setWorkspaceTaxId(data.workspaceTaxId)
-        }
-        if (data.commonFee !== undefined) {
-          setCommonFee(data.commonFee)
-        }
-        if (data.waterRate !== undefined) {
-          setWaterRate(data.waterRate)
-        }
-        if (data.electricRate !== undefined) {
-          setElectricRate(data.electricRate)
-        }
-        if (data.latePenaltyRate !== undefined) {
-          setLatePenaltyRate(data.latePenaltyRate)
-        }
-        if (data.waiveElectricMin !== undefined) {
-          setWaiveElectricMin(!!data.waiveElectricMin)
-        }
-        if (data.waiveWaterMin !== undefined) {
-          setWaiveWaterMin(!!data.waiveWaterMin)
-        }
-        if (data.waterMinChecked !== undefined) {
-          setWaterMinChecked(!!data.waterMinChecked)
-        }
-        if (data.waterMinUnit !== undefined) {
-          setWaterMinUnit(Number(data.waterMinUnit))
-        }
-        if (data.electricMinChecked !== undefined) {
-          setElectricMinChecked(!!data.electricMinChecked)
-        }
-        if (data.electricMinUnit !== undefined) {
-          setElectricMinUnit(Number(data.electricMinUnit))
-        }
-        setExtraExpenses(data.extraExpenses || [])
-        if (data.electricBillingMode === "building_total") {
-          setElectricBillingMode("building_total")
-        } else {
-          setElectricBillingMode("fixed_rate")
-        }
-        if (data.waterBillingMode === "building_total") {
-          setWaterBillingMode("building_total")
-        } else {
-          setWaterBillingMode("fixed_rate")
-        }
-        if (data.workspaceLogo) {
-          setWorkspaceLogo(data.workspaceLogo)
-        } else {
-          setWorkspaceLogo("")
-        }
+      const activeBills = data.bills as any[]
+      if (activeBills && activeBills.length > 0) {
+        // Latest bill is current bill
+        const latest = activeBills[0]
+        setBill(latest)
+        setBillStatus(latest.status)
+        setUploadedSlip(latest.slipUrl)
+        setBillingCycle(formatCycle(latest.billingCycle))
 
-        const activeBills = data.bills as any[]
-        if (activeBills && activeBills.length > 0) {
-          // Latest bill is current bill
-          const latest = activeBills[0]
-          setBill(latest)
-          setBillStatus(latest.status)
-          setUploadedSlip(latest.slipUrl)
-          setBillingCycle(formatCycle(latest.billingCycle))
+        // Rest are history
+        const hist: BillHistoryItem[] = activeBills.slice(1).map(b => ({
+          cycle: formatCycle(b.billingCycle),
+          amount: b.amount,
+          status: b.status === "paid" ? "paid" : b.status === "pending" ? "pending" : "unpaid"
+        }))
+        setHistory(hist)
+        setNoBillYet(false)
+      } else {
+        setBill(null)
+        setBillStatus("paid") // default to clean state if no bills
+        setUploadedSlip(null)
+        setBillingCycle(t("tenant_portal.no_cycle_yet"))
+        setHistory([])
+        // ห้องนี้ยังไม่เคยมีบิลออกมาเลย — ต้องแยกจาก "จ่ายครบแล้ว" ให้ชัด ไม่งั้นผู้เช่าที่เพิ่ง
+        // ลงทะเบียนแล้วกดปุ่มใน rich menu จะเจอข้อความ "ยอดชำระของคุณเสร็จเรียบร้อย!"
+        // ทั้งที่ยังไม่เคยมีบิลให้จ่าย (ยอดในการ์ดบิลก็จะเป็นค่าตั้งต้นของหอ ไม่ใช่ยอดจริง)
+        setNoBillYet(true)
+      }
+    } else if ((res as any).fallback) {
+      setIsDemo(true)
+      setRoomNumber("105")
+      setTenantName("คุณณัฐพล ใจดี")
+      setBillingCycle("มิถุนายน 2026")
+      setBaseRent(4500)
+      setLatePenaltyRate(100) // Fallback penalty rate for demo
 
-          // Rest are history
-          const hist: BillHistoryItem[] = activeBills.slice(1).map(b => ({
-            cycle: formatCycle(b.billingCycle),
-            amount: b.amount,
-            status: b.status === "paid" ? "paid" : b.status === "pending" ? "pending" : "unpaid"
-          }))
-          setHistory(hist)
-          setNoBillYet(false)
-        } else {
-          setBill(null)
-          setBillStatus("paid") // default to clean state if no bills
-          setUploadedSlip(null)
-          setBillingCycle(t("tenant_portal.no_cycle_yet"))
-          setHistory([])
-          // ห้องนี้ยังไม่เคยมีบิลออกมาเลย — ต้องแยกจาก "จ่ายครบแล้ว" ให้ชัด ไม่งั้นผู้เช่าที่เพิ่ง
-          // ลงทะเบียนแล้วกดปุ่มใน rich menu จะเจอข้อความ "ยอดชำระของคุณเสร็จเรียบร้อย!"
-          // ทั้งที่ยังไม่เคยมีบิลให้จ่าย (ยอดในการ์ดบิลก็จะเป็นค่าตั้งต้นของหอ ไม่ใช่ยอดจริง)
-          setNoBillYet(true)
-        }
-      } else if ((res as any).fallback) {
-        setIsDemo(true)
-        setRoomNumber("105")
-        setTenantName("คุณณัฐพล ใจดี")
-        setBillingCycle("มิถุนายน 2026")
-        setBaseRent(4500)
-        setLatePenaltyRate(100) // Fallback penalty rate for demo
-
-        const loadMyBill = () => {
-          const savedBills = getCookie("horset_bills")
-          if (savedBills) {
-            try {
-              const bills = JSON.parse(decodeURIComponent(savedBills))
-              const myBill = bills.find((b: any) => b.roomNumber === "105" && b.billingCycle === "2026-06")
-              if (myBill) {
-                setBill(myBill)
-                setBillStatus(myBill.status)
-                setUploadedSlip(myBill.slipUrl)
-              }
-            } catch (e) {
-              console.error(e)
+      const loadMyBill = () => {
+        const savedBills = getCookie("horset_bills")
+        if (savedBills) {
+          try {
+            const bills = JSON.parse(decodeURIComponent(savedBills))
+            const myBill = bills.find((b: any) => b.roomNumber === "105" && b.billingCycle === "2026-06")
+            if (myBill) {
+              setBill(myBill)
+              setBillStatus(myBill.status)
+              setUploadedSlip(myBill.slipUrl)
             }
+          } catch (e) {
+            console.error(e)
           }
         }
-        loadMyBill()
+      }
+      loadMyBill()
 
-        const demoHistory: BillHistoryItem[] = [
-          { cycle: "พฤษภาคม 2026", amount: 5120, status: "paid" },
-          { cycle: "เมษายน 2026", amount: 4950, status: "paid" },
-          { cycle: "มีนาคม 2026", amount: 5310, status: "paid" }
-        ]
-        setHistory(demoHistory)
-      }
-    } catch (e) {
-      console.error("Error loading portal data:", e)
-    } finally {
-      if (isInitial) {
-        setPageLoading(false)
-      }
+      const demoHistory: BillHistoryItem[] = [
+        { cycle: "พฤษภาคม 2026", amount: 5120, status: "paid" },
+        { cycle: "เมษายน 2026", amount: 4950, status: "paid" },
+        { cycle: "มีนาคม 2026", amount: 5310, status: "paid" }
+      ]
+      setHistory(demoHistory)
     }
-  }
-
-  useEffect(() => {
-    loadPortalData(true)
-    // Poll ทุก 30s เพื่ออัปเดตสถานะบิลอัตโนมัติ (ไม่ใช้ Supabase Realtime ที่นี่ เพราะหน้านี้เข้าถึงได้แบบไม่ต้อง
-    // login ผ่านลิงก์ LINE ด้วย token ซึ่งไม่มี RLS session ให้ subscribe ตรงจากเบราว์เซอร์ได้อย่างปลอดภัย)
-    // หยุด poll เมื่อแท็บถูกซ่อน (ประหยัด CPU ฝั่งเซิร์ฟเวอร์) แล้วรีเฟรชทันทีเมื่อกลับมาเปิดดูอีกครั้ง
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        loadPortalData(false)
-      }
-    }, 30000)
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        loadPortalData(false)
-      }
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-
-    return () => {
-      clearInterval(timer)
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
-  }, [])
+  }, [result, t])
 
   // เลื่อนจอไปยังการ์ดที่ปุ่มใน rich menu ระบุมา แล้วขึ้นขอบเรืองแสงสั้น ๆ ให้เห็นว่าคือกล่องไหน
   //
@@ -416,11 +378,7 @@ export default function TenantPortal() {
     // การ์ด QR/อัปโหลดไม่ถูก render เมื่อบิลจ่ายครบแล้ว และกล่องอัปโหลดหายไปตอนสลิปรอตรวจสอบ
     // — กรณีนั้นถอยไปเลื่อนที่การ์ด QR (ซึ่งมีสถานะ "รอตรวจสอบ" อยู่) แทน
     const node =
-      target === "history"
-        ? historySectionRef.current
-        : target === "slip"
-          ? uploadSectionRef.current || qrSectionRef.current
-          : qrSectionRef.current
+      target === "slip" ? uploadSectionRef.current || qrSectionRef.current : qrSectionRef.current
     if (!node) return
 
     didFocusActionRef.current = true
@@ -804,7 +762,7 @@ export default function TenantPortal() {
           setUploadedSlip(publicUrl)
           setBillStatus("pending")
           alert(t("tenant_portal.upload_success"))
-          loadPortalData()
+          reload()
         } else {
           alert(res.error || t("tenant_portal.err_save_slip_db"))
         }
@@ -818,36 +776,11 @@ export default function TenantPortal() {
 
 
   if (pageLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 font-sans flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
-        <div className="absolute bottom-1/4 left-1/3 w-[260px] h-[260px] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
-
-        {/* จัดทรงการ์ดให้ตรงกับจอโหลดของหน้า /tenant-register ที่พาผู้เช่ามาที่นี่ตอนกดปุ่มใน rich menu
-            (กรอบไอคอน + หัวข้อ + คำอธิบาย ตำแหน่งเดียวกัน) เพื่อให้สองจอต่อกันแล้วไม่กระตุก */}
-        <div className="w-full max-w-md z-10">
-          <div className="glass-panel border border-slate-200/60 dark:border-slate-900/60 rounded-3xl p-8 flex flex-col items-center gap-6 text-center">
-            <div className="relative flex items-center justify-center">
-              <div className="w-16 h-16 rounded-full border-4 border-slate-300 dark:border-slate-900 border-t-emerald-500 animate-spin" />
-              <Building className="absolute w-6 h-6 text-emerald-500" />
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-lg font-bold tracking-wide text-slate-900 dark:text-slate-100">{t("tenant_portal.loading_bill")}</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t("tenant_portal.loading_wait")}</p>
-            </div>
-
-            <div className="text-[10px] text-slate-500 tracking-wider uppercase border border-slate-300/60 dark:border-slate-900/60 rounded-full px-3 py-1 bg-slate-100/40 dark:bg-slate-950/40">
-              Secure Connection • SAAS HorSet
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <PortalLoadingScreen />
   }
 
   return (
-    <PullToRefresh onRefresh={async () => { await loadPortalData(false) }}>
+    <PullToRefresh onRefresh={async () => { await reload() }}>
       <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 font-sans pb-12 w-full flex-1 flex flex-col">
         {/* Header สไตล์ Mobile Portal */}
         <header className="glass-panel border-b border-slate-200/60 dark:border-slate-900/60 px-6 py-4 sticky top-0 z-20 flex justify-between items-center shrink-0">
@@ -1287,21 +1220,24 @@ export default function TenantPortal() {
           </div>
         )}
 
-        {/* ประวัติการรับบิลย้อนหลัง */}
-        <div
-          ref={historySectionRef}
-          className={`glass-card rounded-2xl border p-6 space-y-4 transition-shadow duration-500 ${
-            focusSection === "history"
-              ? "border-indigo-500/60 ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-500/10"
-              : "border-slate-200/60 dark:border-slate-900/60"
-          }`}
-        >
-          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
-            <History className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> {t("tenant_portal.history_title")}
-          </h3>
+        {/* ประวัติการรับบิลย้อนหลัง — โชว์ย่อ 3 รอบล่าสุด รายละเอียดเต็มอยู่ที่ /portal/history */}
+        <div className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+              <History className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> {t("tenant_portal.history_title")}
+            </h3>
+            {history.length > 0 && (
+              <Link
+                href={historyHref}
+                className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline shrink-0"
+              >
+                {t("tenant_portal.history_view_all")} →
+              </Link>
+            )}
+          </div>
 
           <div className="space-y-3 text-xs">
-            {history.map((h, idx) => (
+            {history.slice(0, 3).map((h, idx) => (
               <div key={idx} className="flex justify-between items-center p-3 bg-slate-100/40 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-900/80 rounded-xl">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-slate-500" />
@@ -1327,5 +1263,15 @@ export default function TenantPortal() {
       </main>
       </div>
     </PullToRefresh>
+  )
+}
+
+
+/** useSearchParams ต้องอยู่ใต้ Suspense ไม่งั้น Next บังคับให้ทั้งหน้าเป็น dynamic */
+export default function TenantPortal() {
+  return (
+    <Suspense fallback={<PortalLoadingScreen />}>
+      <TenantPortalContent />
+    </Suspense>
   )
 }
