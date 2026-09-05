@@ -12,7 +12,8 @@
     "search": "Search...",
     "thai": "Thai",
     "english": "English",
-    "profile_settings": "Profile & Password Settings"
+    "profile_settings": "Profile & Password Settings",
+    "back": "Back"
   },
   "cookie_consent": {
     "message": "This website uses cookies to remember your preferences and analyze site usage, to improve your experience.",
@@ -583,7 +584,19 @@
     "status_pending_history": "Under Review",
     "share_title": "Payment QR — Room {room}",
     "share_text_full": "QR Code for rent payment, Room {room}, amount due {amount} THB",
-    "share_text_fallback": "Payment QR Code, Room {room}, amount due {amount} THB"
+    "share_text_fallback": "Payment QR Code, Room {room}, amount due {amount} THB",
+    "history_empty_title": "No bill history yet",
+    "history_empty_desc": "Once your building issues a bill for your room, every past cycle will appear here together with the electricity and water meter readings.",
+    "history_view_all": "View all history",
+    "unit_short": "units",
+    "per_unit_short": "THB/unit",
+    "min_charge_note": "minimum {units} units charged",
+    "penalty_label": "Late payment fee",
+    "day_short": "days",
+    "vat_label": "VAT",
+    "total_label": "Total",
+    "history_error_title": "Could not open your bill history",
+    "history_error_desc": "The link may have expired or be invalid. Please tap the button in the LINE menu again, or ask your building for a new link."
   },
   "permissions_tab": {
     "err_login_required": "Please log in before using this page",

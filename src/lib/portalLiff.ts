@@ -31,8 +31,13 @@ export type PortalResolveResponse = {
 export const PORTAL_ACTIONS = ["bill", "qr", "slip", "history"] as const
 export type PortalAction = (typeof PORTAL_ACTIONS)[number]
 
-/** การ์ดที่ต้องเลื่อนไปหา — ไม่รวม "bill" ที่หมายถึงอยู่หัวหน้าบิลตามปกติ */
-export type PortalFocusAction = Exclude<PortalAction, "bill">
+/**
+ * การ์ดในหน้า /portal ที่ต้องเลื่อนไปหา
+ *
+ * ไม่รวม "bill" (อยู่หัวหน้าบิลตามปกติ) และไม่รวม "history" ที่กลายเป็นหน้าของตัวเองแล้ว
+ * (/portal/history) จึงเป็นปลายทางไม่ใช่ตำแหน่งให้เลื่อนหา
+ */
+export type PortalFocusAction = Exclude<PortalAction, "bill" | "history">
 
 export function normalizePortalAction(raw: string): PortalAction {
   const lowered = raw.trim().toLowerCase()
@@ -42,7 +47,7 @@ export function normalizePortalAction(raw: string): PortalAction {
 /** แปลงค่า ?action= ที่หน้า /portal ได้รับ ให้เป็นการ์ดที่ต้องเลื่อนไปหา (null = ไม่เจาะจง) */
 export function parsePortalFocusAction(raw: string): PortalFocusAction | null {
   const action = normalizePortalAction(raw)
-  return action === "bill" ? null : action
+  return action === "qr" || action === "slip" ? action : null
 }
 
 export function buildPortalUrl(room: PortalRoomOption, action: PortalAction): string {
@@ -51,6 +56,11 @@ export function buildPortalUrl(room: PortalRoomOption, action: PortalAction): st
     room_id: room.roomId,
     token: room.token
   })
+
+  // ประวัติบิลเป็นหน้าแยกของตัวเอง ที่เหลือเป็นการ์ดในหน้าบิลเดียวกัน
+  if (action === "history") {
+    return `/portal/history?${params.toString()}`
+  }
   if (action !== "bill") {
     params.set("action", action)
   }
