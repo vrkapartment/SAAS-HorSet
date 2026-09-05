@@ -16,8 +16,8 @@
       "bounds": { "x": 833, "y": 0, "width": 834, "height": 843 },
       "action": {
         "type": "uri",
-        "label": "จัดการหอพัก",
-        "uri": "{{APP_URL}}/super-admin/workspaces"
+        "label": "แพ็กเกจ",
+        "uri": "{{APP_URL}}/super-admin/plans"
       }
     },
     {
