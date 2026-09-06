@@ -1973,3 +1973,72 @@ export async function getLineQuotaAction(workspaceId: string, forceRefresh: bool
 
 
 
+
+/**
+ * ลบการเชื่อมต่อ LINE Admin ออกหนึ่งคน (บันทึกทันที ไม่ต้องกดอัปเดตซ้ำ)
+ *
+ * เดิมการลบทำได้เฉพาะตอนเข้าโหมดแก้ไข และแก้แค่ state ในหน้าจอ ต้องกด "อัปเดตการตั้งค่า"
+ * อีกทีถึงจะมีผลจริง — ปิดหน้าไปก่อนคือไม่มีอะไรเกิดขึ้น จึงแยกออกมาเป็น action ของตัวเอง
+ *
+ * ล้าง UID ออกจากทั้ง admin_line_user_id และ disabled_admin_line_user_ids พร้อมกัน
+ * ไม่งั้นคนที่ถูกลบจะยังค้างอยู่ในรายการ "ปิดแจ้งเตือน" เป็นขยะที่มองไม่เห็น
+ */
+export async function removeLineAdminAction(workspaceId: string, lineUserId: string) {
+  try {
+    if (!workspaceId) {
+      return { success: false, error: "ไม่พบรหัสหอพัก (workspace)" }
+    }
+    if (!lineUserId || !lineUserId.trim()) {
+      return { success: false, error: "ไม่พบรหัส LINE User ID ที่ต้องการลบ" }
+    }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const supabase = await createClient()
+    const target = lineUserId.trim()
+
+    const { data: current, error: readError } = await supabase
+      .from("workspace_line_settings")
+      .select("admin_line_user_id, disabled_admin_line_user_ids")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+
+    if (readError) throw readError
+    if (!current) {
+      return { success: false, error: "ไม่พบการตั้งค่า LINE ของหอพักนี้" }
+    }
+
+    const splitIds = (raw: string | null) =>
+      (raw || "")
+        .split(/[\s,\n]+/)
+        .map(id => id.trim())
+        .filter(id => id.length > 0)
+
+    const remainingAdmins = splitIds(current.admin_line_user_id).filter(id => id !== target)
+    const remainingDisabled = splitIds(current.disabled_admin_line_user_ids).filter(id => id !== target)
+
+    const { error: updateError } = await supabase
+      .from("workspace_line_settings")
+      .update({
+        admin_line_user_id: remainingAdmins.length > 0 ? remainingAdmins.join(", ") : null,
+        disabled_admin_line_user_ids: remainingDisabled.length > 0 ? remainingDisabled.join(",") : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("workspace_id", workspaceId)
+
+    if (updateError) throw updateError
+
+    return {
+      success: true,
+      data: {
+        adminLineUserId: remainingAdmins.join(", "),
+        disabledAdminLineUserIds: remainingDisabled.join(","),
+        remainingCount: remainingAdmins.length
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการลบการเชื่อมต่อ LINE Admin"
+    console.error("removeLineAdminAction Exception:", error)
+    return { success: false, error: message }
+  }
+}
