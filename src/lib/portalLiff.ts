@@ -34,10 +34,10 @@ export type PortalAction = (typeof PORTAL_ACTIONS)[number]
 /**
  * การ์ดในหน้า /portal ที่ต้องเลื่อนไปหา
  *
- * ไม่รวม "bill" (อยู่หัวหน้าบิลตามปกติ) และไม่รวม "history" ที่กลายเป็นหน้าของตัวเองแล้ว
- * (/portal/history) จึงเป็นปลายทางไม่ใช่ตำแหน่งให้เลื่อนหา
+ * เหลือแค่ "slip" — "history" กับ "qr" กลายเป็นหน้าของตัวเองแล้ว จึงเป็นปลายทาง
+ * ไม่ใช่ตำแหน่งให้เลื่อนหา ส่วน "bill" คืออยู่หัวหน้าบิลตามปกติ
  */
-export type PortalFocusAction = Exclude<PortalAction, "bill" | "history">
+export type PortalFocusAction = Exclude<PortalAction, "bill" | "history" | "qr">
 
 export function normalizePortalAction(raw: string): PortalAction {
   const lowered = raw.trim().toLowerCase()
@@ -46,8 +46,13 @@ export function normalizePortalAction(raw: string): PortalAction {
 
 /** แปลงค่า ?action= ที่หน้า /portal ได้รับ ให้เป็นการ์ดที่ต้องเลื่อนไปหา (null = ไม่เจาะจง) */
 export function parsePortalFocusAction(raw: string): PortalFocusAction | null {
-  const action = normalizePortalAction(raw)
-  return action === "qr" || action === "slip" ? action : null
+  return normalizePortalAction(raw) === "slip" ? "slip" : null
+}
+
+/** หน้าแยกของแต่ละ action — ที่ไม่อยู่ในนี้คือการ์ดในหน้าบิลเดียวกัน */
+const ACTION_PAGES: Partial<Record<PortalAction, string>> = {
+  history: "/portal/history",
+  qr: "/portal/qr"
 }
 
 export function buildPortalUrl(room: PortalRoomOption, action: PortalAction): string {
@@ -57,9 +62,9 @@ export function buildPortalUrl(room: PortalRoomOption, action: PortalAction): st
     token: room.token
   })
 
-  // ประวัติบิลเป็นหน้าแยกของตัวเอง ที่เหลือเป็นการ์ดในหน้าบิลเดียวกัน
-  if (action === "history") {
-    return `/portal/history?${params.toString()}`
+  const page = ACTION_PAGES[action]
+  if (page) {
+    return `${page}?${params.toString()}`
   }
   if (action !== "bill") {
     params.set("action", action)

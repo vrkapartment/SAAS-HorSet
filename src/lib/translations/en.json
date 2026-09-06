@@ -596,7 +596,12 @@
     "vat_label": "VAT",
     "total_label": "Total",
     "history_error_title": "Could not open your bill history",
-    "history_error_desc": "The link may have expired or be invalid. Please tap the button in the LINE menu again, or ask your building for a new link."
+    "history_error_desc": "The link may have expired or be invalid. Please tap the button in the LINE menu again, or ask your building for a new link.",
+    "qr_no_promptpay_title": "PromptPay is not set up yet",
+    "qr_no_promptpay_desc": "Please contact your building for payment details, or check the bill page for the breakdown.",
+    "qr_no_bill_desc": "Once your building issues a bill, the payment QR code with the amount will appear here.",
+    "qr_already_paid_desc": "This billing cycle is already paid — no further transfer is needed.",
+    "qr_save_hint": "Press and hold the QR image to save it, or use the button above to share."
   },
   "permissions_tab": {
     "err_login_required": "Please log in before using this page",

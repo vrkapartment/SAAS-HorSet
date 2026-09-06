@@ -36,7 +36,7 @@ import {
   X,
   Share2
 } from "lucide-react"
-import { generatePromptPayPayload } from "@/lib/promptpay"
+import { buildPromptPayQrDataUrl } from "@/lib/promptpayQr"
 import { usePortalData } from "./PortalDataProvider"
 import PortalLoadingScreen from "./PortalLoadingScreen"
 import { updateBillStatus } from "@/features/billing/actions"
@@ -487,92 +487,24 @@ function TenantPortalContent() {
     ? Number(bill.amount) 
     : (rentPrice + elecAmount + waterAmount + commonAreaFee + otherServiceAmount + extraExpensesSum)
 
+  // สร้างภาพ QR ผ่านตัวกลางที่ใช้ร่วมกับหน้า /portal/qr (ดู lib/promptpayQr.ts)
+  // เรียกใน callback ของ timer เพื่อไม่ให้ setState เกิดในจังหวะเดียวกับ render รอบแรก
   useEffect(() => {
     if (!promptPayId) return
 
-    const qrPayload = generatePromptPayPayload(promptPayId, totalAmount)
-    const qrRawUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrPayload)}&size=500x500&ecc=H`
-
-    setIsQrLoading(true)
-
-    const qrImg = new Image()
-    qrImg.crossOrigin = "anonymous"
-    qrImg.src = qrRawUrl
-
-    qrImg.onload = () => {
-      const canvas = document.createElement("canvas")
-      canvas.width = 500
-      canvas.height = 500
-      const ctx = canvas.getContext("2d")
-      if (!ctx) {
-        setCombinedQrUrl(qrRawUrl)
-        setIsQrLoading(false)
-        return
-      }
-
-      // Draw base QR code
-      ctx.drawImage(qrImg, 0, 0, 500, 500)
-
-      if (workspaceLogo) {
-        const logoImg = new Image()
-        logoImg.crossOrigin = "anonymous"
-        logoImg.src = workspaceLogo
-
-        logoImg.onload = () => {
-          try {
-            // Draw white rounded background for logo overlay to keep it scan-friendly
-            const bgSize = 86
-            const logoSize = 64
-            const radius = 12
-            const x = 250 - bgSize / 2
-            const y = 250 - bgSize / 2
-
-            ctx.fillStyle = "#ffffff"
-            ctx.beginPath()
-            ctx.moveTo(x + radius, y)
-            ctx.arcTo(x + bgSize, y, x + bgSize, y + bgSize, radius)
-            ctx.arcTo(x + bgSize, y + bgSize, x, y + bgSize, radius)
-            ctx.arcTo(x, y + bgSize, x, y, radius)
-            ctx.arcTo(x, y, x + bgSize, y, radius)
-            ctx.closePath()
-            ctx.fill()
-
-            // Draw logo centered
-            const lx = 250 - logoSize / 2
-            const ly = 250 - logoSize / 2
-            ctx.drawImage(logoImg, lx, ly, logoSize, logoSize)
-
-            setCombinedQrUrl(canvas.toDataURL("image/png"))
-          } catch (err) {
-            console.error("Error drawing logo on QR canvas:", err)
-            setCombinedQrUrl(qrRawUrl)
-          } finally {
-            setIsQrLoading(false)
-          }
-        }
-
-        logoImg.onerror = (err) => {
-          console.error("Error loading logo image for QR:", err)
-          try {
-            setCombinedQrUrl(canvas.toDataURL("image/png"))
-          } catch (e) {
-            setCombinedQrUrl(qrRawUrl)
-          }
-          setIsQrLoading(false)
-        }
-      } else {
-        try {
-          setCombinedQrUrl(canvas.toDataURL("image/png"))
-        } catch (e) {
-          setCombinedQrUrl(qrRawUrl)
-        }
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      setIsQrLoading(true)
+      const url = await buildPromptPayQrDataUrl({ promptPayId, amount: totalAmount, logoUrl: workspaceLogo })
+      if (!cancelled) {
+        setCombinedQrUrl(url)
         setIsQrLoading(false)
       }
-    }
+    }, 0)
 
-    qrImg.onerror = () => {
-      setCombinedQrUrl(qrRawUrl)
-      setIsQrLoading(false)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
     }
   }, [promptPayId, totalAmount, workspaceLogo])
 
@@ -1079,11 +1011,7 @@ function TenantPortalContent() {
         {billStatus !== "paid" && (
           <div
             ref={qrSectionRef}
-            className={`glass-card rounded-2xl border p-6 space-y-5 transition-shadow duration-500 ${
-              focusSection === "qr"
-                ? "border-blue-500/60 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/10"
-                : "border-slate-200/60 dark:border-slate-900/60"
-            }`}
+            className="glass-card rounded-2xl border border-slate-200/60 dark:border-slate-900/60 p-6 space-y-5"
           >
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
               <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400" /> {t("tenant_portal.scan_promptpay_title")}
@@ -1105,7 +1033,7 @@ function TenantPortalContent() {
                   </div>
                 ) : (
                   <img
-                    src={combinedQrUrl || `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(generatePromptPayPayload(promptPayId, totalAmount))}&size=200x200&ecc=H`}
+                    src={combinedQrUrl}
                     alt="PromptPay QR Code"
                     className="w-40 h-40 object-contain"
                   />
