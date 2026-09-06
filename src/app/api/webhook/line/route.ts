@@ -7,6 +7,7 @@ import {
   armSlipUpload,
   handleSlipBillChoice,
   handleSlipImage,
+  handleSlipRoomChoice,
   type LineTextMessage
 } from "@/features/notification/line-slip"
 
@@ -96,6 +97,13 @@ async function handleLineSlipEvent(args: {
         await replyToLine(event.replyToken || "", await armSlipUpload(ctx), channelAccessToken)
         return true
       }
+      // ผู้เช่าหลายห้องต้องผ่านสองขั้น: เลือกห้องก่อน แล้วค่อยเลือกรอบบิล
+      const pickedRoom = await handleSlipRoomChoice(ctx, data)
+      if (pickedRoom) {
+        await replyToLine(event.replyToken || "", pickedRoom, channelAccessToken)
+        return true
+      }
+
       const chosen = await handleSlipBillChoice(ctx, data)
       if (chosen) {
         await replyToLine(event.replyToken || "", chosen, channelAccessToken)
