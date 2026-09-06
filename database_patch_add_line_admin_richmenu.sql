@@ -37,6 +37,19 @@ alter table public.workspace_line_settings
 alter table public.workspace_line_settings
   add column if not exists richmenu_admin_linked_uids text;
 
+-- สวิตช์เปิด/ปิดเมนูผู้ดูแล แยกอิสระจาก richmenu_enabled (ซึ่งคุมเมนูผู้เช่า)
+--
+-- แยกกันเพราะมีเคสใช้จริง: หอที่ไม่อยากให้ผู้เช่ามีเมนูล่าง แต่เจ้าของหอยังอยากกดดูสรุป
+-- ในแชทเองได้ — ถ้าใช้สวิตช์ร่วมกันจะทำแบบนั้นไม่ได้เลย
+--
+-- ปิด = ถอดเมนูออกจากแอดมินทุกคนและลบตัวเมนูทิ้ง (เมนูผู้ดูแลผูกรายบุคคล ไม่มี default
+-- ให้ยกเลิกเหมือนเมนูผู้เช่า) เปิดกลับ = สร้างใหม่แล้วผูกให้ใหม่ ซึ่งไม่มีค่าอะไรให้เสีย
+-- เพราะเมนูผู้ดูแลใช้ภาพต้นแบบของระบบเสมอ ไม่มีภาพที่หอพักอัปโหลดเองให้ต้องเก็บไว้
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_enabled boolean not null default true;
+
+comment on column public.workspace_line_settings.richmenu_admin_enabled is
+  'false = ปิดเมนูผู้ดูแล (ถอดออกจากแอดมินทุกคน) — แยกอิสระจาก richmenu_enabled ที่คุมเมนูผู้เช่า';
 comment on column public.workspace_line_settings.richmenu_admin_id is
   'richMenuId ของเมนูแอดมิน ผูกรายบุคคลให้ UID ใน admin_line_user_id (null = ยังไม่ติดตั้ง)';
 comment on column public.workspace_line_settings.richmenu_admin_linked_uids is

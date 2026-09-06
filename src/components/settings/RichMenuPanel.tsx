@@ -20,6 +20,7 @@ import {
   installRichMenuAction,
   removeRichMenuAction,
   saveRichMenuImageAction,
+  setAdminRichMenuEnabledAction,
   setRichMenuEnabledAction,
   syncAdminRichMenuAction,
   type RichMenuStatus
@@ -54,6 +55,7 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
   const [removing, setRemoving] = useState(false)
   const [togglingEnabled, setTogglingEnabled] = useState(false)
   const [syncingAdmin, setSyncingAdmin] = useState(false)
+  const [togglingAdmin, setTogglingAdmin] = useState(false)
 
   const loadStatus = useCallback(async () => {
     if (!workspaceId) return
@@ -273,8 +275,39 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
     }
   }
 
-  const busy = uploading || installing || removing || togglingEnabled || syncingAdmin
+  const handleToggleAdminMenu = async () => {
+    if (!status) return
+    const next = !status.admin.enabled
+    if (!next && status.admin.installed && !confirm(t("line_settings.richmenu_admin_disable_confirm"))) return
+
+    setError(null)
+    setSuccess(null)
+    setTogglingAdmin(true)
+    try {
+      const res = await setAdminRichMenuEnabledAction(workspaceId, next)
+      if (!res.success) {
+        setError(res.error || t("line_settings.richmenu_admin_err_toggle"))
+        await loadStatus()
+        return
+      }
+      setSuccess(
+        next
+          ? t("line_settings.richmenu_admin_enabled_msg")
+              .replace("{linked}", String(res.data?.linked ?? 0))
+              .replace("{total}", String(res.data?.total ?? 0))
+          : t("line_settings.richmenu_admin_disabled_msg")
+      )
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("line_settings.richmenu_admin_err_toggle"))
+    } finally {
+      setTogglingAdmin(false)
+    }
+  }
+
+  const busy = uploading || installing || removing || togglingEnabled || syncingAdmin || togglingAdmin
   const enabled = status?.enabled !== false
+  const adminEnabled = status?.admin.enabled !== false
   const canInstall = channelConfigured && !!status && enabled && !status.contactMissing && !busy
 
   return (
@@ -525,8 +558,8 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
             {t("line_settings.richmenu_note")}
           </p>
 
-          {/* เมนูผู้ดูแล — เมนูใบที่สองที่ผูกให้เฉพาะแอดมิน ไม่ใช่เมนูเริ่มต้นของ channel */}
-          <div className={`pt-5 border-t border-slate-100 dark:border-slate-800 space-y-3 transition-all duration-300 ${enabled ? "" : "opacity-60 pointer-events-none select-none"}`}>
+          {/* เมนูผู้ดูแล — เมนูใบที่สองที่ผูกให้เฉพาะแอดมิน มีสวิตช์ของตัวเองแยกจากเมนูผู้เช่า */}
+          <div className="pt-5 border-t border-slate-100 dark:border-slate-800 space-y-3">
             <div className="flex items-start gap-3">
               <div className="p-2.5 bg-sky-500/10 text-sky-500 rounded-xl shrink-0">
                 <ShieldCheck className="w-5 h-5" />
@@ -541,7 +574,57 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
               </div>
             </div>
 
-            {status?.admin.adminCount === 0 ? (
+            {/* สวิตช์ของเมนูผู้ดูแล — คุมแยกจากเมนูผู้เช่า ปิดอันนี้ผู้เช่าไม่กระทบ */}
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-2.5 rounded-xl transition-colors shrink-0 ${
+                    adminEnabled
+                      ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                      : "bg-slate-100 dark:bg-slate-950 text-slate-400"
+                  }`}
+                >
+                  {adminEnabled ? <ShieldCheck className="w-5 h-5" /> : <PowerOff className="w-5 h-5" />}
+                </div>
+                <div className="space-y-0.5">
+                  <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">
+                    {t("line_settings.richmenu_admin_toggle_title")}
+                  </h5>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-bold leading-normal">
+                    {adminEnabled
+                      ? `🟢 ${t("line_settings.richmenu_admin_toggle_on")}`
+                      : `🔴 ${t("line_settings.richmenu_admin_toggle_off")}`}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleAdminMenu}
+                disabled={busy || !status?.admin.ready}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none ${
+                  adminEnabled ? "bg-sky-500" : "bg-slate-200 dark:bg-slate-800"
+                } ${busy || !status?.admin.ready ? "opacity-60 cursor-not-allowed" : ""}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out ${
+                    adminEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* ยังไม่ได้รัน SQL patch — สวิตช์กดไม่ได้ ต้องบอกเหตุผล ไม่ใช่ปล่อยให้จางเฉย ๆ */}
+            {status && !status.admin.ready && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-700/90 dark:text-amber-500/90 font-bold leading-relaxed">
+                  {t("line_settings.richmenu_admin_not_ready")}
+                </p>
+              </div>
+            )}
+
+            {!adminEnabled || !status?.admin.ready ? null : status?.admin.adminCount === 0 ? (
               <div className="p-4 bg-slate-50 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 rounded-2xl flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold leading-relaxed">

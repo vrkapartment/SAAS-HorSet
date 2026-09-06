@@ -12,7 +12,12 @@ import {
   phoneToContactUri,
   TENANT_RICHMENU_TEMPLATE
 } from "./richmenu"
-import { lineRequest, syncAdminRichMenu, teardownAdminRichMenu } from "./richmenu-admin"
+import {
+  ADMIN_MENU_COLUMN_HINT,
+  lineRequest,
+  syncAdminRichMenu,
+  teardownAdminRichMenu
+} from "./richmenu-admin"
 import { splitUids } from "./line-admin"
 
 /**
@@ -39,10 +44,15 @@ type RichMenuSettingsRow = {
   richmenu_admin_installed_at: string | null
   richmenu_admin_template_version: string | null
   richmenu_admin_linked_uids: string | null
+  richmenu_admin_enabled: boolean | null
 }
 
 /** สถานะของเมนูใบที่สองซึ่งผูกให้เฉพาะแอดมิน (ดู richmenu-admin.ts) */
 export type AdminRichMenuStatus = {
+  /** สวิตช์ของเมนูผู้ดูแล — แยกอิสระจาก enabled ของเมนูผู้เช่า */
+  enabled: boolean
+  /** false = คอลัมน์ของ patch นี้ยังไม่ถูกเพิ่ม จึงยังใช้เมนูผู้ดูแลไม่ได้ */
+  ready: boolean
   installed: boolean
   installedAt: string | null
   /** จำนวนแอดมินที่ผูก LINE ไว้กับหอนี้ (0 = ยังไม่มีใครให้ผูกเมนู) */
@@ -143,7 +153,7 @@ const BASE_COLUMNS =
   "channel_access_token, liff_id, richmenu_id, richmenu_image_url, richmenu_installed_at, richmenu_contact_uri, richmenu_liff_id, richmenu_enabled, richmenu_template_version, admin_line_user_id"
 
 const ADMIN_MENU_COLUMNS =
-  "richmenu_admin_id, richmenu_admin_installed_at, richmenu_admin_template_version, richmenu_admin_linked_uids"
+  "richmenu_admin_id, richmenu_admin_installed_at, richmenu_admin_template_version, richmenu_admin_linked_uids, richmenu_admin_enabled"
 
 /**
  * อ่านค่าตั้งค่าเมนูของหอพัก
@@ -198,19 +208,32 @@ function buildAdminStatus(
   const adminCount = splitUids(row?.admin_line_user_id).length
 
   if (!adminColumnsReady) {
-    return { installed: false, installedAt: null, adminCount, linkedCount: 0, needsSync: false }
+    return {
+      enabled: true,
+      ready: false,
+      installed: false,
+      installedAt: null,
+      adminCount,
+      linkedCount: 0,
+      needsSync: false
+    }
   }
 
+  const enabled = row?.richmenu_admin_enabled !== false
   const installed = !!row?.richmenu_admin_id
   const linkedCount = splitUids(row?.richmenu_admin_linked_uids).length
   const templateChanged = row?.richmenu_admin_template_version !== ADMIN_RICHMENU_TEMPLATE.name
 
   return {
+    enabled,
+    ready: true,
     installed,
     installedAt: row?.richmenu_admin_installed_at || null,
     adminCount,
     linkedCount,
-    needsSync: adminCount > 0 && (!installed || templateChanged || linkedCount < adminCount)
+    // ปิดสวิตช์อยู่ = ไม่มีอะไรให้ซิงก์ ไม่ควรขึ้นเตือนให้เจ้าหอกดทั้งที่ตั้งใจปิดเอง
+    needsSync:
+      enabled && adminCount > 0 && (!installed || templateChanged || linkedCount < adminCount)
   }
 }
 
@@ -372,20 +395,8 @@ export async function setRichMenuEnabledAction(workspaceId: string, enabled: boo
       }
     }
 
-    // เมนูผู้ดูแลเป็นเมนูรายบุคคล การยกเลิก default menu ไม่ได้ทำให้มันหายไปเอง
-    // ต้องถอดออกด้วย ไม่งั้นปิดสวิตช์แล้วแอดมินยังเห็นเมนูค้างอยู่คนเดียว
-    if (hasToken) {
-      if (enabled) {
-        await syncAdminRichMenu({
-          db: auth.db,
-          workspaceId,
-          channelAccessToken,
-          appUrl: resolveAppUrl()
-        })
-      } else {
-        await teardownAdminRichMenu({ db: auth.db, workspaceId, channelAccessToken })
-      }
-    }
+    // ตั้งใจไม่แตะเมนูผู้ดูแลตรงนี้ — สวิตช์นี้คุมเฉพาะเมนูผู้เช่า เมนูผู้ดูแลมีสวิตช์ของตัวเอง
+    // (setAdminRichMenuEnabledAction) เพราะมีหอที่ไม่อยากให้ผู้เช่ามีเมนู แต่เจ้าของหอยังอยากใช้
 
     const { error: saveError } = await auth.db
       .from("workspace_line_settings")
@@ -564,6 +575,65 @@ export async function installRichMenuAction(workspaceId: string) {
 }
 
 /**
+ * เปิด/ปิดเมนูผู้ดูแล — แยกอิสระจากสวิตช์ของเมนูผู้เช่า
+ *
+ * เมนูผู้ดูแลผูกเป็นรายบุคคล ไม่มี "เมนูเริ่มต้นของ channel" ให้ยกเลิกเหมือนเมนูผู้เช่า
+ * การปิดจึงต้องถอดออกจากทุกคนแล้วลบตัวเมนูทิ้งจริง ๆ ซึ่งไม่มีอะไรให้เสียเพราะเมนูนี้
+ * ใช้ภาพต้นแบบของระบบเสมอ เปิดกลับเมื่อไหร่ก็สร้างใหม่ได้ทันที
+ */
+export async function setAdminRichMenuEnabledAction(workspaceId: string, enabled: boolean) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const { row, error: readError, adminColumnsReady } = await readSettings(auth.db, workspaceId)
+    if (readError) return { success: false, error: readError }
+    if (!adminColumnsReady) return { success: false, error: ADMIN_MENU_COLUMN_HINT }
+
+    const channelAccessToken = row?.channel_access_token?.trim() || ""
+    const hasToken = !!channelAccessToken && channelAccessToken !== "placeholder"
+
+    // บันทึกสวิตช์ก่อนเสมอ เพราะ syncAdminRichMenu อ่านค่านี้เพื่อตัดสินใจว่าจะผูกไหม
+    const { error: saveError } = await auth.db
+      .from("workspace_line_settings")
+      .update({ richmenu_admin_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+
+    if (saveError) {
+      if (isMissingColumnError(saveError)) return { success: false, error: ADMIN_MENU_COLUMN_HINT }
+      throw saveError
+    }
+
+    if (!hasToken) {
+      return { success: true, data: { enabled, linked: 0, total: 0, appliedToLine: false } }
+    }
+
+    if (!enabled) {
+      await teardownAdminRichMenu({ db: auth.db, workspaceId, channelAccessToken })
+      return { success: true, data: { enabled, linked: 0, total: 0, appliedToLine: true } }
+    }
+
+    const result = await syncAdminRichMenu({
+      db: auth.db,
+      workspaceId,
+      channelAccessToken,
+      appUrl: resolveAppUrl()
+    })
+
+    if (!result.ok) return { success: false, error: result.error || "เปิดเมนูผู้ดูแลไม่สำเร็จ" }
+    return {
+      success: true,
+      data: { enabled, linked: result.linked, total: result.total, appliedToLine: true }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเปลี่ยนสถานะเมนูผู้ดูแล"
+    return { success: false, error: message }
+  }
+}
+
+/**
  * ผูกเมนูผู้ดูแลให้ตรงกับรายชื่อแอดมินปัจจุบัน โดยไม่ยุ่งกับเมนูผู้เช่า
  *
  * ใช้เมื่อเพิ่ม/ลบแอดมินแล้วอยากให้เมนูตามทันทีโดยไม่ต้องติดตั้งเมนูผู้เช่าใหม่ทั้งใบ
@@ -578,8 +648,8 @@ export async function syncAdminRichMenuAction(workspaceId: string) {
     const { row, error: readError } = await readSettings(auth.db, workspaceId)
     if (readError) return { success: false, error: readError }
 
-    if (row?.richmenu_enabled === false) {
-      return { success: false, error: "หอพักนี้ปิดการใช้งานเมนูล่างอยู่ กรุณาเปิดสวิตช์ก่อน" }
+    if (row?.richmenu_admin_enabled === false) {
+      return { success: false, error: "หอพักนี้ปิดเมนูผู้ดูแลอยู่ กรุณาเปิดสวิตช์ก่อน" }
     }
 
     const channelAccessToken = row?.channel_access_token?.trim() || ""
@@ -615,9 +685,8 @@ export async function removeRichMenuAction(workspaceId: string) {
       return { success: false, error: "ยังไม่ได้ตั้งค่า Channel Access Token ของหอพักนี้" }
     }
 
-    // เมนูผู้ดูแลผูกรายบุคคลไว้ ต้องถอดออกด้วย ไม่งั้นแอดมินจะเหลือเมนูค้างทั้งที่หอนี้เอาเมนูออกแล้ว
-    await teardownAdminRichMenu({ db: auth.db, workspaceId, channelAccessToken })
-
+    // ตั้งใจไม่แตะเมนูผู้ดูแล — ปุ่มนี้นำ "เมนูผู้เช่า" ออก เมนูผู้ดูแลถอดด้วยสวิตช์ของตัวเอง
+    //
     // ยกเลิกเมนูเริ่มต้นก่อน แล้วจึงลบตัวเมนู — สลับลำดับจะลบไม่ได้เพราะยังถูกใช้เป็น default อยู่
     const unset = await lineRequest("https://api.line.me/v2/bot/user/all/richmenu", channelAccessToken, {
       method: "DELETE"

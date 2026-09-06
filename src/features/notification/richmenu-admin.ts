@@ -66,6 +66,7 @@ type AdminMenuRow = {
   richmenu_admin_id: string | null
   richmenu_admin_template_version: string | null
   richmenu_admin_linked_uids: string | null
+  richmenu_admin_enabled: boolean | null
 }
 
 /** คอลัมน์ของ patch นี้ยังไม่ถูกเพิ่ม — ถือว่าใช้ฟีเจอร์นี้ไม่ได้ แทนที่จะพังทั้ง flow */
@@ -84,7 +85,7 @@ async function readAdminMenuRow(
   const { data, error } = await db
     .from("workspace_line_settings")
     .select(
-      "admin_line_user_id, richmenu_admin_id, richmenu_admin_template_version, richmenu_admin_linked_uids"
+      "admin_line_user_id, richmenu_admin_id, richmenu_admin_template_version, richmenu_admin_linked_uids, richmenu_admin_enabled"
     )
     .eq("workspace_id", workspaceId)
     .maybeSingle()
@@ -189,6 +190,15 @@ export async function syncAdminRichMenu(args: {
   if (readError) return { ...empty, error: readError }
 
   const adminIds = splitUids(row?.admin_line_user_id)
+
+  // หอพักปิดเมนูผู้ดูแลไว้ — เงียบไว้ ไม่ไปแตะ LINE เลย
+  //
+  // กันไว้ที่นี่จุดเดียวเพราะมีที่เรียก 3 ทาง (กดติดตั้ง / แอดมินใหม่ส่งรหัสใน webhook /
+  // ลบ LINE Admin) ถ้าไปกันทีละที่จะพลาดง่ายและกลายเป็นว่าปิดแล้วเมนูเด้งกลับมาเอง
+  // การถอดเมนูออกทำตอนกดปิดสวิตช์ไปแล้ว (teardownAdminRichMenu) ที่นี่จึงไม่ต้องทำซ้ำ
+  if (row?.richmenu_admin_enabled === false) {
+    return { ok: true, richMenuId: null, linked: 0, total: adminIds.length }
+  }
   const previouslyLinked = splitUids(row?.richmenu_admin_linked_uids)
   const existingMenuId = row?.richmenu_admin_id || null
 
