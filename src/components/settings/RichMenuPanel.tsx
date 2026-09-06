@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   PowerOff,
   RefreshCw,
+  ShieldCheck,
   Trash2,
   Upload
 } from "lucide-react"
@@ -20,6 +21,7 @@ import {
   removeRichMenuAction,
   saveRichMenuImageAction,
   setRichMenuEnabledAction,
+  syncAdminRichMenuAction,
   type RichMenuStatus
 } from "@/features/notification/richmenu-actions"
 
@@ -51,6 +53,7 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
   const [installing, setInstalling] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [togglingEnabled, setTogglingEnabled] = useState(false)
+  const [syncingAdmin, setSyncingAdmin] = useState(false)
 
   const loadStatus = useCallback(async () => {
     if (!workspaceId) return
@@ -247,7 +250,30 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
     }
   }
 
-  const busy = uploading || installing || removing || togglingEnabled
+  const handleSyncAdminMenu = async () => {
+    setError(null)
+    setSuccess(null)
+    setSyncingAdmin(true)
+    try {
+      const res = await syncAdminRichMenuAction(workspaceId)
+      if (!res.success) {
+        setError(res.error || t("line_settings.richmenu_admin_err_sync"))
+        return
+      }
+      setSuccess(
+        t("line_settings.richmenu_admin_synced")
+          .replace("{linked}", String(res.data?.linked ?? 0))
+          .replace("{total}", String(res.data?.total ?? 0))
+      )
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("line_settings.richmenu_admin_err_sync"))
+    } finally {
+      setSyncingAdmin(false)
+    }
+  }
+
+  const busy = uploading || installing || removing || togglingEnabled || syncingAdmin
   const enabled = status?.enabled !== false
   const canInstall = channelConfigured && !!status && enabled && !status.contactMissing && !busy
 
@@ -498,6 +524,76 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
           <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 leading-relaxed">
             {t("line_settings.richmenu_note")}
           </p>
+
+          {/* เมนูผู้ดูแล — เมนูใบที่สองที่ผูกให้เฉพาะแอดมิน ไม่ใช่เมนูเริ่มต้นของ channel */}
+          <div className={`pt-5 border-t border-slate-100 dark:border-slate-800 space-y-3 transition-all duration-300 ${enabled ? "" : "opacity-60 pointer-events-none select-none"}`}>
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-sky-500/10 text-sky-500 rounded-xl shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h5 className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">
+                  {t("line_settings.richmenu_admin_title")}
+                </h5>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">
+                  {t("line_settings.richmenu_admin_desc")}
+                </p>
+              </div>
+            </div>
+
+            {status?.admin.adminCount === 0 ? (
+              <div className="p-4 bg-slate-50 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 rounded-2xl flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
+                  {t("line_settings.richmenu_admin_none")}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="p-4 bg-slate-50 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 rounded-2xl space-y-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    {t("line_settings.richmenu_admin_linked_label")}
+                  </span>
+                  <p className="text-sm font-black text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 shrink-0 text-slate-400" />
+                    {t("line_settings.richmenu_admin_linked_value")
+                      .replace("{linked}", String(status?.admin.linkedCount ?? 0))
+                      .replace("{total}", String(status?.admin.adminCount ?? 0))}
+                  </p>
+                </div>
+
+                {status?.admin.needsSync && (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-700/90 dark:text-amber-500/90 font-bold leading-relaxed">
+                      {t("line_settings.richmenu_admin_needs_sync")}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSyncAdminMenu}
+                  disabled={busy || !channelConfigured}
+                  className={`w-full py-2.5 px-4 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors ${
+                    busy || !channelConfigured
+                      ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                      : "bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-sky-400 text-slate-700 dark:text-slate-200"
+                  }`}
+                >
+                  {syncingAdmin ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4 text-sky-500" />
+                  )}
+                  <span>{t("line_settings.richmenu_admin_sync_btn")}</span>
+                </button>
+              </>
+            )}
+
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 leading-relaxed">
+              {t("line_settings.richmenu_admin_note")}
+            </p>
+          </div>
         </>
       )}
     </div>

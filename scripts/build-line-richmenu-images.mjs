@@ -18,6 +18,7 @@ import { execFileSync } from "child_process"
 
 const TARGETS = [
   { key: "tenant", html: "tenant-menu.html", png: "tenant-menu.png", width: 2500, height: 1686 },
+  { key: "admin", html: "admin-menu.html", png: "admin-menu.png", width: 2500, height: 1686 },
   { key: "super-admin", html: "super-admin-menu.html", png: "super-admin-menu.png", width: 2500, height: 843 }
 ]
 

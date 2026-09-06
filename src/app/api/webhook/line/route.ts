@@ -10,6 +10,8 @@ import {
   handleSlipRoomChoice,
   type LineTextMessage
 } from "@/features/notification/line-slip"
+import { ADMIN_POSTBACKS, handleAdminPostback } from "@/features/notification/line-admin"
+import { syncAdminRichMenu } from "@/features/notification/richmenu-admin"
 
 // Helper function to verify signature from LINE Webhook
 function verifySignature(body: string, channelSecret: string, signature: string): boolean {
@@ -57,6 +59,48 @@ async function replyToLine(replyToken: string, messages: LineTextMessage[], toke
   }
 }
 
+/** URL ของแอปแบบมี scheme และไม่มี / ปิดท้าย (ว่างได้ — แค่ไม่มีลิงก์ให้กดต่อในข้อความ) */
+function resolveAppUrl(): string {
+  let appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").trim()
+  while (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1)
+  if (appUrl && !appUrl.startsWith("http")) appUrl = `https://${appUrl}`
+  return appUrl
+}
+
+/**
+ * จัดการปุ่มใน "เมนูผู้ดูแลหอ" ที่บอทตอบข้อมูลกลับในแชท
+ *
+ * ต้องมาก่อนตัวจัดการสลิปเสมอ เพราะแอดมินอยู่ใน OA เดียวกับผู้เช่า และตัวจัดการสลิป
+ * จะเมินทุก postback ที่ไม่ใช่ของมันแบบเงียบ ๆ
+ *
+ * คืน true เมื่อจัดการ event นี้ไปแล้ว
+ */
+async function handleLineAdminEvent(args: {
+  supabase: SupabaseClient
+  workspaceId: string
+  channelAccessToken: string
+  event: LineSlipEvent
+}): Promise<boolean> {
+  const { supabase, workspaceId, channelAccessToken, event } = args
+  const lineUserId: string = event.source?.userId || ""
+  const data: string = event.postback?.data || ""
+  if (!lineUserId || !ADMIN_POSTBACKS.includes(data)) return false
+
+  try {
+    const messages = await handleAdminPostback(
+      { db: supabase, workspaceId, lineUserId, appUrl: resolveAppUrl() },
+      data
+    )
+    if (!messages) return false
+
+    await replyToLine(event.replyToken || "", messages, channelAccessToken)
+    return true
+  } catch (err) {
+    console.error("line-admin: จัดการคำสั่งเมนูผู้ดูแลไม่สำเร็จ:", err)
+    return false
+  }
+}
+
 /**
  * จัดการ event ที่เกี่ยวกับการส่งสลิปในแชท
  *
@@ -84,11 +128,7 @@ async function handleLineSlipEvent(args: {
     .filter((id: string) => id.length > 0)
   if (adminIds.includes(lineUserId)) return false
 
-  let appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").trim()
-  while (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1)
-  if (appUrl && !appUrl.startsWith("http")) appUrl = `https://${appUrl}`
-
-  const ctx = { db: supabase, workspaceId, lineUserId, channelAccessToken, appUrl }
+  const ctx = { db: supabase, workspaceId, lineUserId, channelAccessToken, appUrl: resolveAppUrl() }
 
   try {
     if (event.type === "postback") {
@@ -210,6 +250,16 @@ export async function POST(request: NextRequest) {
         const isSlipRelated =
           (event.type === "postback" && typeof event.postback?.data === "string") ||
           (event.type === "message" && event.message?.type === "image")
+
+        if (isPrivateChat && event.type === "postback") {
+          const handledByAdmin = await handleLineAdminEvent({
+            supabase,
+            workspaceId: activeWorkspaceId,
+            channelAccessToken,
+            event
+          })
+          if (handledByAdmin) continue
+        }
 
         if (isPrivateChat && isSlipRelated) {
           const handled = await handleLineSlipEvent({
@@ -442,7 +492,25 @@ export async function POST(request: NextRequest) {
                       console.error("Error fetching admin profile name:", pErr)
                     }
 
-                    replyMessageText = `🎉 เชื่อมต่อบัญชีแอดมินสำเร็จ!\n\nสวัสดีครับคุณ ${displayName}\n\nยินดีต้อนรับเข้าสู่ระบบ! บัญชี LINE ของคุณได้รับการเชื่อมต่อเป็น LINE Admin สำหรับหอพัก "${workspaceName}" เรียบร้อยแล้ว ตั้งแต่นี้ไปคุณจะได้รับการแจ้งเตือนสลิปโอนเงินของผู้เช่าทันทีที่มีการส่งตรวจสอบครับ 🚀`
+                    // ผูกเมนูผู้ดูแลให้ทันที ไม่งั้นแอดมินคนใหม่จะได้เมนูผู้เช่า (เมนู default ของ channel)
+                    // ซึ่งกดปุ่มไหนก็เจอ "ไม่พบห้องพักที่ผูกกับบัญชีนี้" จนกว่าเจ้าหอจะไปกดซิงก์ในหน้าตั้งค่า
+                    let menuNote = ""
+                    try {
+                      const synced = await syncAdminRichMenu({
+                        db: supabase,
+                        workspaceId: pairedWorkspaceId,
+                        channelAccessToken: activeToken,
+                        appUrl: resolveAppUrl()
+                      })
+                      if (synced.ok && synced.richMenuId) {
+                        menuNote = "\n\nเมนูผู้ดูแลถูกติดตั้งให้แล้ว กดที่เมนูด้านล่างเพื่อดูสรุปของหอได้เลยครับ"
+                      }
+                    } catch (menuErr) {
+                      // ผูกเมนูไม่สำเร็จไม่ควรทำให้การเชื่อมต่อแอดมินล้มเหลว — เจ้าหอกดซิงก์ทีหลังได้
+                      console.error("line-admin: ผูกเมนูผู้ดูแลตอนเชื่อมต่อไม่สำเร็จ:", menuErr)
+                    }
+
+                    replyMessageText = `🎉 เชื่อมต่อบัญชีแอดมินสำเร็จ!\n\nสวัสดีครับคุณ ${displayName}\n\nยินดีต้อนรับเข้าสู่ระบบ! บัญชี LINE ของคุณได้รับการเชื่อมต่อเป็น LINE Admin สำหรับหอพัก "${workspaceName}" เรียบร้อยแล้ว ตั้งแต่นี้ไปคุณจะได้รับการแจ้งเตือนสลิปโอนเงินของผู้เช่าทันทีที่มีการส่งตรวจสอบครับ 🚀${menuNote}`
                   }
                 }
 

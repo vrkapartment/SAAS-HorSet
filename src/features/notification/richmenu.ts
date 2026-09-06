@@ -7,6 +7,7 @@
 
 import tenantTemplate from "./richmenu-templates/tenant.json"
 import superAdminTemplate from "./richmenu-templates/super-admin.json"
+import adminTemplate from "./richmenu-templates/admin.json"
 import { readImageInfo } from "@/lib/imageSize"
 
 /** ข้อจำกัดของ LINE ที่ต้องเช็คก่อนยิง (ฝั่ง LINE จะตอบ error กำกวมถ้าผิด) */
@@ -38,9 +39,13 @@ export type RichMenuDefinition = {
 
 export const TENANT_RICHMENU_TEMPLATE = tenantTemplate as RichMenuDefinition
 export const SUPER_ADMIN_RICHMENU_TEMPLATE = superAdminTemplate as RichMenuDefinition
+export const ADMIN_RICHMENU_TEMPLATE = adminTemplate as RichMenuDefinition
 
 /** ภาพต้นแบบที่แถมมากับระบบ ใช้เมื่อหอพักยังไม่ได้อัปโหลดภาพของตัวเอง */
 export const DEFAULT_TENANT_MENU_IMAGE_PATH = "/line-richmenu/tenant-menu.png"
+
+/** เมนูแอดมินใช้ภาพต้นแบบของระบบเสมอ — ไม่เปิดให้หอพักอัปโหลดเอง เพราะปุ่มเป็นคำสั่งตายตัว */
+export const DEFAULT_ADMIN_MENU_IMAGE_PATH = "/line-richmenu/admin-menu.png"
 
 export type TenantMenuValues = {
   liffId: string
@@ -66,6 +71,16 @@ export function buildTenantRichMenu(values: TenantMenuValues): RichMenuDefinitio
 /** เมนูของ LINE OA ทีมงาน HorSet — ทุกปุ่มชี้ไปหน้าหลังบ้าน จึงต้องรู้แค่ URL ของแอป */
 export function buildSuperAdminRichMenu(appUrl: string): RichMenuDefinition {
   return applyTemplate(SUPER_ADMIN_RICHMENU_TEMPLATE, { "{{APP_URL}}": appUrl })
+}
+
+/**
+ * เมนูผู้ดูแลหอ — ผูกรายบุคคลให้ UID ใน admin_line_user_id เท่านั้น
+ *
+ * ปุ่มแถวบนเป็น postback ที่บอทตอบข้อมูลกลับในแชท (ไม่ต้อง login) ส่วนแถวล่างเป็นลิงก์
+ * เข้าหลังบ้านซึ่งยังต้องผ่าน login + 2FA ตามปกติ จึงต้องรู้แค่ URL ของแอป
+ */
+export function buildAdminRichMenu(appUrl: string): RichMenuDefinition {
+  return applyTemplate(ADMIN_RICHMENU_TEMPLATE, { "{{APP_URL}}": appUrl })
 }
 
 function applyTemplate(

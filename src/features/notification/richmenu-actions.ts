@@ -5,12 +5,15 @@ import { createClient as createSupabaseServiceClient } from "@supabase/supabase-
 import { assertWorkspaceFeatureEnabled } from "@/features/subscription/actions"
 import { DEFAULT_LIFF_ID } from "@/lib/lineLiff"
 import {
+  ADMIN_RICHMENU_TEMPLATE,
   DEFAULT_TENANT_MENU_IMAGE_PATH,
   buildTenantRichMenu,
   checkRichMenuImage,
   phoneToContactUri,
   TENANT_RICHMENU_TEMPLATE
 } from "./richmenu"
+import { lineRequest, syncAdminRichMenu, teardownAdminRichMenu } from "./richmenu-admin"
+import { splitUids } from "./line-admin"
 
 /**
  * จัดการ LINE Rich Menu ของแต่ละหอพักจากหน้าตั้งค่า › LINE OA
@@ -31,6 +34,23 @@ type RichMenuSettingsRow = {
   richmenu_liff_id: string | null
   richmenu_enabled: boolean | null
   richmenu_template_version: string | null
+  admin_line_user_id: string | null
+  richmenu_admin_id: string | null
+  richmenu_admin_installed_at: string | null
+  richmenu_admin_template_version: string | null
+  richmenu_admin_linked_uids: string | null
+}
+
+/** สถานะของเมนูใบที่สองซึ่งผูกให้เฉพาะแอดมิน (ดู richmenu-admin.ts) */
+export type AdminRichMenuStatus = {
+  installed: boolean
+  installedAt: string | null
+  /** จำนวนแอดมินที่ผูก LINE ไว้กับหอนี้ (0 = ยังไม่มีใครให้ผูกเมนู) */
+  adminCount: number
+  /** จำนวนที่ผูกเมนูผู้ดูแลไว้สำเร็จจริงบน LINE */
+  linkedCount: number
+  /** ผังปุ่มในโค้ดเปลี่ยนไปหลังหอนี้ติดตั้ง หรือมีแอดมินที่ยังไม่ได้รับเมนู */
+  needsSync: boolean
 }
 
 export type RichMenuStatus = {
@@ -53,6 +73,7 @@ export type RichMenuStatus = {
   /** true = หอพักยังไม่ได้กรอกเบอร์โทร ติดตั้งไม่ได้ */
   contactMissing: boolean
   channelReady: boolean
+  admin: AdminRichMenuStatus
 }
 
 const COLUMN_MISSING_HINT =
@@ -118,23 +139,79 @@ function resolveAppUrl(): string {
   return appUrl.startsWith("http://") || appUrl.startsWith("https://") ? appUrl : `https://${appUrl}`
 }
 
+const BASE_COLUMNS =
+  "channel_access_token, liff_id, richmenu_id, richmenu_image_url, richmenu_installed_at, richmenu_contact_uri, richmenu_liff_id, richmenu_enabled, richmenu_template_version, admin_line_user_id"
+
+const ADMIN_MENU_COLUMNS =
+  "richmenu_admin_id, richmenu_admin_installed_at, richmenu_admin_template_version, richmenu_admin_linked_uids"
+
+/**
+ * อ่านค่าตั้งค่าเมนูของหอพัก
+ *
+ * คอลัมน์ของเมนูผู้ดูแลมาทีหลัง จึงถอยไปอ่านเฉพาะคอลัมน์เดิมได้ถ้ายังไม่ได้รัน SQL patch
+ * — หน้าตั้งค่าจะยังใช้จัดการเมนูผู้เช่าได้ตามปกติ แค่ส่วนเมนูผู้ดูแลขึ้นว่ายังไม่พร้อม
+ */
 async function readSettings(
   db: ReturnType<typeof getServiceClient>,
   workspaceId: string
-): Promise<{ row: RichMenuSettingsRow | null; error?: string }> {
-  const { data, error } = await db
+): Promise<{ row: RichMenuSettingsRow | null; error?: string; adminColumnsReady: boolean }> {
+  const full = await db
     .from("workspace_line_settings")
-    .select(
-      "channel_access_token, liff_id, richmenu_id, richmenu_image_url, richmenu_installed_at, richmenu_contact_uri, richmenu_liff_id, richmenu_enabled, richmenu_template_version"
-    )
+    .select(`${BASE_COLUMNS}, ${ADMIN_MENU_COLUMNS}`)
     .eq("workspace_id", workspaceId)
     .maybeSingle()
 
-  if (error) {
-    if (isMissingColumnError(error)) return { row: null, error: COLUMN_MISSING_HINT }
-    return { row: null, error: error.message }
+  if (!full.error) {
+    return { row: (full.data as RichMenuSettingsRow | null) ?? null, adminColumnsReady: true }
   }
-  return { row: (data as RichMenuSettingsRow | null) ?? null }
+
+  if (!isMissingColumnError(full.error)) {
+    return { row: null, error: full.error.message, adminColumnsReady: false }
+  }
+
+  const base = await db
+    .from("workspace_line_settings")
+    .select(BASE_COLUMNS)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()
+
+  if (base.error) {
+    if (isMissingColumnError(base.error)) {
+      return { row: null, error: COLUMN_MISSING_HINT, adminColumnsReady: false }
+    }
+    return { row: null, error: base.error.message, adminColumnsReady: false }
+  }
+
+  return { row: (base.data as RichMenuSettingsRow | null) ?? null, adminColumnsReady: false }
+}
+
+/**
+ * สรุปสถานะเมนูผู้ดูแลจากแถวที่อ่านมา
+ *
+ * needsSync ตั้งใจให้ครอบคลุมทั้ง 3 กรณีที่ทำให้แอดมินไม่ได้เมนูที่ถูกต้อง:
+ * มีแอดมินแต่ยังไม่เคยติดตั้ง / ผังปุ่มในโค้ดเปลี่ยนไปแล้ว / มีแอดมินที่ผูกไม่ครบ
+ */
+function buildAdminStatus(
+  row: RichMenuSettingsRow | null,
+  adminColumnsReady: boolean
+): AdminRichMenuStatus {
+  const adminCount = splitUids(row?.admin_line_user_id).length
+
+  if (!adminColumnsReady) {
+    return { installed: false, installedAt: null, adminCount, linkedCount: 0, needsSync: false }
+  }
+
+  const installed = !!row?.richmenu_admin_id
+  const linkedCount = splitUids(row?.richmenu_admin_linked_uids).length
+  const templateChanged = row?.richmenu_admin_template_version !== ADMIN_RICHMENU_TEMPLATE.name
+
+  return {
+    installed,
+    installedAt: row?.richmenu_admin_installed_at || null,
+    adminCount,
+    linkedCount,
+    needsSync: adminCount > 0 && (!installed || templateChanged || linkedCount < adminCount)
+  }
 }
 
 /** อ่านสถานะเมนูปัจจุบันสำหรับแสดงในหน้าตั้งค่า */
@@ -143,7 +220,7 @@ export async function getRichMenuStatusAction(workspaceId: string) {
     const auth = await assertWorkspaceAdmin(workspaceId)
     if (!auth.ok) return { success: false, error: auth.error }
 
-    const { row, error } = await readSettings(auth.db, workspaceId)
+    const { row, error, adminColumnsReady } = await readSettings(auth.db, workspaceId)
     if (error) return { success: false, error }
 
     const { data: ws } = await auth.db
@@ -176,7 +253,8 @@ export async function getRichMenuStatusAction(workspaceId: string) {
           // ผังปุ่มในโค้ดเปลี่ยนไปหลังหอนี้ติดตั้ง (เช่นปุ่มส่งสลิปเปลี่ยนพฤติกรรม) ต้องติดตั้งใหม่
           row?.richmenu_template_version !== TENANT_RICHMENU_TEMPLATE.name),
       contactMissing: !currentContactUri,
-      channelReady: !!row?.channel_access_token?.trim() && row.channel_access_token !== "placeholder"
+      channelReady: !!row?.channel_access_token?.trim() && row.channel_access_token !== "placeholder",
+      admin: buildAdminStatus(row, adminColumnsReady)
     }
 
     return { success: true, data: status }
@@ -245,34 +323,6 @@ async function fetchAndCheckImage(url: string): Promise<FetchedImage> {
   return { ok: true, buffer, type: check.type }
 }
 
-async function lineRequest(
-  url: string,
-  token: string,
-  init: RequestInit = {}
-): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; error: string }> {
-  let res: Response
-  try {
-    res = await fetch(url, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) }
-    })
-  } catch {
-    return { ok: false, error: "เชื่อมต่อ LINE API ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" }
-  }
-
-  const text = await res.text()
-  if (!res.ok) {
-    console.error(`LINE richmenu API ${init.method || "GET"} ${url} → ${res.status} ${text}`)
-    return { ok: false, error: `LINE ตอบกลับว่าไม่สำเร็จ (HTTP ${res.status}) — ${text.slice(0, 200)}` }
-  }
-
-  try {
-    return { ok: true, body: text ? (JSON.parse(text) as Record<string, unknown>) : {} }
-  } catch {
-    return { ok: true, body: {} }
-  }
-}
-
 /**
  * เปิด/ปิดการใช้งานเมนูล่างของหอพักนี้
  *
@@ -319,6 +369,21 @@ export async function setRichMenuEnabledAction(workspaceId: string, enabled: boo
           { method: "DELETE" }
         )
         if (!unset.ok) return { success: false, error: unset.error }
+      }
+    }
+
+    // เมนูผู้ดูแลเป็นเมนูรายบุคคล การยกเลิก default menu ไม่ได้ทำให้มันหายไปเอง
+    // ต้องถอดออกด้วย ไม่งั้นปิดสวิตช์แล้วแอดมินยังเห็นเมนูค้างอยู่คนเดียว
+    if (hasToken) {
+      if (enabled) {
+        await syncAdminRichMenu({
+          db: auth.db,
+          workspaceId,
+          channelAccessToken,
+          appUrl: resolveAppUrl()
+        })
+      } else {
+        await teardownAdminRichMenu({ db: auth.db, workspaceId, channelAccessToken })
       }
     }
 
@@ -472,9 +537,63 @@ export async function installRichMenuAction(workspaceId: string) {
       throw saveError
     }
 
-    return { success: true, data: { richMenuId, installedAt } }
+    // เมนูผู้ดูแลเป็นของแถม ไม่ใช่เงื่อนไขความสำเร็จของเมนูผู้เช่า — ถ้าพลาดก็รายงานเป็นคำเตือน
+    // ไม่ย้อนการติดตั้งเมนูผู้เช่าที่สำเร็จไปแล้ว เจ้าหอกดปุ่มซิงก์เมนูผู้ดูแลซ้ำทีหลังได้
+    const adminSync = await syncAdminRichMenu({
+      db: auth.db,
+      workspaceId,
+      channelAccessToken,
+      appUrl,
+      forceRecreate: true
+    })
+
+    return {
+      success: true,
+      data: {
+        richMenuId,
+        installedAt,
+        adminLinked: adminSync.linked,
+        adminTotal: adminSync.total,
+        adminWarning: adminSync.ok ? "" : adminSync.error || ""
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการติดตั้งเมนู LINE"
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * ผูกเมนูผู้ดูแลให้ตรงกับรายชื่อแอดมินปัจจุบัน โดยไม่ยุ่งกับเมนูผู้เช่า
+ *
+ * ใช้เมื่อเพิ่ม/ลบแอดมินแล้วอยากให้เมนูตามทันทีโดยไม่ต้องติดตั้งเมนูผู้เช่าใหม่ทั้งใบ
+ */
+export async function syncAdminRichMenuAction(workspaceId: string) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    await assertWorkspaceFeatureEnabled(workspaceId, "line_notify")
+
+    const { row, error: readError } = await readSettings(auth.db, workspaceId)
+    if (readError) return { success: false, error: readError }
+
+    if (row?.richmenu_enabled === false) {
+      return { success: false, error: "หอพักนี้ปิดการใช้งานเมนูล่างอยู่ กรุณาเปิดสวิตช์ก่อน" }
+    }
+
+    const channelAccessToken = row?.channel_access_token?.trim() || ""
+    const result = await syncAdminRichMenu({
+      db: auth.db,
+      workspaceId,
+      channelAccessToken,
+      appUrl: resolveAppUrl()
+    })
+
+    if (!result.ok) return { success: false, error: result.error || "ซิงก์เมนูผู้ดูแลไม่สำเร็จ" }
+    return { success: true, data: { linked: result.linked, total: result.total } }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการซิงก์เมนูผู้ดูแล"
     return { success: false, error: message }
   }
 }
@@ -495,6 +614,9 @@ export async function removeRichMenuAction(workspaceId: string) {
     if (!channelAccessToken || channelAccessToken === "placeholder") {
       return { success: false, error: "ยังไม่ได้ตั้งค่า Channel Access Token ของหอพักนี้" }
     }
+
+    // เมนูผู้ดูแลผูกรายบุคคลไว้ ต้องถอดออกด้วย ไม่งั้นแอดมินจะเหลือเมนูค้างทั้งที่หอนี้เอาเมนูออกแล้ว
+    await teardownAdminRichMenu({ db: auth.db, workspaceId, channelAccessToken })
 
     // ยกเลิกเมนูเริ่มต้นก่อน แล้วจึงลบตัวเมนู — สลับลำดับจะลบไม่ได้เพราะยังถูกใช้เป็น default อยู่
     const unset = await lineRequest("https://api.line.me/v2/bot/user/all/richmenu", channelAccessToken, {

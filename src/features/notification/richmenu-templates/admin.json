@@ -1,0 +1,59 @@
+{
+  "size": { "width": 2500, "height": 1686 },
+  "selected": true,
+  "name": "HorSet Admin Menu v1",
+  "chatBarText": "เมนูผู้ดูแลหอ",
+  "areas": [
+    {
+      "bounds": { "x": 0, "y": 0, "width": 833, "height": 843 },
+      "action": {
+        "type": "postback",
+        "label": "สรุปวันนี้",
+        "data": "action=admin_summary",
+        "displayText": "ขอสรุปวันนี้"
+      }
+    },
+    {
+      "bounds": { "x": 833, "y": 0, "width": 834, "height": 843 },
+      "action": {
+        "type": "postback",
+        "label": "สลิปรอตรวจ",
+        "data": "action=admin_pending",
+        "displayText": "ขอดูสลิปรอตรวจ"
+      }
+    },
+    {
+      "bounds": { "x": 1667, "y": 0, "width": 833, "height": 843 },
+      "action": {
+        "type": "postback",
+        "label": "ห้องค้างชำระ",
+        "data": "action=admin_unpaid",
+        "displayText": "ขอดูห้องค้างชำระ"
+      }
+    },
+    {
+      "bounds": { "x": 0, "y": 843, "width": 833, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "หลังบ้าน",
+        "uri": "{{APP_URL}}/dashboard"
+      }
+    },
+    {
+      "bounds": { "x": 833, "y": 843, "width": 834, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "จดมิเตอร์",
+        "uri": "{{APP_URL}}/meter"
+      }
+    },
+    {
+      "bounds": { "x": 1667, "y": 843, "width": 833, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "จัดการบิล",
+        "uri": "{{APP_URL}}/manage-bills"
+      }
+    }
+  ]
+}
