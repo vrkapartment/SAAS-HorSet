@@ -67,6 +67,23 @@ type AdminMenuRow = {
   richmenu_admin_template_version: string | null
   richmenu_admin_linked_uids: string | null
   richmenu_admin_enabled: boolean | null
+  richmenu_admin_image_url: string | null
+  richmenu_admin_installed_image_url: string | null
+}
+
+/**
+ * ภาพที่จะใช้ติดตั้งจริง — ภาพที่หอพักอัปโหลดเอง ถ้าไม่มีก็ใช้ภาพต้นแบบของระบบ
+ *
+ * แยกออกมาเป็นฟังก์ชันเพราะต้องใช้ 2 ที่: ตอนดึงไบต์ไปติดตั้ง และตอนเทียบว่าภาพที่ติดตั้ง
+ * ไปแล้วตรงกับภาพปัจจุบันหรือยัง ถ้าคำนวณคนละแบบจะกลายเป็นสร้างเมนูใหม่ทุกครั้งที่ซิงก์
+ */
+export function resolveAdminMenuImageUrl(
+  customImageUrl: string | null | undefined,
+  appUrl: string
+): string {
+  const custom = (customImageUrl || "").trim()
+  if (custom) return custom
+  return appUrl ? `${appUrl}${DEFAULT_ADMIN_MENU_IMAGE_PATH}` : ""
 }
 
 /** คอลัมน์ของ patch นี้ยังไม่ถูกเพิ่ม — ถือว่าใช้ฟีเจอร์นี้ไม่ได้ แทนที่จะพังทั้ง flow */
@@ -85,7 +102,7 @@ async function readAdminMenuRow(
   const { data, error } = await db
     .from("workspace_line_settings")
     .select(
-      "admin_line_user_id, richmenu_admin_id, richmenu_admin_template_version, richmenu_admin_linked_uids, richmenu_admin_enabled"
+      "admin_line_user_id, richmenu_admin_id, richmenu_admin_template_version, richmenu_admin_linked_uids, richmenu_admin_enabled, richmenu_admin_image_url, richmenu_admin_installed_image_url"
     )
     .eq("workspace_id", workspaceId)
     .maybeSingle()
@@ -97,11 +114,16 @@ async function readAdminMenuRow(
   return { row: (data as AdminMenuRow | null) ?? null }
 }
 
-/** ดึงภาพต้นแบบของเมนูแอดมินแล้วตรวจว่าส่งขึ้น LINE ได้จริง */
-async function fetchAdminMenuImage(
-  appUrl: string
+/**
+ * ดึงไบต์ภาพเมนูแอดมินแล้วตรวจว่าส่งขึ้น LINE ได้จริง
+ *
+ * ตรวจซ้ำที่ฝั่งเซิร์ฟเวอร์เสมอแม้เบราว์เซอร์จะตรวจมาแล้วตอนอัปโหลด เพราะไฟล์ใน Storage
+ * ถูกเปลี่ยนทีหลังได้ และ LINE จะตอบ error กำกวมถ้าขนาดไม่ตรงผัง
+ */
+export async function fetchAdminMenuImage(
+  url: string
 ): Promise<{ ok: true; buffer: Buffer; type: string } | { ok: false; error: string }> {
-  const url = `${appUrl}${DEFAULT_ADMIN_MENU_IMAGE_PATH}`
+  if (!url) return { ok: false, error: "ไม่พบภาพเมนูผู้ดูแลที่จะใช้ติดตั้ง" }
 
   let res: Response
   try {
@@ -216,18 +238,25 @@ export async function syncAdminRichMenu(args: {
       richmenu_admin_id: null,
       richmenu_admin_installed_at: null,
       richmenu_admin_template_version: null,
-      richmenu_admin_linked_uids: null
+      richmenu_admin_linked_uids: null,
+      richmenu_admin_installed_image_url: null
     })
     if (cleared) return { ...empty, error: cleared }
     return { ok: true, richMenuId: null, linked: 0, total: 0 }
   }
 
   const templateChanged = row?.richmenu_admin_template_version !== ADMIN_RICHMENU_TEMPLATE.name
-  const needNewMenu = forceRecreate || !existingMenuId || templateChanged
+
+  // LINE ไม่มี API เปลี่ยนภาพของเมนูที่สร้างแล้ว เปลี่ยนภาพจึงต้องสร้างเมนูใบใหม่
+  // ถ้าไม่เทียบตรงนี้ เจ้าหอเปลี่ยนแค่ภาพ (ผังปุ่มไม่เปลี่ยน) แล้วกดซิงก์จะไม่เกิดอะไรขึ้นเลย
+  const imageUrl = resolveAdminMenuImageUrl(row?.richmenu_admin_image_url, appUrl)
+  const imageChanged = row?.richmenu_admin_installed_image_url !== imageUrl
+
+  const needNewMenu = forceRecreate || !existingMenuId || templateChanged || imageChanged
 
   let richMenuId = existingMenuId
   if (needNewMenu) {
-    const image = await fetchAdminMenuImage(appUrl)
+    const image = await fetchAdminMenuImage(imageUrl)
     if (!image.ok) return { ...empty, error: image.error }
 
     let menu
@@ -291,7 +320,8 @@ export async function syncAdminRichMenu(args: {
     richmenu_admin_id: richMenuId,
     richmenu_admin_installed_at: new Date().toISOString(),
     richmenu_admin_template_version: ADMIN_RICHMENU_TEMPLATE.name,
-    richmenu_admin_linked_uids: linked.join(",") || null
+    richmenu_admin_linked_uids: linked.join(",") || null,
+    richmenu_admin_installed_image_url: imageUrl
   })
   if (saveError) return { ...empty, richMenuId, linked: linked.length, total: adminIds.length, error: saveError }
 
@@ -321,11 +351,14 @@ export async function teardownAdminRichMenu(args: {
     })
   }
 
+  // ไม่ล้าง richmenu_admin_image_url — ภาพที่เจ้าหออัปโหลดไว้ต้องอยู่ต่อ เปิดสวิตช์กลับแล้ว
+  // ได้ภาพเดิมโดยไม่ต้องอัปโหลดใหม่ ส่วน installed_image_url ต้องล้างเพราะเมนูถูกลบไปแล้วจริง
   await saveAdminMenuState(db, workspaceId, {
     richmenu_admin_id: null,
     richmenu_admin_installed_at: null,
     richmenu_admin_template_version: null,
-    richmenu_admin_linked_uids: null
+    richmenu_admin_linked_uids: null,
+    richmenu_admin_installed_image_url: null
   })
 }
 

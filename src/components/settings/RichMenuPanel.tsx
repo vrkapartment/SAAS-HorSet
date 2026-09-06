@@ -19,6 +19,7 @@ import {
   getRichMenuStatusAction,
   installRichMenuAction,
   removeRichMenuAction,
+  saveAdminRichMenuImageAction,
   saveRichMenuImageAction,
   setAdminRichMenuEnabledAction,
   setRichMenuEnabledAction,
@@ -45,6 +46,7 @@ type Props = {
 export default function RichMenuPanel({ workspaceId, channelConfigured }: Props) {
   const { t, locale } = useLanguage()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const adminFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<RichMenuStatus | null>(null)
@@ -56,6 +58,7 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
   const [togglingEnabled, setTogglingEnabled] = useState(false)
   const [syncingAdmin, setSyncingAdmin] = useState(false)
   const [togglingAdmin, setTogglingAdmin] = useState(false)
+  const [uploadingAdmin, setUploadingAdmin] = useState(false)
 
   const loadStatus = useCallback(async () => {
     if (!workspaceId) return
@@ -95,8 +98,13 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
     }
   }
 
-  /** ตรวจไฟล์ฝั่งเบราว์เซอร์ก่อนอัปโหลด เพื่อไม่ให้เสียเวลาอัปไฟล์ที่ LINE จะปฏิเสธอยู่ดี */
-  const validateFile = (file: File): Promise<string | null> =>
+  /**
+   * ตรวจไฟล์ฝั่งเบราว์เซอร์ก่อนอัปโหลด เพื่อไม่ให้เสียเวลาอัปไฟล์ที่ LINE จะปฏิเสธอยู่ดี
+   *
+   * รับขนาดที่ต้องการมาเป็นพารามิเตอร์ เพราะเมนูผู้เช่ากับเมนูผู้ดูแลเป็นคนละผัง
+   * (บังเอิญขนาดเท่ากันตอนนี้ แต่ถ้าวันหนึ่งผังใดผังหนึ่งเปลี่ยน จะได้ไม่ตรวจผิดใบ)
+   */
+  const validateFile = (file: File, width: number, height: number): Promise<string | null> =>
     new Promise(resolve => {
       if (!["image/png", "image/jpeg"].includes(file.type)) {
         resolve(t("line_settings.richmenu_err_type"))
@@ -110,8 +118,8 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
       const img = new Image()
       img.onload = () => {
         URL.revokeObjectURL(url)
-        const w = status?.requiredWidth ?? 2500
-        const h = status?.requiredHeight ?? 1686
+        const w = width
+        const h = height
         if (img.naturalWidth !== w || img.naturalHeight !== h) {
           resolve(
             t("line_settings.richmenu_err_dimension")
@@ -137,7 +145,11 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
     setError(null)
     setSuccess(null)
 
-    const invalid = await validateFile(file)
+    const invalid = await validateFile(
+      file,
+      status?.requiredWidth ?? 2500,
+      status?.requiredHeight ?? 1686
+    )
     if (invalid) {
       setError(invalid)
       return
@@ -186,6 +198,70 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
       await loadStatus()
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleAdminFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    setError(null)
+    setSuccess(null)
+
+    const invalid = await validateFile(
+      file,
+      status?.admin.requiredWidth ?? 2500,
+      status?.admin.requiredHeight ?? 1686
+    )
+    if (invalid) {
+      setError(invalid)
+      return
+    }
+
+    setUploadingAdmin(true)
+    try {
+      const supabase = createClient()
+      const ext = file.type === "image/png" ? "png" : "jpg"
+      const path = `line-richmenu/workspace_${workspaceId}_admin_menu_${Date.now()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(path, file, { contentType: file.type, cacheControl: "3600", upsert: true })
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
+
+      const res = await saveAdminRichMenuImageAction(workspaceId, publicUrl)
+      if (!res.success) {
+        setError(res.error || t("line_settings.richmenu_admin_err_save_image"))
+        return
+      }
+
+      setSuccess(t("line_settings.richmenu_admin_image_saved"))
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("line_settings.richmenu_admin_err_save_image"))
+    } finally {
+      setUploadingAdmin(false)
+    }
+  }
+
+  const handleUseDefaultAdminImage = async () => {
+    if (!confirm(t("line_settings.richmenu_admin_reset_image_confirm"))) return
+    setError(null)
+    setSuccess(null)
+    setUploadingAdmin(true)
+    try {
+      const res = await saveAdminRichMenuImageAction(workspaceId, "")
+      if (!res.success) {
+        setError(res.error || t("line_settings.richmenu_admin_err_save_image"))
+        return
+      }
+      setSuccess(t("line_settings.richmenu_admin_image_reset"))
+      await loadStatus()
+    } finally {
+      setUploadingAdmin(false)
     }
   }
 
@@ -305,7 +381,8 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
     }
   }
 
-  const busy = uploading || installing || removing || togglingEnabled || syncingAdmin || togglingAdmin
+  const busy =
+    uploading || installing || removing || togglingEnabled || syncingAdmin || togglingAdmin || uploadingAdmin
   const enabled = status?.enabled !== false
   const adminEnabled = status?.admin.enabled !== false
   const canInstall = channelConfigured && !!status && enabled && !status.contactMissing && !busy
@@ -671,6 +748,69 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
                   <span>{t("line_settings.richmenu_admin_sync_btn")}</span>
                 </button>
               </>
+            )}
+
+            {/* ภาพเมนูผู้ดูแล — อยู่นอกเงื่อนไข "มีแอดมินไหม" เพราะเจ้าหอเตรียมภาพไว้ล่วงหน้าได้ */}
+            {adminEnabled && status?.admin.ready && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-black text-slate-600 dark:text-slate-300">
+                    {t("line_settings.richmenu_admin_image_label")}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 font-mono">
+                    {`${status.admin.requiredWidth}x${status.admin.requiredHeight}`} · PNG/JPEG · ≤1MB
+                  </span>
+                </div>
+
+                {status.admin.effectiveImageUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={status.admin.effectiveImageUrl}
+                    alt={t("line_settings.richmenu_admin_image_label")}
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                  />
+                )}
+
+                <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 leading-relaxed">
+                  {status.admin.customImageUrl
+                    ? t("line_settings.richmenu_admin_image_custom")
+                    : t("line_settings.richmenu_admin_image_default")}
+                </p>
+
+                <input
+                  type="file"
+                  ref={adminFileInputRef}
+                  onChange={handleAdminFileChange}
+                  accept="image/png,image/jpeg"
+                  className="hidden"
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => adminFileInputRef.current?.click()}
+                    disabled={busy}
+                    className="flex-1 min-w-[160px] py-2.5 px-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-sky-400 disabled:opacity-50 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
+                  >
+                    {uploadingAdmin ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-sky-500" />
+                    )}
+                    <span>{t("line_settings.richmenu_admin_upload_btn")}</span>
+                  </button>
+
+                  {status.admin.customImageUrl && (
+                    <button
+                      onClick={handleUseDefaultAdminImage}
+                      disabled={busy}
+                      className="py-2.5 px-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-slate-300 disabled:opacity-50 text-slate-500 dark:text-slate-400 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>{t("line_settings.richmenu_admin_use_default_btn")}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
 
             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 leading-relaxed">
