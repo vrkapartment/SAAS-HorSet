@@ -30,6 +30,7 @@ type RichMenuSettingsRow = {
   richmenu_contact_uri: string | null
   richmenu_liff_id: string | null
   richmenu_enabled: boolean | null
+  richmenu_template_version: string | null
 }
 
 export type RichMenuStatus = {
@@ -124,7 +125,7 @@ async function readSettings(
   const { data, error } = await db
     .from("workspace_line_settings")
     .select(
-      "channel_access_token, liff_id, richmenu_id, richmenu_image_url, richmenu_installed_at, richmenu_contact_uri, richmenu_liff_id, richmenu_enabled"
+      "channel_access_token, liff_id, richmenu_id, richmenu_image_url, richmenu_installed_at, richmenu_contact_uri, richmenu_liff_id, richmenu_enabled, richmenu_template_version"
     )
     .eq("workspace_id", workspaceId)
     .maybeSingle()
@@ -170,7 +171,10 @@ export async function getRichMenuStatusAction(workspaceId: string) {
       installedContactUri: row?.richmenu_contact_uri || "",
       outdated:
         installed &&
-        (row?.richmenu_contact_uri !== currentContactUri || row?.richmenu_liff_id !== currentLiffId),
+        (row?.richmenu_contact_uri !== currentContactUri ||
+          row?.richmenu_liff_id !== currentLiffId ||
+          // ผังปุ่มในโค้ดเปลี่ยนไปหลังหอนี้ติดตั้ง (เช่นปุ่มส่งสลิปเปลี่ยนพฤติกรรม) ต้องติดตั้งใหม่
+          row?.richmenu_template_version !== TENANT_RICHMENU_TEMPLATE.name),
       contactMissing: !currentContactUri,
       channelReady: !!row?.channel_access_token?.trim() && row.channel_access_token !== "placeholder"
     }
@@ -458,6 +462,7 @@ export async function installRichMenuAction(workspaceId: string) {
         richmenu_installed_at: installedAt,
         richmenu_contact_uri: contactUri,
         richmenu_liff_id: liffId,
+        richmenu_template_version: TENANT_RICHMENU_TEMPLATE.name,
         updated_at: installedAt
       })
       .eq("workspace_id", workspaceId)
@@ -513,6 +518,7 @@ export async function removeRichMenuAction(workspaceId: string) {
         richmenu_installed_at: null,
         richmenu_contact_uri: null,
         richmenu_liff_id: null,
+        richmenu_template_version: null,
         updated_at: new Date().toISOString()
       })
       .eq("workspace_id", workspaceId)
