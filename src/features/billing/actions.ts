@@ -833,6 +833,21 @@ export async function updateBillStatus(
       }
     }
 
+    // แจ้งผู้เช่าว่าชำระเงินเรียบร้อยแล้ว
+    //
+    // วางไว้จุดเดียวหลัง finalData นิ่งแล้ว จึงครอบคลุมทั้ง "แอดมินกดยืนยันเอง" (status = paid)
+    // และ "SlipOK ตรวจผ่านแล้วปิดบิลให้เอง" (เข้ามาด้วย status = pending แล้วถูกอัปเป็น paid ข้างบน)
+    // โดยไม่ต้องไปแทรกทีละที่
+    //
+    // เช็ค billData?.status !== "paid" ด้วย เพื่อไม่ส่งซ้ำเวลาแอดมินกดบันทึกบิลที่ปิดไปแล้ว
+    if (finalData?.status === "paid" && billData?.status !== "paid") {
+      const paidWorkspaceId = finalData.workspace_id || billData?.workspace_id
+      if (paidWorkspaceId) {
+        const { notifyTenantPaidSafely } = await import("@/features/notification/line-paid")
+        await notifyTenantPaidSafely({ db: activeClient, billId: id, workspaceId: paidWorkspaceId })
+      }
+    }
+
     return { success: true, data: finalData }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการอัปเดตสถานะบิล"

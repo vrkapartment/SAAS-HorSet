@@ -45,6 +45,7 @@ import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
 import PricingModal from "@/features/subscription/components/PricingModal"
 import RichMenuPanel from "@/components/settings/RichMenuPanel"
+import PaidNotifyPanel from "@/components/settings/PaidNotifyPanel"
 
 /** โปรไฟล์ LINE ของแอดมินหนึ่งคน (รูปแบบเดียวกับที่ getLineProfilesAction ส่งกลับมา) */
 type LineAdminProfile = {
@@ -1159,6 +1160,11 @@ export default function LineSettingsTab() {
           {/* Card: Rich Menu (แสดงเฉพาะเมื่อเชื่อมต่อ LINE OA แล้ว เพราะต้องมี channel access token ถึงจะติดตั้งเมนูได้) */}
           {isConfigured && workspaceId && (
             <RichMenuPanel workspaceId={workspaceId} channelConfigured={isConfigured} />
+          )}
+
+          {/* Card: แจ้งเตือนผู้เช่าเมื่อชำระเงินสำเร็จ (ต้องมี channel access token เหมือนกัน) */}
+          {isConfigured && workspaceId && (
+            <PaidNotifyPanel workspaceId={workspaceId} channelConfigured={isConfigured} />
           )}
 
           {/* Card: Configuration Settings */}

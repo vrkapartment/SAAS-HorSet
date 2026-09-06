@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { verifySlipWithSlipOk } from "@/features/slipok/actions"
 import { SLIPOK_RETRYABLE_ERROR_CODES } from "@/features/slipok/constants"
 import { sendLineSlipNotificationAction } from "@/features/notification/actions"
+import { notifyTenantPaidSafely } from "@/features/notification/line-paid"
 
 export const dynamic = "force-dynamic"
 // เพดานสูงสุดของ Vercel Hobby plan (Pro ตั้งได้ถึง 300s) — ต้องอัป plan ก่อนถึงจะเพิ่มได้
@@ -105,6 +106,12 @@ export async function GET(request: Request) {
             .update({ status: "paid", updated_at: new Date().toISOString() })
             .eq("id", item.bill_id)
           await sendLineSlipNotificationAction(item.bill_id, item.workspace_id, "success")
+          // เส้นทางที่ 3 ที่บิลกลายเป็น paid — ต้องแจ้งผู้เช่าเหมือนอีก 2 ทาง (ดู line-paid.ts)
+          await notifyTenantPaidSafely({
+            db: supabaseAdmin,
+            billId: item.bill_id,
+            workspaceId: item.workspace_id
+          })
           return { queue_id: item.id, bill_id: item.bill_id, outcome: "succeeded" }
         }
 
