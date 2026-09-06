@@ -2039,7 +2039,7 @@
     "richmenu_admin_sync_btn": "Sync admin menu",
     "richmenu_admin_synced": "Admin menu synced — linked to {linked} of {total}",
     "richmenu_admin_err_sync": "Could not sync the admin menu",
-    "richmenu_admin_note": "The admin menu always uses the built-in image and is linked only to the LINE accounts listed as admins above. Everyone else keeps the tenant menu.",
+    "richmenu_admin_note": "The admin menu is linked only to the LINE accounts listed as admins above; everyone else keeps the tenant menu. You can change the image, but the button positions always stay on the same 6-cell layout — an image whose buttons do not line up will do something other than what it shows.",
     "confirm_delete_admin": "Remove the LINE Admin connection for \"{name}\"?\n\nThey will stop receiving payment slip notifications on LINE and will need to pair again with a 6-digit code to come back.",
     "confirm_delete_last_admin": "⚠️ \"{name}\" is the last admin linked to LINE.\n\nAfter removing them, nobody will receive payment slip notifications on LINE — you will have to check the system yourself every time.\n\nRemove anyway?",
     "success_delete_admin": "Removed the LINE Admin connection for \"{name}\"",
@@ -2051,7 +2051,16 @@
     "richmenu_admin_disabled_msg": "Admin menu turned off — admins are back on the tenant menu",
     "richmenu_admin_err_toggle": "Could not change the admin menu status",
     "richmenu_admin_status_disabled": "Off — admins see the same menu as tenants",
-    "richmenu_admin_not_ready": "The admin menu is not available yet — the database is missing the required columns. Run database_patch_add_line_admin_richmenu.sql in Supabase first."
+    "richmenu_admin_not_ready": "The admin menu is not available yet — the database is missing the required columns. Run database_patch_add_line_admin_richmenu.sql in Supabase first.",
+    "richmenu_admin_image_label": "Admin menu image",
+    "richmenu_admin_image_custom": "Using the image this property uploaded",
+    "richmenu_admin_image_default": "Using the built-in image — you can upload your own, but the button positions always stay on the same 6-cell layout",
+    "richmenu_admin_upload_btn": "Upload admin menu image",
+    "richmenu_admin_use_default_btn": "Back to the built-in image",
+    "richmenu_admin_reset_image_confirm": "Go back to the built-in admin menu image? (Press \"Sync admin menu\" again for it to take effect on LINE.)",
+    "richmenu_admin_image_saved": "Admin menu image saved — press \"Sync admin menu\" for it to take effect on LINE",
+    "richmenu_admin_image_reset": "Back to the built-in image — press \"Sync admin menu\" for it to take effect on LINE",
+    "richmenu_admin_err_save_image": "Could not save the admin menu image"
   },
   "property_settings": {
     "title": "Property Settings",

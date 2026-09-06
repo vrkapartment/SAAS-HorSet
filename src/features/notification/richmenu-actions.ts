@@ -10,11 +10,13 @@ import {
   buildTenantRichMenu,
   checkRichMenuImage,
   phoneToContactUri,
-  TENANT_RICHMENU_TEMPLATE
+  TENANT_RICHMENU_TEMPLATE,
+  type RichMenuDefinition
 } from "./richmenu"
 import {
   ADMIN_MENU_COLUMN_HINT,
   lineRequest,
+  resolveAdminMenuImageUrl,
   syncAdminRichMenu,
   teardownAdminRichMenu
 } from "./richmenu-admin"
@@ -45,6 +47,8 @@ type RichMenuSettingsRow = {
   richmenu_admin_template_version: string | null
   richmenu_admin_linked_uids: string | null
   richmenu_admin_enabled: boolean | null
+  richmenu_admin_image_url: string | null
+  richmenu_admin_installed_image_url: string | null
 }
 
 /** สถานะของเมนูใบที่สองซึ่งผูกให้เฉพาะแอดมิน (ดู richmenu-admin.ts) */
@@ -59,7 +63,13 @@ export type AdminRichMenuStatus = {
   adminCount: number
   /** จำนวนที่ผูกเมนูผู้ดูแลไว้สำเร็จจริงบน LINE */
   linkedCount: number
-  /** ผังปุ่มในโค้ดเปลี่ยนไปหลังหอนี้ติดตั้ง หรือมีแอดมินที่ยังไม่ได้รับเมนู */
+  /** ภาพเมนูผู้ดูแลที่หอพักอัปโหลดเอง (ว่าง = ใช้ภาพต้นแบบของระบบ) */
+  customImageUrl: string
+  /** ภาพที่จะถูกใช้จริงตอนติดตั้ง */
+  effectiveImageUrl: string
+  requiredWidth: number
+  requiredHeight: number
+  /** ผังปุ่มหรือภาพเปลี่ยนไปหลังหอนี้ติดตั้ง หรือมีแอดมินที่ยังไม่ได้รับเมนู */
   needsSync: boolean
 }
 
@@ -153,7 +163,7 @@ const BASE_COLUMNS =
   "channel_access_token, liff_id, richmenu_id, richmenu_image_url, richmenu_installed_at, richmenu_contact_uri, richmenu_liff_id, richmenu_enabled, richmenu_template_version, admin_line_user_id"
 
 const ADMIN_MENU_COLUMNS =
-  "richmenu_admin_id, richmenu_admin_installed_at, richmenu_admin_template_version, richmenu_admin_linked_uids, richmenu_admin_enabled"
+  "richmenu_admin_id, richmenu_admin_installed_at, richmenu_admin_template_version, richmenu_admin_linked_uids, richmenu_admin_enabled, richmenu_admin_image_url, richmenu_admin_installed_image_url"
 
 /**
  * อ่านค่าตั้งค่าเมนูของหอพัก
@@ -203,9 +213,12 @@ async function readSettings(
  */
 function buildAdminStatus(
   row: RichMenuSettingsRow | null,
-  adminColumnsReady: boolean
+  adminColumnsReady: boolean,
+  appUrl: string
 ): AdminRichMenuStatus {
   const adminCount = splitUids(row?.admin_line_user_id).length
+  const requiredWidth = ADMIN_RICHMENU_TEMPLATE.size.width
+  const requiredHeight = ADMIN_RICHMENU_TEMPLATE.size.height
 
   if (!adminColumnsReady) {
     return {
@@ -215,6 +228,10 @@ function buildAdminStatus(
       installedAt: null,
       adminCount,
       linkedCount: 0,
+      customImageUrl: "",
+      effectiveImageUrl: resolveAdminMenuImageUrl("", appUrl),
+      requiredWidth,
+      requiredHeight,
       needsSync: false
     }
   }
@@ -224,6 +241,11 @@ function buildAdminStatus(
   const linkedCount = splitUids(row?.richmenu_admin_linked_uids).length
   const templateChanged = row?.richmenu_admin_template_version !== ADMIN_RICHMENU_TEMPLATE.name
 
+  const customImageUrl = row?.richmenu_admin_image_url?.trim() || ""
+  const effectiveImageUrl = resolveAdminMenuImageUrl(customImageUrl, appUrl)
+  // เทียบด้วยตรรกะเดียวกับ syncAdminRichMenu ไม่งั้นแบนเนอร์กับพฤติกรรมจริงจะไม่ตรงกัน
+  const imageChanged = installed && row?.richmenu_admin_installed_image_url !== effectiveImageUrl
+
   return {
     enabled,
     ready: true,
@@ -231,9 +253,15 @@ function buildAdminStatus(
     installedAt: row?.richmenu_admin_installed_at || null,
     adminCount,
     linkedCount,
+    customImageUrl,
+    effectiveImageUrl,
+    requiredWidth,
+    requiredHeight,
     // ปิดสวิตช์อยู่ = ไม่มีอะไรให้ซิงก์ ไม่ควรขึ้นเตือนให้เจ้าหอกดทั้งที่ตั้งใจปิดเอง
     needsSync:
-      enabled && adminCount > 0 && (!installed || templateChanged || linkedCount < adminCount)
+      enabled &&
+      adminCount > 0 &&
+      (!installed || templateChanged || imageChanged || linkedCount < adminCount)
   }
 }
 
@@ -277,7 +305,7 @@ export async function getRichMenuStatusAction(workspaceId: string) {
           row?.richmenu_template_version !== TENANT_RICHMENU_TEMPLATE.name),
       contactMissing: !currentContactUri,
       channelReady: !!row?.channel_access_token?.trim() && row.channel_access_token !== "placeholder",
-      admin: buildAdminStatus(row, adminColumnsReady)
+      admin: buildAdminStatus(row, adminColumnsReady, appUrl)
     }
 
     return { success: true, data: status }
@@ -326,9 +354,53 @@ export async function saveRichMenuImageAction(workspaceId: string, imageUrl: str
   }
 }
 
+/**
+ * บันทึก URL ภาพ "เมนูผู้ดูแล" ที่เจ้าหออัปโหลดขึ้น Storage แล้ว
+ *
+ * ทำงานเหมือน saveRichMenuImageAction ทุกประการ แค่คนละคอลัมน์และตรวจกับผังของเมนูผู้ดูแล
+ * ส่งค่าว่างมาเพื่อกลับไปใช้ภาพต้นแบบของระบบ
+ *
+ * บันทึกอย่างเดียว ยังไม่แตะ LINE — เพราะ LINE ไม่มี API เปลี่ยนภาพของเมนูที่สร้างแล้ว
+ * ต้องสร้างเมนูใบใหม่ ซึ่งเกิดตอนกด "ซิงก์เมนูผู้ดูแล" (needsSync จะขึ้นเตือนให้กด)
+ */
+export async function saveAdminRichMenuImageAction(workspaceId: string, imageUrl: string) {
+  try {
+    const auth = await assertWorkspaceAdmin(workspaceId)
+    if (!auth.ok) return { success: false, error: auth.error }
+
+    const trimmed = (imageUrl || "").trim()
+
+    if (trimmed) {
+      if (!/^https?:\/\//i.test(trimmed)) {
+        return { success: false, error: "ลิงก์ภาพไม่ถูกต้อง" }
+      }
+      const check = await fetchAndCheckImage(trimmed, ADMIN_RICHMENU_TEMPLATE)
+      if (!check.ok) return { success: false, error: check.error }
+    }
+
+    const { error } = await auth.db
+      .from("workspace_line_settings")
+      .update({ richmenu_admin_image_url: trimmed || null, updated_at: new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+
+    if (error) {
+      if (isMissingColumnError(error)) return { success: false, error: ADMIN_MENU_COLUMN_HINT }
+      throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึกภาพเมนูผู้ดูแล"
+    return { success: false, error: message }
+  }
+}
+
 type FetchedImage = { ok: true; buffer: Buffer; type: "image/png" | "image/jpeg" } | { ok: false; error: string }
 
-async function fetchAndCheckImage(url: string): Promise<FetchedImage> {
+async function fetchAndCheckImage(
+  url: string,
+  template: RichMenuDefinition = TENANT_RICHMENU_TEMPLATE
+): Promise<FetchedImage> {
   let res: Response
   try {
     res = await fetch(url, { cache: "no-store" })
@@ -340,7 +412,7 @@ async function fetchAndCheckImage(url: string): Promise<FetchedImage> {
   }
 
   const buffer = Buffer.from(await res.arrayBuffer())
-  const check = checkRichMenuImage(buffer, TENANT_RICHMENU_TEMPLATE)
+  const check = checkRichMenuImage(buffer, template)
   if (!check.ok) return { ok: false, error: check.error }
 
   return { ok: true, buffer, type: check.type }

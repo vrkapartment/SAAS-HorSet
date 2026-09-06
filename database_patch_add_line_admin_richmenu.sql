@@ -48,8 +48,25 @@ alter table public.workspace_line_settings
 alter table public.workspace_line_settings
   add column if not exists richmenu_admin_enabled boolean not null default true;
 
+-- ภาพเมนูผู้ดูแลที่เจ้าหออัปโหลดเอง (ว่าง = ใช้ภาพต้นแบบที่แถมมากับระบบ)
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_image_url text;
+
+-- ภาพที่ "ติดตั้งลงเมนูบน LINE ไปแล้วจริง"
+--
+-- ต้องเก็บแยกจาก richmenu_admin_image_url เพราะ LINE ไม่มี API เปลี่ยนภาพของเมนูที่สร้างแล้ว
+-- การเปลี่ยนภาพจึงต้องสร้างเมนูใบใหม่ ถ้าไม่จำว่าภาพไหนถูกติดตั้งไป ระบบจะไม่รู้ว่า
+-- ต้องสร้างใหม่ตอนเจ้าหอเปลี่ยนแค่ภาพ (ผังปุ่มไม่เปลี่ยน) แล้วภาพใหม่จะไม่มีผลเลย
+-- หลักการเดียวกับ richmenu_contact_uri ของเมนูผู้เช่า
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_installed_image_url text;
+
 comment on column public.workspace_line_settings.richmenu_admin_enabled is
   'false = ปิดเมนูผู้ดูแล (ถอดออกจากแอดมินทุกคน) — แยกอิสระจาก richmenu_enabled ที่คุมเมนูผู้เช่า';
+comment on column public.workspace_line_settings.richmenu_admin_image_url is
+  'ภาพเมนูผู้ดูแลที่เจ้าหออัปโหลดเอง — ว่างหมายถึงใช้ภาพต้นแบบของระบบ (public/line-richmenu/admin-menu.png)';
+comment on column public.workspace_line_settings.richmenu_admin_installed_image_url is
+  'ภาพที่ติดตั้งลงเมนูบน LINE ไปแล้วจริง ใช้เทียบเพื่อรู้ว่าต้องสร้างเมนูใบใหม่เพราะภาพเปลี่ยน';
 comment on column public.workspace_line_settings.richmenu_admin_id is
   'richMenuId ของเมนูแอดมิน ผูกรายบุคคลให้ UID ใน admin_line_user_id (null = ยังไม่ติดตั้ง)';
 comment on column public.workspace_line_settings.richmenu_admin_linked_uids is
