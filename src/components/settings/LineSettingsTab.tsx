@@ -38,12 +38,23 @@ import {
   listActiveLineConnectionCodesAction,
   deleteLineConnectionCodeAction,
   pollLineConnectionCodeStatusAction,
-  getLineQuotaAction
+  getLineQuotaAction,
+  removeLineAdminAction
 } from "@/features/notification/actions"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
 import PricingModal from "@/features/subscription/components/PricingModal"
 import RichMenuPanel from "@/components/settings/RichMenuPanel"
+
+/** โปรไฟล์ LINE ของแอดมินหนึ่งคน (รูปแบบเดียวกับที่ getLineProfilesAction ส่งกลับมา) */
+type LineAdminProfile = {
+  userId: string
+  displayName?: string
+  pictureUrl?: string | null
+  statusMessage?: string
+  success?: boolean
+  error?: string
+}
 
 export default function LineSettingsTab() {
   const { t, locale } = useLanguage()
@@ -81,7 +92,7 @@ export default function LineSettingsTab() {
   const [savedDisabledAdminUserIds, setSavedDisabledAdminUserIds] = useState("")
   
   // Admin LINE Profiles
-  const [adminProfiles, setAdminProfiles] = useState<any[]>([])
+  const [adminProfiles, setAdminProfiles] = useState<LineAdminProfile[]>([])
   const [loadingProfiles, setLoadingProfiles] = useState(false)
   
   // Add LINE Admin Connection Modal States
@@ -469,18 +480,61 @@ export default function LineSettingsTab() {
     setShowAddModal(false)
   }
 
-  const handleDeleteAdmin = (uidToDelete: string) => {
-    const updatedProfiles = adminProfiles.filter((p: any) => p.userId !== uidToDelete)
-    setAdminProfiles(updatedProfiles)
-    const updatedUidsStr = updatedProfiles.map((p: any) => p.userId).join(",")
-    setAdminUserIdInput(updatedUidsStr)
+  /**
+   * ลบการเชื่อมต่อ LINE Admin ออกหนึ่งคน — บันทึกลงฐานข้อมูลทันที
+   *
+   * เดิมฟังก์ชันนี้แก้แค่ state ในหน้าจอ ต้องกด "อัปเดตการตั้งค่า" อีกทีถึงจะมีผลจริง
+   * ปิดหน้าไปก่อนคือไม่มีอะไรเกิดขึ้น จึงเปลี่ยนมาเรียก server action ตรง ๆ
+   */
+  const handleDeleteAdmin = async (uidToDelete: string) => {
+    if (!uidToDelete) return
 
-    // Clean up disabled list
-    const disabledList = disabledAdminUserIdsInput
-      ? disabledAdminUserIdsInput.split(/[\s,\n]+/).map(id => id.trim()).filter(id => id.length > 0)
-      : []
-    const updatedDisabledList = disabledList.filter(id => id !== uidToDelete)
-    const updatedDisabledStr = updatedDisabledList.join(",")
+    const target = adminProfiles.find((p: LineAdminProfile) => p.userId === uidToDelete)
+    const displayName = target?.displayName || uidToDelete
+    const isLastAdmin = adminProfiles.length <= 1
+
+    const confirmText = isLastAdmin
+      ? t("line_settings.confirm_delete_last_admin").replace("{name}", displayName)
+      : t("line_settings.confirm_delete_admin").replace("{name}", displayName)
+    if (!confirm(confirmText)) return
+
+    setSettingsError(null)
+    setSettingsSuccess(null)
+
+    // โหมดสาธิตไม่มี workspace จริงให้บันทึก — ตัดออกจากรายการในจอไปเลย
+    if (isDemo || !workspaceId) {
+      applyAdminRemovalToState(uidToDelete)
+      setSettingsSuccess(t("line_settings.success_delete_admin").replace("{name}", displayName))
+      return
+    }
+
+    setModalLoading(true)
+    try {
+      const res = await removeLineAdminAction(workspaceId, uidToDelete)
+      if (!res.success) throw new Error(res.error)
+
+      applyAdminRemovalToState(uidToDelete)
+      setSavedAdminUserId(res.data?.adminLineUserId || "")
+      setSettingsSuccess(t("line_settings.success_delete_admin").replace("{name}", displayName))
+    } catch (err: unknown) {
+      console.error("Error removing LINE admin:", err)
+      setSettingsError(err instanceof Error ? err.message : t("line_settings.err_tech"))
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  /** ตัดคนที่ถูกลบออกจาก state ทุกที่ที่อ้างถึง UID นั้น */
+  const applyAdminRemovalToState = (uidToDelete: string) => {
+    const updatedProfiles = adminProfiles.filter((p: LineAdminProfile) => p.userId !== uidToDelete)
+    setAdminProfiles(updatedProfiles)
+    setAdminUserIdInput(updatedProfiles.map((p: LineAdminProfile) => p.userId).join(", "))
+
+    const updatedDisabledStr = (disabledAdminUserIdsInput || "")
+      .split(/[\s,\n]+/)
+      .map(id => id.trim())
+      .filter(id => id.length > 0 && id !== uidToDelete)
+      .join(",")
     setDisabledAdminUserIdsInput(updatedDisabledStr)
     setSavedDisabledAdminUserIds(updatedDisabledStr)
   }
@@ -1411,17 +1465,16 @@ export default function LineSettingsTab() {
                                 )}
                               </button>
 
-                              {/* Delete/Remove Button - only visible during Editing or if Not Configured */}
-                              {(!isConfigured || isEditing) && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteAdmin(p.userId)}
-                                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer shadow-sm group shrink-0"
-                                  title={t("line_settings.delete_admin_tip")}
-                                >
-                                  <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                </button>
-                              )}
+                              {/* ปุ่มลบ — แสดงตลอด ไม่ซ่อนหลังโหมดแก้ไข เพราะเป็น action ของตัวเองที่บันทึกทันที */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAdmin(p.userId)}
+                                disabled={modalLoading}
+                                className="p-2 bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-rose-500 border border-rose-500/20 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer shadow-sm group shrink-0"
+                                title={t("line_settings.delete_admin_tip")}
+                              >
+                                <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                              </button>
                             </div>
                           </div>
                         );

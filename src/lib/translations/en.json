@@ -2024,7 +2024,10 @@
     "richmenu_disable_confirm": "Turn the chat menu off? Tenants will stop seeing the shortcut buttons immediately, but your image and settings are kept so you can turn it back on any time without re-uploading.",
     "richmenu_enabled_msg": "The chat menu is on",
     "richmenu_disabled_msg": "The chat menu is off — tenants no longer see the shortcut buttons",
-    "richmenu_err_toggle": "Could not change the menu status"
+    "richmenu_err_toggle": "Could not change the menu status",
+    "confirm_delete_admin": "Remove the LINE Admin connection for \"{name}\"?\n\nThey will stop receiving payment slip notifications on LINE and will need to pair again with a 6-digit code to come back.",
+    "confirm_delete_last_admin": "⚠️ \"{name}\" is the last admin linked to LINE.\n\nAfter removing them, nobody will receive payment slip notifications on LINE — you will have to check the system yourself every time.\n\nRemove anyway?",
+    "success_delete_admin": "Removed the LINE Admin connection for \"{name}\""
   },
   "property_settings": {
     "title": "Property Settings",
