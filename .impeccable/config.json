@@ -37,6 +37,24 @@
         "rule": "design-system-color",
         "value": "*",
         "files": [
+          "docs/line-rich-menu/images/admin-menu.html"
+        ],
+        "createdAt": "2026-09-06T00:00:00.000Z",
+        "reason": "ต้นฉบับภาพ LINE rich menu ขนาด 2500px ไม่ใช่ UI ของแอป — เงื่อนไขเดียวกับ tenant-menu.html / super-admin-menu.html"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          "docs/line-rich-menu/images/admin-menu.html"
+        ],
+        "createdAt": "2026-09-06T00:00:00.000Z",
+        "reason": "ต้นฉบับภาพ LINE rich menu ขนาด 2500px ไม่ใช่ UI ของแอป — เงื่อนไขเดียวกับ tenant-menu.html / super-admin-menu.html"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
           "docs/line-rich-menu/images/super-admin-menu.html"
         ],
         "createdAt": "2026-09-04T16:33:13.147Z",

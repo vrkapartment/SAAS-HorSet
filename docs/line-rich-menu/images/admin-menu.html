@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>HorSet — Rich Menu ผู้ดูแลหอ (2500x1686)</title>
+<!--
+  ต้นฉบับภาพ rich menu ฝั่งผู้ดูแลหอ (เจ้าของหอ/แอดมิน) — แก้ไฟล์นี้แล้วสั่ง render ใหม่ด้วย
+      node scripts/build-line-richmenu-images.mjs --only admin
+
+  เมนูนี้ผูกให้เป็น "รายบุคคล" เฉพาะ UID ใน admin_line_user_id ไม่ใช่เมนู default ของ channel
+  (ดู src/features/notification/richmenu-admin.ts)
+
+  ⚠️ ขนาดและตำแหน่งของทุกช่องต้องตรงกับ areas[].bounds ใน richmenu-templates/admin.json เป๊ะ ๆ
+       แถวบน  y 0    สูง 843 : 0-833 | 833-1667 | 1667-2500  (postback — บอทตอบในแชท)
+       แถวล่าง y 843  สูง 843 : 0-833 | 833-1667 | 1667-2500  (uri — เปิดหลังบ้าน)
+
+  แถวบนพื้นขาว แถวล่างพื้นเทาอ่อน เพื่อให้แยกออกทันทีว่าปุ่มไหน "ตอบในแชท"
+  กับปุ่มไหน "ต้องเปิดเว็บแล้วล็อกอิน" — ป้ายกำกับใต้ชื่อปุ่มย้ำอีกชั้น
+-->
+<style>
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-SemiBold.ttf") format("truetype");
+    font-weight: 600;
+  }
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-Bold.ttf") format("truetype");
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: "Prompt";
+    src: url("../../../src/app/fonts/Prompt/Prompt-Medium.ttf") format("truetype");
+    font-weight: 500;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 2500px;
+    height: 1686px;
+    overflow: hidden;
+    font-family: "Prompt", "Leelawadee UI", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .menu {
+    position: relative;
+    width: 2500px;
+    height: 1686px;
+    background: #ffffff;
+  }
+
+  .cell {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* ---- แถวบน: คำสั่งที่บอทตอบกลับในแชท ---- */
+  .cell-summary { left: 0;      top: 0; width: 833px; height: 843px; background: #ffffff; }
+  .cell-pending { left: 833px;  top: 0; width: 834px; height: 843px; background: #ffffff; }
+  .cell-unpaid  { left: 1667px; top: 0; width: 833px; height: 843px; background: #ffffff; }
+
+  /* ---- แถวล่าง: ลิงก์เข้าหลังบ้าน ---- */
+  .cell-console { left: 0;      top: 843px; width: 833px; height: 843px; background: #f8fafc; }
+  .cell-meter   { left: 833px;  top: 843px; width: 834px; height: 843px; background: #f8fafc; }
+  .cell-bills   { left: 1667px; top: 843px; width: 833px; height: 843px; background: #f8fafc; }
+
+  /* ---- เส้นแบ่งช่อง (หนา 4px ให้เห็นขอบปุ่มชัดตอนย่อลงจอมือถือ) ---- */
+  .rule { position: absolute; background: #e2e8f0; }
+  .rule-h        { left: 0;      top: 841px; width: 2500px; height: 4px; }
+  .rule-v-top-l  { left: 831px;  top: 0;     width: 4px;    height: 841px; }
+  .rule-v-top-r  { left: 1665px; top: 0;     width: 4px;    height: 841px; }
+  .rule-v-bot-l  { left: 831px;  top: 845px; width: 4px;    height: 841px; }
+  .rule-v-bot-r  { left: 1665px; top: 845px; width: 4px;    height: 841px; }
+
+  .icon { width: 140px; height: 140px; margin-bottom: 38px; }
+
+  .title { font-size: 88px; font-weight: 700; line-height: 1.08; letter-spacing: -0.5px; color: #0f172a; }
+  .hint  { font-size: 46px; font-weight: 500; margin-top: 20px; color: #64748b; }
+
+  .ink-blue    { color: #2563eb; }
+  .ink-emerald { color: #059669; }
+  .ink-red     { color: #dc2626; }
+  .ink-slate   { color: #475569; }
+</style>
+</head>
+<body>
+<div class="menu">
+
+  <!-- ปุ่ม 1 : สรุปวันนี้ -->
+  <div class="cell cell-summary">
+    <svg class="icon ink-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.6 20.4h16.8"/>
+      <rect x="5.4" y="12.4" width="3.4" height="8"/>
+      <rect x="10.3" y="8.2" width="3.4" height="12.2"/>
+      <rect x="15.2" y="4.4" width="3.4" height="16"/>
+    </svg>
+    <div class="title">สรุปวันนี้</div>
+    <div class="hint">ตอบในแชท</div>
+  </div>
+
+  <!-- ปุ่ม 2 : สลิปรอตรวจ -->
+  <div class="cell cell-pending">
+    <svg class="icon ink-emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 2.8h12v18.4l-2 -1.4l-2 1.4l-2 -1.4l-2 1.4l-2 -1.4l-2 1.4z"/>
+      <path d="M9.2 8.4h5.6"/><path d="M9.2 12.2h5.6"/>
+    </svg>
+    <div class="title">สลิปรอตรวจ</div>
+    <div class="hint">ตอบในแชท</div>
+  </div>
+
+  <!-- ปุ่ม 3 : ห้องค้างชำระ -->
+  <div class="cell cell-unpaid">
+    <svg class="icon ink-red" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.8"/>
+      <path d="M12 7.6v5"/>
+      <circle cx="12" cy="16.1" r="0.95" fill="currentColor" stroke="none"/>
+    </svg>
+    <div class="title">ห้องค้างชำระ</div>
+    <div class="hint">ตอบในแชท</div>
+  </div>
+
+  <!-- ปุ่ม 4 : หลังบ้าน -->
+  <div class="cell cell-console">
+    <svg class="icon ink-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.4 10.6L12 3.6l8.6 7"/>
+      <path d="M5.6 12.4v8h12.8v-8"/>
+      <path d="M10 20.4v-4.8h4v4.8"/>
+    </svg>
+    <div class="title">หลังบ้าน</div>
+    <div class="hint">เปิดเว็บ</div>
+  </div>
+
+  <!-- ปุ่ม 5 : จดมิเตอร์ -->
+  <div class="cell cell-meter">
+    <svg class="icon ink-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.8"/>
+      <path d="M12 12l4-3"/>
+      <path d="M6.6 15.6h10.8"/>
+    </svg>
+    <div class="title">จดมิเตอร์</div>
+    <div class="hint">เปิดเว็บ</div>
+  </div>
+
+  <!-- ปุ่ม 6 : จัดการบิล -->
+  <div class="cell cell-bills">
+    <svg class="icon ink-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3.6" y="4.6" width="16.8" height="14.8" rx="2.2"/>
+      <path d="M3.6 9.4h16.8"/>
+      <path d="M7.6 13.4h4.4"/>
+    </svg>
+    <div class="title">จัดการบิล</div>
+    <div class="hint">เปิดเว็บ</div>
+  </div>
+
+  <div class="rule rule-h"></div>
+  <div class="rule rule-v-top-l"></div>
+  <div class="rule rule-v-top-r"></div>
+  <div class="rule rule-v-bot-l"></div>
+  <div class="rule rule-v-bot-r"></div>
+
+</div>
+</body>
+</html>

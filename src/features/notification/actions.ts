@@ -5,6 +5,14 @@ import { generatePortalToken } from "@/features/tenant/actions"
 import { calculateLateDays } from "@/features/billing/utils"
 import { assertWorkspaceFeatureEnabled } from "@/features/subscription/actions"
 
+/** URL ของแอปแบบมี scheme และไม่มี / ปิดท้าย ใช้ตอนฝังลิงก์ลงเมนู/ข้อความ LINE */
+function resolveAppUrlForLine(): string {
+  let appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").trim()
+  while (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1)
+  if (appUrl && !appUrl.startsWith("http")) appUrl = `https://${appUrl}`
+  return appUrl
+}
+
 /**
  * ฟังก์ชันจำลองสำหรับระบบส่งข้อความแจ้งเตือนผ่าน LINE Messaging API (เก็บไว้เพื่อความเสถียรของระบบเก่า)
  */
@@ -2027,6 +2035,32 @@ export async function removeLineAdminAction(workspaceId: string, lineUserId: str
       .eq("workspace_id", workspaceId)
 
     if (updateError) throw updateError
+
+    // ถอด "เมนูผู้ดูแล" ออกจากคนที่เพิ่งถูกลบ ไม่งั้นเมนูจะค้างบนมือถือของเขาต่อไป
+    // (กดแล้วไม่ได้ข้อมูลอยู่ดีเพราะ handleAdminPostback ตรวจสิทธิ์ซ้ำ แต่เห็นเมนูค้างก็ชวนสับสน)
+    // พลาดตรงนี้ไม่ควรทำให้การลบล้มเหลว เพราะข้อมูลในฐานข้อมูลถูกลบไปเรียบร้อยแล้ว
+    try {
+      const { data: lineRow } = await supabase
+        .from("workspace_line_settings")
+        .select("channel_access_token")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle()
+
+      const token = lineRow?.channel_access_token?.trim() || ""
+      if (token && token !== "placeholder") {
+        const { unlinkAdminMenuFromUsers, syncAdminRichMenu } = await import("./richmenu-admin")
+        await unlinkAdminMenuFromUsers(token, [target])
+        // ซิงก์ต่อเพื่อให้ richmenu_admin_linked_uids ตรงกับความจริง (และเก็บกวาดถ้าไม่เหลือแอดมินเลย)
+        await syncAdminRichMenu({
+          db: supabase,
+          workspaceId,
+          channelAccessToken: token,
+          appUrl: resolveAppUrlForLine()
+        })
+      }
+    } catch (menuError) {
+      console.error("removeLineAdminAction: ถอดเมนูผู้ดูแลไม่สำเร็จ:", menuError)
+    }
 
     return {
       success: true,
