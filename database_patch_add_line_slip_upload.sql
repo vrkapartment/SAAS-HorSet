@@ -32,3 +32,16 @@ alter table public.workspace_line_settings
 
 comment on column public.workspace_line_settings.richmenu_template_version is
   'ชื่อ/เวอร์ชันของผังเมนูที่ติดตั้งลง LINE ไปจริง ใช้เทียบกับผังปัจจุบันในโค้ดเพื่อเตือนว่าเมนูล้าสมัย';
+
+-- บิลเป้าหมายที่ผู้เช่าเลือกไว้ ก่อนส่งรูปสลิปเข้ามา
+--
+-- flow ใหม่ถามให้จบก่อนแล้วค่อยส่งรูป: กดปุ่ม -> (ถามห้อง) -> (ถามรอบบิล) -> ส่งรูป
+-- รูปที่ส่งตามมาทีหลังไม่มีข้อมูลติดมาด้วย (ต่างจาก postback ที่พา data มาได้) จึงต้องจำ
+-- ไว้ฝั่งเซิร์ฟเวอร์ว่าผู้เช่าเลือกบิลใบไหนไว้ แล้วรูปถัดไปจะถูกแปะเข้าใบนั้น
+--
+-- หมดอายุพร้อมกับ slip_armed_at และถูกล้างทันทีที่แปะสลิปสำเร็จ
+alter table public.tenants
+  add column if not exists slip_target_bill_id uuid;
+
+comment on column public.tenants.slip_target_bill_id is
+  'บิลที่ผู้เช่าเลือกไว้ว่าจะส่งสลิปให้ รอรูปที่จะส่งตามมาในแชท (null = ยังไม่ได้เลือก/แปะไปแล้ว)';
