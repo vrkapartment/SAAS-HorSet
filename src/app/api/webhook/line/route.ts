@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import crypto from "crypto"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  SLIP_ARM_POSTBACK,
+  armSlipUpload,
+  handleSlipBillChoice,
+  handleSlipImage,
+  type LineTextMessage
+} from "@/features/notification/line-slip"
 
 // Helper function to verify signature from LINE Webhook
 function verifySignature(body: string, channelSecret: string, signature: string): boolean {
@@ -22,6 +30,92 @@ function getSystemClient() {
       autoRefreshToken: false,
     }
   })
+}
+
+
+/** เท่าที่ตัวจัดการสลิปใช้จาก event ที่ LINE ส่งมา (webhook รับ event ได้หลายชนิด) */
+type LineSlipEvent = {
+  type?: string
+  replyToken?: string
+  source?: { type?: string; userId?: string }
+  message?: { type?: string; id?: string }
+  postback?: { data?: string }
+}
+
+/** ตอบกลับผู้ใช้ด้วย replyToken (ฟรี ไม่กินโควตาเหมือน push) */
+async function replyToLine(replyToken: string, messages: LineTextMessage[], token: string) {
+  if (!replyToken || messages.length === 0) return
+  try {
+    await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ replyToken, messages })
+    })
+  } catch (err) {
+    console.error("line-slip: ตอบกลับ LINE ไม่สำเร็จ:", err)
+  }
+}
+
+/**
+ * จัดการ event ที่เกี่ยวกับการส่งสลิปในแชท
+ *
+ * คืน true เมื่อจัดการ event นี้ไปแล้ว เพื่อให้ webhook ข้ามตัวจัดการอื่นที่เหลือ
+ */
+async function handleLineSlipEvent(args: {
+  supabase: SupabaseClient
+  workspaceId: string
+  channelAccessToken: string
+  event: LineSlipEvent
+}): Promise<boolean> {
+  const { supabase, workspaceId, channelAccessToken, event } = args
+  const lineUserId: string = event.source?.userId || ""
+  if (!lineUserId) return false
+
+  // แอดมินที่ผูก LINE ไว้รับแจ้งเตือนสลิปอยู่ใน OA เดียวกับผู้เช่า — รูปของแอดมินไม่ใช่สลิป
+  const { data: lineSettings } = await supabase
+    .from("workspace_line_settings")
+    .select("admin_line_user_id")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()
+  const adminIds = (lineSettings?.admin_line_user_id || "")
+    .split(/[\s,\n]+/)
+    .map((id: string) => id.trim())
+    .filter((id: string) => id.length > 0)
+  if (adminIds.includes(lineUserId)) return false
+
+  let appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").trim()
+  while (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1)
+  if (appUrl && !appUrl.startsWith("http")) appUrl = `https://${appUrl}`
+
+  const ctx = { db: supabase, workspaceId, lineUserId, channelAccessToken, appUrl }
+
+  try {
+    if (event.type === "postback") {
+      const data: string = event.postback?.data || ""
+      if (data === SLIP_ARM_POSTBACK) {
+        await replyToLine(event.replyToken || "", await armSlipUpload(ctx), channelAccessToken)
+        return true
+      }
+      const chosen = await handleSlipBillChoice(ctx, data)
+      if (chosen) {
+        await replyToLine(event.replyToken || "", chosen, channelAccessToken)
+        return true
+      }
+      return false
+    }
+
+    if (event.type === "message" && event.message?.type === "image") {
+      const messages = await handleSlipImage(ctx, event.message.id || "")
+      // null = ไม่ควรตอบอะไรเลย (ไม่ใช่ผู้เช่า / ไม่มีบิลค้าง) — ถือว่าจัดการแล้ว ไม่ให้ตัวอื่นมายุ่ง
+      if (messages) await replyToLine(event.replyToken || "", messages, channelAccessToken)
+      return true
+    }
+  } catch (err) {
+    console.error("line-slip: จัดการ event ไม่สำเร็จ:", err)
+    return true
+  }
+
+  return false
 }
 
 export async function POST(request: NextRequest) {
@@ -97,6 +191,29 @@ export async function POST(request: NextRequest) {
     }
 
     for (const event of events) {
+      // ---- ส่งสลิปในแชท LINE (เฉพาะ webhook ของหอพัก ไม่ใช่ของทีมงาน) ----
+      //
+      // รับได้เฉพาะแชทส่วนตัวของผู้เช่า และต้องกดปุ่ม "ส่งสลิป" ใน rich menu ก่อนเสมอ
+      // (ดูเหตุผลใน features/notification/line-slip.ts) แอดมินที่ผูก LINE ไว้รับแจ้งเตือน
+      // อยู่ใน OA เดียวกัน จึงต้องข้ามไม่ให้รูปของแอดมินกลายเป็นสลิป
+      if (!isSuperAdminScope && activeWorkspaceId && channelAccessToken) {
+        const source = event.source || {}
+        const isPrivateChat = source.type === "user" && !!source.userId
+        const isSlipRelated =
+          (event.type === "postback" && typeof event.postback?.data === "string") ||
+          (event.type === "message" && event.message?.type === "image")
+
+        if (isPrivateChat && isSlipRelated) {
+          const handled = await handleLineSlipEvent({
+            supabase,
+            workspaceId: activeWorkspaceId,
+            channelAccessToken,
+            event
+          })
+          if (handled) continue
+        }
+      }
+
       // We only handle message events of type text
       if (event.type === "message" && event.message && event.message.type === "text") {
         const text = event.message.text.trim()
