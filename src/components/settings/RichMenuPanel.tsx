@@ -9,11 +9,13 @@ import {
   LayoutGrid,
   PowerOff,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   Trash2,
   Upload
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import RichMenuImagePreview from "@/components/settings/RichMenuImagePreview"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import {
   getRichMenuStatusAction,
@@ -533,11 +535,11 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
             </div>
 
             {status?.effectiveImageUrl && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
+              <RichMenuImagePreview
                 src={status.effectiveImageUrl}
                 alt={t("line_settings.richmenu_image_label")}
-                className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                hint={t("line_settings.richmenu_preview_hint")}
+                closeLabel={t("line_settings.richmenu_preview_close")}
               />
             )}
 
@@ -569,13 +571,26 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
                 <span>{t("line_settings.richmenu_upload_btn")}</span>
               </button>
 
+              {/* ดาวน์โหลดภาพต้นแบบไปแก้ทับ — ทางที่ปลอดภัยสุดสำหรับคนทำภาพเอง
+                  เพราะผังปุ่มจะไม่เลื่อน (ระบบตรวจตำแหน่งปุ่มแทนไม่ได้) */}
+              {status?.defaultImageUrl && (
+                <a
+                  href={status.defaultImageUrl}
+                  download
+                  className="py-2.5 px-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
+                >
+                  <Download className="w-4 h-4 text-indigo-500" />
+                  <span>{t("line_settings.richmenu_download_template_btn")}</span>
+                </a>
+              )}
+
               {status?.customImageUrl && (
                 <button
                   onClick={handleUseDefaultImage}
                   disabled={busy}
                   className="py-2.5 px-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-slate-300 disabled:opacity-50 text-slate-500 dark:text-slate-400 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
                 >
-                  <Download className="w-4 h-4" />
+                  <RotateCcw className="w-4 h-4" />
                   <span>{t("line_settings.richmenu_use_default_btn")}</span>
                 </button>
               )}
@@ -763,11 +778,11 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
                 </div>
 
                 {status.admin.effectiveImageUrl && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
+                  <RichMenuImagePreview
                     src={status.admin.effectiveImageUrl}
                     alt={t("line_settings.richmenu_admin_image_label")}
-                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    hint={t("line_settings.richmenu_preview_hint")}
+                    closeLabel={t("line_settings.richmenu_preview_close")}
                   />
                 )}
 
@@ -799,13 +814,24 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
                     <span>{t("line_settings.richmenu_admin_upload_btn")}</span>
                   </button>
 
+                  {status.admin.defaultImageUrl && (
+                    <a
+                      href={status.admin.defaultImageUrl}
+                      download
+                      className="py-2.5 px-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-sky-400 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
+                    >
+                      <Download className="w-4 h-4 text-sky-500" />
+                      <span>{t("line_settings.richmenu_download_template_btn")}</span>
+                    </a>
+                  )}
+
                   {status.admin.customImageUrl && (
                     <button
                       onClick={handleUseDefaultAdminImage}
                       disabled={busy}
                       className="py-2.5 px-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-slate-300 disabled:opacity-50 text-slate-500 dark:text-slate-400 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition-colors"
                     >
-                      <Download className="w-4 h-4" />
+                      <RotateCcw className="w-4 h-4" />
                       <span>{t("line_settings.richmenu_admin_use_default_btn")}</span>
                     </button>
                   )}

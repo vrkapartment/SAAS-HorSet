@@ -6,6 +6,7 @@ import { AlertCircle, ArrowRight, LayoutGrid, RefreshCw } from "lucide-react"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { getLineSettingsAction } from "@/features/notification/actions"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
+import RichMenuGuide from "@/components/settings/RichMenuGuide"
 import RichMenuPanel from "@/components/settings/RichMenuPanel"
 
 /**
@@ -116,5 +117,11 @@ export default function RichMenuSettingsTab() {
     )
   }
 
-  return <RichMenuPanel workspaceId={workspaceId} channelConfigured={channelConfigured} />
+  return (
+    <div className="space-y-6">
+      {/* คู่มืออยู่บนสุดแต่พับเก็บไว้ — คนเข้าครั้งแรกเห็นว่ามีให้อ่าน คนที่ตั้งค่าเป็นแล้วไม่เกะกะ */}
+      <RichMenuGuide />
+      <RichMenuPanel workspaceId={workspaceId} channelConfigured={channelConfigured} />
+    </div>
+  )
 }
