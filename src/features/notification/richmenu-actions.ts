@@ -67,6 +67,8 @@ export type AdminRichMenuStatus = {
   customImageUrl: string
   /** ภาพที่จะถูกใช้จริงตอนติดตั้ง */
   effectiveImageUrl: string
+  /** ภาพต้นแบบของระบบ — แยกจาก effectiveImageUrl ไว้ให้ปุ่มดาวน์โหลดเอาไปแก้ทับ */
+  defaultImageUrl: string
   requiredWidth: number
   requiredHeight: number
   /** ผังปุ่มหรือภาพเปลี่ยนไปหลังหอนี้ติดตั้ง หรือมีแอดมินที่ยังไม่ได้รับเมนู */
@@ -82,6 +84,8 @@ export type RichMenuStatus = {
   customImageUrl: string
   /** ภาพที่จะถูกใช้จริงตอนติดตั้ง */
   effectiveImageUrl: string
+  /** ภาพต้นแบบของระบบ — แยกจาก effectiveImageUrl ไว้ให้ปุ่มดาวน์โหลดเอาไปแก้ทับ */
+  defaultImageUrl: string
   requiredWidth: number
   requiredHeight: number
   /** เบอร์ติดต่อที่ระบบจะฝังลงเมนูถ้ากดติดตั้งเดี๋ยวนี้ */
@@ -230,6 +234,7 @@ function buildAdminStatus(
       linkedCount: 0,
       customImageUrl: "",
       effectiveImageUrl: resolveAdminMenuImageUrl("", appUrl),
+      defaultImageUrl: resolveAdminMenuImageUrl("", appUrl),
       requiredWidth,
       requiredHeight,
       needsSync: false
@@ -255,6 +260,7 @@ function buildAdminStatus(
     linkedCount,
     customImageUrl,
     effectiveImageUrl,
+    defaultImageUrl: resolveAdminMenuImageUrl("", appUrl),
     requiredWidth,
     requiredHeight,
     // ปิดสวิตช์อยู่ = ไม่มีอะไรให้ซิงก์ ไม่ควรขึ้นเตือนให้เจ้าหอกดทั้งที่ตั้งใจปิดเอง
@@ -293,6 +299,7 @@ export async function getRichMenuStatusAction(workspaceId: string) {
       installedAt: row?.richmenu_installed_at || null,
       customImageUrl,
       effectiveImageUrl: customImageUrl || `${appUrl}${DEFAULT_TENANT_MENU_IMAGE_PATH}`,
+      defaultImageUrl: `${appUrl}${DEFAULT_TENANT_MENU_IMAGE_PATH}`,
       requiredWidth: TENANT_RICHMENU_TEMPLATE.size.width,
       requiredHeight: TENANT_RICHMENU_TEMPLATE.size.height,
       currentContactUri,
