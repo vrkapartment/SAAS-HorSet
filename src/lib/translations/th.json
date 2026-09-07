@@ -2086,7 +2086,11 @@
     "paidnotify_err_save": "บันทึกข้อความไม่สำเร็จ",
     "paidnotify_err_load": "อ่านสถานะการแจ้งเตือนไม่สำเร็จ",
     "paidnotify_not_ready": "ยังใช้ฟีเจอร์นี้ไม่ได้ — ฐานข้อมูลยังไม่มีคอลัมน์ที่ต้องใช้ กรุณารัน database_patch_add_paid_notify.sql ใน Supabase ก่อน",
-    "paidnotify_channel_missing": "ยังไม่ได้เชื่อมต่อ LINE OA ของหอพักนี้ ข้อความจะยังส่งไม่ได้จนกว่าจะตั้งค่า Channel Access Token"
+    "paidnotify_channel_missing": "ยังไม่ได้เชื่อมต่อ LINE OA ของหอพักนี้ ข้อความจะยังส่งไม่ได้จนกว่าจะตั้งค่า Channel Access Token",
+    "richmenu_tab_need_channel_title": "ต้องเชื่อมต่อ LINE OA ก่อน",
+    "richmenu_tab_need_channel_desc": "เมนูล่างติดตั้งลง LINE OA ของหอพักโดยตรง จึงต้องตั้งค่า Channel Access Token ให้เสร็จก่อน",
+    "richmenu_tab_need_channel_cta": "ไปหน้า LINE OA และการแจ้งเตือน",
+    "richmenu_tab_loading": "กำลังโหลดข้อมูลหอพัก..."
   },
   "property_settings": {
     "title": "ตั้งค่าหอพัก",
@@ -2338,6 +2342,10 @@
       "supabase": {
         "name": "สถานะฐานข้อมูล Supabase",
         "description": "ตรวจสอบความเสถียร สรุปสภาพแวดล้อม และสคริปต์ SQL Database"
+      },
+      "rich_menu": {
+        "name": "เมนูล่างในแชท LINE",
+        "description": "ผังปุ่มลัดที่ผู้เช่าและผู้ดูแลเห็นในห้องแชท LINE ของหอพัก"
       }
     }
   },

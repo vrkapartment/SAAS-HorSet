@@ -2086,7 +2086,11 @@
     "paidnotify_err_save": "Could not save the message",
     "paidnotify_err_load": "Could not read the notification status",
     "paidnotify_not_ready": "Not available yet — the database is missing the required columns. Run database_patch_add_paid_notify.sql in Supabase first.",
-    "paidnotify_channel_missing": "This property has not connected its LINE OA yet, so nothing can be sent until a Channel Access Token is set."
+    "paidnotify_channel_missing": "This property has not connected its LINE OA yet, so nothing can be sent until a Channel Access Token is set.",
+    "richmenu_tab_need_channel_title": "Connect your LINE OA first",
+    "richmenu_tab_need_channel_desc": "The chat menu installs straight onto your property LINE OA, so the Channel Access Token has to be set up first.",
+    "richmenu_tab_need_channel_cta": "Go to LINE OA & notifications",
+    "richmenu_tab_loading": "Loading property data..."
   },
   "property_settings": {
     "title": "Property Settings",
@@ -2338,6 +2342,10 @@
       "supabase": {
         "name": "Supabase Database Status",
         "description": "Check stability, review the environment, and access SQL database scripts"
+      },
+      "rich_menu": {
+        "name": "LINE chat menu",
+        "description": "The shortcut layout tenants and admins see in your property LINE chat"
       }
     }
   },
