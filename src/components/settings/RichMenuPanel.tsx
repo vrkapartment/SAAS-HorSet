@@ -14,6 +14,7 @@ import {
   Upload
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import RichMenuImagePreview from "@/components/settings/RichMenuImagePreview"
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import {
   getRichMenuStatusAction,
@@ -533,11 +534,11 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
             </div>
 
             {status?.effectiveImageUrl && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
+              <RichMenuImagePreview
                 src={status.effectiveImageUrl}
                 alt={t("line_settings.richmenu_image_label")}
-                className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                hint={t("line_settings.richmenu_preview_hint")}
+                closeLabel={t("line_settings.richmenu_preview_close")}
               />
             )}
 
@@ -763,11 +764,11 @@ export default function RichMenuPanel({ workspaceId, channelConfigured }: Props)
                 </div>
 
                 {status.admin.effectiveImageUrl && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
+                  <RichMenuImagePreview
                     src={status.admin.effectiveImageUrl}
                     alt={t("line_settings.richmenu_admin_image_label")}
-                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                    hint={t("line_settings.richmenu_preview_hint")}
+                    closeLabel={t("line_settings.richmenu_preview_close")}
                   />
                 )}
 

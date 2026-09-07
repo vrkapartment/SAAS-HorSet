@@ -2090,7 +2090,9 @@
     "richmenu_tab_need_channel_title": "Connect your LINE OA first",
     "richmenu_tab_need_channel_desc": "The chat menu installs straight onto your property LINE OA, so the Channel Access Token has to be set up first.",
     "richmenu_tab_need_channel_cta": "Go to LINE OA & notifications",
-    "richmenu_tab_loading": "Loading property data..."
+    "richmenu_tab_loading": "Loading property data...",
+    "richmenu_preview_hint": "Tap to view full screen",
+    "richmenu_preview_close": "Close"
   },
   "property_settings": {
     "title": "Property Settings",

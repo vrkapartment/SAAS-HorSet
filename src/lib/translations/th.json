@@ -2090,7 +2090,9 @@
     "richmenu_tab_need_channel_title": "ต้องเชื่อมต่อ LINE OA ก่อน",
     "richmenu_tab_need_channel_desc": "เมนูล่างติดตั้งลง LINE OA ของหอพักโดยตรง จึงต้องตั้งค่า Channel Access Token ให้เสร็จก่อน",
     "richmenu_tab_need_channel_cta": "ไปหน้า LINE OA และการแจ้งเตือน",
-    "richmenu_tab_loading": "กำลังโหลดข้อมูลหอพัก..."
+    "richmenu_tab_loading": "กำลังโหลดข้อมูลหอพัก...",
+    "richmenu_preview_hint": "กดเพื่อดูเต็มจอ",
+    "richmenu_preview_close": "ปิด"
   },
   "property_settings": {
     "title": "ตั้งค่าหอพัก",
