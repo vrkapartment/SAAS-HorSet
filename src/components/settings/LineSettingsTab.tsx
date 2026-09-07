@@ -44,7 +44,6 @@ import {
 import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { useWorkspaceSubscription } from "@/features/subscription/hooks/useWorkspaceSubscription"
 import PricingModal from "@/features/subscription/components/PricingModal"
-import RichMenuPanel from "@/components/settings/RichMenuPanel"
 import PaidNotifyPanel from "@/components/settings/PaidNotifyPanel"
 
 /** โปรไฟล์ LINE ของแอดมินหนึ่งคน (รูปแบบเดียวกับที่ getLineProfilesAction ส่งกลับมา) */
@@ -1157,10 +1156,8 @@ export default function LineSettingsTab() {
             </div>
           )}
 
-          {/* Card: Rich Menu (แสดงเฉพาะเมื่อเชื่อมต่อ LINE OA แล้ว เพราะต้องมี channel access token ถึงจะติดตั้งเมนูได้) */}
-          {isConfigured && workspaceId && (
-            <RichMenuPanel workspaceId={workspaceId} channelConfigured={isConfigured} />
-          )}
+          {/* เมนูล่างในแชท (Rich Menu) ย้ายไปเป็นแท็บของตัวเองแล้ว — settings?tab=rich-menu
+              (RichMenuSettingsTab.tsx) เพราะแท็บนี้ยาวมากอยู่แล้ว */}
 
           {/* Card: แจ้งเตือนผู้เช่าเมื่อชำระเงินสำเร็จ (ต้องมี channel access token เหมือนกัน) */}
           {isConfigured && workspaceId && (

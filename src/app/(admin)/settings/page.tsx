@@ -11,6 +11,7 @@ import {
   Settings,
   RefreshCw,
   AlertCircle,
+  LayoutGrid,
   MessageSquare,
   ShieldCheck,
   Package,
@@ -28,6 +29,7 @@ import PermissionsTab from "@/components/settings/PermissionsTab"
 import TestConnectionTab from "@/components/settings/TestConnectionTab"
 import ProfileTab from "@/components/settings/ProfileTab"
 import LineSettingsTab from "@/components/settings/LineSettingsTab"
+import RichMenuSettingsTab from "@/components/settings/RichMenuSettingsTab"
 import SlipOkSettingsTab from "@/components/settings/SlipOkSettingsTab"
 import PackageSettingsTab from "@/components/settings/PackageSettingsTab"
 import GoogleDriveSettingsTab from "@/components/settings/GoogleDriveSettingsTab"
@@ -219,6 +221,15 @@ function SettingsHubContent() {
       allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
     },
     {
+      // แยกออกจากแท็บ LINE OA เพราะแท็บนั้นยาวมากอยู่แล้ว และเมนูล่างเป็นงานที่เข้ามาทำเป็นครั้ง ๆ
+      id: "rich-menu",
+      name: t("settings_hub.tabs.rich_menu.name"),
+      icon: LayoutGrid,
+      description: t("settings_hub.tabs.rich_menu.description"),
+      group: "automation",
+      allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
+    },
+    {
       id: "google_drive",
       name: t("settings_hub.tabs.google_drive.name"),
       icon: HardDrive,
@@ -273,6 +284,8 @@ function SettingsHubContent() {
         return <TestConnectionTab />
       case "line-oa":
         return <LineSettingsTab />
+      case "rich-menu":
+        return <RichMenuSettingsTab />
       case "slipok":
         return <SlipOkSettingsTab />
       case "package":
