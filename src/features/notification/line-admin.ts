@@ -114,15 +114,20 @@ async function buildSummary(ctx: AdminCtx): Promise<LineTextMessage[]> {
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", ctx.workspaceId)
       .eq("status", "pending"),
-    ctx.db.from("rooms").select("status").eq("workspace_id", ctx.workspaceId)
+    ctx.db.from("rooms").select("id, tenants(id)").eq("workspace_id", ctx.workspaceId)
   ])
 
   const unpaidBills = (unpaidRes.data as { amount: number | null }[] | null) ?? []
   const unpaidTotal = unpaidBills.reduce((sum, b) => sum + Number(b.amount ?? 0), 0)
   const pendingCount = pendingRes.count ?? 0
 
-  const rooms = (roomsRes.data as { status: string | null }[] | null) ?? []
-  const vacant = rooms.filter(r => r.status === "available").length
+  // "ห้องว่าง" = ไม่มีแถวในตาราง tenants ให้ตรงกับตัวเลขที่หน้าจัดการห้องพักแสดง
+  // (rooms/page.tsx นับ !tenantName ซึ่งมาจาก room/actions.ts ที่ join tenants เข้ามา)
+  //
+  // ⚠️ ห้ามใช้ rooms.status — เป็นอีกฟิลด์ที่หลุดจากความจริงได้ ตอนตรวจเจอห้องที่
+  // status = "occupied" แต่ไม่มีผู้เช่าเลย ทำให้เลขในแชทน้อยกว่าที่เจ้าหอเห็นบนเว็บ
+  const rooms = (roomsRes.data as { tenants: unknown[] | null }[] | null) ?? []
+  const vacant = rooms.filter(r => !(r.tenants && r.tenants.length > 0)).length
 
   const workspaceName = (wsRes.data as { name?: string } | null)?.name || "หอพัก"
 
