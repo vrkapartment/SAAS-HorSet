@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 
 import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "./types"
@@ -325,7 +326,22 @@ export async function updateStaffPermissionsAction(
     }
 
     // 2. อัปเดตข้อมูลในตาราง public.profiles
-    const { error: updateError } = await supabaseAdmin
+    //
+    // ⚠️ ตั้งใจใช้ client ของผู้ใช้ที่ล็อกอิน (ไม่ใช่ supabaseAdmin) เฉพาะการเขียนตรงนี้
+    //
+    // เหตุผล: การเปลี่ยนสิทธิ์คือจุดที่ต้องรู้ตัวคนทำมากที่สุดในเรื่องกันโกง (คนโกงยกสิทธิ์
+    // ตัวเองก่อนลงมือ) การเขียนผ่าน JWT ทำให้ auth.uid() ใช้ได้ในฐานข้อมูล audit log
+    // จึงบันทึกชื่อคนทำได้แบบปลอมไม่ได้ — ต่างจาก service-role ที่ไม่มีตัวตนติดไปเลย
+    //
+    // RLS รองรับอยู่แล้ว: policy "Manage profiles for admin" ให้แอดมินแก้โปรไฟล์ในหอตัวเองได้
+    // ส่วน super admin ต้องได้รับอนุมัติสิทธิ์เข้าช่วยเหลือจากเจ้าหอก่อน
+    // (policy profiles_update_super_admin_needs_grant)
+    //
+    // ส่วนที่เหลือในฟังก์ชันนี้ยังใช้ supabaseAdmin ตามเดิม เพราะย้ายไม่ได้:
+    //   - auth.admin.updateUserById ต้องใช้ service-role เท่านั้น
+    //   - staff_building_access ไม่ได้อยู่ในขอบเขตที่ต้องรู้ตัวคนทำ
+    const supabaseUser = await createClient()
+    const { data: updatedRows, error: updateError } = await supabaseUser
       .from("profiles")
       .update({
         full_name: data.fullName,
@@ -334,8 +350,19 @@ export async function updateStaffPermissionsAction(
         updated_at: new Date().toISOString()
       })
       .eq("id", staffId)
+      .select("id")
 
     if (updateError) throw updateError
+
+    // RLS ที่ปฏิเสธจะคืน 0 แถวโดยไม่โยน error — ถ้าไม่เช็คจะขึ้นว่าบันทึกสำเร็จทั้งที่ไม่เปลี่ยน
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error:
+          "ไม่สามารถบันทึกสิทธิ์ได้: บัญชีของท่านไม่มีสิทธิ์แก้ไขผู้ใช้คนนี้ " +
+          "(กรณีเป็นทีมงาน HorSet ต้องได้รับอนุมัติสิทธิ์เข้าช่วยเหลือจากเจ้าของหอก่อน)"
+      }
+    }
 
     // 3. อัปเดตข้อมูล metadata ในระบบ Auth ด้วย เพื่อความปลอดภัยและทำงานสอดคล้องกัน
     try {

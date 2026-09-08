@@ -965,26 +965,17 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
       await assertSubscriptionActive(profileRes.data.workspace_id)
     }
 
-    // 2. เชื่อมต่อฐานข้อมูลโดยสลับไปใช้ Admin Client หากตั้งค่า Service Role Key ไว้
+    // 2. เชื่อมต่อฐานข้อมูลด้วยสิทธิ์ของผู้ใช้ที่ล็อกอินอยู่ (ไม่ใช้ Admin Client)
+    //
+    // ⚠️ เคยสลับไปใช้ service-role เพื่อ bypass RLS ตรงนี้ ตอนนี้เอาออกแล้วเพราะ:
+    //   1. RLS มี policy รองรับอยู่แล้ว — "Manage bills for admin/staff" ครอบ UPDATE
+    //      และตรวจทั้ง workspace กับสิทธิ์อาคารของ staff ให้ด้วย
+    //   2. การเขียนผ่าน JWT ของผู้ใช้ทำให้ auth.uid() ใช้ได้ในฐานข้อมูล ซึ่งจำเป็นกับ
+    //      audit log ที่จะบันทึกว่า "ใครแก้ค่าปรับ" แบบปลอมไม่ได้ (service-role ไม่มีตัวตน)
+    //
+    // ถ้า RLS ปฏิเสธ จะได้ 0 แถวกลับมา ซึ่งถูกจับไว้ในข้อ 7 ด้านล่างแล้ว ไม่พังเงียบ
     const supabase = await createClient()
-    let activeClient = supabase
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const hasServiceKey = !!(url && serviceKey && !serviceKey.includes("placeholder"))
-    console.log("🖥️ [Server Action] Service Role Key present:", hasServiceKey)
-
-    if (hasServiceKey) {
-      console.log("🖥️ [Server Action] Instantiating Admin Client to bypass RLS...")
-      activeClient = createSupabaseClient(url, serviceKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        }
-      }) as any
-    } else {
-      console.log("🖥️ [Server Action] No Service Role Key found. Using default User Client...")
-    }
+    const activeClient = supabase
 
     // 3. Fetch current bill data
     const { data: billData, error: billFetchError } = await activeClient
@@ -1102,12 +1093,15 @@ export async function updateBillPenalty(id: string, lateDays: number, penaltyAmo
 
     console.log("🖥️ [Server Action] Database returned rows count:", data ? data.length : 0, "rows:", data)
 
-    // ตรวจสอบว่ามีแถวถูกแก้ไขจริงหรือไม่ เพื่อจับกรณี RLS บล็อก หรือส่ง ID ผิด โดยไม่ส่งผลให้สำเร็จหลอกๆ บนหน้าบ้าน
+    // 7. ตรวจสอบว่ามีแถวถูกแก้ไขจริงหรือไม่
+    //
+    // สำคัญมากตั้งแต่เลิกใช้ service-role: RLS ที่ปฏิเสธจะคืน 0 แถวโดยไม่โยน error
+    // ถ้าไม่เช็คตรงนี้ หน้าบ้านจะขึ้นว่าบันทึกสำเร็จทั้งที่ข้อมูลไม่เปลี่ยน
     if (!data || data.length === 0) {
-      const rlsContext = !hasServiceKey 
-        ? " (ตรวจไม่พบ SUPABASE_SERVICE_ROLE_KEY ใน Environment Variables ของท่าน ทำให้ระบบต้องใช้สิทธิ์ของท่านตามนโยบาย RLS ดั้งเดิม)" 
-        : ""
-      const noRowsError = `ไม่สามารถอัปเดตข้อมูลบิลได้: ไม่พบข้อมูลบิลที่มีรหัส '${id}' ในระบบ หรือบัญชีของท่านไม่มีสิทธิ์เข้าถึงเพื่อแก้ไข${rlsContext}`
+      const noRowsError =
+        `ไม่สามารถอัปเดตข้อมูลบิลได้: ไม่พบบิลรหัส '${id}' ในหอพักของท่าน ` +
+        `หรือบัญชีของท่านไม่มีสิทธิ์แก้ไขบิลใบนี้ ` +
+        `(กรณีเป็นทีมงาน HorSet ต้องได้รับอนุมัติสิทธิ์เข้าช่วยเหลือจากเจ้าของหอก่อน)`
       console.error("🖥️ [Server Action] Error: 0 rows modified. Threw:", noRowsError)
       throw new Error(noRowsError)
     }
