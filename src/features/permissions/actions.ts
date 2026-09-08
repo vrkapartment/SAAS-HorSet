@@ -1,8 +1,10 @@
 "use server"
 
+import { cookies } from "next/headers"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
+import { blockUnapprovedSupportAccess } from "@/features/auth/support-access"
 
 import { type StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "./types"
 
@@ -29,7 +31,23 @@ function getSupabaseAdmin() {
 }
 
 /**
- * ดึงรายการ Staff ทั้งหมดใน Workspace ของตนเอง (หรือทั้งหมดในระบบถ้าเป็น Super Admin)
+ * หอพักที่ผู้ใช้เลือกไว้จากตัวสลับหอด้านบน
+ *
+ * ใช้สำหรับ super admin ซึ่งไม่สังกัดหอใดหอหนึ่ง (profiles.workspace_id = null)
+ * cookie ตัวนี้ถูกตั้งจากฝั่งเบราว์เซอร์ใน DashboardLayout
+ */
+async function readSelectedWorkspaceCookie(): Promise<string | null> {
+  try {
+    const store = await cookies()
+    return store.get("horset_current_workspace_id")?.value || null
+  } catch {
+    // เรียกจากบริบทที่ไม่มี request context (เช่น cron) — ถือว่าไม่ได้เลือกหอไว้
+    return null
+  }
+}
+
+/**
+ * ดึงรายการ Staff ของหอพักที่ระบุ (หรือหอที่กำลังเลือกอยู่)
  */
 export async function getWorkspaceStaffAction(workspaceId?: string) {
   try {
@@ -50,7 +68,14 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
     }
 
     // กำหนด Workspace ID ที่จะดึงข้อมูล
-    const targetWorkspaceId = workspaceId || currentUser.workspace_id
+    //
+    // super admin ไม่สังกัดหอ (workspace_id = null) จึงต้องถอยไปอ่านหอที่เลือกไว้จาก cookie
+    // ที่ตัวสลับหอด้านบนตั้งไว้ ไม่งั้นจะไม่รู้ว่ากำลังดูหอไหน
+    //
+    // ปลอดภัยที่จะเชื่อ cookie ตรงนี้ เพราะมันแค่ "เลือกให้แคบลง" ในกลุ่มที่ผู้ใช้เข้าถึงได้อยู่แล้ว
+    // และสำหรับ admin ทั่วไป currentUser.workspace_id มาก่อนเสมอ cookie จึงไม่มีผล
+    const targetWorkspaceId =
+      workspaceId || currentUser.workspace_id || (await readSelectedWorkspaceCookie())
 
     if (isDemo) {
       // Mock data ในโหมดเดโม
@@ -111,16 +136,19 @@ export async function getWorkspaceStaffAction(workspaceId?: string) {
       .select("id, email, full_name, phone, role, workspace_id, created_at, permissions")
       .eq("role", "staff")
 
-    // ถ้าไม่ได้เป็น Super Admin บังคับดึงเฉพาะ Workspace ตัวเองเท่านั้น
-    if (!isSuperAdmin) {
-      if (!targetWorkspaceId) {
-        return { success: true, data: [] }
-      }
-      query = query.eq("workspace_id", targetWorkspaceId)
-    } else if (targetWorkspaceId) {
-      // Super admin สามารถเจาะจง workspace ได้
-      query = query.eq("workspace_id", targetWorkspaceId)
+    // บังคับกรองตาม workspace เสมอ ไม่มีข้อยกเว้น
+    //
+    // ⚠️ เดิม super admin ที่ไม่ระบุ workspace จะไม่ถูกกรองเลย → ได้ staff ของทุกหอ
+    // พร้อมอีเมล/เบอร์โทร/สิทธิ์ มาในหน้าเดียว โดยเจ้าหอไม่รู้ตัว
+    // (เกิดจริงเพราะ PermissionsTab เรียกโดยไม่ส่ง workspaceId และ super admin
+    //  ก็ไม่มี workspace_id ในโปรไฟล์)
+    //
+    // เปลี่ยนเป็น fail-safe: ไม่รู้ว่าหอไหน = ไม่คืนอะไรเลย เหมือนที่ admin ทำอยู่แล้ว
+    // โค้ดใหม่ในอนาคตที่ลืมส่ง workspace จะปลอดภัยโดยปริยาย ไม่ใช่รั่วโดยปริยาย
+    if (!targetWorkspaceId) {
+      return { success: true, data: [] }
     }
+    query = query.eq("workspace_id", targetWorkspaceId)
 
     const { data: profiles, error } = await query.order("created_at", { ascending: false })
 
@@ -204,9 +232,22 @@ export async function createWorkspaceStaffAction(data: {
       return { success: false, error: "กรุณากรอกรหัสผ่านอย่างน้อย 6 ตัวอักษร" }
     }
 
-    const targetWorkspaceId = data.workspaceId || currentUser.workspace_id
+    const targetWorkspaceId =
+      data.workspaceId || currentUser.workspace_id || (await readSelectedWorkspaceCookie())
     if (!targetWorkspaceId) {
       return { success: false, error: "ไม่พบ Workspace ID สำหรับผู้ใช้ปัจจุบัน" }
+    }
+
+    // สร้างบัญชีทำผ่าน Auth Admin API เช่นเดียวกับการลบ — RLS กันไม่ได้ ต้องกันในโค้ด
+    // ไม่งั้น super admin สร้างบัญชี staff ในหอไหนก็ได้โดยเจ้าหอไม่รู้ตัว
+    {
+      const supabaseAdminForGuard = getSupabaseAdmin()
+      const supportBlock = await blockUnapprovedSupportAccess({
+        db: supabaseAdminForGuard,
+        isSuperAdmin,
+        workspaceId: targetWorkspaceId
+      })
+      if (supportBlock) return { success: false, error: supportBlock }
     }
 
     if (isDemo) {
@@ -324,6 +365,15 @@ export async function updateStaffPermissionsAction(
     if (!isSuperAdmin && targetProfile.workspace_id !== currentUser.workspace_id) {
       return { success: false, error: "คุณไม่มีสิทธิ์แก้ไขข้อมูลผู้ใช้นอก Workspace ของคุณ" }
     }
+
+    // super admin ต้องได้รับอนุมัติสิทธิ์เข้าช่วยเหลือจากเจ้าของหอก่อน
+    // เช็คในโค้ดด้วยเพื่อได้ข้อความบอกเหตุผล ไม่ใช่ปล่อยให้ RLS ปฏิเสธเงียบ ๆ
+    const supportBlock = await blockUnapprovedSupportAccess({
+      db: supabaseAdmin,
+      isSuperAdmin,
+      workspaceId: targetProfile.workspace_id
+    })
+    if (supportBlock) return { success: false, error: supportBlock }
 
     // 2. อัปเดตข้อมูลในตาราง public.profiles
     //
@@ -449,6 +499,15 @@ export async function deleteStaffAction(staffId: string) {
     if (!isSuperAdmin && targetProfile.workspace_id !== currentUser.workspace_id) {
       return { success: false, error: "คุณไม่มีสิทธิ์ลบบัญชีผู้อื่นนอกเหนือจาก Workspace ของตนเอง" }
     }
+
+    // ⚠️ การลบบัญชีทำผ่าน Auth Admin API ซึ่งย้ายไป JWT ไม่ได้ (Supabase บังคับ service-role)
+    // RLS จึงกันไม่ได้เลย — ด่านนี้ในโค้ดเป็นด่านเดียวที่กันการลบข้ามหอโดยไม่ขออนุญาต
+    const supportBlock = await blockUnapprovedSupportAccess({
+      db: supabaseAdmin,
+      isSuperAdmin,
+      workspaceId: targetProfile.workspace_id
+    })
+    if (supportBlock) return { success: false, error: supportBlock }
 
     // ลบผู้ใช้ผ่าน Auth Admin API (ระบบ Cascade จะลบข้อมูล profiles อัตโนมัติ)
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(staffId)
