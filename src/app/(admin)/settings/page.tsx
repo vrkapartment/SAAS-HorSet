@@ -11,6 +11,7 @@ import {
   Settings,
   RefreshCw,
   AlertCircle,
+  History,
   LayoutGrid,
   MessageSquare,
   ShieldCheck,
@@ -30,6 +31,7 @@ import TestConnectionTab from "@/components/settings/TestConnectionTab"
 import ProfileTab from "@/components/settings/ProfileTab"
 import LineSettingsTab from "@/components/settings/LineSettingsTab"
 import RichMenuSettingsTab from "@/components/settings/RichMenuSettingsTab"
+import AuditLogTab from "@/components/settings/AuditLogTab"
 import SlipOkSettingsTab from "@/components/settings/SlipOkSettingsTab"
 import PackageSettingsTab from "@/components/settings/PackageSettingsTab"
 import GoogleDriveSettingsTab from "@/components/settings/GoogleDriveSettingsTab"
@@ -246,6 +248,16 @@ function SettingsHubContent() {
       allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin" || !!userPermissions?.manage_staff_permissions
     },
     {
+      // ประวัติการแก้ไข — สงวนไว้สำหรับเจ้าของหอเท่านั้น ตั้งใจไม่เปิดให้ staff
+      // (คนที่ถูกตรวจสอบไม่ควรเห็นว่าระบบจดอะไรไว้)
+      id: "audit-log",
+      name: t("settings_hub.tabs.audit_log.name"),
+      icon: History,
+      description: t("settings_hub.tabs.audit_log.description"),
+      group: "team",
+      allowed: currentUser?.role === "super_admin" || currentUser?.role === "admin"
+    },
+    {
       id: "supabase",
       name: t("settings_hub.tabs.supabase.name"),
       icon: Network,
@@ -286,6 +298,8 @@ function SettingsHubContent() {
         return <LineSettingsTab />
       case "rich-menu":
         return <RichMenuSettingsTab />
+      case "audit-log":
+        return <AuditLogTab />
       case "slipok":
         return <SlipOkSettingsTab />
       case "package":

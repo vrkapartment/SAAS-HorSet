@@ -2366,6 +2366,10 @@
       "rich_menu": {
         "name": "LINE chat menu",
         "description": "The shortcut layout tenants and admins see in your property LINE chat"
+      },
+      "audit_log": {
+        "name": "Change history",
+        "description": "Trace who changed bills, meters, rents or user permissions and when"
       }
     }
   },
