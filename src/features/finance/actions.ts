@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js"
+import { createActorServiceClient } from "@/lib/supabase/service-actor"
 import { DEFAULT_STAFF_PERMISSIONS, type StaffPermissions } from "@/features/permissions/types"
 import { buildTaxSettingsPayload, type TaxSettingsUpdate } from "./tax-settings-payload"
 import { uploadFileToGoogleDriveAction } from "@/lib/googleDrive"
@@ -469,14 +469,14 @@ export async function saveFinanceSettings(workspaceId: string, settings: Finance
     }
 
     // สิทธิ์ถูกตรวจสอบด้วยโค้ดข้างบนแล้ว (isAuthorized + isSameWorkspace) จึงเขียนข้อมูลด้วย Service Role Client แทน
-    // client ปกติที่ผูกกับ RLS โดยตรง — เพราะ RLS policy เดิมของตาราง workspaces เช็คแค่ profiles.workspace_id
-    // ตรงกับ id แถวเป๊ะๆ ซึ่งสำหรับ super_admin ที่ profiles.workspace_id เป็น NULL แล้ว จะไม่ match แถวไหนเลย
-    // ทำให้ UPDATE จับคู่ได้ 0 แถวแบบเงียบๆ (ไม่ error) เหมือนบันทึกสำเร็จทั้งที่ไม่มีอะไรถูกเขียนจริง
-    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const dbClient = (serviceUrl && serviceKey && !serviceKey.includes("placeholder"))
-      ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
-      : supabase
+    // client ปกติที่ผูกกับ RLS โดยตรง — เพราะ RLS ของตาราง workspaces อนุญาตให้แก้ได้เฉพาะ admin ของหอนั้น
+    // ในขณะที่หน้านี้เปิดให้ staff ที่ได้รับสิทธิ์แก้ไขบันทึกได้ด้วย (ดู hasStaffEditAccess) และสำหรับ
+    // super_admin ที่ profiles.workspace_id เป็น NULL ก็จะไม่ match แถวไหนเลย ทำให้ UPDATE จับคู่ได้
+    // 0 แถวแบบเงียบๆ (ไม่ error) เหมือนบันทึกสำเร็จทั้งที่ไม่มีอะไรถูกเขียนจริง
+    //
+    // ⚠️ ส่ง user.id ไปกับ client ด้วย เพราะ Service Role ไม่มี JWT ติดไป → auth.uid() เป็น null
+    //    → trigger จด audit log ได้แค่ว่า "ระบบ" แก้ ซึ่งใช้ตรวจย้อนหลังไม่ได้ (ตารางนี้เก็บเลขพร้อมเพย์)
+    const dbClient = createActorServiceClient(user.id) ?? supabase
 
     // ฟิลด์หลักที่ทั้งสองหน้า (ตั้งค่าหอพัก / ตั้งค่าการเงินฯ) ส่งมาครบทุกครั้งเสมอ (บังคับ required ใน FinanceSettings)
     const corePayload: Record<string, any> = {
@@ -647,13 +647,11 @@ async function getWorkspaceAdminClient(workspaceId: string) {
     return { success: false as const, error: "ขออภัย คุณไม่มีสิทธิ์ (Workspace Admin) ในการจัดการข้อมูลส่วนนี้" }
   }
 
-  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const client = serviceUrl && serviceKey && !serviceKey.includes("placeholder")
-    ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
-    : supabase
+  // ส่ง user.id ไปด้วย เพื่อให้ audit log รู้ว่าใครแก้ (Service Role ไม่มี JWT ติดไป)
+  const client = createActorServiceClient(user.id) ?? supabase
 
-  return { success: true as const, client }
+  // คืน actorId ให้ผู้เรียกที่ต้องสร้าง client เองด้วย (เช่นงานที่แตะ Storage) ส่งตัวตนต่อได้
+  return { success: true as const, client, actorId: user.id }
 }
 
 export async function getSlipRetentionMonthsAction(workspaceId: string) {
@@ -793,11 +791,9 @@ export async function saveTaxSettings(workspaceId: string, settings: TaxSettings
       return { success: false, error: "ขออภัย คุณไม่มีสิทธิ์แก้ไขการตั้งค่าภาษีของ workspace นี้" }
     }
 
-    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const dbClient = (serviceUrl && serviceKey && !serviceKey.includes("placeholder"))
-      ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
-      : supabase
+    // Service Role เพราะ staff ที่ได้รับสิทธิ์ access_tax_edit ต้องบันทึกได้ (RLS อนุญาตแค่ admin)
+    // ส่ง user.id ไปด้วยเพื่อให้ audit log รู้ว่าใครแก้ — ดูเหตุผลเต็มใน lib/supabase/service-actor.ts
+    const dbClient = createActorServiceClient(user.id) ?? supabase
 
     const taxPayload = buildTaxSettingsPayload(settings)
     const { data: updatedRows, error: updateError } = await dbClient
@@ -828,20 +824,13 @@ export async function cleanupExpiredSlipsAction(workspaceId: string) {
     const access = await getWorkspaceAdminClient(workspaceId)
     if (!access.success) return access
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    // Admin Client ด้วย Service Role Key เพื่อลบรูปใน Storage และอัปเดตบิลได้โดยตรง
+    // พก actorId ไปด้วยเพื่อให้ audit log ของ bills รู้ว่าใครสั่งล้างสลิป (ไม่ใช่ "ระบบ")
+    const supabaseAdmin = createActorServiceClient(access.actorId)
 
-    if (!supabaseUrl || !serviceKey || serviceKey.includes("placeholder")) {
+    if (!supabaseAdmin) {
       return { success: false, error: "ระบบฐานข้อมูลหรือคีย์เชื่อมต่อเซิร์ฟเวอร์ไม่พร้อมใช้งาน" }
     }
-
-    // สร้าง Admin Client ด้วย Service Role Key เพื่อลบรูปใน Storage และอัปเดตบิลได้โดยตรง
-    const supabaseAdmin = createSupabaseServiceClient(supabaseUrl, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
 
     // 1. ดึงค่า retention และตรวจว่า workspace เชื่อมต่อ Google Drive หรือไม่
     const { data: wsData, error: wsError } = await supabaseAdmin
@@ -1021,11 +1010,8 @@ export async function savePropertyLogoUrl(workspaceId: string, logoUrl: string) 
     }
 
     // สิทธิ์ตรวจสอบด้วยโค้ดข้างบนแล้ว เขียนด้วย Service Role Client แทน (ดูเหตุผลเดียวกับ saveFinanceSettings)
-    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const dbClient = (serviceUrl && serviceKey && !serviceKey.includes("placeholder"))
-      ? createSupabaseServiceClient(serviceUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
-      : supabase
+    // พร้อมส่ง user.id ไปให้ audit log รู้ว่าใครเปลี่ยนโลโก้
+    const dbClient = createActorServiceClient(user.id) ?? supabase
 
     // 2. อัปเดตคอลัมน์ logo_url
     const { data: updatedRows, error: updateError } = await dbClient
