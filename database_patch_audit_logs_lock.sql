@@ -182,20 +182,47 @@ grant select on public.audit_logs to authenticated;
 -- ═══════════════════════════════════════════════════════════════════════
 -- ตรวจผล
 -- ═══════════════════════════════════════════════════════════════════════
+--
+-- ไล่จากรายชื่อ role เป็นหลัก (left join) ไม่ใช่จากตารางสิทธิ์
+-- เพราะ role ที่ถูกถอนสิทธิ์หมดจะ "ไม่มีแถว" ในตารางสิทธิ์เลย
+-- ถ้าไล่จากตารางสิทธิ์ ผลลัพธ์จะขาดไปเฉย ๆ ซึ่งแยกไม่ออกจาก query เขียนผิด
+--
+-- ต้องได้:
+--   anon           = ไม่มีสิทธิ์เลย ✅
+--   authenticated  = อ่านได้เท่านั้น ✅
+--   service_role   = อ่านได้เท่านั้น ✅
 
 select
-  grantee                                                  as "role",
-  string_agg(privilege_type, ', ' order by privilege_type)  as "สิทธิ์ที่เหลือ",
+  r.role                                                        as "role",
+  coalesce(string_agg(g.privilege_type, ', ' order by g.privilege_type), '(ไม่มี)')
+                                                                as "สิทธิ์ที่เหลือ",
   case
-    when bool_or(privilege_type in ('INSERT','UPDATE','DELETE','TRUNCATE'))
+    when bool_or(g.privilege_type in ('INSERT','UPDATE','DELETE','TRUNCATE'))
       then 'ยังเขียน/ลบได้ ⚠️'
-    when bool_or(privilege_type = 'SELECT')
+    when bool_or(g.privilege_type = 'SELECT')
       then 'อ่านได้เท่านั้น ✅'
-    else 'ไม่มีสิทธิ์เลย'
-  end                                                      as "สรุป"
-from information_schema.role_table_grants
-where table_schema = 'public'
-  and table_name = 'audit_logs'
-  and grantee in ('anon', 'authenticated', 'service_role')
-group by grantee
-order by grantee;
+    else 'ไม่มีสิทธิ์เลย ✅'
+  end                                                           as "สรุป"
+from unnest(array['anon', 'authenticated', 'service_role']) as r(role)
+left join information_schema.role_table_grants g
+  on g.grantee = r.role
+ and g.table_schema = 'public'
+ and g.table_name = 'audit_logs'
+group by r.role
+order by r.role;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- หลังรันเสร็จ ต้องทดลองใช้จริงอีกครั้ง
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- การ REVOKE ไม่ควรกระทบการจด log เพราะ trigger ทำงานในสิทธิ์เจ้าของฟังก์ชัน
+-- (SECURITY DEFINER, เจ้าของคือ postgres) แต่ต้องพิสูจน์ ไม่ใช่เชื่อ
+--
+--   1. ไปแก้ค่าปรับในบิลใบใดใบหนึ่ง แล้วกดบันทึก
+--      → ต้องบันทึกได้ปกติ (ถ้า error แปลว่าล็อกกระทบการเขียน ต้องแจ้งทันที)
+--   2. เปิด ตั้งค่า › ประวัติการแก้ไข
+--      → ต้องเห็นแถวใหม่ พร้อมชื่อคุณและป้าย "ยืนยันตัวตน"
+--
+-- ถ้าข้อ 1 ล้ม ให้คืนสิทธิ์ชั่วคราวด้วยคำสั่งนี้ใน SQL Editor แล้วแจ้งทันที:
+--   grant insert on public.audit_logs to service_role;
