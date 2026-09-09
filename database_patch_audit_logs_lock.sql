@@ -5,18 +5,32 @@
 -- ล็อก audit_logs ให้ "เขียนได้ทางเดียวคือผ่าน trigger" และลบไม่ได้
 -- ═══════════════════════════════════════════════════════════════════════
 --
--- ⚠️⚠️ อ่านก่อนรัน — ขั้นนี้ย้อนกลับได้ยากในทางปฏิบัติ
---
 -- หลังรันไฟล์นี้:
 --   - ไม่มี role ใดที่แอปใช้ (anon / authenticated / service_role) แก้หรือลบ log ได้
 --   - แม้แต่ service-role ที่ bypass RLS ก็ทำไม่ได้ เพราะเป็นการถอนสิทธิ์ระดับตาราง
 --     ซึ่งอยู่เหนือ RLS (RLS ป้องกัน TRUNCATE ไม่ได้เลย จึงต้องกันที่ระดับนี้)
 --   - เขียน log ได้เฉพาะผ่าน trigger audit_capture() ซึ่งเป็น SECURITY DEFINER
---     ทำงานในสิทธิ์เจ้าของฟังก์ชัน (postgres) จึงไม่ถูกกระทบจากการ REVOKE
+--     ทำงานในสิทธิ์เจ้าของฟังก์ชัน จึงไม่ถูกกระทบจากการ REVOKE (ตัวกันพลาด 5 ตรวจให้)
 --
--- สิ่งที่ยังทำได้อยู่ (ยอมรับตั้งแต่ออกแบบ):
---   - role postgres ผ่าน Supabase SQL Editor ยังลบได้ — เป็นทางออกฉุกเฉินที่จำเป็น
---     และทิ้งร่องรอยคนละชั้น (ต้องเข้าถึง dashboard ไม่ใช่ช่องทางที่แอปเปิดไว้)
+-- ── ย้อนกลับได้ไหม ──
+-- ได้ ไฟล์นี้เปลี่ยนแค่สิทธิ์ระดับตาราง คืนสภาพเดิมได้ด้วยคำสั่งนี้ใน SQL Editor:
+--
+--   grant insert, update, delete, truncate on public.audit_logs to service_role;
+--   grant insert, update, delete, truncate on public.audit_logs to authenticated;
+--   grant insert, update, delete, truncate on public.audit_logs to anon;
+--
+-- (REVOKE ข้างล่างระบุแค่ 4 สิทธิ์นี้ ไม่แตะ select / references / trigger
+--  จึงคืนได้ตรงสภาพเดิม)
+--
+-- สิ่งที่ไฟล์นี้เปลี่ยนจริง ๆ ไม่ใช่ "ทำไม่ได้อีกเลย" แต่คือ "ทำได้เฉพาะทางที่ยากกว่า":
+-- ยกการลบหลักฐานออกจากมือทุกคนที่ไม่มีรหัส Supabase — พนักงาน แอดมิน super admin
+-- และโค้ดในแอปทุกเส้นทาง รวมถึงบั๊กที่เขียนพลาด ทำไม่ได้ทั้งหมด
+--
+-- ความเสี่ยงที่เหลือ (ยอมรับตั้งแต่ออกแบบ):
+--   - role postgres ผ่าน Supabase SQL Editor ยังลบและปลดล็อกได้ — เป็นทางออก
+--     ฉุกเฉินที่จำเป็น และเป็นช่องทางคนละชั้น (ต้องเข้าถึง dashboard
+--     ไม่ใช่ช่องทางที่แอปเปิดไว้)
+--   - ถ้าต้องการอุดจุดนี้ ต้องใช้กลไกคนละแบบ เช่นส่ง log ออกไปเก็บนอกฐานข้อมูล
 --
 -- ต้องรันไฟล์เหล่านี้ให้ครบก่อน + ผ่าน QA เรื่องการกรองความลับ:
 --   1. database_patch_add_audit_logs.sql
@@ -25,7 +39,7 @@
 --   4. database_patch_audit_ignore_machine_state.sql
 --   5. database_patch_audit_cleanup_before_lock.sql
 --
--- ไฟล์นี้มีตัวกันพลาด 4 ชั้นที่จะหยุดทำงานเองถ้ายังไม่พร้อม (ดูด้านล่าง)
+-- ไฟล์นี้มีตัวกันพลาด 5 ชั้นที่จะหยุดทำงานเองถ้ายังไม่พร้อม (ดูด้านล่าง)
 --
 -- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
 -- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
@@ -114,8 +128,15 @@ begin
     or (after  -> 'tenant_phone' is not null and (after  ->> 'tenant_phone') <> '(ซ่อนไว้)')
     or (before -> 'line_user_id' is not null and (before ->> 'line_user_id') <> '(ซ่อนไว้)')
     or (after  -> 'line_user_id' is not null and (after  ->> 'line_user_id') <> '(ซ่อนไว้)')
-    -- LINE UID ของแอดมินที่ผูกเมนูล่างไว้ — คอลัมน์นี้ชื่อไม่ตรงกับ line_user_id
-    -- จึงรอดกฎซ่อนความลับ ต้องไม่มีเหลืออยู่เลย (ดู audit_ignored_columns)
+    -- LINE UID ของแอดมินที่ผูกเมนูล่างไว้
+    --
+    -- ตอนนี้เป็นการกันไว้เผื่ออนาคตเท่านั้น ไม่ใช่ช่องรั่วที่มีอยู่จริง:
+    -- คอลัมน์นี้อยู่บนตาราง workspace_line_settings ซึ่งไม่ได้ติด trigger
+    -- จึงไม่มีทางเข้ามาอยู่ใน log ได้ในสภาพปัจจุบัน
+    --
+    -- เก็บการตรวจไว้เพราะถ้าวันหนึ่งเพิ่ม trigger ให้ตารางนั้น (ซึ่งมีเหตุผล —
+    -- มันเก็บ channel_access_token ที่ถ้าถูกสลับจะเปลี่ยนปลายทางการแจ้งเตือน)
+    -- ชื่อคอลัมน์นี้ไม่ตรงกับ line_user_id จึงจะรอดกฎซ่อนความลับ
     or (before ? 'richmenu_admin_linked_uids')
     or (after  ? 'richmenu_admin_linked_uids');
 
@@ -165,10 +186,60 @@ end $$;
 
 
 -- ═══════════════════════════════════════════════════════════════════════
+-- ตัวกันพลาด 5 — ล็อกแล้ว trigger ต้องยังเขียน log ได้
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- นี่คือความเสี่ยงร้ายแรงที่สุดของไฟล์นี้
+--
+-- audit_capture เป็น fail-closed โดยตั้งใจ (ถ้าจดไม่ได้ การแก้ข้อมูลต้องล้ม)
+-- ดังนั้นถ้าการ REVOKE ทำให้ trigger เขียนไม่ได้ ผลไม่ใช่ "log ขาดหาย"
+-- แต่คือ "บันทึกบิล/มิเตอร์/ผู้เช่า ไม่ได้ทั้งระบบ"
+--
+-- เหตุผลที่ควรปลอดภัย: audit_capture เป็น SECURITY DEFINER จึงทำงานในสิทธิ์
+-- ของเจ้าของฟังก์ชัน ไม่ใช่สิทธิ์ของ role ที่เรียก และถ้าเจ้าของฟังก์ชันเป็น
+-- เจ้าของตาราง audit_logs ด้วย สิทธิ์นั้นมาจากความเป็นเจ้าของ ซึ่ง REVOKE
+-- ข้างล่างไม่ได้แตะเลย (ถอนจาก anon / authenticated / service_role เท่านั้น)
+--
+-- แต่ต้องพิสูจน์ ไม่ใช่เชื่อ — จึงตรวจเงื่อนไขทั้งสองข้อก่อนล็อก
+
+do $$
+declare
+  _fn_owner    name;
+  _tbl_owner   name;
+  _is_secdef   boolean;
+begin
+  select pg_get_userbyid(p.proowner), p.prosecdef
+    into _fn_owner, _is_secdef
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'audit_capture';
+
+  select pg_get_userbyid(c.relowner)
+    into _tbl_owner
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relname = 'audit_logs';
+
+  if not coalesce(_is_secdef, false) then
+    raise exception
+      'audit_capture ไม่ใช่ SECURITY DEFINER — ถ้าล็อกตอนนี้ trigger จะเขียน log ไม่ได้ '
+      'และเพราะ trigger เป็น fail-closed ระบบจะบันทึกข้อมูลไม่ได้ทั้งระบบ';
+  end if;
+
+  if _fn_owner is distinct from _tbl_owner then
+    raise exception
+      'เจ้าของฟังก์ชัน audit_capture (%) ไม่ใช่เจ้าของตาราง audit_logs (%) — '
+      'สิทธิ์เขียนของ trigger จึงอาจมาจาก grant ที่ไฟล์นี้กำลังจะถอน ห้ามล็อก',
+      _fn_owner, _tbl_owner;
+  end if;
+end $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- ล็อก
 -- ═══════════════════════════════════════════════════════════════════════
 --
--- ถอน INSERT ด้วย: trigger เขียนได้อยู่แล้วในสิทธิ์เจ้าของฟังก์ชัน
+-- ถอน INSERT ด้วย: trigger เขียนได้อยู่แล้วในสิทธิ์เจ้าของฟังก์ชัน (ตรวจแล้วข้างบน)
 -- ผลคือแอปสร้างแถว log ปลอมไม่ได้ ต้องเกิดจากการแก้ข้อมูลจริงเท่านั้น
 
 revoke insert, update, delete, truncate on public.audit_logs from anon;
