@@ -18,8 +18,14 @@
 --   - role postgres ผ่าน Supabase SQL Editor ยังลบได้ — เป็นทางออกฉุกเฉินที่จำเป็น
 --     และทิ้งร่องรอยคนละชั้น (ต้องเข้าถึง dashboard ไม่ใช่ช่องทางที่แอปเปิดไว้)
 --
--- ต้องรันขั้นที่ 1 และ 2 ให้ครบ + ผ่าน QA เรื่องการกรองความลับก่อน
--- (ไฟล์นี้จะหยุดทำงานเองถ้า trigger ยังไม่ครบ 7 ตัว)
+-- ต้องรันไฟล์เหล่านี้ให้ครบก่อน + ผ่าน QA เรื่องการกรองความลับ:
+--   1. database_patch_add_audit_logs.sql
+--   2. database_patch_audit_logs_all_tables.sql
+--   3. database_patch_audit_actor_from_server.sql
+--   4. database_patch_audit_ignore_machine_state.sql
+--   5. database_patch_audit_cleanup_before_lock.sql
+--
+-- ไฟล์นี้มีตัวกันพลาด 4 ชั้นที่จะหยุดทำงานเองถ้ายังไม่พร้อม (ดูด้านล่าง)
 --
 -- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
 -- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
@@ -107,13 +113,53 @@ begin
     or (before -> 'tenant_phone' is not null and (before ->> 'tenant_phone') <> '(ซ่อนไว้)')
     or (after  -> 'tenant_phone' is not null and (after  ->> 'tenant_phone') <> '(ซ่อนไว้)')
     or (before -> 'line_user_id' is not null and (before ->> 'line_user_id') <> '(ซ่อนไว้)')
-    or (after  -> 'line_user_id' is not null and (after  ->> 'line_user_id') <> '(ซ่อนไว้)');
+    or (after  -> 'line_user_id' is not null and (after  ->> 'line_user_id') <> '(ซ่อนไว้)')
+    -- LINE UID ของแอดมินที่ผูกเมนูล่างไว้ — คอลัมน์นี้ชื่อไม่ตรงกับ line_user_id
+    -- จึงรอดกฎซ่อนความลับ ต้องไม่มีเหลืออยู่เลย (ดู audit_ignored_columns)
+    or (before ? 'richmenu_admin_linked_uids')
+    or (after  ? 'richmenu_admin_linked_uids');
 
   if _leaks > 0 then
     raise exception
       'พบ % แถวที่มีข้อมูลอ่อนไหวไม่ถูกกรอง — ห้ามล็อกตอนนี้ '
-      'ให้ลบแถวเหล่านั้น (ยังลบได้เพราะยังไม่ REVOKE) แล้วแก้ audit_capture() ก่อน',
+      'ให้รัน database_patch_audit_ignore_machine_state.sql แล้วต่อด้วย '
+      'database_patch_audit_cleanup_before_lock.sql ก่อน (ยังลบได้เพราะยังไม่ REVOKE)',
       _leaks;
+  end if;
+end $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ตัวกันพลาด 4 — กฎ "คอลัมน์ที่ไม่ต้องจด" ต้องถูกติดตั้งแล้ว
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ถ้ายังไม่ได้ติดตั้ง log จะเต็มไปด้วยสวิตช์ภายในของระบบ (สลิปใบเดียว = 7 แถว)
+-- แล้วเรื่องจริงจะจมหาย ซึ่งทำให้ระบบกันโกงใช้ไม่ได้จริง
+-- ต้องกันไว้ก่อนล็อก เพราะหลังล็อกแล้วล้างของเก่าออกไม่ได้
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'audit_capture'
+      and pg_get_functiondef(p.oid) like '%audit_ignored_columns%'
+  ) then
+    raise exception
+      'audit_capture ยังไม่ได้ใช้ audit_ignored_columns — '
+      'กรุณารัน database_patch_audit_ignore_machine_state.sql ก่อนล็อก';
+  end if;
+
+  if exists (
+    select 1 from public.audit_logs
+    where table_name in ('tenants', 'workspaces')
+      and changed_fields is not null
+      and array_length(changed_fields, 1) > 0
+      and changed_fields <@ public.audit_ignored_columns(table_name)
+  ) then
+    raise exception
+      'ยังมีแถวสภาวะภายในของระบบค้างอยู่ใน log — '
+      'กรุณารัน database_patch_audit_cleanup_before_lock.sql ก่อนล็อก';
   end if;
 end $$;
 
