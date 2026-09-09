@@ -159,14 +159,41 @@ export function decreaseWarning(
   return { amount: b - a }
 }
 
+/**
+ * ความยาวสูงสุดที่แสดงในตาราง
+ *
+ * ลิงก์ไฟล์สลิปยาวเกิน 100 ตัวอักษร ถ้าแสดงเต็มจะดันตารางล้นจอจนอ่านแถวอื่นไม่ได้
+ * ค่าเต็มยังดูได้จากการเอาเมาส์ชี้ (ดู fullValue) และในฐานข้อมูลยังเก็บครบ
+ */
+const MAX_VALUE_LENGTH = 44
+
+function clip(text: string): string {
+  return text.length > MAX_VALUE_LENGTH ? text.slice(0, MAX_VALUE_LENGTH - 1) + "…" : text
+}
+
 /** แปลงค่าใน jsonb ให้เป็นข้อความที่อ่านได้ในหน้าจอ */
 export function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "—"
   if (typeof value === "boolean") return value ? "เปิด" : "ปิด"
   if (typeof value === "number") return value.toLocaleString("th-TH")
-  if (typeof value === "object") return JSON.stringify(value)
+  if (typeof value === "object") return clip(JSON.stringify(value))
+
   const text = String(value)
-  return text.trim() === "" ? "—" : text
+  if (text.trim() === "") return "—"
+
+  // ลิงก์ไฟล์ (สลิป / โลโก้) — เหลือแค่ชื่อไฟล์ ซึ่งพอระบุตัวไฟล์ได้แล้ว
+  if (/^https?:\/\//i.test(text)) {
+    return clip(text.split("?")[0].split("/").pop() || text)
+  }
+
+  return clip(text)
+}
+
+/** ค่าเต็มสำหรับเอาเมาส์ชี้ดู — คืน undefined เมื่อค่านั้นแสดงครบอยู่แล้ว */
+export function fullValue(value: unknown): string | undefined {
+  if (value === null || value === undefined || typeof value === "boolean") return undefined
+  const text = typeof value === "object" ? JSON.stringify(value) : String(value)
+  return formatValue(value) === text ? undefined : text
 }
 
 /**

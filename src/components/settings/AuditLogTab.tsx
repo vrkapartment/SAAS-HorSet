@@ -25,6 +25,7 @@ import {
   auditChanges,
   decreaseWarning,
   formatValue,
+  fullValue,
   tableLabel
 } from "@/features/audit/labels"
 
@@ -119,7 +120,10 @@ function ChangeTable({ row }: { row: AuditLogRow }) {
                   <td className="py-1.5 align-top">
                     <div className="flex flex-wrap items-center gap-1.5">
                       {row.action !== "INSERT" && (
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+                        <span
+                          title={fullValue(before)}
+                          className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-500 dark:bg-slate-950 dark:text-slate-400"
+                        >
                           {formatValue(before)}
                         </span>
                       )}
@@ -127,7 +131,10 @@ function ChangeTable({ row }: { row: AuditLogRow }) {
                         <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
                       )}
                       {row.action !== "DELETE" && (
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] font-black text-white dark:bg-slate-200 dark:text-slate-900">
+                        <span
+                          title={fullValue(after)}
+                          className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] font-black text-white dark:bg-slate-200 dark:text-slate-900"
+                        >
                           {formatValue(after)}
                         </span>
                       )}

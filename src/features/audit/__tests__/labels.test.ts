@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { auditChanges } from "../labels"
+import { auditChanges, formatValue, fullValue } from "../labels"
 
 /**
  * ตรรกะการแสดงผล audit log
@@ -128,5 +128,30 @@ describe("auditChanges — สิทธิ์ที่กางไม่ได�
     expect(changes).toHaveLength(1)
     expect(changes[0].label).toBe("สิทธิ์การใช้งาน")
     expect(changes[0].after).toBe("(ข้อมูลยาวเกิน)")
+  })
+})
+
+describe("formatValue — ค่าที่ยาวเกินจนดันตารางล้นจอ", () => {
+  it("ลิงก์ไฟล์สลิปเหลือแค่ชื่อไฟล์", () => {
+    const url =
+      "https://qumimpfrebffooagpqgt.supabase.co/storage/v1/object/public/payment-slips/line-slips/c9edfdf9-8c31-4b9f-a825-8f7ba5288a9a/631044833767325714.jpg"
+
+    expect(formatValue(url)).toBe("631044833767325714.jpg")
+    expect(fullValue(url)).toBe(url)
+  })
+
+  it("ตัดข้อความยาวและเก็บค่าเต็มไว้ให้เอาเมาส์ชี้ดู", () => {
+    const long = "ก".repeat(80)
+
+    expect(formatValue(long).length).toBeLessThanOrEqual(44)
+    expect(formatValue(long).endsWith("…")).toBe(true)
+    expect(fullValue(long)).toBe(long)
+  })
+
+  it("ค่าสั้นไม่ถูกแตะ และไม่มี title ให้ชี้", () => {
+    expect(formatValue("pending")).toBe("pending")
+    expect(fullValue("pending")).toBeUndefined()
+    expect(fullValue(200)).toBeUndefined()
+    expect(fullValue(null)).toBeUndefined()
   })
 })
