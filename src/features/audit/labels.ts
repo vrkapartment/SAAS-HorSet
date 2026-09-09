@@ -72,6 +72,8 @@ export const FIELD_LABELS: Record<string, string> = {
   water_curr: "เลขน้ำล่าสุด",
   occupancy_start_elec: "เลขไฟตั้งต้นตอนเข้าอยู่",
   occupancy_start_water: "เลขน้ำตั้งต้นตอนเข้าอยู่",
+  elec_min_applied: "คิดหน่วยไฟขั้นต่ำในบิลนี้",
+  water_min_applied: "คิดหน่วยน้ำขั้นต่ำในบิลนี้",
 
   // ── ตั้งค่าหอ ──
   promptpay_id: "เลขพร้อมเพย์",
@@ -91,6 +93,53 @@ export const FIELD_LABELS: Record<string, string> = {
   slip_retention_months: "เก็บสลิปกี่เดือน",
   tax_id: "เลขผู้เสียภาษี",
   name: "ชื่อหอพัก",
+  logo_url: "โลโก้หอพัก",
+  deposit_type: "รูปแบบเงินประกัน",
+  lease_duration: "ระยะสัญญา (เดือน)",
+  lease_expiry_action: "เมื่อสัญญาหมดอายุ",
+  checkout_policy: "เงื่อนไขการย้ายออก",
+  electric_billing_mode: "วิธีคิดค่าไฟ",
+  water_billing_mode: "วิธีคิดค่าน้ำ",
+
+  // ── ข้อมูลผู้เสียภาษี ──
+  tax_firstname: "ชื่อผู้เสียภาษี",
+  tax_lastname: "นามสกุลผู้เสียภาษี",
+  tax_phone: "เบอร์โทรผู้เสียภาษี",
+  tax_address: "ที่อยู่ผู้เสียภาษี",
+  tax_address_building: "ที่อยู่ · อาคาร",
+  tax_address_room: "ที่อยู่ · ห้อง",
+  tax_address_floor: "ที่อยู่ · ชั้น",
+  tax_address_village: "ที่อยู่ · หมู่บ้าน",
+  tax_address_moo: "ที่อยู่ · หมู่ที่",
+  tax_address_soi: "ที่อยู่ · ซอย",
+  tax_address_yaek: "ที่อยู่ · แยก",
+  taxpayer_status: "สถานภาพผู้เสียภาษี",
+  partner_count: "จำนวนหุ้นส่วน",
+
+  // ── ภาษีมูลค่าเพิ่ม / การหักค่าใช้จ่าย (ใช้คำเดียวกับหน้าภาษี) ──
+  vat_registered_from: "จดภาษีมูลค่าเพิ่มตั้งแต่",
+  vat_threshold: "เกณฑ์รายได้ที่ต้องจด VAT",
+  vat_opening_credit: "ภาษีซื้อยกมา",
+  expense_a_mode: "วิธีหักค่าใช้จ่าย · ค่าเช่าห้อง",
+  expense_a_lump_rate: "อัตราหักเหมา · ค่าเช่าห้อง",
+  expense_b_mode: "วิธีหักค่าใช้จ่าย · ค่าบริการ/อื่นๆ",
+  expense_b_lump_rate: "อัตราหักเหมา · ค่าบริการ/อื่นๆ",
+  cap_expense_per_bucket: "จำกัดค่าใช้จ่ายแยกตามประเภทเงินได้",
+  min_tax_enabled: "ใช้กฎภาษีขั้นต่ำ 0.5%",
+  min_tax_rate: "อัตราภาษีขั้นต่ำ",
+  min_tax_threshold_pnd90: "เกณฑ์ภาษีขั้นต่ำ ภ.ง.ด. 90",
+  min_tax_threshold_pnd94: "เกณฑ์ภาษีขั้นต่ำ ภ.ง.ด. 94",
+  min_tax_exempt_below: "ยกเว้นภาษีขั้นต่ำถ้าต่ำกว่า",
+
+  // ── LINE OA / เมนูล่าง ──
+  channel_access_token: "โทเคน LINE OA",
+  channel_secret: "รหัสลับ LINE OA",
+  richmenu_enabled: "เปิดเมนูล่างของผู้เช่า",
+  richmenu_admin_enabled: "เปิดเมนูล่างของผู้ดูแล",
+  richmenu_image_url: "ภาพเมนูผู้เช่า",
+  richmenu_admin_image_url: "ภาพเมนูผู้ดูแล",
+  richmenu_contact_uri: "ปลายทางปุ่มติดต่อ",
+  richmenu_liff_id: "LIFF ID",
 
   // ── ผู้เช่า / ห้องพัก ──
   tenant_phone: "เบอร์โทรผู้เช่า",

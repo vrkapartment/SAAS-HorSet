@@ -82,24 +82,45 @@ where action = 'UPDATE'
 -- ═══════════════════════════════════════════════════════════════════════
 --
 -- แถวที่มาถึงขั้นนี้คือแถวที่มีของจริงปนอยู่ด้วย จึงห้ามลบทั้งแถว
--- ตัดเฉพาะคีย์ที่อ่อนไหว แล้วเก็บส่วนที่เป็นหลักฐานไว้ครบ
+-- ตัดเฉพาะคอลัมน์ที่ไม่ต้องจด แล้วเก็บส่วนที่เป็นหลักฐานไว้ครบ
 --
--- (jsonb - 'key' คือการลบคีย์นั้นออกจาก jsonb)
+-- ⚠️ ต้องดูใน before/after ไม่ใช่แค่ changed_fields
+--    เพราะเหตุการณ์ "เพิ่ม" กับ "ลบ" จดทั้งแถวโดยที่ changed_fields เป็น null
+--    ถ้าดูแค่ changed_fields จะพลาด LINE user id ที่ติดอยู่ในแถวประเภทนั้น
+--
+-- ตัวดำเนินการที่ใช้:
+--   jsonb - text[]   ลบทุกคีย์ในลิสต์ออกจาก jsonb
+--   jsonb ?| text[]  จริงเมื่อมีคีย์ใดคีย์หนึ่งในลิสต์อยู่ใน jsonb
 
-update public.audit_logs
-set changed_fields = array_remove(changed_fields, 'richmenu_admin_linked_uids'),
-    before = case when before is null then null else before - 'richmenu_admin_linked_uids' end,
-    after  = case when after  is null then null else after  - 'richmenu_admin_linked_uids' end
-where table_name = 'workspaces'
-  and changed_fields is not null
-  and 'richmenu_admin_linked_uids' = any(changed_fields);
+update public.audit_logs a
+set changed_fields = case
+      when a.changed_fields is null then null
+      else (
+        select array_agg(f)
+        from unnest(a.changed_fields) f
+        where not (f = any(public.audit_ignored_columns(a.table_name)))
+      )
+    end,
+    before = case when a.before is null then null
+                  else a.before - public.audit_ignored_columns(a.table_name) end,
+    after  = case when a.after  is null then null
+                  else a.after  - public.audit_ignored_columns(a.table_name) end
+where a.table_name in ('tenants', 'workspaces')
+  and (
+    (a.changed_fields is not null and exists (
+      select 1 from unnest(a.changed_fields) f
+      where f = any(public.audit_ignored_columns(a.table_name))
+    ))
+    or (a.before is not null and a.before ?| public.audit_ignored_columns(a.table_name))
+    or (a.after  is not null and a.after  ?| public.audit_ignored_columns(a.table_name))
+  );
 
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- 3. ตรวจผล
 -- ═══════════════════════════════════════════════════════════════════════
 --
--- แถว "ต้องได้ 0" ทั้งสองแถวต้องเป็น 0 ถึงจะไปขั้นที่ 3 (ล็อกถาวร) ได้
+-- ทุกแถวที่เขียนว่า "ต้องได้ 0" ต้องเป็น 0 ถึงจะไปขั้นที่ 3 (ล็อกถาวร) ได้
 
 select 'แถวสภาวะภายในที่เหลืออยู่ (ต้องได้ 0)' as "รายการตรวจ",
        count(*)::text as "ผล"
@@ -111,11 +132,28 @@ where action = 'UPDATE'
 
 union all
 
+-- ครอบทั้ง 3 ที่ที่ค่าอาจซ่อนอยู่ (รายการคอลัมน์ที่เปลี่ยน, ค่าก่อน, ค่าหลัง)
 select 'แถวที่ยังมี LINE user id ของแอดมิน (ต้องได้ 0)',
        count(*)::text
 from public.audit_logs
-where changed_fields is not null
-  and 'richmenu_admin_linked_uids' = any(changed_fields)
+where (changed_fields is not null and 'richmenu_admin_linked_uids' = any(changed_fields))
+   or (before is not null and before ? 'richmenu_admin_linked_uids')
+   or (after  is not null and after  ? 'richmenu_admin_linked_uids')
+
+union all
+
+select 'แถวที่ยังมีคอลัมน์สภาวะภายในติดอยู่ (ต้องได้ 0)',
+       count(*)::text
+from public.audit_logs
+where table_name in ('tenants', 'workspaces')
+  and (
+    (changed_fields is not null and exists (
+      select 1 from unnest(changed_fields) f
+      where f = any(public.audit_ignored_columns(table_name))
+    ))
+    or (before is not null and before ?| public.audit_ignored_columns(table_name))
+    or (after  is not null and after  ?| public.audit_ignored_columns(table_name))
+  )
 
 union all
 
