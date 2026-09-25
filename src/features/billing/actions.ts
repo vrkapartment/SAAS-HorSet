@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
-import { verifyPortalToken, type PortalRoomRef } from "@/features/tenant/actions"
+import { createServiceRoleClient, resolvePortalTenant, tenantCanSeeBill, type PortalTenantRow } from "@/features/tenant/portal-access"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { calculateLateDays, buildInvoiceId, hasBillSnapshot, readBillSnapshot } from "./utils"
 import type { RoomRef } from "@/features/room/utils"
@@ -469,7 +469,7 @@ export async function updateBillStatus(
   status: "unpaid" | "pending" | "paid",
   slipUrl?: string | null,
   amount?: number,
-  portalAuth?: { workspaceId: string; room: PortalRoomRef; token: string }
+  portalAuth?: { workspaceId: string; tenantId: string; token: string }
 ) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -490,41 +490,45 @@ export async function updateBillStatus(
     if (status === "pending") {
       // ต้องพิสูจน์ก่อนว่าผู้เรียกเป็นเจ้าของบิลนี้จริง ก่อนอนุญาตให้บายพาส RLS
       // ไม่เช่นนั้นใครก็สามารถส่ง bill id ของ workspace/ห้องอื่นเข้ามาแก้ไขได้ (IDOR)
+      //
+      // ผู้เช่าเป็นเจ้าของบิลได้เฉพาะบิลที่หน้า Portal แสดงให้เขาเห็น (tenantCanSeeBill) — ห้ามเชื่อแค่
+      // "บิลอยู่ในห้องของเขา" เพราะห้องเดียวกันมีบิลของผู้เช่าคนก่อน/คนถัดไปปนอยู่
       let isOwner = false
+      const checkClient = createServiceRoleClient()
 
-      // เส้นทางที่ 1: ผู้เช่าที่ login ปกติ - ถ้า session ปัจจุบันมองเห็นบิลนี้ผ่าน RLS ปกติได้
-      // (นโยบาย "Read bills for tenants" อนุญาตเฉพาะบิลของห้องตัวเองเท่านั้น) แปลว่าเป็นเจ้าของจริง
-      const { data: visibleBill } = await supabase.from("bills").select("id").eq("id", id).maybeSingle()
-      if (visibleBill) {
-        isOwner = true
+      // เส้นทางที่ 1: ผู้ใช้ที่ login อยู่
+      const { data: { user: sessionUser } } = await supabase.auth.getUser()
+      if (sessionUser) {
+        const { data: sessionProfile } = await supabase
+          .from("profiles")
+          .select("role, phone")
+          .eq("id", sessionUser.id)
+          .maybeSingle()
+
+        if (sessionProfile?.role === "tenant") {
+          // หาผู้เช่าแบบเดียวกับ getTenantPortalData (เบอร์โทร → สัญญาล่าสุด)
+          if (checkClient && sessionProfile.phone) {
+            const { data: tenantRows } = await supabase
+              .from("tenants")
+              .select("*")
+              .eq("tenant_phone", sessionProfile.phone)
+              .not("room_id", "is", null)
+              .order("lease_start", { ascending: false })
+              .limit(1)
+            const sessionTenant = tenantRows?.[0] as PortalTenantRow | undefined
+            if (sessionTenant) isOwner = await tenantCanSeeBill(checkClient, sessionTenant, id)
+          }
+        } else {
+          // admin / staff — มองเห็นบิลผ่าน RLS ของตัวเองได้ แปลว่ามีสิทธิ์ในห้องนั้น
+          const { data: visibleBill } = await supabase.from("bills").select("id").eq("id", id).maybeSingle()
+          if (visibleBill) isOwner = true
+        }
       }
 
-      // เส้นทางที่ 2: หน้า Portal แบบไม่ต้อง Login (ไม่มี session ให้ RLS ตรวจ) - ตรวจสอบผ่าน token เซ็นชื่อแทน
-      if (!isOwner && portalAuth?.workspaceId && portalAuth?.room && portalAuth?.token) {
-        // คีย์ที่ใช้เซ็น token ต้องตรงกับตัวระบุห้องที่อยู่ในลิงก์จริง — ลิงก์ใหม่เซ็นด้วย rooms.id
-        // ลิงก์เก่าที่ยังค้างใน LINE เซ็นด้วยเลขห้อง (ดู PortalRoomRef ใน tenant/actions.ts)
-        const portalRoom = portalAuth.room
-        const roomKey = "roomId" in portalRoom ? portalRoom.roomId : portalRoom.roomNumber
-        const tokenValid = await verifyPortalToken(portalAuth.workspaceId, roomKey, portalAuth.token)
-        if (tokenValid) {
-          const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-          if (url && serviceKey && !serviceKey.includes("placeholder")) {
-            const checkClient = createSupabaseClient(url, serviceKey, {
-              auth: { persistSession: false, autoRefreshToken: false }
-            })
-            let scopedQuery = checkClient
-              .from("bills")
-              .select("id")
-              .eq("id", id)
-              .eq("workspace_id", portalAuth.workspaceId)
-            scopedQuery = "roomId" in portalRoom
-              ? scopedQuery.eq("room_id", portalRoom.roomId)
-              : scopedQuery.eq("room_number", portalRoom.roomNumber)
-            const { data: scopedBill } = await scopedQuery.maybeSingle()
-            if (scopedBill) isOwner = true
-          }
-        }
+      // เส้นทางที่ 2: หน้า Portal แบบไม่ต้อง Login — ยืนยันผู้เช่าด้วย token ที่ผูกกับ tenants.id
+      if (!isOwner && checkClient && portalAuth?.workspaceId && portalAuth?.tenantId && portalAuth?.token) {
+        const portalTenant = await resolvePortalTenant(checkClient, portalAuth.workspaceId, portalAuth.tenantId, portalAuth.token)
+        if (portalTenant) isOwner = await tenantCanSeeBill(checkClient, portalTenant, id)
       }
 
       if (!isOwner) {

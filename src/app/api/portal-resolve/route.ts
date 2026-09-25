@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { generatePortalToken } from "@/features/tenant/actions"
+import { signPortalToken } from "@/features/tenant/portal-access"
 import { DEFAULT_LIFF_ID, liffChannelId } from "@/lib/lineLiff"
 
 /**
@@ -38,6 +38,7 @@ type ResolvedRoom = {
   workspaceName: string
   roomId: string
   roomNumber: string
+  tenantId: string
   token: string
 }
 
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
     //    (ผู้เช่าที่ย้ายออกแล้วถูกย้ายไปตาราง tenants_old จึงไม่ต้องกรอง moved_out_at ที่นี่)
     let query = supabase
       .from("tenants")
-      .select("room_id, workspace_id, lease_start, rooms(room_number), workspaces(name)")
+      .select("id, room_id, workspace_id, lease_start, rooms(room_number), workspaces(name)")
       .eq("line_user_id", lineUserId)
       .not("room_id", "is", null)
       .order("lease_start", { ascending: false })
@@ -201,7 +202,8 @@ export async function POST(request: NextRequest) {
     for (const row of tenantRows || []) {
       const roomId = typeof row.room_id === "string" ? row.room_id : ""
       const rowWorkspaceId = typeof row.workspace_id === "string" ? row.workspace_id : ""
-      if (!roomId || !rowWorkspaceId) continue
+      const tenantId = typeof row.id === "string" ? row.id : ""
+      if (!roomId || !rowWorkspaceId || !tenantId) continue
       const key = `${rowWorkspaceId}:${roomId}`
       if (seenRooms.has(key)) continue
       seenRooms.add(key)
@@ -216,7 +218,9 @@ export async function POST(request: NextRequest) {
         workspaceName: workspaceRow?.name || "หอพัก",
         roomId,
         roomNumber: roomRow?.room_number || "-",
-        token: await generatePortalToken(rowWorkspaceId, roomId)
+        tenantId,
+        // token ผูกกับผู้เช่า — ย้ายออกแล้วลิงก์ใช้ไม่ได้ (ดู features/tenant/portal-access.ts)
+        token: signPortalToken(rowWorkspaceId, tenantId)
       })
     }
 

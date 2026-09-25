@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { generatePortalToken } from "@/features/tenant/actions"
+import { buildPortalSearchParams, signPortalToken } from "@/features/tenant/portal-access"
 
 /**
  * ส่งสลิปโอนเงินผ่านห้องแชท LINE ได้โดยตรง
@@ -157,15 +157,11 @@ function slipStoragePath(workspaceId: string, messageId: string) {
 }
 
 /** ลิงก์หน้าอัปโหลดบนเว็บ ใช้เป็นทางเลือกสำรองในข้อความตอบกลับ */
-async function buildUploadPageUrl(ctx: Ctx, roomId: string): Promise<string> {
+async function buildUploadPageUrl(ctx: Ctx, tenant: TenantRow): Promise<string> {
   if (!ctx.appUrl) return ""
-  const token = await generatePortalToken(ctx.workspaceId, roomId)
-  const params = new URLSearchParams({
-    workspace_id: ctx.workspaceId,
-    room_id: roomId,
-    token,
-    action: "slip"
-  })
+  // token ผูกกับผู้เช่า (tenants.id) — ดู features/tenant/portal-access.ts
+  const params = buildPortalSearchParams(ctx.workspaceId, tenant.room_id, tenant.id)
+  params.set("action", "slip")
   return `${ctx.appUrl}/portal?${params.toString()}`
 }
 
@@ -252,7 +248,7 @@ async function askForPhoto(ctx: Ctx, tenant: TenantRow, bill: BillRow): Promise<
   }
 
   const minutes = Math.round(SLIP_ARM_WINDOW_MS / 60000)
-  const uploadUrl = await buildUploadPageUrl(ctx, tenant.room_id)
+  const uploadUrl = await buildUploadPageUrl(ctx, tenant)
 
   return [
     text(
@@ -460,13 +456,12 @@ async function attachSlip(
   tenant: TenantRow,
   slipUrl: string
 ): Promise<LineTextMessage[]> {
-  const token = await generatePortalToken(ctx.workspaceId, tenant.room_id)
   const { updateBillStatus } = await import("@/features/billing/actions")
 
   const res = await updateBillStatus(bill.id, "pending", slipUrl, Number(bill.amount ?? 0), {
     workspaceId: ctx.workspaceId,
-    room: { roomId: tenant.room_id },
-    token
+    tenantId: tenant.id,
+    token: signPortalToken(ctx.workspaceId, tenant.id)
   })
 
   if (!res.success) {

@@ -673,18 +673,16 @@ function TenantPortalContent() {
           .getPublicUrl(fileName)
 
         // 4. Update Database Bill Status
-        // ส่งตัวระบุห้อง "ตามที่อยู่ในลิงก์จริง" ไปให้ฝั่ง server ตรวจ token — ลิงก์ใหม่ใช้ room_id
-        // ลิงก์เก่าที่ยังค้างใน LINE ใช้ room_number และ token ถูกเซ็นด้วยเลขห้องนั้น
-        // ถ้าส่งผิดชนิด token จะตรวจไม่ผ่านและผู้เช่าจะอัปโหลดสลิปไม่ได้
-        let portalAuth: { workspaceId: string; room: { roomId: string } | { roomNumber: string }; token: string } | undefined
+        // ลิงก์แบบไม่ต้อง login ยืนยันตัวตนด้วย tenant_id + token (ผูกกับผู้เช่า ไม่ใช่ห้อง)
+        // ฝั่ง server ตรวจซ้ำว่าบิลใบนี้เป็นของผู้เช่าคนนี้จริงก่อนรับสลิป
+        let portalAuth: { workspaceId: string; tenantId: string; token: string } | undefined
         if (typeof window !== "undefined") {
           const searchParams = new URLSearchParams(window.location.search)
           const wsId = searchParams.get("workspace_id") || ""
-          const rId = searchParams.get("room_id") || ""
-          const rNum = searchParams.get("room_number") || ""
+          const tenantId = searchParams.get("tenant_id") || ""
           const token = searchParams.get("token") || ""
-          if (wsId && token && (rId || rNum)) {
-            portalAuth = { workspaceId: wsId, room: rId ? { roomId: rId } : { roomNumber: rNum }, token }
+          if (wsId && tenantId && token) {
+            portalAuth = { workspaceId: wsId, tenantId, token }
           }
         }
         const res = await updateBillStatus(bill.id, "pending", publicUrl, totalAmount, portalAuth)

@@ -536,6 +536,7 @@
     "loading_bill": "Loading your bill data...",
     "loading_wait": "Please wait a moment while we fetch your rent and service details",
     "room_prefix_label": "Room {room}",
+    "previous_room_badge": "Previous room {room}",
     "role_tenant": "Tenant",
     "invoice_cycle_label": "Monthly Invoice Cycle",
     "invoice_id_label": "Invoice ID:",

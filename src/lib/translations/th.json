@@ -536,6 +536,7 @@
     "loading_bill": "กำลังโหลดข้อมูลบิลของคุณ...",
     "loading_wait": "กรุณารอสักครู่ ระบบกำลังดึงรายละเอียดค่าเช่าและบริการ",
     "room_prefix_label": "ห้องพัก {room}",
+    "previous_room_badge": "ห้องเดิม {room}",
     "role_tenant": "ผู้เช่า",
     "invoice_cycle_label": "ใบแจ้งหนี้รอบประจำเดือน",
     "invoice_id_label": "รหัสใบแจ้งหนี้ (Invoice ID):",

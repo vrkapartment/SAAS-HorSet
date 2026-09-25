@@ -38,16 +38,19 @@ export function usePortalData(): PortalDataValue {
   return ctx
 }
 
-/** ตัวระบุห้องที่อยู่ในลิงก์ — room_number เป็นรูปแบบเก่าที่ยังค้างอยู่ใน LINE ของผู้เช่า */
+/**
+ * พารามิเตอร์ในลิงก์ — tenant_id + token คือสิ่งที่ยืนยันตัวตน (ดู features/tenant/portal-access.ts)
+ * ลิงก์รุ่นเก่ามีแค่ room_id / room_number ไม่มี tenant_id → server ปฏิเสธพร้อมข้อความแนะนำ
+ */
 function readPortalParams() {
   if (typeof window === "undefined") {
-    return { workspaceId: "", roomId: "", roomNumber: "", token: "" }
+    return { workspaceId: "", tenantId: "", hasRoom: false, token: "" }
   }
   const params = new URLSearchParams(window.location.search)
   return {
     workspaceId: params.get("workspace_id") || "",
-    roomId: params.get("room_id") || "",
-    roomNumber: params.get("room_number") || "",
+    tenantId: params.get("tenant_id") || "",
+    hasRoom: Boolean(params.get("room_id") || params.get("room_number")),
     token: params.get("token") || ""
   }
 }
@@ -59,17 +62,13 @@ export default function PortalDataProvider({ children }: { children: React.React
   const loadedOnceRef = useRef(false)
 
   const load = useCallback(async (isInitial: boolean) => {
-    const { workspaceId, roomId, roomNumber, token } = readPortalParams()
+    const { workspaceId, tenantId, hasRoom, token } = readPortalParams()
 
     try {
       let res: PortalResult
-      if (workspaceId && (roomId || roomNumber)) {
+      if (workspaceId && (tenantId || hasRoom)) {
         setIsLoginFree(true)
-        res = await getTenantPortalDataNoLoginAction(
-          workspaceId,
-          roomId ? { roomId } : { roomNumber },
-          token
-        )
+        res = await getTenantPortalDataNoLoginAction(workspaceId, tenantId, token)
       } else {
         setIsLoginFree(false)
         res = await getTenantPortalData()

@@ -133,6 +133,75 @@ export function isTenantActiveInCycle(
   return true
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// มุมมองของผู้เช่า (Portal): ผู้เช่าคนหนึ่งเคยอยู่ห้องไหน ช่วงรอบบิลไหน
+// ─────────────────────────────────────────────────────────────────────────
+
+/** ช่วงที่ผู้เช่าอยู่ห้องหนึ่ง — endCycle = null คือห้องปัจจุบัน */
+export type TenantStint = {
+  roomId: string
+  startCycle: string
+  endCycle: string | null
+}
+
+export type StintTenant = {
+  id: string
+  room_id: string | null
+  lease_start: string | null
+  created_at?: string | null
+}
+
+/**
+ * ช่วงที่ผู้เช่าอยู่แต่ละห้อง จากสัญญา + ประวัติการย้าย
+ *
+ * เดือนที่ย้าย "นับเป็นของทั้งสองห้อง" สำหรับการมองเห็นบิล เพราะห้องเดิมอาจมีใบปิดรอบ
+ * (bill_kind = transfer_closing) ในเดือนนั้น — ตัวกรองชื่อผู้เช่าใน isBillVisibleToTenant
+ * กันไม่ให้เห็นบิลของผู้เช่าคนอื่นที่เข้ามาห้องเดิมในเดือนเดียวกันอยู่แล้ว
+ */
+export function tenantRoomStints(tenant: StintTenant, transfers: TenantTransferRow[]): TenantStint[] {
+  // ไม่มีวันเริ่มสัญญา → ใช้วันที่สร้างข้อมูลผู้เช่า (ห้ามปล่อยว่าง ไม่งั้นจะเห็นบิลเก่าของห้องทั้งหมด)
+  const baseDate = tenant.lease_start || tenant.created_at || ""
+  let cursor = baseDate.slice(0, 7)
+
+  const moves = transfers
+    .filter((t) => t.tenant_id === tenant.id)
+    .sort((a, b) => a.transfer_date.localeCompare(b.transfer_date))
+
+  const stints: TenantStint[] = []
+  for (const move of moves) {
+    const moveCycle = move.transfer_date.slice(0, 7)
+    if (move.from_room_id) {
+      stints.push({ roomId: move.from_room_id, startCycle: cursor, endCycle: moveCycle })
+    }
+    cursor = moveCycle
+  }
+  if (tenant.room_id) {
+    stints.push({ roomId: tenant.room_id, startCycle: cursor, endCycle: null })
+  }
+  return stints
+}
+
+export type VisibilityBill = {
+  room_id: string | null
+  billing_cycle: string
+  tenant_name: string | null
+}
+
+/**
+ * ผู้เช่าเห็นบิลใบนี้ได้หรือไม่ — ต้องผ่านทั้งสองชั้น
+ *   1. บิลอยู่ในห้องและช่วงรอบบิลที่ผู้เช่าคนนี้อยู่จริง (กันผู้เช่าใหม่เห็นบิลเก่าของห้อง)
+ *   2. ชื่อในบิลตรงกับผู้เช่า (กันเห็นบิลของคนอื่นในเดือนที่เปลี่ยนมือ)
+ */
+export function isBillVisibleToTenant(bill: VisibilityBill, tenantName: string, stints: TenantStint[]): boolean {
+  if (!tenantName || !bill.room_id || bill.tenant_name !== tenantName) return false
+  return stints.some(
+    (s) =>
+      s.roomId === bill.room_id &&
+      bill.billing_cycle >= s.startCycle &&
+      (s.endCycle === null || bill.billing_cycle <= s.endCycle)
+  )
+}
+
 /** ผู้เช่าล่าสุดของห้อง — ไม่นับคนที่ย้ายออกไปห้องอื่นแล้ว */
 function latestTenantId(tenants: RoomTenantEntry[]): string | undefined {
   let latest: RoomTenantEntry | undefined

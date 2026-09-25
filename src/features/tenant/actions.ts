@@ -2,8 +2,17 @@
 
 import { createClient } from "@/lib/supabase/server"
 import type { RoomRef } from "@/features/room/utils"
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import crypto from "crypto"
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
+import {
+  buildPortalSearchParams,
+  createServiceRoleClient,
+  fetchTenantVisibleBills,
+  resolvePortalTenant,
+  INVALID_PORTAL_LINK_ERROR,
+  LEGACY_PORTAL_LINK_ERROR,
+  type PortalBillRow,
+  type PortalTenantRow
+} from "@/features/tenant/portal-access"
 import { billKindRank, hasBillSnapshot, readBillSnapshot, resolveBillPenalty } from "@/features/billing/utils"
 
 /**
@@ -468,6 +477,254 @@ export async function updateTenant(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Tenant Portal — ใช้ร่วมกันทั้งผู้เช่าที่ login และที่เข้าผ่านลิงก์จาก LINE
+// ─────────────────────────────────────────────────────────────────────────
+//
+// ผู้เช่าเห็นบิลอะไรได้บ้าง ตัดสินที่ fetchTenantVisibleBills (features/tenant/portal-access.ts) ที่เดียว:
+//   - บิลของตัวเองในทุกห้องที่เคยอยู่ (ย้ายห้อง → เห็นบิลห้องเก่าช่วงที่ตัวเองอยู่ด้วย)
+//   - ไม่เห็นบิลของผู้เช่าคนก่อนหรือคนถัดไปของห้องเดียวกันเด็ดขาด
+// ห้ามกรองบิลซ้ำเองในฟังก์ชันด้านล่าง ไม่งั้นสองเส้นทางจะเห็นบิลไม่ตรงกันอีก
+
+type PortalWorkspaceSettings = {
+  promptPayId: string
+  promptPayName: string
+  workspaceName: string
+  workspaceAddress: string
+  workspacePhone: string
+  workspaceTaxId: string
+  commonFee: number
+  waterRate: number
+  electricRate: number
+  waterMinChecked: boolean
+  waterMinUnit: number
+  electricMinChecked: boolean
+  electricMinUnit: number
+  latePenaltyRate: number
+  workspaceLogo: string
+  electricBillingMode: "fixed_rate" | "building_total"
+  waterBillingMode: "fixed_rate" | "building_total"
+}
+
+const DEFAULT_PORTAL_SETTINGS: PortalWorkspaceSettings = {
+  promptPayId: "",
+  promptPayName: "",
+  workspaceName: "",
+  workspaceAddress: "",
+  workspacePhone: "",
+  workspaceTaxId: "",
+  commonFee: 50,
+  waterRate: 18,
+  electricRate: 7,
+  waterMinChecked: true,
+  waterMinUnit: 3,
+  electricMinChecked: true,
+  electricMinUnit: 10,
+  latePenaltyRate: 0,
+  workspaceLogo: "",
+  electricBillingMode: "fixed_rate",
+  waterBillingMode: "fixed_rate"
+}
+
+async function loadPortalWorkspaceSettings(db: SupabaseClient, workspaceId: string): Promise<PortalWorkspaceSettings> {
+  const s = { ...DEFAULT_PORTAL_SETTINGS }
+  // logo_url และ late_penalty_rate เป็นคอลัมน์ในตาราง workspaces ตั้งแต่ base schema (schema_multi_workspace.sql)
+  const { data: ws } = await db
+    .from("workspaces")
+    .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate, electric_billing_mode, water_billing_mode")
+    .eq("id", workspaceId)
+    .maybeSingle()
+  if (!ws) return s
+
+  s.promptPayId = ws.promptpay_id || ""
+  s.promptPayName = ws.promptpay_name || ""
+  s.workspaceName = ws.name || ""
+  s.workspaceAddress = ws.tax_address || ""
+  s.workspacePhone = ws.tax_phone || ""
+  s.workspaceTaxId = ws.tax_id || ""
+  if (ws.common_fee !== null && ws.common_fee !== undefined) s.commonFee = Number(ws.common_fee)
+  if (ws.water_rate !== null && ws.water_rate !== undefined) s.waterRate = Number(ws.water_rate)
+  if (ws.electric_rate !== null && ws.electric_rate !== undefined) s.electricRate = Number(ws.electric_rate)
+  if (ws.water_min_checked !== null && ws.water_min_checked !== undefined) s.waterMinChecked = Boolean(ws.water_min_checked)
+  if (ws.water_min_unit !== null && ws.water_min_unit !== undefined) s.waterMinUnit = Number(ws.water_min_unit)
+  if (ws.electric_min_checked !== null && ws.electric_min_checked !== undefined) s.electricMinChecked = Boolean(ws.electric_min_checked)
+  if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) s.electricMinUnit = Number(ws.electric_min_unit)
+  if (ws.logo_url) s.workspaceLogo = ws.logo_url
+  if (ws.late_penalty_rate !== null && ws.late_penalty_rate !== undefined) s.latePenaltyRate = Number(ws.late_penalty_rate)
+  if (ws.electric_billing_mode === "building_total") s.electricBillingMode = "building_total"
+  if (ws.water_billing_mode === "building_total") s.waterBillingMode = "building_total"
+  return s
+}
+
+type MeterReading = { elecPrev: number; elecCurr: number | null; waterPrev: number; waterCurr: number | null }
+type BuildingUtilityTotals = { electric?: { amount: number; units: number }; water?: { amount: number; units: number } }
+
+/** แปลงแถวบิลเป็นรูปแบบที่หน้า Portal ใช้ (เรียง + เติมเลขมิเตอร์ + ยอดรวมอาคาร) */
+async function formatPortalBills(
+  db: SupabaseClient,
+  workspaceId: string,
+  rows: PortalBillRow[],
+  settings: PortalWorkspaceSettings,
+  currentRoomBuildingId: string | null
+) {
+  // บิลรอบปกติต้องมาก่อนใบปิดรอบเสมอ — ฝั่งจอหยิบ bills[0] เป็น "บิลรอบปัจจุบัน"
+  // เรียงด้วยตารางลำดับที่ประกาศชัด (billKindRank) ไม่พึ่งการเรียงตามตัวอักษรของ bill_kind
+  const sorted = [...rows].sort((a, b) => {
+    const x = a as unknown as BillOrderRow
+    const y = b as unknown as BillOrderRow
+    return x.billing_cycle === y.billing_cycle
+      ? billKindRank(x.bill_kind) - billKindRank(y.bill_kind)
+      : (x.billing_cycle < y.billing_cycle ? 1 : -1)
+  })
+
+  // เลขมิเตอร์ของทุกบิลที่จะแสดง (query ครั้งเดียว) — คีย์ด้วยห้อง + รอบบิล เพราะบิลห้องเก่า
+  // (ก่อนย้ายห้อง) ต้องได้เลขมิเตอร์ของห้องเก่า ไม่ใช่ของห้องปัจจุบัน
+  const cycles = [...new Set(sorted.map((b) => b.billing_cycle))]
+  const roomIds = [...new Set(sorted.map((b) => b.room_id).filter((v): v is string => typeof v === "string"))]
+  const meterByRoomCycle = new Map<string, MeterReading>()
+  if (cycles.length > 0 && roomIds.length > 0) {
+    const { data: meterRows } = await db
+      .from("meter_records")
+      .select("room_id, billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
+      .eq("workspace_id", workspaceId)
+      .in("room_id", roomIds)
+      .in("billing_cycle", cycles)
+
+    meterRows?.forEach((m: any) => {
+      meterByRoomCycle.set(`${m.room_id}:${m.billing_cycle}`, {
+        elecPrev: Number(m.elec_prev),
+        elecCurr: m.elec_curr === null || m.elec_curr === undefined ? null : Number(m.elec_curr),
+        waterPrev: Number(m.water_prev),
+        waterCurr: m.water_curr === null || m.water_curr === undefined ? null : Number(m.water_curr)
+      })
+    })
+  }
+
+  // ถ้าเปิดโหมด building_total ดึงยอดบิลรวมทั้งอาคารของทุกรอบบิลที่จะแสดง (ครั้งเดียว)
+  // ใช้ building_id ที่ snapshot ไว้ ณ ตอนออกบิล (bills.building_id) ไม่ใช่ building_id ปัจจุบันของห้อง
+  // เพราะห้องอาจถูกย้ายไปอาคารอื่นภายหลัง บิลเก่าต้องอ้างอิงอาคารที่ถูกต้อง ณ ตอนออกบิลเสมอ
+  const { electricBillingMode, waterBillingMode, latePenaltyRate } = settings
+  const buildingIds = [...new Set(
+    sorted.map((b) => (b.building_id as string | null | undefined) ?? currentRoomBuildingId).filter(Boolean)
+  )]
+  const buildingUtilityByCycle = new Map<string, BuildingUtilityTotals>()
+  if (buildingIds.length > 0 && (electricBillingMode === "building_total" || waterBillingMode === "building_total") && cycles.length > 0) {
+    const { data: buildingBillRows } = await db
+      .from("building_utility_bills")
+      .select("billing_cycle, building_id, utility_type, total_amount, total_units")
+      .in("building_id", buildingIds)
+      .in("billing_cycle", cycles)
+
+    buildingBillRows?.forEach((row: any) => {
+      const key = `${row.building_id}:${row.billing_cycle}`
+      const entry = buildingUtilityByCycle.get(key) || {}
+      entry[row.utility_type as "electric" | "water"] = { amount: Number(row.total_amount), units: Number(row.total_units) }
+      buildingUtilityByCycle.set(key, entry)
+    })
+  }
+
+  return sorted.map((b: any) => {
+    const snap = readBillSnapshot(b)
+
+    // ค่าปรับล่าช้า — กฎอยู่ใน resolveBillPenalty ที่เดียว (ห้ามเขียนซ้ำที่นี่)
+    const { lateDays, penaltyAmount, amount } = resolveBillPenalty({
+      savedPenaltyAmount: b.penalty_amount,
+      savedLateDays: b.late_days,
+      billAmount: b.amount,
+      billingCycle: b.billing_cycle,
+      billStatus: b.status,
+      latePenaltyRate
+    })
+
+    const meter = meterByRoomCycle.get(`${b.room_id}:${b.billing_cycle}`)
+    const billBuildingId = b.building_id ?? currentRoomBuildingId
+    const buildingUtility = billBuildingId ? buildingUtilityByCycle.get(`${billBuildingId}:${b.billing_cycle}`) : undefined
+    const electricBuildingTotal = electricBillingMode === "building_total" ? buildingUtility?.electric : undefined
+    const waterBuildingTotal = waterBillingMode === "building_total" ? buildingUtility?.water : undefined
+
+    return {
+      id: b.id,
+      roomId: b.room_id,
+      roomNumber: b.room_number,
+      tenantName: b.tenant_name,
+      amount: amount,
+      status: b.status,
+      billingCycle: b.billing_cycle,
+      slipUrl: b.slip_url,
+      electricUnits: Number(b.electric_units),
+      waterUnits: Number(b.water_units),
+      penaltyAmount: penaltyAmount,
+      lateDays: lateDays,
+      otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
+      vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
+      invoiceId: b.invoice_id,
+      // ชนิดบิล: regular = บิลรอบปกติ · transfer_closing = ใบปิดรอบตอนย้ายห้อง (เลิกออกใหม่แล้ว)
+      // ฝั่งจอใช้แยกป้ายในประวัติ ไม่ให้เห็นรอบเดียวกันสองบรรทัดแล้วงงว่าอันไหนของจริง
+      billKind: (b.bill_kind as string | null) ?? "regular",
+      // เลขมิเตอร์: ใช้ค่าที่บันทึกไว้ในบิลก่อน ถอยไปอ่านสดจาก meter_records เฉพาะบิลเก่า
+      // ที่ยังไม่มี snapshot — ไม่งั้นจะเห็นเลขมิเตอร์ชุดใหม่คู่กับจำนวนหน่วยชุดเก่า
+      elecPrev: snap.elecPrev ?? meter?.elecPrev ?? null,
+      elecCurr: snap.elecCurr ?? meter?.elecCurr ?? null,
+      waterPrev: snap.waterPrev ?? meter?.waterPrev ?? null,
+      waterCurr: snap.waterCurr ?? meter?.waterCurr ?? null,
+      // องค์ประกอบที่บันทึกไว้ ณ ตอนออกบิล (null = บิลเก่า ฝั่งหน้าเว็บถอยไปใช้ค่า config ปัจจุบัน)
+      hasSnapshot: hasBillSnapshot(snap),
+      baseRent: snap.baseRent,
+      electricAmount: snap.electricAmount,
+      waterAmount: snap.waterAmount,
+      electricRate: snap.electricRate,
+      waterRate: snap.waterRate,
+      commonFee: snap.commonFee,
+      extraExpenses: snap.extraExpenses,
+      elecMinApplied: snap.elecMinApplied,
+      waterMinApplied: snap.waterMinApplied,
+      electricMinUnitSnapshot: snap.electricMinUnit,
+      waterMinUnitSnapshot: snap.waterMinUnit,
+      // รายการของห้องเดิมที่ยกมารวมในบิลนี้ (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
+      utilitySegments: snap.utilitySegments,
+      electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
+      electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
+      waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
+      waterBuildingTotalUnits: waterBuildingTotal?.units ?? null
+    }
+  })
+}
+
+/**
+ * ข้อมูลหน้า Portal ของผู้เช่าหนึ่งคน
+ *
+ * ⚠️ db ต้องเป็น service role และผู้เรียกต้องยืนยันตัวตนผู้เช่าเรียบร้อยแล้ว
+ */
+async function buildTenantPortalPayload(db: SupabaseClient, tenant: PortalTenantRow) {
+  const { data: roomRow, error: roomError } = await db
+    .from("rooms")
+    .select("id, room_number, base_rent, building_id, waive_electric_min, waive_water_min, extra_expenses, room_types(default_rent)")
+    .eq("id", tenant.room_id)
+    .eq("workspace_id", tenant.workspace_id)
+    .maybeSingle()
+  if (roomError) throw roomError
+  if (!roomRow) throw new Error("ไม่พบข้อมูลห้องพักนี้ในระบบ")
+
+  const settings = await loadPortalWorkspaceSettings(db, tenant.workspace_id)
+  const { bills } = await fetchTenantVisibleBills(db, tenant)
+  const formattedBills = await formatPortalBills(db, tenant.workspace_id, bills, settings, roomRow.building_id ?? null)
+
+  const roomType = (Array.isArray(roomRow.room_types) ? roomRow.room_types[0] : roomRow.room_types) as { default_rent?: number } | null
+  const baseRent = roomType ? Number(roomType.default_rent) : Number(roomRow.base_rent || 0)
+
+  return {
+    roomId: roomRow.id as string,
+    roomNumber: roomRow.room_number as string,
+    tenantName: tenant.tenant_name,
+    baseRent,
+    waiveElectricMin: roomRow.waive_electric_min,
+    waiveWaterMin: roomRow.waive_water_min,
+    extraExpenses: roomRow.extra_expenses || [],
+    bills: formattedBills,
+    ...settings
+  }
+}
+
 export async function getTenantPortalData() {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -493,77 +750,17 @@ export async function getTenantPortalData() {
       return { success: false, error: "ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน" }
     }
 
-    // 3. Find tenant by matching phone number (เรียงลำดับสัญญาเข้าอยู่ล่าสุดก่อนเพื่อความถูกต้องกรณีเคยอยู่หลายสัญญา)
+    // 3. หาผู้เช่าจากเบอร์โทรของบัญชีนี้ (ผ่าน RLS — เห็นได้แค่แถวของตัวเอง) สัญญาล่าสุดก่อน
     const { data: tenantsList, error: tenantError } = await supabase
       .from("tenants")
-      .select(`
-        *,
-        rooms (
-          id,
-          room_number,
-          base_rent,
-          building_id,
-          waive_electric_min,
-          waive_water_min,
-          extra_expenses,
-          room_types (
-            default_rent
-          )
-        )
-      `)
+      .select("*")
       .eq("tenant_phone", profile.phone)
+      .not("room_id", "is", null)
       .order("lease_start", { ascending: false })
 
     if (tenantError) throw tenantError
 
-    const tenant = tenantsList && tenantsList.length > 0 ? tenantsList[0] : null
-
-    let promptPayId = ""
-    let promptPayName = ""
-    let workspaceName = ""
-    let workspaceAddress = ""
-    let workspacePhone = ""
-    let workspaceTaxId = ""
-    let commonFee = 50
-    let waterRate = 18
-    let electricRate = 7
-    let waterMinChecked = true
-    let waterMinUnit = 3
-    let electricMinChecked = true
-    let electricMinUnit = 10
-    let electricBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
-    let waterBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
-
-    let latePenaltyRate = 0
-    let workspaceLogo = ""
-    if (tenant && tenant.workspace_id) {
-      // logo_url และ late_penalty_rate เป็นคอลัมน์ในตาราง workspaces ตั้งแต่ base schema (schema_multi_workspace.sql)
-      // จึงรวมเข้ากับ query หลักได้โดยไม่ต้องแยกยิงซ้ำเพื่อความปลอดภัยแบบเดิมอีกต่อไป
-      const { data: ws } = await supabase
-        .from("workspaces")
-        .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate, electric_billing_mode, water_billing_mode")
-        .eq("id", tenant.workspace_id)
-        .maybeSingle()
-      if (ws) {
-        promptPayId = ws.promptpay_id || ""
-        promptPayName = ws.promptpay_name || ""
-        workspaceName = ws.name || ""
-        workspaceAddress = ws.tax_address || ""
-        workspacePhone = ws.tax_phone || ""
-        workspaceTaxId = ws.tax_id || ""
-        if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
-        if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
-        if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
-        if (ws.water_min_checked !== null && ws.water_min_checked !== undefined) waterMinChecked = Boolean(ws.water_min_checked)
-        if (ws.water_min_unit !== null && ws.water_min_unit !== undefined) waterMinUnit = Number(ws.water_min_unit)
-        if (ws.electric_min_checked !== null && ws.electric_min_checked !== undefined) electricMinChecked = Boolean(ws.electric_min_checked)
-        if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
-        if (ws.logo_url) workspaceLogo = ws.logo_url
-        if (ws.late_penalty_rate !== null && ws.late_penalty_rate !== undefined) latePenaltyRate = Number(ws.late_penalty_rate)
-        if (ws.electric_billing_mode === "building_total") electricBillingMode = "building_total"
-        if (ws.water_billing_mode === "building_total") waterBillingMode = "building_total"
-      }
-    }
+    const tenant = (tenantsList && tenantsList.length > 0 ? tenantsList[0] : null) as PortalTenantRow | null
 
     if (!tenant) {
       // Profile exists but not assigned as a tenant in any room yet
@@ -574,218 +771,29 @@ export async function getTenantPortalData() {
           roomNumber: null,
           tenantName: profile.full_name || profile.email,
           baseRent: 0,
+          waiveElectricMin: false,
+          waiveWaterMin: false,
+          extraExpenses: [],
           bills: [],
-          promptPayId,
-          promptPayName,
-          workspaceName,
-          workspaceAddress,
-          workspacePhone,
-          workspaceTaxId,
-          commonFee,
-          waterRate,
-          electricRate,
-          waterMinChecked,
-          waterMinUnit,
-          electricMinChecked,
-          electricMinUnit,
-          latePenaltyRate,
-          electricBillingMode,
-          waterBillingMode
+          ...DEFAULT_PORTAL_SETTINGS
         }
       }
     }
 
-    // 4. Get bills for this room
-    //    จับด้วย room_id เท่านั้น — ถ้าเทียบด้วยเลขห้อง ผู้เช่าจะเห็นบิลของห้องเลขเดียวกันในอาคารอื่นด้วย
-    const roomNumber = tenant.rooms?.room_number
-    const tenantRoomId: string | null = tenant.room_id ?? null
-    let formattedBills: any[] = []
-
-    if (tenantRoomId) {
-      const { data: bills, error: billsError } = await supabase
-        .from("bills")
-        .select("*")
-        .eq("room_id", tenantRoomId)
-        .eq("workspace_id", tenant.workspace_id)
-        .order("billing_cycle", { ascending: false })
-
-      if (billsError) throw billsError
-
-      if (bills) {
-        // ตรวจสอบว่ามีผู้เช่ารายใหม่เข้ามาอยู่ต่อหลังจากสัญญาเช่าของตนเองหรือไม่
-        const { data: newer } = await supabase
-          .from("tenants")
-          .select("id")
-          .eq("room_id", tenant.room_id)
-          .gt("lease_start", tenant.lease_start)
-          .limit(1)
-        const isLatestTenant = !newer || newer.length === 0
-
-        const leaseStartCycle = tenant.lease_start ? tenant.lease_start.substring(0, 7) : ""
-        const leaseEndCycle = tenant.lease_end ? tenant.lease_end.substring(0, 7) : ""
-
-        // บิลรอบปกติต้องมาก่อนใบปิดรอบเสมอ — ฝั่งจอหยิบ bills[0] เป็น "บิลรอบปัจจุบัน"
-        // เรียงด้วยตารางลำดับที่ประกาศชัด (billKindRank) ไม่พึ่งการเรียงตามตัวอักษรของ bill_kind
-        let filteredBills = [...bills].sort((a: BillOrderRow, b: BillOrderRow) =>
-          a.billing_cycle === b.billing_cycle
-            ? billKindRank(a.bill_kind) - billKindRank(b.bill_kind)
-            : (a.billing_cycle < b.billing_cycle ? 1 : -1)
-        )
-        
-        // 1. กรองด้วยประวัติชื่อผู้เช่า (ต้องตรงกัน) ป้องกันไม่ให้เห็นบิลของผู้เช่ารายอื่น
-        if (tenant.tenant_name) {
-          filteredBills = filteredBills.filter((b: any) => b.tenant_name === tenant.tenant_name)
-        }
-
-        // 2. กรองตามเงื่อนไข lease_start และ lease_end ที่นำกลับมา
-        if (leaseStartCycle) {
-          filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
-        }
-        if (leaseEndCycle && !isLatestTenant) {
-          filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
-        }
-
-        // ดึงเลขมิเตอร์ก่อนหน้า-ปัจจุบันของทุกรอบบิลที่จะแสดง (ครั้งเดียว ไม่ query แยกทีละบิล)
-        // เพื่อเอาไปโชว์ "เลขมิเตอร์เดือนก่อนหน้า - เลขมิเตอร์เดือนที่วางบิล" ในหน้าบิลของผู้เช่า
-        const billingCyclesForMeters = Array.from(new Set(filteredBills.map((b: any) => b.billing_cycle)))
-        const meterByCycle = new Map<string, { elecPrev: number; elecCurr: number | null; waterPrev: number; waterCurr: number | null }>()
-        if (tenantRoomId && billingCyclesForMeters.length > 0) {
-          const { data: meterRows } = await supabase
-            .from("meter_records")
-            .select("billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
-            .eq("workspace_id", tenant.workspace_id)
-            .eq("room_id", tenantRoomId)
-            .in("billing_cycle", billingCyclesForMeters)
-
-          meterRows?.forEach((m: any) => {
-            meterByCycle.set(m.billing_cycle, {
-              elecPrev: Number(m.elec_prev),
-              elecCurr: m.elec_curr === null || m.elec_curr === undefined ? null : Number(m.elec_curr),
-              waterPrev: Number(m.water_prev),
-              waterCurr: m.water_curr === null || m.water_curr === undefined ? null : Number(m.water_curr)
-            })
-          })
-        }
-
-        // ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของทุกรอบบิลที่จะแสดง
-        // (ครั้งเดียว) เพื่อเอาไปโชว์ "รายละเอียดใบแจ้งหนี้จริงจากหน่วยงาน" ในหน้าบิลของผู้เช่า
-        // ใช้ building_id ที่ snapshot ไว้ ณ ตอนออกบิล (bills.building_id) ไม่ใช่ building_id ปัจจุบันของห้อง
-        // เพราะห้องอาจถูกย้ายไปอาคารอื่นภายหลัง บิลเก่าต้องอ้างอิงอาคารที่ถูกต้อง ณ ตอนออกบิลเสมอ
-        const currentRoomBuildingId = (tenant.rooms as any)?.building_id ?? null
-        const buildingIdsForUtility = Array.from(new Set(
-          filteredBills.map((b: any) => b.building_id ?? currentRoomBuildingId).filter(Boolean)
-        ))
-        const buildingUtilityByCycle = new Map<string, { electric?: { amount: number; units: number }; water?: { amount: number; units: number } }>()
-        if (buildingIdsForUtility.length > 0 && (electricBillingMode === "building_total" || waterBillingMode === "building_total") && billingCyclesForMeters.length > 0) {
-          const { data: buildingBillRows } = await supabase
-            .from("building_utility_bills")
-            .select("billing_cycle, building_id, utility_type, total_amount, total_units")
-            .in("building_id", buildingIdsForUtility)
-            .in("billing_cycle", billingCyclesForMeters)
-
-          buildingBillRows?.forEach((row: any) => {
-            const key = `${row.building_id}:${row.billing_cycle}`
-            const entry = buildingUtilityByCycle.get(key) || {}
-            entry[row.utility_type as "electric" | "water"] = { amount: Number(row.total_amount), units: Number(row.total_units) }
-            buildingUtilityByCycle.set(key, entry)
-          })
-        }
-
-        formattedBills = filteredBills.map((b: any) => {
-          const snap = readBillSnapshot(b)
-
-          // ค่าปรับล่าช้า — กฎอยู่ใน resolveBillPenalty ที่เดียว (ห้ามเขียนซ้ำที่นี่)
-          const { lateDays, penaltyAmount, amount } = resolveBillPenalty({
-            savedPenaltyAmount: b.penalty_amount,
-            savedLateDays: b.late_days,
-            billAmount: b.amount,
-            billingCycle: b.billing_cycle,
-            billStatus: b.status,
-            latePenaltyRate
-          })
-
-          const meter = meterByCycle.get(b.billing_cycle)
-          const billBuildingId = b.building_id ?? currentRoomBuildingId
-          const buildingUtility = billBuildingId ? buildingUtilityByCycle.get(`${billBuildingId}:${b.billing_cycle}`) : undefined
-          const electricBuildingTotal = electricBillingMode === "building_total" ? buildingUtility?.electric : undefined
-          const waterBuildingTotal = waterBillingMode === "building_total" ? buildingUtility?.water : undefined
-
-          return {
-            id: b.id,
-            roomNumber: b.room_number,
-            tenantName: b.tenant_name,
-            amount: amount,
-            status: b.status,
-            billingCycle: b.billing_cycle,
-            slipUrl: b.slip_url,
-            electricUnits: Number(b.electric_units),
-            waterUnits: Number(b.water_units),
-            penaltyAmount: penaltyAmount,
-            lateDays: lateDays,
-            otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
-            vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
-            invoiceId: b.invoice_id,
-            // ชนิดบิล: regular = บิลรอบปกติ · transfer_closing = ใบปิดรอบตอนย้ายห้อง (เลิกออกใหม่แล้ว)
-            // ฝั่งจอใช้แยกป้ายในประวัติ ไม่ให้เห็นรอบเดียวกันสองบรรทัดแล้วงงว่าอันไหนของจริง
-            billKind: (b.bill_kind as string | null) ?? "regular",
-            // เลขมิเตอร์: ใช้ค่าที่บันทึกไว้ในบิลก่อน ถอยไปอ่านสดจาก meter_records เฉพาะบิลเก่า
-            // ที่ยังไม่มี snapshot — ไม่งั้นจะเห็นเลขมิเตอร์ชุดใหม่คู่กับจำนวนหน่วยชุดเก่า
-            elecPrev: snap.elecPrev ?? meter?.elecPrev ?? null,
-            elecCurr: snap.elecCurr ?? meter?.elecCurr ?? null,
-            waterPrev: snap.waterPrev ?? meter?.waterPrev ?? null,
-            waterCurr: snap.waterCurr ?? meter?.waterCurr ?? null,
-            // องค์ประกอบที่บันทึกไว้ ณ ตอนออกบิล (null = บิลเก่า ฝั่งหน้าเว็บถอยไปใช้ค่า config ปัจจุบัน)
-            hasSnapshot: hasBillSnapshot(snap),
-            baseRent: snap.baseRent,
-            electricAmount: snap.electricAmount,
-            waterAmount: snap.waterAmount,
-            electricRate: snap.electricRate,
-            waterRate: snap.waterRate,
-            commonFee: snap.commonFee,
-            extraExpenses: snap.extraExpenses,
-            elecMinApplied: snap.elecMinApplied,
-            waterMinApplied: snap.waterMinApplied,
-            electricMinUnitSnapshot: snap.electricMinUnit,
-            waterMinUnitSnapshot: snap.waterMinUnit,
-            // รายการของห้องเดิมที่ยกมารวมในบิลนี้ (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
-            utilitySegments: snap.utilitySegments,
-            electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
-            electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
-            waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
-            waterBuildingTotalUnits: waterBuildingTotal?.units ?? null
-          }
-        })
-      }
+    // 4. ยืนยันตัวตนผ่าน session แล้ว — อ่านบิลด้วย service role เพราะ RLS ของผู้เช่า
+    //    เปิดแค่ห้องปัจจุบัน ส่วนบิลห้องเก่า (ก่อนย้ายห้อง) ต้องอ่านข้าม RLS ตามกติกาใน fetchTenantVisibleBills
+    const db = createServiceRoleClient()
+    if (!db) {
+      return { success: false, error: "ระบบฐานข้อมูลหลังบ้านไม่พร้อมใช้งาน" }
     }
 
+    const payload = await buildTenantPortalPayload(db, tenant)
     return {
       success: true,
       data: {
         profile,
-        roomNumber: roomNumber || null,
-        tenantName: tenant.tenant_name || profile.full_name,
-        baseRent: tenant.rooms?.room_types ? Number((tenant.rooms as any).room_types.default_rent) : (tenant.rooms?.base_rent ? Number(tenant.rooms.base_rent) : 0),
-        waiveElectricMin: tenant.rooms?.waive_electric_min,
-        waiveWaterMin: tenant.rooms?.waive_water_min,
-        extraExpenses: tenant.rooms?.extra_expenses || [],
-        bills: formattedBills,
-        electricBillingMode,
-        waterBillingMode,
-        promptPayId,
-        promptPayName,
-        workspaceName,
-        workspaceAddress,
-        workspacePhone,
-        workspaceTaxId,
-        commonFee,
-        waterRate,
-        electricRate,
-        waterMinChecked,
-        waterMinUnit,
-        electricMinChecked,
-        electricMinUnit,
-        latePenaltyRate,
-        workspaceLogo
+        ...payload,
+        tenantName: tenant.tenant_name || profile.full_name
       }
     }
   } catch (error) {
@@ -795,364 +803,72 @@ export async function getTenantPortalData() {
 }
 
 /**
- * ฟังก์ชันช่วยสร้างและตรวจสอบ Token ลิงก์ดูบิลแบบไม่ล็อกอิน (เพื่อป้องกัน IDOR)
- */
-function getSignatureSecret() {
-  return process.env.PORTAL_SIGNATURE_SECRET || process.env.LINE_CHANNEL_SECRET || "horset-portal-signature-secret-key-fallback"
-}
-
-/**
- * ตัวระบุห้องในลิงก์ดูบิลแบบไม่ล็อกอิน
+ * สร้างลิงก์ดูบิลแบบไม่ต้องล็อกอินให้ผู้เช่าปัจจุบันของห้อง
  *
- * `roomId` = รูปแบบปัจจุบัน (rooms.id) — ใช้กับลิงก์ที่ออกใหม่ทุกใบ
- * `roomNumber` = รูปแบบเก่าที่เคยส่งไปใน LINE ก่อนหน้านี้ ยังรับไว้เพื่อไม่ให้ผู้เช่ากดลิงก์
- * เดือนก่อนแล้วเปิดไม่ได้ — แต่เปิดได้เฉพาะเมื่อเลขห้องนั้นไม่กำกวมในหอ (ดู resolvePortalRoom)
- */
-export type PortalRoomRef = { roomId: string } | { roomNumber: string }
-
-/** คีย์ที่ใช้เซ็น token — roomId สำหรับลิงก์ใหม่, roomNumber สำหรับลิงก์เก่า */
-function portalRoomKey(room: PortalRoomRef): string {
-  return "roomId" in room ? room.roomId : room.roomNumber
-}
-
-export async function generatePortalToken(workspaceId: string, roomKey: string): Promise<string> {
-  const secret = getSignatureSecret()
-  return crypto
-    .createHmac("sha256", secret)
-    .update(`${workspaceId}:${roomKey}`)
-    .digest("hex")
-}
-
-export async function verifyPortalToken(workspaceId: string, roomKey: string, token: string): Promise<boolean> {
-  if (!token) return false
-  const expectedToken = await generatePortalToken(workspaceId, roomKey)
-  try {
-    return crypto.timingSafeEqual(Buffer.from(token, "utf-8"), Buffer.from(expectedToken, "utf-8"))
-  } catch {
-    return token === expectedToken
-  }
-}
-
-/**
- * สร้างลิงก์ดูบิลแบบไม่ต้องล็อกอิน
+ * ลิงก์ผูกกับ "ผู้เช่า" (tenants.id) ไม่ใช่ห้อง — ผู้เช่าย้ายออกแล้วลิงก์ใช้ไม่ได้ทันที
+ * (ดูเหตุผลเต็มที่หัวไฟล์ features/tenant/portal-access.ts)
  *
- * ⚠️ ต้องส่ง rooms.id เข้ามา ไม่ใช่เลขห้อง — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าใช้เลขห้องเป็นตัวระบุ
- * ผู้เช่าห้อง 101 ตึก A จะเปิดลิงก์แล้วเห็นบิลของห้อง 101 ตึก B (หรือกลับกัน) แบบสุ่ม
+ * จำกัดเฉพาะ admin / staff ของหอนั้น และ super_admin ที่ได้รับอนุญาต — ค้นผู้เช่าผ่าน RLS
+ * ของผู้เรียก ถ้าไม่มีสิทธิ์ในห้องนั้นจะหาผู้เช่าไม่เจอและไม่ได้ลิงก์
  */
 export async function generateSecurePortalLinkAction(workspaceId: string, roomId: string) {
   try {
-    const token = await generatePortalToken(workspaceId, roomId)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "กรุณาเข้าสู่ระบบก่อนดำเนินการ" }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, workspace_id")
+      .eq("id", user.id)
+      .single()
+    const isWorkspaceMember = profile?.workspace_id === workspaceId && (profile.role === "admin" || profile.role === "staff")
+    if (!profile || (!isWorkspaceMember && profile.role !== "super_admin")) {
+      return { success: false, error: "คุณไม่มีสิทธิ์สร้างลิงก์ของหอพักนี้" }
+    }
+
+    const { data: tenantRows, error } = await supabase
+      .from("tenants")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("room_id", roomId)
+      .order("lease_start", { ascending: false })
+      .limit(1)
+    if (error) throw error
+    const tenantId = tenantRows?.[0]?.id as string | undefined
+    if (!tenantId) return { success: false, error: "ห้องนี้ยังไม่มีผู้เช่า" }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ""
-    const link = `${appUrl}/portal?workspace_id=${workspaceId}&room_id=${encodeURIComponent(roomId)}&token=${token}`
+    const link = `${appUrl}/portal?${buildPortalSearchParams(workspaceId, roomId, tenantId).toString()}`
     return { success: true, link }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "สร้างลิงก์ไม่สำเร็จ" }
   }
 }
 
 /**
- * ดึงข้อมูลบิลและค่าใช้จ่ายแบบไม่ต้อง Login โดยอาศัยรหัสความปลอดภัยร่วมกัน (workspaceId + ตัวระบุห้อง + token เพื่อความปลอดภัย)
+ * ข้อมูลหน้า Portal สำหรับลิงก์แบบไม่ต้อง login (workspace_id + tenant_id + token)
  *
- * รับตัวระบุห้องได้ 2 รูปแบบ (ดู PortalRoomRef) — ลิงก์ใหม่ใช้ roomId, ลิงก์เก่าที่ยังค้างใน LINE ใช้ roomNumber
+ * tenantId ว่าง = ลิงก์รุ่นเก่าที่ผูกกับห้อง → ปฏิเสธเสมอ (แยกไม่ได้ว่าคนถือเป็นผู้เช่าปัจจุบันหรือคนที่ย้ายออกไปแล้ว)
  */
-export async function getTenantPortalDataNoLoginAction(workspaceId: string, room: PortalRoomRef, token?: string) {
+export async function getTenantPortalDataNoLoginAction(workspaceId: string, tenantId: string, token: string) {
   try {
-    if (!token) {
-      return { success: false, error: "กรุณาระบุรหัสความปลอดภัยในการเข้าถึงข้อมูล (Missing signature token)" }
+    if (!tenantId) {
+      return { success: false, error: LEGACY_PORTAL_LINK_ERROR }
     }
 
-    const isValid = await verifyPortalToken(workspaceId, portalRoomKey(room), token)
-    if (!isValid) {
-      return { success: false, error: "ลิงก์ดูข้อมูลบิลไม่ถูกต้องหรือไม่ได้รับอนุญาต (Invalid signature token)" }
-    }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!url || !serviceKey || serviceKey.includes("placeholder")) {
+    const db = createServiceRoleClient()
+    if (!db) {
       return { success: false, error: "ระบบฐานข้อมูลหลังบ้านไม่พร้อมใช้งาน" }
     }
 
-    const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
-    const supabase = createSupabaseClient(url, serviceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      }
-    })
-
-    // 1. ค้นหาข้อมูลห้องพัก
-    //
-    // ลิงก์รูปแบบเก่าเทียบด้วยเลขห้อง ซึ่งกำกวมได้เมื่อหอมีหลายอาคารใช้เลขห้องซ้ำกัน —
-    // ในกรณีนั้นต้องปฏิเสธ ไม่ใช่หยิบห้องแรกที่เจอ (ไม่งั้นผู้เช่าจะเห็นบิลของคนอื่น)
-    // ผู้เช่าใช้ลิงก์รอบบิลล่าสุดที่ระบบส่งให้ทาง LINE ได้เสมอ ลิงก์นั้นใช้ roomId แล้ว
-    const roomSelect = "id, room_number, base_rent, building_id, waive_electric_min, waive_water_min, extra_expenses, room_types(default_rent)"
-    let roomRow: any = null
-    if ("roomId" in room) {
-      const { data, error } = await supabase
-        .from("rooms")
-        .select(roomSelect)
-        .eq("workspace_id", workspaceId)
-        .eq("id", room.roomId)
-        .maybeSingle()
-      if (error) return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
-      roomRow = data
-    } else {
-      const { data, error } = await supabase
-        .from("rooms")
-        .select(roomSelect)
-        .eq("workspace_id", workspaceId)
-        .eq("room_number", room.roomNumber)
-      if (error) return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
-      if (data && data.length > 1) {
-        return { success: false, error: "ลิงก์นี้เป็นรูปแบบเดิมและใช้ไม่ได้แล้วเนื่องจากหอพักมีห้องเลขนี้มากกว่าหนึ่งอาคาร กรุณาใช้ลิงก์จากใบแจ้งหนี้รอบล่าสุด" }
-      }
-      roomRow = data && data.length === 1 ? data[0] : null
+    const tenant = await resolvePortalTenant(db, workspaceId, tenantId, token)
+    if (!tenant) {
+      return { success: false, error: INVALID_PORTAL_LINK_ERROR }
     }
 
-    if (!roomRow) {
-      return { success: false, error: "ไม่พบข้อมูลห้องพักนี้ในระบบ" }
-    }
-    const roomId: string = roomRow.id
-    const roomNumber: string = roomRow.room_number
-
-    // 2. ค้นหาข้อมูลผู้เช่าของห้องนี้ (ดึงสัญญาล่าสุดของห้องนี้เพื่อป้องกันข้อผิดพลาดกรณีมีประวัติสัญญาเช่าหลายใบ)
-    const { data: tenantsList, error: tenantError } = await supabase
-      .from("tenants")
-      .select("*")
-      .eq("room_id", roomId)
-      .eq("workspace_id", workspaceId)
-      .order("lease_start", { ascending: false })
-
-    if (tenantError) throw tenantError
-    const tenant = tenantsList && tenantsList.length > 0 ? tenantsList[0] : null
-
-    // 3. ค้นหารายละเอียดของ Workspace และการตั้งค่าพร้อมเพย์
-    // logo_url และ late_penalty_rate เป็นคอลัมน์ในตาราง workspaces ตั้งแต่ base schema (schema_multi_workspace.sql)
-    // จึงรวมเข้ากับ query หลักได้โดยไม่ต้องแยกยิงซ้ำเพื่อความปลอดภัยแบบเดิมอีกต่อไป
-    const { data: ws } = await supabase
-      .from("workspaces")
-      .select("name, promptpay_id, promptpay_name, tax_address, tax_phone, tax_id, common_fee, water_rate, electric_rate, water_min_checked, water_min_unit, electric_min_checked, electric_min_unit, logo_url, late_penalty_rate, electric_billing_mode, water_billing_mode")
-      .eq("id", workspaceId)
-      .maybeSingle()
-
-    let promptPayId = ""
-    let promptPayName = ""
-    let workspaceName = ""
-    let workspaceAddress = ""
-    let workspacePhone = ""
-    let workspaceTaxId = ""
-    let commonFee = 50
-    let waterRate = 18
-    let electricRate = 7
-    let waterMinChecked = true
-    let waterMinUnit = 3
-    let electricMinChecked = true
-    let electricMinUnit = 10
-    let latePenaltyRate = 0
-    let electricBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
-    let waterBillingMode: "fixed_rate" | "building_total" = "fixed_rate"
-
-    let workspaceLogo = ""
-    if (ws) {
-      promptPayId = ws.promptpay_id || ""
-      promptPayName = ws.promptpay_name || ""
-      workspaceName = ws.name || ""
-      workspaceAddress = ws.tax_address || ""
-      workspacePhone = ws.tax_phone || ""
-      workspaceTaxId = ws.tax_id || ""
-      if (ws.common_fee !== null && ws.common_fee !== undefined) commonFee = Number(ws.common_fee)
-      if (ws.water_rate !== null && ws.water_rate !== undefined) waterRate = Number(ws.water_rate)
-      if (ws.electric_rate !== null && ws.electric_rate !== undefined) electricRate = Number(ws.electric_rate)
-      if (ws.water_min_checked !== null && ws.water_min_checked !== undefined) waterMinChecked = Boolean(ws.water_min_checked)
-      if (ws.water_min_unit !== null && ws.water_min_unit !== undefined) waterMinUnit = Number(ws.water_min_unit)
-      if (ws.electric_min_checked !== null && ws.electric_min_checked !== undefined) electricMinChecked = Boolean(ws.electric_min_checked)
-      if (ws.electric_min_unit !== null && ws.electric_min_unit !== undefined) electricMinUnit = Number(ws.electric_min_unit)
-      if (ws.logo_url) workspaceLogo = ws.logo_url
-      if (ws.late_penalty_rate !== null && ws.late_penalty_rate !== undefined) latePenaltyRate = Number(ws.late_penalty_rate)
-      if (ws.electric_billing_mode === "building_total") electricBillingMode = "building_total"
-      if (ws.water_billing_mode === "building_total") waterBillingMode = "building_total"
-    }
-
-    // 4. ดึงข้อมูลบิลทั้งหมดประจำห้องนี้ในตึกนี้ — จับด้วย room_id เท่านั้น
-    // (เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้องผู้เช่าจะเห็นบิลของห้องเลขเดียวกันในตึกอื่นด้วย)
-    const { data: bills, error: billsError } = await supabase
-      .from("bills")
-      .select("*")
-      .eq("room_id", roomId)
-      .eq("workspace_id", workspaceId)
-      .order("billing_cycle", { ascending: false })
-
-    if (billsError) throw billsError
-
-    let formattedBills: any[] = []
-    if (bills) {
-      // ใน NoLogin โหลดข้อมูลสัญญาของผู้เช่าล่าสุดของห้องนี้โดยตรงอยู่แล้ว จึงถือว่าเป็นผู้เช่าคนล่าสุด (isLatestTenant = true)
-      const isLatestTenant = true
-
-      const leaseStartCycle = tenant?.lease_start ? tenant.lease_start.substring(0, 7) : ""
-      const leaseEndCycle = tenant?.lease_end ? tenant.lease_end.substring(0, 7) : ""
-
-      // บิลรอบปกติต้องมาก่อนใบปิดรอบเสมอ — ฝั่งจอหยิบ bills[0] เป็น "บิลรอบปัจจุบัน"
-      // เรียงด้วยตารางลำดับที่ประกาศชัด (billKindRank) ไม่พึ่งการเรียงตามตัวอักษรของ bill_kind
-      let filteredBills = [...bills].sort((a: BillOrderRow, b: BillOrderRow) =>
-        a.billing_cycle === b.billing_cycle
-          ? billKindRank(a.bill_kind) - billKindRank(b.bill_kind)
-          : (a.billing_cycle < b.billing_cycle ? 1 : -1)
-      )
-      
-      // 1. กรองด้วยประวัติชื่อผู้เช่า (ต้องตรงกัน) ป้องกันไม่ให้เห็นบิลของผู้เช่ารายอื่น
-      if (tenant?.tenant_name) {
-        filteredBills = filteredBills.filter((b: any) => b.tenant_name === tenant.tenant_name)
-      }
-
-      // 2. กรองตามเงื่อนไข lease_start และ lease_end ที่นำกลับมา
-      if (leaseStartCycle) {
-        filteredBills = filteredBills.filter((b: any) => b.billing_cycle >= leaseStartCycle)
-      }
-      if (leaseEndCycle && !isLatestTenant) {
-        filteredBills = filteredBills.filter((b: any) => b.billing_cycle <= leaseEndCycle)
-      }
-
-      // ดึงเลขมิเตอร์ก่อนหน้า-ปัจจุบันของทุกรอบบิลที่จะแสดง (ครั้งเดียว ไม่ query แยกทีละบิล)
-      const billingCyclesForMeters = Array.from(new Set(filteredBills.map((b: any) => b.billing_cycle)))
-      const meterByCycle = new Map<string, { elecPrev: number; elecCurr: number | null; waterPrev: number; waterCurr: number | null }>()
-      if (billingCyclesForMeters.length > 0) {
-        const { data: meterRows } = await supabase
-          .from("meter_records")
-          .select("billing_cycle, elec_prev, elec_curr, water_prev, water_curr")
-          .eq("workspace_id", workspaceId)
-          .eq("room_id", roomId)
-          .in("billing_cycle", billingCyclesForMeters)
-
-        meterRows?.forEach((m: any) => {
-          meterByCycle.set(m.billing_cycle, {
-            elecPrev: Number(m.elec_prev),
-            elecCurr: m.elec_curr === null || m.elec_curr === undefined ? null : Number(m.elec_curr),
-            waterPrev: Number(m.water_prev),
-            waterCurr: m.water_curr === null || m.water_curr === undefined ? null : Number(m.water_curr)
-          })
-        })
-      }
-
-      // ถ้าเปิดโหมด building_total ของ utility ใดก็ตาม ดึงยอดบิลรวมทั้งอาคารของทุกรอบบิลที่จะแสดง
-      // ใช้ building_id ที่ snapshot ไว้ ณ ตอนออกบิล (bills.building_id) ไม่ใช่ building_id ปัจจุบันของห้อง
-      // เพราะห้องอาจถูกย้ายไปอาคารอื่นภายหลัง บิลเก่าต้องอ้างอิงอาคารที่ถูกต้อง ณ ตอนออกบิลเสมอ
-      const currentRoomBuildingId = roomRow.building_id ?? null
-      const buildingIdsForUtility = Array.from(new Set(
-        filteredBills.map((b: any) => b.building_id ?? currentRoomBuildingId).filter(Boolean)
-      ))
-      const buildingUtilityByCycle = new Map<string, { electric?: { amount: number; units: number }; water?: { amount: number; units: number } }>()
-      if (buildingIdsForUtility.length > 0 && (electricBillingMode === "building_total" || waterBillingMode === "building_total") && billingCyclesForMeters.length > 0) {
-        const { data: buildingBillRows } = await supabase
-          .from("building_utility_bills")
-          .select("billing_cycle, building_id, utility_type, total_amount, total_units")
-          .in("building_id", buildingIdsForUtility)
-          .in("billing_cycle", billingCyclesForMeters)
-
-        buildingBillRows?.forEach((row: any) => {
-          const key = `${row.building_id}:${row.billing_cycle}`
-          const entry = buildingUtilityByCycle.get(key) || {}
-          entry[row.utility_type as "electric" | "water"] = { amount: Number(row.total_amount), units: Number(row.total_units) }
-          buildingUtilityByCycle.set(key, entry)
-        })
-      }
-
-      formattedBills = filteredBills.map((b: any) => {
-        const snap = readBillSnapshot(b)
-
-        // ค่าปรับล่าช้า — กฎอยู่ใน resolveBillPenalty ที่เดียว (ห้ามเขียนซ้ำที่นี่)
-        // เดิมตรรกะนี้ถูกคัดลอกไว้สองที่ ซึ่งเสี่ยงให้ผู้เช่าที่ล็อกอินกับที่กดลิงก์เห็นยอดต่างกัน
-        const { lateDays, penaltyAmount, amount } = resolveBillPenalty({
-          savedPenaltyAmount: b.penalty_amount,
-          savedLateDays: b.late_days,
-          billAmount: b.amount,
-          billingCycle: b.billing_cycle,
-          billStatus: b.status,
-          latePenaltyRate
-        })
-
-        const meter = meterByCycle.get(b.billing_cycle)
-        const billBuildingId = b.building_id ?? currentRoomBuildingId
-        const buildingUtility = billBuildingId ? buildingUtilityByCycle.get(`${billBuildingId}:${b.billing_cycle}`) : undefined
-        const electricBuildingTotal = electricBillingMode === "building_total" ? buildingUtility?.electric : undefined
-        const waterBuildingTotal = waterBillingMode === "building_total" ? buildingUtility?.water : undefined
-
-        return {
-          id: b.id,
-          roomNumber: b.room_number,
-          tenantName: b.tenant_name,
-          amount: amount,
-          status: b.status,
-          billingCycle: b.billing_cycle,
-          slipUrl: b.slip_url,
-          electricUnits: Number(b.electric_units),
-          waterUnits: Number(b.water_units),
-          penaltyAmount: penaltyAmount,
-          lateDays: lateDays,
-          otherServiceAmount: b.other_service_amount !== null && b.other_service_amount !== undefined ? Number(b.other_service_amount) : 0,
-          vatAmount: b.vat_amount !== null && b.vat_amount !== undefined ? Number(b.vat_amount) : 0,
-          invoiceId: b.invoice_id,
-          // ชนิดบิล (ดูหมายเหตุเดียวกันในเส้นทางที่ล็อกอิน)
-          billKind: (b.bill_kind as string | null) ?? "regular",
-          // เลขมิเตอร์: ใช้ค่าที่บันทึกไว้ในบิลก่อน (ดูหมายเหตุเดียวกันในเส้นทางไม่ล็อกอิน)
-          elecPrev: snap.elecPrev ?? meter?.elecPrev ?? null,
-          elecCurr: snap.elecCurr ?? meter?.elecCurr ?? null,
-          waterPrev: snap.waterPrev ?? meter?.waterPrev ?? null,
-          waterCurr: snap.waterCurr ?? meter?.waterCurr ?? null,
-          hasSnapshot: hasBillSnapshot(snap),
-          baseRent: snap.baseRent,
-          electricAmount: snap.electricAmount,
-          waterAmount: snap.waterAmount,
-          electricRate: snap.electricRate,
-          waterRate: snap.waterRate,
-          commonFee: snap.commonFee,
-          extraExpenses: snap.extraExpenses,
-          elecMinApplied: snap.elecMinApplied,
-          waterMinApplied: snap.waterMinApplied,
-          electricMinUnitSnapshot: snap.electricMinUnit,
-          waterMinUnitSnapshot: snap.waterMinUnit,
-          // รายการของห้องเดิมที่ยกมารวมในบิลนี้ (ย้ายห้องกลางเดือน) — ว่างในบิลปกติทุกใบ
-          utilitySegments: snap.utilitySegments,
-          electricBuildingTotalAmount: electricBuildingTotal?.amount ?? null,
-          electricBuildingTotalUnits: electricBuildingTotal?.units ?? null,
-          waterBuildingTotalAmount: waterBuildingTotal?.amount ?? null,
-          waterBuildingTotalUnits: waterBuildingTotal?.units ?? null
-        }
-      })
-    }
-
-    const baseRent = roomRow.room_types ? Number(roomRow.room_types.default_rent) : Number(roomRow.base_rent)
-
-    return {
-      success: true,
-      data: {
-        roomNumber,
-        tenantName: tenant ? tenant.tenant_name : "ผู้เช่า",
-        baseRent,
-        waiveElectricMin: roomRow.waive_electric_min,
-        waiveWaterMin: roomRow.waive_water_min,
-        extraExpenses: roomRow.extra_expenses || [],
-        bills: formattedBills,
-        electricBillingMode,
-        waterBillingMode,
-        promptPayId,
-        promptPayName,
-        workspaceName,
-        workspaceAddress,
-        workspacePhone,
-        workspaceTaxId,
-        commonFee,
-        waterRate,
-        electricRate,
-        waterMinChecked,
-        waterMinUnit,
-        electricMinChecked,
-        electricMinUnit,
-        latePenaltyRate,
-        workspaceLogo
-      }
-    }
+    const payload = await buildTenantPortalPayload(db, tenant)
+    return { success: true, data: payload }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการโหลดข้อมูลบิล"
     return { success: false, error: errorMessage }

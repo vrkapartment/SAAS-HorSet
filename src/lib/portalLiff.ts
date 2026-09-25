@@ -15,6 +15,7 @@ export type PortalRoomOption = {
   workspaceName: string
   roomId: string
   roomNumber: string
+  tenantId: string
   token: string
 }
 
@@ -59,6 +60,7 @@ export function buildPortalUrl(room: PortalRoomOption, action: PortalAction): st
   const params = new URLSearchParams({
     workspace_id: room.workspaceId,
     room_id: room.roomId,
+    tenant_id: room.tenantId,
     token: room.token
   })
 

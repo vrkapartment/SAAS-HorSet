@@ -67,6 +67,7 @@ const ORDER = [
   // 12) RLS ของ support access + Staff อ่านประวัติการย้ายห้อง
   "database_patch_fix_support_access_rls.sql",
   "database_patch_add_staff_read_tenant_room_transfers.sql",
+  "database_patch_tenant_bills_rls_own_only.sql",
 
   // 13) Audit log — ต้องเป็นชุดสุดท้าย เพราะติด trigger กับตารางที่สร้างไว้ข้างบนทั้งหมด
   //     ลำดับขั้น 1 → 2 → 2.5 → 2.6 → 2.7 → 3 ห้ามสลับ (ขั้น 3 REVOKE สิทธิ์ลบ log ถาวร)
