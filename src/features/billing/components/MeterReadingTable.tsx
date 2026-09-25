@@ -652,7 +652,9 @@ export default function MeterReadingTable({
         portalLink = res.link
       } else {
         const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
-        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_id=${encodeURIComponent(item.roomId)}`
+        // สร้างลิงก์ที่มี token ไม่ได้ (ห้องว่าง / ไม่มีสิทธิ์) → ส่งหน้า portal เปล่าให้ผู้เช่า login เอง
+        // ห้ามส่งลิงก์ที่มีแค่ room_id — ลิงก์แบบนั้นถูกปฏิเสธแล้ว (ดู features/tenant/portal-access.ts)
+        portalLink = `${safeAppUrl}/portal`
       }
     } else {
       const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
@@ -760,7 +762,9 @@ Thank you 🙏`
         portalLink = res.link
       } else {
         const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""
-        portalLink = `${safeAppUrl}/portal?workspace_id=${currentWorkspaceId}&room_id=${encodeURIComponent(item.roomId)}`
+        // สร้างลิงก์ที่มี token ไม่ได้ (ห้องว่าง / ไม่มีสิทธิ์) → ส่งหน้า portal เปล่าให้ผู้เช่า login เอง
+        // ห้ามส่งลิงก์ที่มีแค่ room_id — ลิงก์แบบนั้นถูกปฏิเสธแล้ว (ดู features/tenant/portal-access.ts)
+        portalLink = `${safeAppUrl}/portal`
       }
     } else {
       const safeAppUrl = typeof window !== "undefined" ? window.location.origin : ""

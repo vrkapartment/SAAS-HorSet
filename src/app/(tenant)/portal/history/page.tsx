@@ -35,6 +35,8 @@ import { usePortalData } from "../PortalDataProvider"
 /** เท่าที่หน้านี้ใช้จากบิลหนึ่งใบ (รูปแบบเดียวกับที่ getTenantPortalData* ส่งกลับมา) */
 type PortalBill = {
   id?: string
+  roomId?: string | null
+  roomNumber?: string
   billingCycle?: string
   amount?: number
   status?: string
@@ -76,6 +78,7 @@ type PortalDefaults = {
   electricMinUnit?: number
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
+  roomId?: string
   roomNumber?: string
   tenantName?: string
   bills?: PortalBill[]
@@ -254,6 +257,12 @@ function PortalHistoryContent() {
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="text-sm font-bold truncate">{formatCycle(bill.billingCycle || "")}</span>
+                    {/* บิลของห้องที่เคยอยู่ก่อนย้ายห้อง — บอกให้ชัดว่าไม่ใช่ห้องปัจจุบัน */}
+                    {bill.roomNumber && bill.roomId && data?.roomId && bill.roomId !== data.roomId && (
+                      <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500">
+                        {t("tenant_portal.previous_room_badge").replace("{room}", bill.roomNumber)}
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     <Zap className="w-3 h-3 inline text-amber-500" /> {elecUnits} {t("tenant_portal.unit_short")}

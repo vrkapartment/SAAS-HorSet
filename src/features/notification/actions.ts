@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { generatePortalToken } from "@/features/tenant/actions"
+import { buildPortalSearchParams } from "@/features/tenant/portal-access"
 import { calculateLateDays } from "@/features/billing/utils"
 import { assertWorkspaceFeatureEnabled } from "@/features/subscription/actions"
 
@@ -139,10 +139,23 @@ export async function sendLineBillNotificationAction(payload: LineBillNotificati
     // ⚠️ ตัวระบุห้องในลิงก์ต้องเป็น rooms.id ไม่ใช่เลขห้อง — หอที่มีหลายอาคารใช้เลขห้องซ้ำกันได้
     // ถ้าใช้เลขห้อง ผู้เช่าห้อง 101 ตึก A จะกดลิงก์แล้วเห็นบิลของห้อง 101 ตึก B
     // ไม่มี roomId (ผู้เรียกรุ่นเก่า) ให้ส่งลิงก์หน้า portal เปล่า ๆ ให้ผู้เช่าล็อกอินเอง ดีกว่าส่งลิงก์ที่อาจพาไปห้องผิด
+    //
+    // ลิงก์ผูกกับผู้เช่าปัจจุบันของห้อง (tenants.id) — ย้ายออกแล้วลิงก์ใช้ไม่ได้ (ดู features/tenant/portal-access.ts)
+    // ค้นผู้เช่าผ่าน RLS ของผู้เรียก: ผู้ที่ไม่มีสิทธิ์ในห้องนั้นจะไม่ได้ลิงก์ที่มี token
     const portalRoomId = roomId && roomId.trim() ? roomId.trim() : ""
-    const token = workspaceId && portalRoomId ? await generatePortalToken(workspaceId, portalRoomId) : ""
-    const portalLink = workspaceId && portalRoomId
-      ? `${safeAppUrl}/portal?workspace_id=${workspaceId}&room_id=${encodeURIComponent(portalRoomId)}&token=${token}`
+    let portalTenantId = ""
+    if (workspaceId && portalRoomId) {
+      const { data: tenantRows } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("room_id", portalRoomId)
+        .order("lease_start", { ascending: false })
+        .limit(1)
+      portalTenantId = (tenantRows?.[0]?.id as string | undefined) ?? ""
+    }
+    const portalLink = workspaceId && portalRoomId && portalTenantId
+      ? `${safeAppUrl}/portal?${buildPortalSearchParams(workspaceId, portalRoomId, portalTenantId).toString()}`
       : `${safeAppUrl}/portal`
 
     // สร้างข้อความสำรองสำหรับหน้าจอแจ้งเตือน (Notification / Lock Screen)
