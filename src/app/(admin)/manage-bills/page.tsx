@@ -30,6 +30,7 @@ import { getBills, createBill, updateBillStatus, getBillingPageData, deleteBill 
 import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
 import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
+import { findActiveTenantInCycle, resolveTenantNameForCycle } from "@/features/tenant/occupancy"
 import { meterUnitsUsed } from "@/features/meter/utils"
 import { getBuildings } from "@/features/building/actions"
 import { getMeterRecords, saveMeterRecord, getMeterReplacements } from "@/features/meter/actions"
@@ -440,26 +441,6 @@ function ManageBillsContent() {
   }
 
 
-  const isTenantActiveInCycle = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined, cycle: string, isLatest = true): boolean => {
-    if (!leaseStart) return false
-    
-    const [cYear, cMonth] = cycle.split("-").map(Number)
-    const cycleStart = new Date(cYear, cMonth - 1, 1)
-    const cycleEnd = new Date(cYear, cMonth, 0, 23, 59, 59, 999)
-    
-    const start = new Date(leaseStart)
-    start.setHours(0, 0, 0, 0)
-    
-    if (start > cycleEnd) return false
-    
-    if (leaseEnd && !isLatest) {
-      const end = new Date(leaseEnd)
-      end.setHours(23, 59, 59, 999)
-      if (end < cycleStart) return false
-    }
-    
-    return true
-  }
 
   const loadData = async (cycle = billingCycle, forceRefresh = false, silent = false) => {
     // กันไม่ให้คำตอบของรอบบิลเก่าที่โหลดช้ากว่ามาทับข้อมูลของรอบบิลใหม่ที่โหลดเสร็จก่อน
@@ -627,37 +608,8 @@ function ManageBillsContent() {
         const roomMeter = dbMeters.find((m: any) => m.roomId === roomId)
         const prevMeter = dbPrevMeters.find((m: any) => m.roomId === roomId)
         
-        let resolvedTenantName: string | null = null
-        const sortedTenants = [...(r.allTenants || [])].sort((a: any, b: any) => {
-          const aTime = a.leaseStart ? new Date(a.leaseStart).getTime() : 0
-          const bTime = b.leaseStart ? new Date(b.leaseStart).getTime() : 0
-          return bTime - aTime
-        })
-
-        if (roomBill && roomBill.tenantName) {
-          const matchingTenant = (r.allTenants || []).find((t: any) => t.tenantName === roomBill.tenantName)
-          if (matchingTenant) {
-            const matchingTenantIsLatest = sortedTenants[0]?.id === matchingTenant.id
-            const isActive = isTenantActiveInCycle(matchingTenant.leaseStart, matchingTenant.leaseEnd, cycle, matchingTenantIsLatest)
-            if (isActive) {
-              resolvedTenantName = roomBill.tenantName
-            } else {
-              const actualActiveTenant = (r.allTenants || []).find((t: any) => {
-                const tIsLatest = sortedTenants[0]?.id === t.id
-                return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle, tIsLatest)
-              })
-              resolvedTenantName = actualActiveTenant ? actualActiveTenant.tenantName : null
-            }
-          } else {
-            resolvedTenantName = roomBill.tenantName
-          }
-        } else {
-          const activeTenant = (r.allTenants || []).find((t: any) => {
-            const tIsLatest = sortedTenants[0]?.id === t.id
-            return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, cycle, tIsLatest)
-          })
-          resolvedTenantName = activeTenant ? activeTenant.tenantName : null
-        }
+        // ผู้เช่าของห้องในรอบบิลนี้ ตามบิล + สัญญา + ประวัติการย้ายห้อง
+        const resolvedTenantName = resolveTenantNameForCycle(r.allTenants, cycle, roomBill?.tenantName)
         
         const isOccupiedInCycle = resolvedTenantName !== null
 
@@ -1897,15 +1849,7 @@ function ManageBillsContent() {
       return
     }
     if (room) {
-      const sortedTenants = [...(room.allTenants || [])].sort((a: any, b: any) => {
-        const aTime = a.leaseStart ? new Date(a.leaseStart).getTime() : 0
-        const bTime = b.leaseStart ? new Date(b.leaseStart).getTime() : 0
-        return bTime - aTime
-      })
-      const activeTenant = (room.allTenants || []).find((t: any) => {
-        const tIsLatest = sortedTenants[0]?.id === t.id
-        return isTenantActiveInCycle(t.leaseStart, t.leaseEnd, billingCycle, tIsLatest)
-      })
+      const activeTenant = findActiveTenantInCycle(room.allTenants, billingCycle)
       if (activeTenant && activeTenant.tenantName) {
         targetTenant = activeTenant.tenantName
       }

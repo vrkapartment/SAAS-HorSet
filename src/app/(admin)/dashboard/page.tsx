@@ -27,6 +27,7 @@ import {
   Check
 } from "lucide-react"
 import { getDashboardData } from "@/features/dashboard/actions"
+import { resolveTenantNameForCycle } from "@/features/tenant/occupancy"
 import { getCurrentUserProfileClient } from "@/features/auth/client"
 import { useWorkspaceData } from "@/context/WorkspaceDataContext"
 import { createClient } from "@/lib/supabase/client"
@@ -210,58 +211,8 @@ function AdminDashboardContent() {
     const compiledRooms = rooms.map((r: any) => {
       const roomBill = currentMonthBills.find((b: any) => b.roomNumber === r.roomNumber)
       
-      let resolvedTenantName: string | null = null
-      const sortedTenants = [...(r.allTenants || [])].sort((a: any, b: any) => {
-        const aTime = a.leaseStart ? new Date(a.leaseStart).getTime() : 0
-        const bTime = b.leaseStart ? new Date(b.leaseStart).getTime() : 0
-        return bTime - aTime
-      })
-
-      const checkTenantActive = (leaseStart: string | null | undefined, leaseEnd: string | null | undefined, isLatest = true) => {
-        if (!leaseStart) return false
-        
-        const [cYear, cMonth] = cycle.split("-").map(Number)
-        const cycleStart = new Date(cYear, cMonth - 1, 1)
-        const cycleEnd = new Date(cYear, cMonth, 0, 23, 59, 59, 999)
-        
-        const start = new Date(leaseStart)
-        start.setHours(0, 0, 0, 0)
-        
-        if (start > cycleEnd) return false
-        
-        if (leaseEnd && !isLatest) {
-          const end = new Date(leaseEnd)
-          end.setHours(23, 59, 59, 999)
-          if (end < cycleStart) return false
-        }
-        
-        return true
-      }
-
-      if (roomBill && roomBill.tenantName) {
-        const matchingTenant = (r.allTenants || []).find((t: any) => t.tenantName === roomBill.tenantName)
-        if (matchingTenant) {
-          const matchingTenantIsLatest = sortedTenants[0]?.id === matchingTenant.id
-          const isActive = checkTenantActive(matchingTenant.leaseStart, matchingTenant.leaseEnd, matchingTenantIsLatest)
-          if (isActive) {
-            resolvedTenantName = roomBill.tenantName
-          } else {
-            const actualActiveTenant = (r.allTenants || []).find((t: any) => {
-              const tIsLatest = sortedTenants[0]?.id === t.id
-              return checkTenantActive(t.leaseStart, t.leaseEnd, tIsLatest)
-            })
-            resolvedTenantName = actualActiveTenant ? actualActiveTenant.tenantName : null
-          }
-        } else {
-          resolvedTenantName = roomBill.tenantName
-        }
-      } else {
-        const activeTenant = (r.allTenants || []).find((t: any) => {
-          const tIsLatest = sortedTenants[0]?.id === t.id
-          return checkTenantActive(t.leaseStart, t.leaseEnd, tIsLatest)
-        })
-        resolvedTenantName = activeTenant ? activeTenant.tenantName : null
-      }
+      // ผู้เช่าของห้องในรอบบิลนี้ ตามบิล + สัญญา + ประวัติการย้ายห้อง
+      const resolvedTenantName = resolveTenantNameForCycle(r.allTenants, cycle, roomBill?.tenantName)
 
       return {
         roomNumber: r.roomNumber,
