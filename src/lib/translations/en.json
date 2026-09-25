@@ -597,6 +597,7 @@
     "vat_label": "VAT",
     "total_label": "Total",
     "history_error_title": "Could not open your bill history",
+    "portal_error_title": "Could not open your bill",
     "history_error_desc": "The link may have expired or be invalid. Please tap the button in the LINE menu again, or ask your building for a new link.",
     "qr_no_promptpay_title": "PromptPay is not set up yet",
     "qr_no_promptpay_desc": "Please contact your building for payment details, or check the bill page for the breakdown.",

@@ -709,6 +709,26 @@ function TenantPortalContent() {
     return <PortalLoadingScreen />
   }
 
+  // โหลดไม่สำเร็จ (ลิงก์รุ่นเก่า / ผู้เช่าย้ายออกแล้ว / token ไม่ถูกต้อง) — ต้องแสดงข้อความ error
+  // ห้ามปล่อยให้ตกไปแสดงการ์ดบิลด้วยค่าตั้งต้นของ state (ค่าเช่า 4,500 + QR ตัวอย่าง)
+  // ไม่งั้นผู้เช่าที่กดลิงก์เก่าจะเห็นบิลปลอมและอาจโอนเงินตาม QR นั้น
+  const portalLoadError = result && !result.success && !(result as { fallback?: boolean }).fallback
+    ? ((result as { error?: string }).error || t("tenant_portal.history_error_desc"))
+    : ""
+  if (portalLoadError) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 font-sans flex items-center justify-center px-4">
+        <div className="max-w-sm w-full glass-card rounded-2xl border border-rose-500/25 bg-rose-500/5 p-8 text-center space-y-3">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h1 className="text-base font-bold">{t("tenant_portal.portal_error_title")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{portalLoadError}</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <PullToRefresh onRefresh={async () => { await reload() }}>
       <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 font-sans pb-12 w-full flex-1 flex flex-col">
