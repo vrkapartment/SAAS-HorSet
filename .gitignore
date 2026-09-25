@@ -54,3 +54,10 @@ next-env.d.ts
 
 # Claude settings
 .claude/
+
+# อนุญาตให้ commit template ของ env
+!.env.example
+
+.vercel
+.env*
+!.env.example

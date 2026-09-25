@@ -53,6 +53,29 @@ const ORDER = [
   "database_patch_add_super_admin_line_connection.sql",
   "database_patch_add_super_admin_line_quota_behavior.sql",
   "database_patch_add_workspace_google_drive_settings.sql",
+
+  // 10) ยกค่าน้ำไฟห้องเดิมตอนย้าย + updated_at ของมิเตอร์ (2026-08-24, เพิ่มคอลัมน์อย่างเดียว)
+  "database_patch_move_segments.sql",
+  "database_patch_add_meter_records_updated_at.sql",
+
+  // 11) LINE: rich menu ผู้เช่า → เมนูแอดมิน → รับสลิปทาง LINE → แจ้งเตือนชำระแล้ว
+  "database_patch_add_line_richmenu.sql",
+  "database_patch_add_line_admin_richmenu.sql",
+  "database_patch_add_line_slip_upload.sql",
+  "database_patch_add_paid_notify.sql",
+
+  // 12) RLS ของ support access + Staff อ่านประวัติการย้ายห้อง
+  "database_patch_fix_support_access_rls.sql",
+  "database_patch_add_staff_read_tenant_room_transfers.sql",
+
+  // 13) Audit log — ต้องเป็นชุดสุดท้าย เพราะติด trigger กับตารางที่สร้างไว้ข้างบนทั้งหมด
+  //     ลำดับขั้น 1 → 2 → 2.5 → 2.6 → 2.7 → 3 ห้ามสลับ (ขั้น 3 REVOKE สิทธิ์ลบ log ถาวร)
+  "database_patch_add_audit_logs.sql",
+  "database_patch_audit_logs_all_tables.sql",
+  "database_patch_audit_actor_from_server.sql",
+  "database_patch_audit_ignore_machine_state.sql",
+  "database_patch_audit_cleanup_before_lock.sql",
+  "database_patch_audit_logs_lock.sql",
 ]
 
 // schema.sql = สคีมารุ่นเก่าก่อนรองรับหลาย workspace ไม่ใช้แล้ว (schema_multi_workspace.sql แทน)

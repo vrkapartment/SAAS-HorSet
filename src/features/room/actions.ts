@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { applyTransferHistory, type RoomTenantEntry, type TenantTransferRow } from "@/features/tenant/occupancy"
 
 /**
  * หา building_id ที่จะใช้ตอนสร้างห้อง — ระบุมาก็ใช้ตัวนั้น ไม่ระบุมาและหอมีอาคารเดียวก็ใช้อาคารนั้น
@@ -175,6 +176,42 @@ export async function getRooms(workspaceId?: string) {
 
     if (error) throw error
 
+    // ประวัติการย้ายห้อง — ใช้ตัดสินว่าใครอยู่ห้องไหนในเดือนย้อนหลัง (ดู features/tenant/occupancy.ts)
+    // อ่านไม่ได้ (ยังไม่ได้รัน patch / RLS) → ใช้พฤติกรรมเดิมที่ดูจาก lease_start อย่างเดียว ไม่ throw
+    let transfers: TenantTransferRow[] = []
+    if (workspaceId) {
+      const { data: transferRows, error: transferError } = await supabase
+        .from("tenant_room_transfers")
+        .select("id, tenant_id, from_room_id, to_room_id, transfer_date")
+        .eq("workspace_id", workspaceId)
+      if (transferError) {
+        console.warn("[getRooms] อ่าน tenant_room_transfers ไม่ได้ (ใช้ lease_start อย่างเดียว):", transferError.message)
+      } else {
+        transfers = transferRows ?? []
+      }
+    }
+
+    type TenantRow = {
+      id: string
+      tenant_name: string
+      tenant_phone: string | null
+      line_user_id: string | null
+      lease_start: string | null
+      lease_end: string | null
+    }
+    const toEntry = (t: TenantRow): RoomTenantEntry => ({
+      id: t.id,
+      tenantName: t.tenant_name,
+      tenantPhone: t.tenant_phone,
+      lineUserId: t.line_user_id,
+      leaseStart: t.lease_start,
+      leaseEnd: t.lease_end
+    })
+    const tenantById = new Map<string, RoomTenantEntry>()
+    for (const room of data as any[]) {
+      for (const t of room.tenants || []) tenantById.set(t.id, toEntry(t))
+    }
+
     const formatted = data.map((room: any) => {
       const tenant = room.tenants && room.tenants[0] ? room.tenants[0] : null
       return {
@@ -200,14 +237,7 @@ export async function getRooms(workspaceId?: string) {
         waiveElectricMin: !!room.waive_electric_min,
         waiveWaterMin: !!room.waive_water_min,
         extraExpenses: room.extra_expenses || [],
-        allTenants: (room.tenants || []).map((t: any) => ({
-          id: t.id,
-          tenantName: t.tenant_name,
-          tenantPhone: t.tenant_phone,
-          lineUserId: t.line_user_id,
-          leaseStart: t.lease_start,
-          leaseEnd: t.lease_end
-        }))
+        allTenants: applyTransferHistory(room.id, (room.tenants || []).map(toEntry), transfers, tenantById)
       }
     })
 

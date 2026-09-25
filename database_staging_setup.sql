@@ -14,7 +14,7 @@
 -- วิธีใช้: คัดลอกทั้งไฟล์ไปวางใน Supabase SQL Editor แล้วกด Run ครั้งเดียว
 --         ถ้าเจอ error ให้ดูว่า error อยู่ในส่วนของไฟล์ไหน (มีหัวข้อคั่นไว้ทุกไฟล์)
 --
--- รวม 20 ไฟล์:
+-- รวม 34 ไฟล์:
 --   1. schema_multi_workspace.sql  (สคีมาหลัก)
 --   2. database_patch_fix_handle_new_user_workspace_fallback.sql
 --   3. database_patch_add_vat_pp30.sql
@@ -35,11 +35,25 @@
 --   18. database_patch_add_super_admin_line_connection.sql
 --   19. database_patch_add_super_admin_line_quota_behavior.sql
 --   20. database_patch_add_workspace_google_drive_settings.sql
+--   21. database_patch_move_segments.sql
+--   22. database_patch_add_meter_records_updated_at.sql
+--   23. database_patch_add_line_richmenu.sql
+--   24. database_patch_add_line_admin_richmenu.sql
+--   25. database_patch_add_line_slip_upload.sql
+--   26. database_patch_add_paid_notify.sql
+--   27. database_patch_fix_support_access_rls.sql
+--   28. database_patch_add_staff_read_tenant_room_transfers.sql
+--   29. database_patch_add_audit_logs.sql
+--   30. database_patch_audit_logs_all_tables.sql
+--   31. database_patch_audit_actor_from_server.sql
+--   32. database_patch_audit_ignore_machine_state.sql
+--   33. database_patch_audit_cleanup_before_lock.sql
+--   34. database_patch_audit_logs_lock.sql
 ------------------------------------------------------------------------------
 
 
 ------------------------------------------------------------------------------
--- [1/20]  schema_multi_workspace.sql
+-- [1/34]  schema_multi_workspace.sql
 ------------------------------------------------------------------------------
 
 -- =========================================================================
@@ -1494,7 +1508,7 @@ using (public.get_current_user_role() = 'super_admin');
 
 
 ------------------------------------------------------------------------------
--- [2/20]  database_patch_fix_handle_new_user_workspace_fallback.sql
+-- [2/34]  database_patch_fix_handle_new_user_workspace_fallback.sql
 ------------------------------------------------------------------------------
 
 -- Patch: fix_handle_new_user_workspace_fallback
@@ -1534,7 +1548,7 @@ $$ language plpgsql security definer;
 
 
 ------------------------------------------------------------------------------
--- [3/20]  database_patch_add_vat_pp30.sql
+-- [3/34]  database_patch_add_vat_pp30.sql
 ------------------------------------------------------------------------------
 
 -- ============================================================================
@@ -1881,7 +1895,7 @@ using (public.get_current_user_role() in ('admin', 'staff', 'super_admin'));
 
 
 ------------------------------------------------------------------------------
--- [4/20]  database_patch_add_pp30_output_vat_manual.sql
+-- [4/34]  database_patch_add_pp30_output_vat_manual.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_pp30_output_vat_manual
@@ -1901,7 +1915,7 @@ alter table public.pp30_filings
 
 
 ------------------------------------------------------------------------------
--- [5/20]  database_patch_add_building_utility_billing.sql
+-- [5/34]  database_patch_add_building_utility_billing.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_building_utility_billing
@@ -2059,7 +2073,7 @@ where b.building_id is null
 
 
 ------------------------------------------------------------------------------
--- [6/20]  database_patch_add_staff_building_access.sql
+-- [6/34]  database_patch_add_staff_building_access.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_staff_building_access
@@ -2370,7 +2384,7 @@ using (
 
 
 ------------------------------------------------------------------------------
--- [7/20]  database_patch_add_tenant_room_transfers.sql
+-- [7/34]  database_patch_add_tenant_room_transfers.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_tenant_room_transfers
@@ -2489,7 +2503,7 @@ where t.room_id = r.id
 
 
 ------------------------------------------------------------------------------
--- [8/20]  database_patch_add_meter_entry_mode.sql
+-- [8/34]  database_patch_add_meter_entry_mode.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_meter_entry_mode
@@ -2551,7 +2565,7 @@ comment on column public.workspaces.meter_entry_floor is 'ขอบเขตช�
 
 
 ------------------------------------------------------------------------------
--- [9/20]  database_patch_add_room_id_to_meters_bills.sql
+-- [9/34]  database_patch_add_room_id_to_meters_bills.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_room_id_to_meters_bills
@@ -2636,7 +2650,7 @@ comment on column public.bills.room_id is 'ตัวระบุห้องท�
 
 
 ------------------------------------------------------------------------------
--- [10/20]  database_patch_fix_tenant_rls_scope.sql
+-- [10/34]  database_patch_fix_tenant_rls_scope.sql
 ------------------------------------------------------------------------------
 
 -- Patch: fix_tenant_rls_scope
@@ -2753,7 +2767,7 @@ using (
 
 
 ------------------------------------------------------------------------------
--- [11/20]  database_patch_room_id_identity_1_additive.sql
+-- [11/34]  database_patch_room_id_identity_1_additive.sql
 ------------------------------------------------------------------------------
 
 -- Patch: room_id_identity — ส่วนที่ 1 จาก 2 "เพิ่มของใหม่เท่านั้น"
@@ -2935,7 +2949,7 @@ end $$;
 
 
 ------------------------------------------------------------------------------
--- [12/20]  database_patch_room_id_identity_2_switch.sql
+-- [12/34]  database_patch_room_id_identity_2_switch.sql
 ------------------------------------------------------------------------------
 
 -- Patch: room_id_identity — ส่วนที่ 2 จาก 2 "สวิตช์เปิดใช้จริง"
@@ -3091,7 +3105,7 @@ end $$;
 
 
 ------------------------------------------------------------------------------
--- [13/20]  database_patch_room_id_identity_3_close_null_building_gap.sql
+-- [13/34]  database_patch_room_id_identity_3_close_null_building_gap.sql
 ------------------------------------------------------------------------------
 
 -- Patch: room_id_identity — ส่วนที่ 3 "ปิดช่องห้องที่ไม่มีอาคาร"
@@ -3165,7 +3179,7 @@ comment on index public.rooms_workspace_room_number_no_building_key is
 
 
 ------------------------------------------------------------------------------
--- [14/20]  database_patch_add_bill_snapshot.sql
+-- [14/34]  database_patch_add_bill_snapshot.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_bill_snapshot
@@ -3322,7 +3336,7 @@ comment on column public.bills.water_min_unit is 'snapshot: จำนวนห�
 
 
 ------------------------------------------------------------------------------
--- [15/20]  database_patch_add_saas_payments_manual_review.sql
+-- [15/34]  database_patch_add_saas_payments_manual_review.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_saas_payments_manual_review
@@ -3347,7 +3361,7 @@ alter table public.saas_payments
 
 
 ------------------------------------------------------------------------------
--- [16/20]  database_patch_add_saas_payments_archived_drive_url.sql
+-- [16/34]  database_patch_add_saas_payments_archived_drive_url.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_saas_payments_archived_drive_url
@@ -3365,7 +3379,7 @@ alter table public.saas_payments
 
 
 ------------------------------------------------------------------------------
--- [17/20]  database_patch_add_super_admin_line_settings.sql
+-- [17/34]  database_patch_add_super_admin_line_settings.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_super_admin_line_settings
@@ -3401,7 +3415,7 @@ create policy "Super Admins can manage super admin line settings"
 
 
 ------------------------------------------------------------------------------
--- [18/20]  database_patch_add_super_admin_line_connection.sql
+-- [18/34]  database_patch_add_super_admin_line_connection.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_super_admin_line_connection
@@ -3444,7 +3458,7 @@ create policy "Super Admins can manage their own connection codes"
 
 
 ------------------------------------------------------------------------------
--- [19/20]  database_patch_add_super_admin_line_quota_behavior.sql
+-- [19/34]  database_patch_add_super_admin_line_quota_behavior.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_super_admin_line_quota_behavior
@@ -3467,7 +3481,7 @@ alter table public.super_admin_line_settings
 
 
 ------------------------------------------------------------------------------
--- [20/20]  database_patch_add_workspace_google_drive_settings.sql
+-- [20/34]  database_patch_add_workspace_google_drive_settings.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_workspace_google_drive_settings
@@ -3503,4 +3517,2185 @@ create policy "Users can manage their own workspace google drive settings"
     workspace_id = public.get_current_user_workspace_id()
     or public.get_current_user_role() = 'super_admin'
   );
+
+
+------------------------------------------------------------------------------
+-- [21/34]  database_patch_move_segments.sql
+------------------------------------------------------------------------------
+
+-- Patch: move_segments
+-- วันที่: 2026-08-24
+--
+-- =========================================================================
+-- ทำไมต้องมี patch นี้
+-- =========================================================================
+-- แก้สองอาการที่เกิดจากเรื่องเดียวกัน: เหตุการณ์ "ย้าย" กับ "การจดมิเตอร์รายเดือน"
+-- ใช้ที่เก็บข้อมูลร่วมกันอยู่ ทั้งที่เป็นข้อมูลสองชนิด
+--
+-- อาการที่ 1 — ย้ายออกแล้วมีผู้เช่าใหม่เข้ามาในเดือนเดียวกัน
+--   ตอนย้ายออก ระบบเขียนเลขมิเตอร์ปิดห้องลงแถว meter_records ของรอบนั้นเลย
+--   ค่าน้ำ-ไฟของผู้เช่าที่ย้ายออกถูกหักจากเงินประกันไปแล้ว (ไม่ได้ออกเป็นบิล)
+--   แต่แถวมิเตอร์ยังมี elec_prev เป็นเลขตั้งต้นของ "ผู้เช่าคนเดิม"
+--   → ปลายเดือนผู้เช่าคนใหม่ถูกออกบิลนับหน่วยตั้งแต่เลขของคนเดิม = จ่ายซ้ำหน่วยที่คนเดิม
+--     จ่ายไปแล้วผ่านเงินประกัน และไม่มีอะไรในระบบฟ้องเลย
+--
+-- อาการที่ 2 — ย้ายห้องกลางเดือน
+--   ระบบออก "บิลปิดรอบ" ของห้องเดิมเป็นอีกใบ (bill_kind = transfer_closing)
+--   ผู้เช่าคนเดียวได้บิลสองใบในเดือนเดียว ต้องจ่ายสองรอบ และดูไม่ออกว่าใบไหนห้องไหน
+--
+-- ทางแก้: เก็บ "เลขมิเตอร์ตอนปิดห้อง" ไว้ที่เหตุการณ์ย้าย (ไม่ใช่ในแถวมิเตอร์รายเดือน)
+-- แล้วยกค่าน้ำ-ไฟของห้องเดิมไปเป็น "รายการย่อย" ในบิลห้องใหม่ใบเดียว
+--
+-- ⚠️ patch นี้เพิ่มคอลัมน์เท่านั้น ไม่แก้/ลบข้อมูลเดิม และไม่เปลี่ยนพฤติกรรมโค้ดที่รันอยู่
+--    (คอลัมน์ใหม่ทุกตัวมีค่า default ที่เท่ากับพฤติกรรมเดิม) บิลเก่าและใบ -TRANSFER
+--    ที่ออกไปแล้วยังอยู่ครบและอ่านได้เหมือนเดิม
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (add column if not exists ทุกข้อ)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+-- =========================================================================
+-- 1. bills.utility_segments — รายการของห้องเดิมที่ยกมารวมในบิลนี้
+-- =========================================================================
+-- เป็น array (ไม่ใช่ object เดียว) เพราะผู้เช่าย้ายห้องได้หลายครั้งในเดือนเดียว
+-- เก็บเป็น jsonb แบบเดียวกับ bills.extra_expenses ที่ใช้อยู่แล้ว
+--
+-- แต่ละสมาชิกเก็บ "ยอดที่คิดเสร็จแล้ว" ทั้งอัตรา หน่วย และเงิน ไม่ใช่ข้อมูลตั้งต้น
+-- เหตุผลอยู่ในหัวไฟล์ src/lib/billSegments.ts (สรุป: ตอนออกบิลปลายเดือน อัตราค่าไฟ
+-- หรือการตั้งค่าขั้นต่ำอาจเปลี่ยนไปแล้วจากวันที่ผู้เช่าอยู่ห้องเดิมจริง)
+alter table public.bills
+  add column if not exists utility_segments jsonb default '[]'::jsonb;
+
+comment on column public.bills.utility_segments is
+  'รายการค่าน้ำ-ไฟ-ค่าเช่าของห้องเดิมที่ยกมารวมในบิลนี้ (ย้ายห้องกลางเดือน) — array ของ segment ที่คิดยอดเสร็จแล้ว ดู src/lib/billSegments.ts';
+
+-- =========================================================================
+-- 2. cancelled_contracts — เลขมิเตอร์ตอนปิดห้อง
+-- =========================================================================
+-- ตารางนี้เดิมเก็บแต่ตัวเลขเงินประกัน/เงินคืน ไม่มีเลขมิเตอร์เลย ทั้งที่ยอดหักค่าน้ำ-ไฟ
+-- (utilities_deduction) คำนวณมาจากเลขมิเตอร์ → ตรวจย้อนหลังไม่ได้ว่ายอดนั้นมาจากเลขอะไร
+--
+-- และที่สำคัญกว่า: เป็นที่เดียวที่จะบอกผู้เช่าคนถัดไปได้ว่า "มิเตอร์ของคุณเริ่มที่เลขนี้"
+-- ตอนย้ายเข้าห้องเดียวกันภายในเดือนเดียวกัน
+alter table public.cancelled_contracts
+  add column if not exists closing_elec_prev numeric,
+  add column if not exists closing_elec_curr numeric,
+  add column if not exists closing_water_prev numeric,
+  add column if not exists closing_water_curr numeric;
+
+comment on column public.cancelled_contracts.closing_elec_curr is
+  'เลขมิเตอร์ไฟตอนปิดห้อง — ใช้เป็นเลขตั้งต้นของผู้เช่าคนถัดไปที่เข้าห้องนี้ในเดือนเดียวกัน';
+comment on column public.cancelled_contracts.closing_water_curr is
+  'เลขมิเตอร์น้ำตอนปิดห้อง — ใช้เป็นเลขตั้งต้นของผู้เช่าคนถัดไปที่เข้าห้องนี้ในเดือนเดียวกัน';
+
+-- =========================================================================
+-- 3. tenant_room_transfers — ยอดที่คิดไว้ของห้องเดิม + ตัวเลือกรวมค่าเช่า
+-- =========================================================================
+-- ตารางนี้มีเลขมิเตอร์ปิด/เปิดอยู่แล้ว (closing_*, starting_*) แต่ไม่มี "ยอดเงิน"
+-- ที่คิดจากเลขนั้น เพราะเดิมยอดไปอยู่ในบิล -TRANSFER แยกใบ
+--
+-- พอเลิกออกบิลแยกใบ ยอดต้องเก็บที่นี่ เพราะที่นี่คือจุดที่รู้อัตราและการตั้งค่าขั้นต่ำ
+-- ณ วันที่ย้ายจริง (ปลายเดือนตอนออกบิลอาจเปลี่ยนไปแล้ว)
+alter table public.tenant_room_transfers
+  add column if not exists closing_elec_units numeric,
+  add column if not exists closing_elec_rate numeric,
+  add column if not exists closing_elec_amount numeric,
+  add column if not exists closing_elec_min_applied boolean,
+  add column if not exists closing_water_units numeric,
+  add column if not exists closing_water_rate numeric,
+  add column if not exists closing_water_amount numeric,
+  add column if not exists closing_water_min_applied boolean,
+  add column if not exists include_old_room_rent boolean not null default false,
+  add column if not exists old_room_rent_amount numeric;
+
+comment on column public.tenant_room_transfers.closing_elec_min_applied is
+  'ช่วงห้องเดิมคิดขั้นต่ำหรือไม่ — ระบบเขียน false เสมอโดยเจตนา ไม่ให้ผู้เช่าโดนขั้นต่ำสองครั้งในเดือนที่ย้ายห้อง (บิลห้องใหม่คิดขั้นต่ำของตัวเองอยู่แล้ว)';
+
+comment on column public.tenant_room_transfers.include_old_room_rent is
+  'true = รวมค่าเช่าห้องเดิม (ต้นเดือนถึงวันย้าย) ไว้ในบิลห้องใหม่ด้วย — ผู้ดูแลเลือกตอนย้าย';
+comment on column public.tenant_room_transfers.old_room_rent_amount is
+  'ค่าเช่าห้องเดิมที่คิดรวม ค่าเริ่มต้นมาจากนโยบายย้ายออกกลางเดือนของหอ (checkout_policy) แต่ผู้ดูแลแก้เองได้';
+
+-- =========================================================================
+-- 4. meter_records — หมุด "เลขตั้งต้นของผู้เช่าคนใหม่" เมื่อมีการย้ายกลางรอบ
+-- =========================================================================
+-- ทำไมต้องมีคอลัมน์นี้ ทั้งที่ elec_prev ก็คือเลขตั้งต้นอยู่แล้ว
+--
+-- หน้าออกบิลตัดสิน prev ของรอบนี้ด้วยลำดับนี้ (src/app/(admin)/billing/page.tsx):
+--     1. curr ของ "รอบก่อนหน้า" ถ้ามี   ← ชนะทุกอย่าง
+--     2. elec_prev ของแถวรอบนี้
+-- กฎข้อ 1 มีเหตุผลของมัน (แก้เลขมิเตอร์เดือนก่อนย้อนหลังแล้วเดือนนี้ตามให้เอง) แต่ทำให้
+-- การตั้ง elec_prev ใหม่กลางรอบ "ไม่มีผล" — พอสตาฟเปิดหน้าออกบิลแล้วกดบันทึก
+-- prev จะเด้งกลับไปเป็นเลขของผู้เช่าคนเดิมทันที
+--
+-- ผลจริง: ผู้เช่าคนใหม่ที่ย้ายเข้าห้องเดิมภายในเดือนเดียวกัน ถูกคิดหน่วยตั้งแต่เลขของคนก่อน
+-- และสตาฟแก้เองไม่ได้ด้วย เพราะช่องเลขก่อนหน้าถูกล็อก (แก้ได้เฉพาะเดือนแรกที่สมัคร —
+-- ล็อกนี้ตั้งใจให้มี เพื่อกันแก้เลขมิเตอร์โดยไม่ตั้งใจ)
+--
+-- คอลัมน์นี้คือหมุดที่ "ชนะกฎข้อ 1" เฉพาะห้อง-รอบที่มีเหตุการณ์ย้ายจริงเท่านั้น
+-- null = ไม่มีเหตุการณ์ = พฤติกรรมเดิมทุกอย่าง (ซึ่งเป็นกรณีของทุกแถวที่มีอยู่วันนี้)
+alter table public.meter_records
+  add column if not exists occupancy_start_elec numeric,
+  add column if not exists occupancy_start_water numeric,
+  add column if not exists occupancy_start_reason text,
+  add column if not exists occupancy_start_date date;
+
+comment on column public.meter_records.occupancy_start_elec is
+  'เลขมิเตอร์ไฟตั้งต้นของผู้เช่าปัจจุบัน เมื่อห้องนี้เปลี่ยนผู้เช่ากลางรอบ — ชนะกฎ "prev = curr ของรอบก่อน" ในหน้าออกบิล';
+comment on column public.meter_records.occupancy_start_reason is
+  'เหตุที่ทำให้ต้องตั้งเลขตั้งต้นใหม่กลางรอบ: checkout (ย้ายออก) หรือ transfer_out (ย้ายไปห้องอื่น) หรือ transfer_in (ย้ายเข้าห้องนี้)';
+
+-- =========================================================================
+-- 5. ให้ PostgREST เห็นคอลัมน์ใหม่ทันที (ไม่ต้องรอ cache หมดอายุ)
+-- =========================================================================
+notify pgrst, 'reload schema';
+
+-- =========================================================================
+-- 6. ตรวจผลหลังรัน
+-- =========================================================================
+-- คอลัมน์ต้องมีครบ 19 ตัว:
+--   select table_name, column_name, data_type, column_default
+--   from information_schema.columns
+--   where table_schema = 'public'
+--     and (
+--       (table_name = 'bills' and column_name = 'utility_segments')
+--       or (table_name = 'cancelled_contracts' and column_name like 'closing_%')
+--       or (table_name = 'meter_records' and column_name like 'occupancy_start_%')
+--       or (table_name = 'tenant_room_transfers'
+--           and column_name in ('closing_elec_units','closing_elec_rate','closing_elec_amount',
+--                               'closing_elec_min_applied','closing_water_units','closing_water_rate',
+--                               'closing_water_amount','closing_water_min_applied',
+--                               'include_old_room_rent','old_room_rent_amount'))
+--     )
+--   order by table_name, column_name;
+--
+-- บิลเดิมทุกใบต้องได้ utility_segments = [] (ไม่ใช่ null) จึงจะไม่มีใบไหนแสดงผลเปลี่ยน:
+--   select count(*) filter (where utility_segments is null) as ยังเป็น_null,
+--          count(*) filter (where utility_segments = '[]'::jsonb) as ว่างถูกต้อง
+--   from public.bills;
+--
+-- หมายเหตุ (ตรวจกับ production หลังรันจริงแล้ว): Postgres 11+ ใส่ default ให้ "แถวเดิม" ด้วย
+-- เมื่อ default เป็นค่าคงที่ จึงอ่านได้เป็น '[]' ทุกแถวโดยไม่ต้อง backfill และไม่ต้อง rewrite ตาราง
+-- ฝั่งโค้ดก็รับ null ได้อยู่แล้ว (parseUtilitySegments คืน array ว่างเมื่อไม่ใช่ array)
+-- จึงปลอดภัยทั้งสองทาง ไม่ว่าเวอร์ชัน Postgres จะทำแบบไหน
+
+
+------------------------------------------------------------------------------
+-- [22/34]  database_patch_add_meter_records_updated_at.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_meter_records_updated_at
+-- วันที่: 2026-08-24
+--
+-- =========================================================================
+-- ทำไมต้องมี patch นี้
+-- =========================================================================
+-- ตาราง meter_records มีแค่ created_at ไม่มี updated_at ทั้งที่ตารางอื่นในระบบมีครบ
+-- และ CLAUDE.md กำหนดว่าทุกตารางต้องมี id / created_at / updated_at
+--
+-- ผลที่เกิดขึ้นจริง: เลขมิเตอร์เป็นข้อมูลที่ "แก้ทับแถวเดิม" ได้ (saveMeterRecord ใช้ update
+-- เมื่อมีแถวของห้อง+รอบนั้นอยู่แล้ว) พอไม่มี updated_at จึงไม่มีทางรู้ว่า
+--   · เลขมิเตอร์ถูกแก้ครั้งล่าสุดเมื่อไหร่
+--   · ถูกแก้ "หลัง" ออกบิลไปแล้วหรือไม่ — ซึ่งเป็นสาเหตุที่หน่วยในบิลไม่ตรงกับมิเตอร์
+--
+-- เคยทำให้ไล่ปัญหาผิดทางจริง: ตรวจว่าการบันทึกมิเตอร์รอบหนึ่งลงฐานข้อมูลไปแล้วหรือยัง
+-- แต่ดูได้แค่ created_at ที่เป็นเวลาสร้างแถวครั้งแรก จึงแยกไม่ออกระหว่าง
+-- "ยังไม่ได้บันทึก" กับ "บันทึกแล้วแต่ค่าเท่าเดิม"
+--
+-- ⚠️ patch นี้ไม่แตะข้อมูลเดิมและไม่เปลี่ยนพฤติกรรมของโค้ดที่รันอยู่
+--    แถวเก่าจะได้ updated_at = created_at (ถือว่ายังไม่เคยถูกแก้หลังสร้าง ซึ่งเป็นข้อสันนิษฐาน
+--    ที่ปลอดภัยที่สุด — ดีกว่าใส่ now() ที่จะทำให้ดูเหมือนทุกแถวถูกแก้วันนี้)
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (if not exists / drop trigger if exists)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+-- =========================================================================
+-- 1. เพิ่มคอลัมน์
+-- =========================================================================
+alter table public.meter_records
+  add column if not exists updated_at timestamptz;
+
+-- แถวเก่า: ตั้งเท่ากับ created_at (ไม่ใช่ now() — ดูเหตุผลด้านบน)
+update public.meter_records
+set updated_at = created_at
+where updated_at is null;
+
+alter table public.meter_records
+  alter column updated_at set default now();
+
+comment on column public.meter_records.updated_at is 'เวลาที่แก้เลขมิเตอร์ครั้งล่าสุด — ใช้ตรวจว่ามิเตอร์ถูกแก้หลังออกบิลไปแล้วหรือไม่';
+
+-- =========================================================================
+-- 2. trigger ให้อัปเดตอัตโนมัติ (ใช้ handle_updated_at() ที่มีอยู่แล้วในสคีมาหลัก)
+-- =========================================================================
+-- ต้องเป็น trigger ไม่ใช่ให้โค้ดส่งค่ามาเอง เพราะ saveMeterRecord เขียนหลายเส้นทาง
+-- (update รายห้อง / upsert แบบกลุ่มใน saveAllBillsForCycle / สคริปต์ย้ายห้อง)
+-- ถ้าพึ่งโค้ด จะมีเส้นทางที่ลืมส่งแล้วค่าเพี้ยนแบบเงียบ ๆ
+drop trigger if exists set_meter_records_updated_at on public.meter_records;
+create trigger set_meter_records_updated_at
+  before update on public.meter_records
+  for each row execute function public.handle_updated_at();
+
+-- =========================================================================
+-- 3. ตรวจผลหลังรัน
+-- =========================================================================
+-- คอลัมน์ต้องมี:
+--   select column_name, is_nullable, column_default from information_schema.columns
+--   where table_schema = 'public' and table_name = 'meter_records' and column_name = 'updated_at';
+--
+-- trigger ต้องมี:
+--   select tgname from pg_trigger where tgname = 'set_meter_records_updated_at';
+--
+-- แถวเก่าต้องมี updated_at = created_at (ควรได้ 0 แถวที่ยังว่าง):
+--   select count(*) from public.meter_records where updated_at is null;
+--
+-- ทดสอบว่า trigger ทำงาน: แก้เลขมิเตอร์ห้องใดห้องหนึ่งจากหน้าจดมิเตอร์
+-- แล้ว updated_at ของแถวนั้นต้องขยับเป็นเวลาปัจจุบัน ส่วน created_at ต้องไม่เปลี่ยน
+
+
+------------------------------------------------------------------------------
+-- [23/34]  database_patch_add_line_richmenu.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_line_richmenu
+-- วันที่: 2026-09-05
+--
+-- เพิ่มคอลัมน์สำหรับจัดการ LINE Rich Menu ของแต่ละหอพักในตาราง public.workspace_line_settings
+--
+-- ทำไมต้องเก็บ state ไว้: LINE ไม่มี API แก้ rich menu ที่สร้างไว้แล้ว มีแค่ "สร้างใหม่" กับ "ลบ"
+-- ดังนั้นทุกครั้งที่เจ้าหอเปลี่ยนเบอร์ติดต่อหรือเปลี่ยนภาพ ระบบต้องสร้างเมนูใบใหม่แล้วสลับให้
+-- ผู้ติดตามทุกคน จึงต้องจำไว้ว่า
+--   1. เมนูใบไหนกำลังใช้อยู่ (เพื่อลบใบเก่าทิ้ง ไม่ให้บวมชน limit 1,000 เมนูต่อ channel)
+--   2. ค่าอะไรถูก "ฝัง" ลงเมนูไปแล้ว (เพื่อเทียบกับค่าปัจจุบันแล้วเตือนว่าเมนูใน LINE ล้าสมัย)
+--
+-- ภาพเมนูเก็บใน bucket payment-slips ที่เปิด public อยู่แล้ว (prefix line-richmenu/) แบบเดียวกับ
+-- โลโก้หอพัก จึงไม่ต้องสร้าง bucket หรือ policy ใหม่
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (ADD COLUMN IF NOT EXISTS ทุกคอลัมน์)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+-- richMenuId ที่ LINE คืนมาตอนสร้าง — ใช้ระบุว่าใบไหนต้องลบตอนติดตั้งใหม่
+alter table public.workspace_line_settings
+  add column if not exists richmenu_id text;
+
+-- URL ภาพเมนูที่เจ้าหออัปโหลดเอง (ว่าง = ใช้ภาพต้นแบบที่แถมมากับระบบ)
+alter table public.workspace_line_settings
+  add column if not exists richmenu_image_url text;
+
+-- เวลาที่ติดตั้ง/อัปเดตเมนูสำเร็จครั้งล่าสุด — แสดงในหน้าตั้งค่าให้เจ้าหอรู้ว่าแก้ไขล่าสุดตอนไหน
+alter table public.workspace_line_settings
+  add column if not exists richmenu_installed_at timestamptz;
+
+-- ปุ่ม "ติดต่อหอพัก" ที่ฝังลงเมนูไปจริง (tel:...) เอามาเทียบกับ workspaces.tax_phone ปัจจุบัน
+alter table public.workspace_line_settings
+  add column if not exists richmenu_contact_uri text;
+
+-- LIFF ID ที่ฝังลงลิงก์ในเมนูไปจริง เอามาเทียบกับ liff_id ปัจจุบัน
+alter table public.workspace_line_settings
+  add column if not exists richmenu_liff_id text;
+
+-- สวิตช์เปิด/ปิดของหอพักที่ไม่ต้องการใช้เมนูล่าง
+--
+-- ปิด = ยกเลิกเมนูเริ่มต้นของ channel (ผู้เช่าไม่เห็นปุ่ม) แต่ "ไม่ลบ" ตัวเมนูบน LINE
+-- และไม่ลบภาพที่อัปโหลดไว้ จึงกดเปิดกลับได้ทันทีโดยไม่ต้องอัปโหลดภาพใหม่
+-- (คนละอย่างกับปุ่ม "ลบเมนูออกจาก LINE ถาวร" ซึ่งลบตัวเมนูทิ้งจริง ๆ)
+alter table public.workspace_line_settings
+  add column if not exists richmenu_enabled boolean not null default true;
+
+comment on column public.workspace_line_settings.richmenu_id is
+  'richMenuId ของ LINE ที่กำลังตั้งเป็นเมนูเริ่มต้นของ channel นี้ (null = ยังไม่ติดตั้ง)';
+comment on column public.workspace_line_settings.richmenu_image_url is
+  'ภาพเมนูที่เจ้าหออัปโหลดเอง — ว่างหมายถึงใช้ภาพต้นแบบของระบบ (public/line-richmenu/)';
+comment on column public.workspace_line_settings.richmenu_contact_uri is
+  'ค่าปุ่มติดต่อที่ฝังลงเมนูไปแล้ว ใช้ตรวจว่าเมนูใน LINE ล้าสมัยกว่าข้อมูลในระบบหรือยัง';
+comment on column public.workspace_line_settings.richmenu_enabled is
+  'false = หอพักปิดการใช้งานเมนูล่าง (ยกเลิก default menu ของ channel แต่ไม่ลบเมนูและภาพทิ้ง)';
+
+
+------------------------------------------------------------------------------
+-- [24/34]  database_patch_add_line_admin_richmenu.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_line_admin_richmenu
+-- วันที่: 2026-09-06
+--
+-- เพิ่มคอลัมน์สำหรับ "เมนูแอดมิน" ซึ่งเป็น LINE Rich Menu อีกใบที่ผูกเฉพาะรายบุคคล
+--
+-- ทำไมต้องมีเมนูใบที่สอง: เมนูผู้เช่าถูกตั้งเป็น default ของทั้ง channel (POST /v2/bot/user/all/richmenu)
+-- ทุกคนที่แอด OA ของหอจึงได้เมนูผู้เช่าหมด รวมถึงเจ้าของหอที่แอดมาเพื่อรับแจ้งเตือนสลิป
+-- ซึ่งกดปุ่มไหนก็เจอ "ยังไม่พบห้องพักที่ผูกกับบัญชี LINE นี้" เพราะไม่ใช่ผู้เช่า
+--
+-- LINE มี per-user link (POST /v2/bot/user/{userId}/richmenu/{richMenuId}) ที่ "ทับ" เมนู default
+-- ได้เป็นรายคน เราจึงสร้างเมนูอีกใบแล้วผูกให้เฉพาะ UID ที่อยู่ใน admin_line_user_id
+--
+-- ตัวเมนูแอดมินไม่ให้อัปโหลดภาพเอง (ใช้ภาพต้นแบบของระบบเสมอ) จึงไม่มีคอลัมน์ image_url
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (ADD COLUMN IF NOT EXISTS ทุกคอลัมน์)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+-- richMenuId ของเมนูแอดมิน — คนละใบกับ richmenu_id (ซึ่งเป็นเมนูผู้เช่า/เมนู default)
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_id text;
+
+-- เวลาที่ติดตั้ง/อัปเดตเมนูแอดมินสำเร็จครั้งล่าสุด
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_installed_at timestamptz;
+
+-- ชื่อผังเมนูแอดมินที่ฝังไปจริง ใช้เทียบกับผังในโค้ดเพื่อเตือนว่าเมนูใน LINE ล้าสมัยแล้ว
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_template_version text;
+
+-- UID ที่ผูกเมนูแอดมินไว้จริงบน LINE (คั่นด้วย comma)
+--
+-- ต้องจำแยกจาก admin_line_user_id เพราะสองค่านี้หลุดจากกันได้: แอดมินใหม่ที่เพิ่งผูก UID
+-- ยังไม่ถูก link เมนู หรือแอดมินที่ถูกลบไปแล้วอาจยัง unlink ไม่สำเร็จ (LINE ล่มชั่วคราว)
+-- เอาไว้ให้หน้าตั้งค่าเทียบแล้วบอกได้ว่า "มีแอดมิน 2 คนที่ยังไม่ได้รับเมนู กดซิงก์"
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_linked_uids text;
+
+-- สวิตช์เปิด/ปิดเมนูผู้ดูแล แยกอิสระจาก richmenu_enabled (ซึ่งคุมเมนูผู้เช่า)
+--
+-- แยกกันเพราะมีเคสใช้จริง: หอที่ไม่อยากให้ผู้เช่ามีเมนูล่าง แต่เจ้าของหอยังอยากกดดูสรุป
+-- ในแชทเองได้ — ถ้าใช้สวิตช์ร่วมกันจะทำแบบนั้นไม่ได้เลย
+--
+-- ปิด = ถอดเมนูออกจากแอดมินทุกคนและลบตัวเมนูทิ้ง (เมนูผู้ดูแลผูกรายบุคคล ไม่มี default
+-- ให้ยกเลิกเหมือนเมนูผู้เช่า) เปิดกลับ = สร้างใหม่แล้วผูกให้ใหม่ ซึ่งไม่มีค่าอะไรให้เสีย
+-- เพราะเมนูผู้ดูแลใช้ภาพต้นแบบของระบบเสมอ ไม่มีภาพที่หอพักอัปโหลดเองให้ต้องเก็บไว้
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_enabled boolean not null default true;
+
+-- ภาพเมนูผู้ดูแลที่เจ้าหออัปโหลดเอง (ว่าง = ใช้ภาพต้นแบบที่แถมมากับระบบ)
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_image_url text;
+
+-- ภาพที่ "ติดตั้งลงเมนูบน LINE ไปแล้วจริง"
+--
+-- ต้องเก็บแยกจาก richmenu_admin_image_url เพราะ LINE ไม่มี API เปลี่ยนภาพของเมนูที่สร้างแล้ว
+-- การเปลี่ยนภาพจึงต้องสร้างเมนูใบใหม่ ถ้าไม่จำว่าภาพไหนถูกติดตั้งไป ระบบจะไม่รู้ว่า
+-- ต้องสร้างใหม่ตอนเจ้าหอเปลี่ยนแค่ภาพ (ผังปุ่มไม่เปลี่ยน) แล้วภาพใหม่จะไม่มีผลเลย
+-- หลักการเดียวกับ richmenu_contact_uri ของเมนูผู้เช่า
+alter table public.workspace_line_settings
+  add column if not exists richmenu_admin_installed_image_url text;
+
+comment on column public.workspace_line_settings.richmenu_admin_enabled is
+  'false = ปิดเมนูผู้ดูแล (ถอดออกจากแอดมินทุกคน) — แยกอิสระจาก richmenu_enabled ที่คุมเมนูผู้เช่า';
+comment on column public.workspace_line_settings.richmenu_admin_image_url is
+  'ภาพเมนูผู้ดูแลที่เจ้าหออัปโหลดเอง — ว่างหมายถึงใช้ภาพต้นแบบของระบบ (public/line-richmenu/admin-menu.png)';
+comment on column public.workspace_line_settings.richmenu_admin_installed_image_url is
+  'ภาพที่ติดตั้งลงเมนูบน LINE ไปแล้วจริง ใช้เทียบเพื่อรู้ว่าต้องสร้างเมนูใบใหม่เพราะภาพเปลี่ยน';
+comment on column public.workspace_line_settings.richmenu_admin_id is
+  'richMenuId ของเมนูแอดมิน ผูกรายบุคคลให้ UID ใน admin_line_user_id (null = ยังไม่ติดตั้ง)';
+comment on column public.workspace_line_settings.richmenu_admin_linked_uids is
+  'UID ที่ผูกเมนูแอดมินไว้สำเร็จจริงบน LINE คั่นด้วย comma — ใช้เทียบกับ admin_line_user_id เพื่อรู้ว่าต้องซิงก์';
+
+
+------------------------------------------------------------------------------
+-- [25/34]  database_patch_add_line_slip_upload.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_line_slip_upload
+-- วันที่: 2026-09-06
+--
+-- รองรับการส่งสลิปโอนเงินในห้องแชท LINE ได้โดยตรง (ไม่ต้องเปิดหน้าเว็บ)
+--
+-- ปัญหาที่ต้องกัน: ถ้านับ "ทุกรูปที่ส่งเข้ามาใน OA" เป็นสลิป หอที่ใช้ LINE OA คุยเรื่องอื่นด้วย
+-- จะพังทันที (รูปแมว รูปห้องน้ำรั่ว กลายเป็นสลิปหมด) ระบบจึงบังคับให้ผู้เช่ากดปุ่ม "ส่งสลิป"
+-- ใน rich menu ก่อน ซึ่งจะส่ง postback เข้า webhook แล้วบันทึกเวลาไว้ที่คอลัมน์นี้
+-- รูปที่ส่งเข้ามาหลังจากนั้นภายในเวลาที่กำหนดเท่านั้นถึงจะถูกนับเป็นสลิป
+--
+-- เก็บที่ตาราง tenants เพราะสถานะนี้เป็นของ "ผู้เช่าคนนั้น" ไม่ใช่ของหอ และหมดอายุเองตามเวลา
+-- จึงไม่ต้องมีตารางแยกหรือ cron มาล้าง
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (ADD COLUMN IF NOT EXISTS)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+alter table public.tenants
+  add column if not exists slip_armed_at timestamptz;
+
+comment on column public.tenants.slip_armed_at is
+  'เวลาที่ผู้เช่ากดปุ่ม "ส่งสลิป" ใน rich menu ล่าสุด — รูปที่ส่งเข้าแชทภายในช่วงเวลาที่กำหนดหลังจากนี้เท่านั้นที่ถูกนับเป็นสลิป (null = ยังไม่ได้กด)';
+
+-- เวอร์ชันผังเมนูที่ติดตั้งลง LINE ไปจริง
+--
+-- ปุ่ม "ส่งสลิป" เปลี่ยนจากเปิดหน้าเว็บ (uri) เป็นเปิดโหมดรับสลิปในแชท (postback) ผังเมนูจึง
+-- เปลี่ยนไปจากเดิม หอที่ติดตั้งเมนูไว้ก่อนหน้านี้ต้องกด "อัปเดตเมนู" ใหม่ถึงจะได้ปุ่มแบบใหม่
+-- เก็บเวอร์ชันไว้เทียบเพื่อให้หน้าตั้งค่าขึ้นแบนเนอร์เตือนเองได้ ไม่ต้องไล่บอกทีละหอ
+alter table public.workspace_line_settings
+  add column if not exists richmenu_template_version text;
+
+comment on column public.workspace_line_settings.richmenu_template_version is
+  'ชื่อ/เวอร์ชันของผังเมนูที่ติดตั้งลง LINE ไปจริง ใช้เทียบกับผังปัจจุบันในโค้ดเพื่อเตือนว่าเมนูล้าสมัย';
+
+-- บิลเป้าหมายที่ผู้เช่าเลือกไว้ ก่อนส่งรูปสลิปเข้ามา
+--
+-- flow ใหม่ถามให้จบก่อนแล้วค่อยส่งรูป: กดปุ่ม -> (ถามห้อง) -> (ถามรอบบิล) -> ส่งรูป
+-- รูปที่ส่งตามมาทีหลังไม่มีข้อมูลติดมาด้วย (ต่างจาก postback ที่พา data มาได้) จึงต้องจำ
+-- ไว้ฝั่งเซิร์ฟเวอร์ว่าผู้เช่าเลือกบิลใบไหนไว้ แล้วรูปถัดไปจะถูกแปะเข้าใบนั้น
+--
+-- หมดอายุพร้อมกับ slip_armed_at และถูกล้างทันทีที่แปะสลิปสำเร็จ
+alter table public.tenants
+  add column if not exists slip_target_bill_id uuid;
+
+comment on column public.tenants.slip_target_bill_id is
+  'บิลที่ผู้เช่าเลือกไว้ว่าจะส่งสลิปให้ รอรูปที่จะส่งตามมาในแชท (null = ยังไม่ได้เลือก/แปะไปแล้ว)';
+
+
+------------------------------------------------------------------------------
+-- [26/34]  database_patch_add_paid_notify.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_paid_notify
+-- วันที่: 2026-09-06
+--
+-- แจ้งเตือนผู้เช่าทาง LINE เมื่อบิลถูกปิดเป็น "ชำระเงินแล้ว"
+--
+-- เดิมไม่ว่า SlipOK จะตรวจสลิปผ่านเอง หรือแอดมินกดยืนยันการชำระเงินเอง ระบบแจ้งแต่แอดมิน
+-- ผู้เช่าไม่เคยรู้เลยว่าจ่ายสำเร็จแล้ว ต้องเข้ามาเช็คในพอร์ทัลเอง
+--
+-- ข้อความปรับเองได้ต่อหอ โดยใช้ตัวแปรในรูปแบบ {{TENANT_NAME}} ฯลฯ (ดู paid-message.ts
+-- ซึ่งเป็นที่เดียวที่นิยามว่ามีตัวแปรอะไรบ้าง) ว่าง = ใช้ข้อความต้นแบบของระบบ
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (ADD COLUMN IF NOT EXISTS ทุกคอลัมน์)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+-- สวิตช์เปิด/ปิดต่อหอ — หอที่ไม่อยากรบกวนผู้เช่าปิดได้
+alter table public.workspace_line_settings
+  add column if not exists paid_notify_enabled boolean not null default true;
+
+-- ข้อความที่เจ้าหอปรับเอง (ว่าง/null = ใช้ข้อความต้นแบบใน paid-message.ts)
+alter table public.workspace_line_settings
+  add column if not exists paid_notify_template text;
+
+comment on column public.workspace_line_settings.paid_notify_enabled is
+  'false = ไม่ส่งแจ้งเตือนผู้เช่าเมื่อบิลถูกปิดเป็นชำระแล้ว';
+comment on column public.workspace_line_settings.paid_notify_template is
+  'ข้อความแจ้งผู้เช่าตอนชำระเงินสำเร็จ ใช้ตัวแปร {{TENANT_NAME}} {{WORKSPACE_NAME}} {{ROOM_NUMBER}} {{BILLING_CYCLE}} {{AMOUNT}} {{PAID_AT}} — ว่างหมายถึงใช้ข้อความต้นแบบของระบบ';
+
+
+------------------------------------------------------------------------------
+-- [27/34]  database_patch_fix_support_access_rls.sql
+------------------------------------------------------------------------------
+
+-- Patch: fix_support_access_rls
+-- วันที่: 2026-09-08
+--
+-- ปิดช่องโหว่ 2 ข้อที่ตรวจพบจาก pg_policies:
+--
+--   1a. super admin กดอนุมัติสิทธิ์เข้าช่วยเหลือ "ให้ตัวเอง" ได้
+--       policy เดิมของ support_access_grants เป็น ALL + USING (role='super_admin')
+--       และไม่มี WITH CHECK เลย → ยิง update({status:'approved'}) จากเบราว์เซอร์ได้ตรง ๆ
+--       ทำให้ด่านที่ตั้งใจให้เจ้าหอเป็นคนอนุญาต กลายเป็นแค่พิธี
+--
+--   1b. policy ของ workspaces และ profiles ฝั่ง super_admin ไม่ได้เช็ค grant
+--       ต่างจาก bills / expenses / meter_records / rooms / tenants ที่เช็คถูกอยู่แล้ว
+--       (workspaces เก็บ promptpay_id, profiles เก็บ permissions — สองจุดที่อ่อนไหวที่สุด)
+--
+-- ⚠️ ขอบเขตที่ patch นี้ทำได้จริง:
+--   - 1a มีผลทันที เพราะ useSupportAccess เขียนตารางนี้จากเบราว์เซอร์ด้วย JWT ของผู้ใช้
+--   - 1b ยังไม่มีผลกับเส้นทางที่ใช้ service-role (ซึ่ง bypass RLS) จึงเป็นการเตรียมทางไว้
+--     การปิดช่องนั้นจริงต้องบังคับด่านฝั่ง server ใน super-admin action ด้วย (งานแยก)
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (drop if exists ก่อน create ทุกตัว)
+-- SQL ย้อนกลับอยู่ท้ายไฟล์
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ส่วนที่ 0 — เก็บสำเนา policy เดิมไว้ก่อน (เผื่อต้องย้อนกลับ)
+-- ═══════════════════════════════════════════════════════════════════════
+-- ชื่อ policy บางตัวยาวเกินกว่าที่แสดงใน export ได้ครบ จึงเก็บลงตารางจริง
+-- ไม่พึ่งการอ่านด้วยตา  ตารางนี้ลบทิ้งได้เมื่อมั่นใจแล้ว
+
+create table if not exists public.rls_policy_backup_20260908 as
+select
+  now() as backed_up_at,
+  schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('support_access_grants', 'workspaces', 'profiles');
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ส่วนที่ 1a — support_access_grants: แยกสิทธิ์ตามบทบาทให้ชัด
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- กฎที่ต้องการ:
+--   super admin  → ขอสิทธิ์ได้ (สร้าง/แก้เป็น 'pending' เท่านั้น) และยกเลิกคำขอตัวเองได้
+--                  ** ตั้ง 'approved' ไม่ได้เด็ดขาด **
+--   admin ของหอ   → ตัดสินใจได้ ('approved' / 'revoked')
+--
+-- RLS รวม policy ของคำสั่งเดียวกันแบบ OR กัน จึงต้องแยก WITH CHECK ให้แต่ละบทบาท
+-- ไม่ให้ policy ตัวกว้างทำให้ตัวแคบไร้ความหมาย
+
+-- ลบ policy เดิมทั้งหมดแบบไม่ต้องพึ่งชื่อ (ชื่อบางตัวยาวและถูกตัดตอน export)
+do $$
+declare p record;
+begin
+  for p in
+    select policyname from pg_policies
+    where schemaname = 'public' and tablename = 'support_access_grants'
+  loop
+    execute format('drop policy if exists %I on public.support_access_grants', p.policyname);
+  end loop;
+end $$;
+
+-- ── อ่าน ──
+create policy "grants_select_super_admin"
+  on public.support_access_grants for select
+  using (get_current_user_role() = 'super_admin');
+
+create policy "grants_select_workspace_admin"
+  on public.support_access_grants for select
+  using (
+    workspace_id = get_current_user_workspace_id()
+    and get_current_user_role() = 'admin'
+  );
+
+-- ── สร้างคำขอ: super admin เท่านั้น และต้องเป็น 'pending' ──
+create policy "grants_insert_super_admin_pending_only"
+  on public.support_access_grants for insert
+  with check (
+    get_current_user_role() = 'super_admin'
+    and status = 'pending'
+  );
+
+-- ── แก้: super admin แก้ได้แต่ต้องลงเอยเป็น 'pending' (ขอใหม่หลังถูกปฏิเสธ) ──
+create policy "grants_update_super_admin_pending_only"
+  on public.support_access_grants for update
+  using (get_current_user_role() = 'super_admin')
+  with check (
+    get_current_user_role() = 'super_admin'
+    and status = 'pending'
+  );
+
+-- ── แก้: admin ของหอนั้นเป็นคนตัดสิน ──
+create policy "grants_update_workspace_admin_decide"
+  on public.support_access_grants for update
+  using (
+    workspace_id = get_current_user_workspace_id()
+    and get_current_user_role() = 'admin'
+  )
+  with check (
+    workspace_id = get_current_user_workspace_id()
+    and get_current_user_role() = 'admin'
+    and status in ('approved', 'revoked', 'pending')
+  );
+
+-- ── ลบ: ทั้งสองฝ่ายเคลียร์ได้ (แอปใช้ตอน super admin กด "ออก") ──
+create policy "grants_delete_super_admin"
+  on public.support_access_grants for delete
+  using (get_current_user_role() = 'super_admin');
+
+create policy "grants_delete_workspace_admin"
+  on public.support_access_grants for delete
+  using (
+    workspace_id = get_current_user_workspace_id()
+    and get_current_user_role() = 'admin'
+  );
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ส่วนที่ 1b — workspaces: super admin แก้/ลบ ต้องมี grant ที่อนุมัติแล้ว
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ⚠️ ตั้งใจ "ไม่" บังคับ grant กับ SELECT และ INSERT:
+--    - INSERT: สร้างหอใหม่ต้องทำได้ เพราะ grant ของหอที่ยังไม่มีตัวตนสร้างไม่ได้
+--    - SELECT: คอนโซลทีมงานต้องเห็นรายชื่อหอทั้งหมดเพื่อเลือกเข้าไปช่วยเหลือ
+--    การคุมที่มีความหมายคือ UPDATE/DELETE ซึ่งเป็นจุดที่แก้ promptpay_id ได้
+
+drop policy if exists "Super Admins can manage all workspaces" on public.workspaces;
+
+-- กันพลาดเงียบ: ถ้าลบ policy เดิมไม่สำเร็จ (ชื่อไม่ตรง) ต้องหยุดทันที
+-- ไม่งั้น policy เก่าจะยังอยู่และรวมแบบ OR ทำให้ข้อจำกัดใหม่ไร้ผล
+do $$
+begin
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'workspaces'
+      and cmd = 'ALL' and policyname ilike '%super admin%'
+  ) then
+    raise exception
+      'ลบ policy เดิมของ workspaces ไม่สำเร็จ — ชื่อไม่ตรง กรุณาส่งผลจาก: select policyname, cmd from pg_policies where tablename = ''workspaces'';';
+  end if;
+end $$;
+
+create policy "workspaces_select_super_admin"
+  on public.workspaces for select
+  using (get_current_user_role() = 'super_admin');
+
+create policy "workspaces_insert_super_admin"
+  on public.workspaces for insert
+  with check (get_current_user_role() = 'super_admin');
+
+create policy "workspaces_update_super_admin_needs_grant"
+  on public.workspaces for update
+  using (
+    get_current_user_role() = 'super_admin'
+    and exists (
+      select 1 from public.support_access_grants g
+      where g.workspace_id = workspaces.id and g.status = 'approved'
+    )
+  )
+  with check (
+    get_current_user_role() = 'super_admin'
+    and exists (
+      select 1 from public.support_access_grants g
+      where g.workspace_id = workspaces.id and g.status = 'approved'
+    )
+  );
+
+create policy "workspaces_delete_super_admin_needs_grant"
+  on public.workspaces for delete
+  using (
+    get_current_user_role() = 'super_admin'
+    and exists (
+      select 1 from public.support_access_grants g
+      where g.workspace_id = workspaces.id and g.status = 'approved'
+    )
+  );
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ส่วนที่ 1b (ต่อ) — profiles: super admin แก้โปรไฟล์คนอื่นต้องมี grant
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- policy "Manage profiles for self" (id = auth.uid()) ยังอยู่ตามเดิม
+-- super admin จึงยังแก้โปรไฟล์ตัวเองได้เสมอ ไม่ต้องมี grant
+
+drop policy if exists "Manage profiles for super_admin" on public.profiles;
+
+do $$
+begin
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'profiles'
+      and cmd = 'UPDATE' and policyname ilike '%super_admin%'
+  ) then
+    raise exception
+      'ลบ policy เดิมของ profiles ไม่สำเร็จ — ชื่อไม่ตรง กรุณาส่งผลจาก: select policyname, cmd from pg_policies where tablename = ''profiles'';';
+  end if;
+end $$;
+
+create policy "profiles_update_super_admin_needs_grant"
+  on public.profiles for update
+  using (
+    get_current_user_role() = 'super_admin'
+    and exists (
+      select 1 from public.support_access_grants g
+      where g.workspace_id = profiles.workspace_id and g.status = 'approved'
+    )
+  )
+  with check (
+    get_current_user_role() = 'super_admin'
+    and exists (
+      select 1 from public.support_access_grants g
+      where g.workspace_id = profiles.workspace_id and g.status = 'approved'
+    )
+  );
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ส่วนที่ 2 — ตรวจผล (query สุดท้ายของไฟล์ จะแสดงในหน้า SQL Editor)
+-- ═══════════════════════════════════════════════════════════════════════
+
+select
+  tablename                                  as "ตาราง",
+  cmd                                        as "คำสั่ง",
+  policyname                                 as "policy",
+  coalesce(with_check, '(ไม่มี WITH CHECK)')  as "เงื่อนไขเขียน"
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('support_access_grants', 'workspaces', 'profiles')
+order by tablename, cmd, policyname;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- SQL ย้อนกลับ (ถ้าจำเป็น) — คัดลอกส่วนนี้ไปรันแยก
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ค่าเดิมทั้งหมดถูกสำรองไว้ที่ public.rls_policy_backup_20260908
+-- ดูด้วย: select * from public.rls_policy_backup_20260908;
+--
+-- -- ลบ policy ใหม่ทั้งหมด
+-- do $$
+-- declare p record;
+-- begin
+--   for p in select tablename, policyname from pg_policies
+--            where schemaname='public'
+--              and (policyname like 'grants_%'
+--                   or policyname like 'workspaces_%super_admin%'
+--                   or policyname like 'profiles_update_super_admin%')
+--   loop
+--     execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
+--   end loop;
+-- end $$;
+--
+-- -- คืน policy เดิม
+-- create policy "Super Admins can manage all support grants"
+--   on public.support_access_grants for all
+--   using (get_current_user_role() = 'super_admin');
+--
+-- create policy "Workspace admins can manage support grants for their workspace"
+--   on public.support_access_grants for all
+--   using (workspace_id = get_current_user_workspace_id()
+--          and get_current_user_role() = 'admin');
+--
+-- create policy "Super Admins can manage all workspaces"
+--   on public.workspaces for all
+--   using (exists (select 1 from profiles
+--                  where profiles.id = auth.uid() and profiles.role = 'super_admin'))
+--   with check (exists (select 1 from profiles
+--                       where profiles.id = auth.uid() and profiles.role = 'super_admin'));
+--
+-- create policy "Manage profiles for super_admin"
+--   on public.profiles for update
+--   using (get_current_user_role() = 'super_admin');
+
+
+------------------------------------------------------------------------------
+-- [28/34]  database_patch_add_staff_read_tenant_room_transfers.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_staff_read_tenant_room_transfers
+-- วันที่: 2026-09-25
+--
+-- =========================================================================
+-- ทำไมต้องมี patch นี้
+-- =========================================================================
+-- เดิมตาราง tenant_room_transfers อ่านได้แค่ admin / super_admin (ดู database_patch_add_tenant_room_transfers.sql)
+-- แต่ Staff ใช้หน้าบิลกับหน้าจัดการบิล ซึ่งต้องอ่านประวัติการย้ายห้อง 2 เรื่อง:
+--
+--   1. ชื่อผู้เช่ารายเดือน (src/features/tenant/occupancy.ts)
+--      ถ้าอ่านไม่ได้ ผู้เช่าที่ย้ายห้องจะไปโผล่ในห้องใหม่ย้อนหลังทุกเดือน
+--      เคสจริง: นุ้ยย้าย 135 → 141 วันที่ 2026-08-07 แต่ห้อง 141 เดือน มิ.ย.–ก.ค. แสดงชื่อนุ้ย
+--
+--   2. ค่าน้ำ-ไฟห้องเดิมที่ยกมารวมในบิลห้องใหม่ (fetchTransferSegments ใน src/features/billing/actions.ts)
+--      RLS ไม่ error แต่คืนแถวว่าง → Staff กดออกบิลห้องที่มีผู้เช่าย้ายเข้ามา
+--      ค่าน้ำ-ไฟส่วนห้องเดิมหายไปจากบิลเงียบ ๆ
+--
+-- ให้สิทธิ์ "อ่านอย่างเดียว" เฉพาะแถวที่ห้องต้นทางหรือห้องปลายทางอยู่ในอาคารที่ Staff ดูแล
+-- (กติกาเดียวกับ bills / meter_records / tenants ใน database_patch_add_staff_building_access.sql)
+-- การบันทึกย้ายห้องยังจำกัดเฉพาะ admin เหมือนเดิม
+--
+-- ⚠️ patch นี้เพิ่ม policy อย่างเดียว ไม่แตะข้อมูล ไม่แก้ policy เดิม
+-- ปลอดภัยที่จะรันซ้ำได้ (drop policy if exists)
+--
+-- ต้องรันหลัง: database_patch_add_tenant_room_transfers.sql, database_patch_add_staff_building_access.sql
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+drop policy if exists "Read tenant_room_transfers for staff" on public.tenant_room_transfers;
+create policy "Read tenant_room_transfers for staff" on public.tenant_room_transfers for select
+using (
+  public.get_current_user_role() = 'staff'
+  and workspace_id = public.get_current_user_workspace_id()
+  and (
+    public.staff_has_building_access(public.get_room_building_id(tenant_room_transfers.from_room_id))
+    or public.staff_has_building_access(public.get_room_building_id(tenant_room_transfers.to_room_id))
+  )
+);
+
+
+------------------------------------------------------------------------------
+-- [29/34]  database_patch_add_audit_logs.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_audit_logs (ขั้นที่ 1 จาก 2)
+-- วันที่: 2026-09-08
+--
+-- ═══════════════════════════════════════════════════════════════════════
+-- ระบบ Audit Log สำหรับกันโกง / ตรวจย้อนหลังว่าใครแก้เลข
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ขั้นที่ 1 (ไฟล์นี้): ตาราง + RLS + ฟังก์ชันจดบันทึก + ติด trigger "แค่ตาราง bills"
+-- ขั้นที่ 2 (ไฟล์ถัดไป): ติด trigger อีก 6 ตาราง + ล็อกไม่ให้ลบ log (REVOKE)
+--
+-- ทำไมแบ่ง 2 ขั้น:
+--   1. trigger เป็นแบบ fail-closed — ถ้ามันพัง การบันทึกบิล/มิเตอร์จะล้มทั้งรายการ
+--      ติดทีละตารางแล้วทดสอบก่อน ปลอดภัยกว่าติด 7 ตัวพร้อมกัน
+--   2. REVOKE ทำเป็นขั้นสุดท้าย เพราะหลัง REVOKE จะลบ log ไม่ได้อีกเลย
+--      ถ้ากฎกรองข้อมูลอ่อนไหวผิด แล้วเลขพร้อมเพย์เต็ม ๆ ถูกเขียนลงไป จะแก้ไม่ได้
+--      จึงเว้นช่วงตรวจสอบไว้ก่อนล็อกถาวร
+--
+-- ปลอดภัยที่จะรันซ้ำได้
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+-- ═══════════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 1. ตารางเก็บ log
+-- ═══════════════════════════════════════════════════════════════════════
+
+create table if not exists public.audit_logs (
+  id            bigint generated always as identity primary key,
+  created_at    timestamptz not null default now(),
+
+  -- หอพักที่เหตุการณ์นี้เกิดขึ้น (ใช้กรองและใช้ใน RLS)
+  workspace_id  uuid,
+
+  -- ใครทำ — เก็บ snapshot ชื่อกับบทบาทไว้ด้วย เพราะถ้าคนนั้นถูกลบบัญชีภายหลัง
+  -- log ต้องยังบอกได้ว่าใครทำ ไม่กลายเป็น uuid ลอย ๆ ที่หาต้นตอไม่ได้
+  actor_id      uuid,
+  actor_name    text,
+  actor_role    text,
+
+  -- น้ำหนักของหลักฐาน — สำคัญมาก ต้องแสดงในหน้า log ด้วย
+  --   'jwt'     = ยืนยันจาก JWT ที่เซ็นด้วยลายเซ็นดิจิทัล ปลอมไม่ได้
+  --   'unknown' = เขียนผ่าน service-role ซึ่งไม่มีตัวตนติดมา (เช่น cron, webhook,
+  --               หรือ super-admin action ที่ยังย้ายไป JWT ไม่ได้)
+  actor_source  text not null default 'unknown',
+
+  action        text not null,   -- INSERT | UPDATE | DELETE
+  table_name    text not null,
+  record_id     uuid,
+
+  -- ป้ายอ่านง่ายของแถวนั้น เช่น "ห้อง 134 · รอบ 2026-08"
+  -- เก็บไว้ตอนเกิดเหตุ เพราะแถวต้นทางอาจถูกลบหรือแก้ไปแล้วตอนมาอ่าน log
+  record_label  text,
+
+  changed_fields text[],
+  before        jsonb,
+  after         jsonb
+);
+
+comment on table public.audit_logs is
+  'บันทึกการแก้ข้อมูลสำหรับตรวจสอบย้อนหลัง — เขียนได้จาก trigger เท่านั้น ห้ามแก้/ลบ';
+comment on column public.audit_logs.actor_source is
+  'jwt = ยืนยันตัวตนจาก JWT ปลอมไม่ได้ / unknown = เขียนผ่าน service-role ไม่มีตัวตน';
+
+create index if not exists audit_logs_workspace_time_idx
+  on public.audit_logs (workspace_id, created_at desc);
+create index if not exists audit_logs_record_idx
+  on public.audit_logs (table_name, record_id);
+create index if not exists audit_logs_actor_idx
+  on public.audit_logs (actor_id, created_at desc);
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 2. สิทธิ์และ RLS
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ตอนนี้ให้แค่ SELECT — การเขียนทำผ่าน trigger ที่เป็น SECURITY DEFINER
+-- จึงไม่ต้อง grant INSERT ให้ role ใดเลย
+--
+-- ⚠️ REVOKE UPDATE/DELETE/TRUNCATE อยู่ในไฟล์ขั้นที่ 2 (ดูเหตุผลด้านบน)
+
+alter table public.audit_logs enable row level security;
+
+grant select on public.audit_logs to authenticated;
+
+-- แอดมินเห็น log ของหอตัวเอง
+drop policy if exists "audit_select_workspace_admin" on public.audit_logs;
+create policy "audit_select_workspace_admin"
+  on public.audit_logs for select
+  using (
+    workspace_id = get_current_user_workspace_id()
+    and get_current_user_role() = 'admin'
+  );
+
+-- ทีมงานเห็นได้เฉพาะหอที่เจ้าของหอกดอนุมัติสิทธิ์เข้าช่วยเหลือแล้ว
+-- (กฎเดียวกับ bills / rooms / tenants / expenses / meter_records)
+drop policy if exists "audit_select_super_admin_needs_grant" on public.audit_logs;
+create policy "audit_select_super_admin_needs_grant"
+  on public.audit_logs for select
+  using (
+    get_current_user_role() = 'super_admin'
+    and exists (
+      select 1 from public.support_access_grants g
+      where g.workspace_id = audit_logs.workspace_id
+        and g.status = 'approved'
+    )
+  );
+
+-- ตั้งใจไม่มี policy สำหรับ staff — staff ไม่ต้องเห็นประวัติการแก้ไขของใคร
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 3. ฟังก์ชันจดบันทึก
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- SECURITY DEFINER เพื่อให้ trigger เขียน audit_logs ได้ แม้จะ REVOKE INSERT
+-- ออกจากทุก role แล้วในขั้นที่ 2 — ผลคือ "เขียน log ได้ทางเดียวคือผ่าน trigger"
+--
+-- ⚠️ ตั้งใจไม่มี EXCEPTION handler (fail-closed)
+--    ถ้าจดไม่ได้ การแก้ข้อมูลต้องล้มไปด้วย ไม่งั้นคนที่รู้จะจงใจทำให้ trigger พัง
+--    เพื่อแก้ข้อมูลแบบไม่ทิ้งร่องรอย
+
+create or replace function public.audit_capture()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $audit$
+declare
+  _old        jsonb := case when tg_op = 'INSERT' then '{}'::jsonb else to_jsonb(old) end;
+  _new        jsonb := case when tg_op = 'DELETE' then '{}'::jsonb else to_jsonb(new) end;
+  _row        jsonb := case when tg_op = 'DELETE' then _old else _new end;
+
+  -- คอลัมน์ที่ไม่ต้องจด (เปลี่ยนทุกครั้งอยู่แล้ว ไม่ได้บอกอะไร)
+  _ignore     text[] := array['updated_at', 'created_at'];
+  -- คอลัมน์ที่จดว่า "เปลี่ยน" ได้ แต่ห้ามเก็บค่าจริง
+  _mask_full  text[] := array['tenant_phone', 'line_user_id', 'channel_access_token', 'channel_secret'];
+  -- คอลัมน์ที่เก็บได้แค่ 4 ตัวท้าย
+  _mask_tail  text[] := array['promptpay_id', 'tax_id'];
+  -- ตารางที่จดได้เฉพาะบางคอลัมน์ (ที่เหลือเป็นข้อมูลส่วนบุคคล ไม่เกี่ยวกับการกันโกง)
+  _allow_only text[];
+
+  _changed    text[] := array[]::text[];
+  _b          jsonb := '{}'::jsonb;
+  _a          jsonb := '{}'::jsonb;
+
+  _key        text;
+  _ov         jsonb;
+  _nv         jsonb;
+
+  _ws         uuid;
+  _label      text;
+  _actor      uuid := auth.uid();
+  _actor_name text;
+  _actor_role text;
+begin
+  -- profiles มีทั้งอีเมล ชื่อ เบอร์โทร — จดเฉพาะสิ่งที่เกี่ยวกับสิทธิ์
+  if tg_table_name = 'profiles' then
+    _allow_only := array['role', 'permissions', 'workspace_id'];
+  end if;
+
+  -- ── หาว่าคอลัมน์ไหนเปลี่ยน แล้วเก็บเฉพาะคอลัมน์นั้น ──
+  for _key in select jsonb_object_keys(_old || _new) loop
+    continue when _key = any(_ignore);
+    continue when _allow_only is not null and not (_key = any(_allow_only));
+
+    _ov := _old -> _key;
+    _nv := _new -> _key;
+    continue when _ov is not distinct from _nv;
+
+    _changed := array_append(_changed, _key);
+
+    if _key = any(_mask_full) then
+      _b := _b || jsonb_build_object(_key, case when _ov is null then null else '(ซ่อนไว้)' end);
+      _a := _a || jsonb_build_object(_key, case when _nv is null then null else '(ซ่อนไว้)' end);
+    elsif _key = any(_mask_tail) then
+      _b := _b || jsonb_build_object(_key,
+        case when _ov is null or _ov = 'null'::jsonb then null
+             else '•••' || right(_ov #>> '{}', 4) end);
+      _a := _a || jsonb_build_object(_key,
+        case when _nv is null or _nv = 'null'::jsonb then null
+             else '•••' || right(_nv #>> '{}', 4) end);
+    else
+      -- jsonb ก้อนใหญ่ (extra_expenses, utility_segments, permissions) อาจโตได้
+      -- ถ้าเกิน 2 KB เก็บแค่ว่าเปลี่ยน ไม่เก็บค่า เพื่อไม่ให้แถว log บวมจนอ่านไม่ไหว
+      _b := _b || jsonb_build_object(_key,
+        case when length(coalesce(_ov::text, '')) > 2048 then to_jsonb('(ข้อมูลยาวเกิน)'::text) else _ov end);
+      _a := _a || jsonb_build_object(_key,
+        case when length(coalesce(_nv::text, '')) > 2048 then to_jsonb('(ข้อมูลยาวเกิน)'::text) else _nv end);
+    end if;
+  end loop;
+
+  -- ไม่มีอะไรเปลี่ยนที่ต้องจด (เช่นแก้แต่ updated_at) — ไม่ต้องเขียน log
+  if tg_op = 'UPDATE' and array_length(_changed, 1) is null then
+    return null;
+  end if;
+
+  -- ── หา workspace ของแถวนี้ ──
+  if tg_table_name = 'workspaces' then
+    _ws := (_row ->> 'id')::uuid;
+  else
+    _ws := nullif(_row ->> 'workspace_id', '')::uuid;
+  end if;
+
+  -- ── ป้ายอ่านง่าย ──
+  _label := case tg_table_name
+    when 'bills'         then 'ห้อง ' || coalesce(_row ->> 'room_number', '-') ||
+                              ' · รอบ ' || coalesce(_row ->> 'billing_cycle', '-')
+    when 'meter_records' then 'ห้อง ' || coalesce(_row ->> 'room_number', '-') ||
+                              ' · รอบ ' || coalesce(_row ->> 'billing_cycle', '-')
+    when 'rooms'         then 'ห้อง ' || coalesce(_row ->> 'room_number', '-')
+    when 'expenses'      then coalesce(_row ->> 'title', '(ไม่มีชื่อรายการ)')
+    when 'workspaces'    then coalesce(_row ->> 'name', '-')
+    when 'profiles'      then 'ผู้ใช้บทบาท ' || coalesce(_row ->> 'role', '-')
+    when 'tenants'       then (
+      select 'ห้อง ' || coalesce(r.room_number, '-')
+      from public.rooms r where r.id = nullif(_row ->> 'room_id', '')::uuid
+    )
+    else null
+  end;
+
+  -- ── ใครทำ ──
+  -- auth.uid() มีค่าเฉพาะเมื่อเขียนผ่าน JWT ของผู้ใช้ ซึ่งปลอมไม่ได้
+  -- ถ้าเป็น null แปลว่าเขียนผ่าน service-role (cron / webhook / บาง action)
+  if _actor is not null then
+    select p.full_name, p.role into _actor_name, _actor_role
+    from public.profiles p where p.id = _actor;
+  end if;
+
+  insert into public.audit_logs (
+    workspace_id, actor_id, actor_name, actor_role, actor_source,
+    action, table_name, record_id, record_label, changed_fields, before, after
+  ) values (
+    _ws,
+    _actor,
+    _actor_name,
+    _actor_role,
+    case when _actor is not null then 'jwt' else 'unknown' end,
+    tg_op,
+    tg_table_name,
+    nullif(_row ->> 'id', '')::uuid,
+    _label,
+    case when tg_op = 'UPDATE' then _changed else null end,
+    case when tg_op = 'INSERT' then null else _b end,
+    case when tg_op = 'DELETE' then null else _a end
+  );
+
+  return null;  -- AFTER trigger ไม่สนค่าที่คืน
+end
+$audit$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 4. ติด trigger — ขั้นนี้แค่ตาราง bills เท่านั้น
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ทดสอบให้ผ่านก่อน แล้วค่อยติดอีก 6 ตารางในไฟล์ขั้นที่ 2
+
+drop trigger if exists audit_bills on public.bills;
+create trigger audit_bills
+  after insert or update or delete on public.bills
+  for each row execute function public.audit_capture();
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 5. ตรวจผล
+-- ═══════════════════════════════════════════════════════════════════════
+
+select
+  'ตาราง audit_logs'                              as "รายการ",
+  (select count(*) from public.audit_logs)::text  as "ค่า"
+union all
+select 'trigger ที่ติดแล้ว',
+       string_agg(tgname, ', ')
+from pg_trigger where tgname like 'audit_%' and not tgisinternal
+union all
+select 'policy ของ audit_logs',
+       string_agg(policyname, ', ')
+from pg_policies where schemaname = 'public' and tablename = 'audit_logs';
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ถอนออกทันทีถ้าพบปัญหา — รันบรรทัดนี้แยก
+-- ═══════════════════════════════════════════════════════════════════════
+--   drop trigger if exists audit_bills on public.bills;
+
+
+------------------------------------------------------------------------------
+-- [30/34]  database_patch_audit_logs_all_tables.sql
+------------------------------------------------------------------------------
+
+-- Patch: audit_logs_all_tables (ขั้นที่ 2 จาก 3)
+-- วันที่: 2026-09-08
+--
+-- ═══════════════════════════════════════════════════════════════════════
+-- ติด trigger audit อีก 6 ตาราง (bills ติดไปแล้วในขั้นที่ 1)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ต้องรัน database_patch_add_audit_logs.sql (ขั้นที่ 1) และผ่าน QA ก่อน
+--
+-- ⚠️ ขั้นนี้ยังไม่ REVOKE — ขั้นที่ 3 ค่อยล็อก
+--    เพราะกฎกรองข้อมูลอ่อนไหว (promptpay_id, tenant_phone, permissions)
+--    ทดสอบได้เฉพาะตอนที่ trigger ติดบน workspaces/tenants/profiles แล้ว
+--    ถ้า REVOKE ไปพร้อมกันแล้วพบว่ากรองผิด จะลบข้อมูลที่รั่วออกไม่ได้อีกเลย
+--
+-- ปลอดภัยที่จะรันซ้ำได้
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+-- ═══════════════════════════════════════════════════════════════════════
+
+
+-- ── กันพลาด: ต้องมีของจากขั้นที่ 1 ก่อน ──────────────────────────────────
+do $$
+begin
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'audit_capture'
+  ) then
+    raise exception 'ยังไม่ได้รันขั้นที่ 1 — กรุณารัน database_patch_add_audit_logs.sql ก่อน';
+  end if;
+end $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ติด trigger เรียงตามความเสี่ยงจากน้อยไปมาก
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- เรียงแบบนี้เพื่อให้ถ้าพัง จะพังกับของที่กระทบงานประจำวันน้อยที่สุดก่อน
+-- (expenses/rooms ใช้นาน ๆ ครั้ง ส่วน meter_records ใช้ทุกเดือน)
+
+-- 1. รายจ่าย — ใช้นาน ๆ ครั้ง เสี่ยงต่ำสุด
+drop trigger if exists audit_expenses on public.expenses;
+create trigger audit_expenses
+  after insert or update or delete on public.expenses
+  for each row execute function public.audit_capture();
+
+-- 2. ห้องพัก — base_rent คือค่าเช่า จึงเป็นข้อมูลการเงิน
+drop trigger if exists audit_rooms on public.rooms;
+create trigger audit_rooms
+  after insert or update or delete on public.rooms
+  for each row execute function public.audit_capture();
+
+-- 3. มิเตอร์ — จุดโกงคลาสสิกที่สุด (แก้เลขย้อนหลัง)
+drop trigger if exists audit_meter_records on public.meter_records;
+create trigger audit_meter_records
+  after insert or update or delete on public.meter_records
+  for each row execute function public.audit_capture();
+
+-- 4. ผู้เช่า — มีเงินประกัน และมี PII ที่ต้องถูกกรอง (tenant_phone, line_user_id)
+drop trigger if exists audit_tenants on public.tenants;
+create trigger audit_tenants
+  after insert or update or delete on public.tenants
+  for each row execute function public.audit_capture();
+
+-- 5. ตั้งค่าหอ — promptpay_id / เรตค่าน้ำไฟ / tax_id (ต้องถูกกรองเป็น 4 ตัวท้าย)
+drop trigger if exists audit_workspaces on public.workspaces;
+create trigger audit_workspaces
+  after insert or update or delete on public.workspaces
+  for each row execute function public.audit_capture();
+
+-- 6. โปรไฟล์/สิทธิ์ — จดเฉพาะ role / permissions / workspace_id
+--
+--    ⚠️ ตารางนี้เสี่ยงสุดในชุด เพราะ audit_capture() อ่าน profiles เพื่อหาชื่อคนทำ
+--       การ INSERT/UPDATE profiles จะยิง trigger แล้ว trigger ไป SELECT profiles
+--       — ปลอดภัย เพราะ SELECT ไม่ยิง trigger จึงไม่วนซ้ำ
+--       แต่ติดไว้ท้ายสุดเพื่อให้ทดสอบตัวอื่นผ่านก่อน
+drop trigger if exists audit_profiles on public.profiles;
+create trigger audit_profiles
+  after insert or update or delete on public.profiles
+  for each row execute function public.audit_capture();
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ตรวจผล
+-- ═══════════════════════════════════════════════════════════════════════
+
+select
+  c.relname                                as "ตาราง",
+  t.tgname                                 as "trigger",
+  case when t.tgenabled = 'O' then 'ทำงาน' else 'ปิดอยู่ ⚠️' end as "สถานะ"
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+where t.tgname like 'audit_%' and not t.tgisinternal
+order by c.relname;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ถอนออกทั้งหมดทันทีถ้าพบปัญหา — รันบล็อกนี้แยก
+-- ═══════════════════════════════════════════════════════════════════════
+--   drop trigger if exists audit_expenses      on public.expenses;
+--   drop trigger if exists audit_rooms         on public.rooms;
+--   drop trigger if exists audit_meter_records on public.meter_records;
+--   drop trigger if exists audit_tenants       on public.tenants;
+--   drop trigger if exists audit_workspaces    on public.workspaces;
+--   drop trigger if exists audit_profiles      on public.profiles;
+--   -- (ถอน bills ด้วยถ้าต้องการ)
+--   drop trigger if exists audit_bills         on public.bills;
+
+
+------------------------------------------------------------------------------
+-- [31/34]  database_patch_audit_actor_from_server.sql
+------------------------------------------------------------------------------
+
+-- Patch: audit_actor_from_server (ขั้นที่ 2.5 — ทำก่อนขั้นที่ 3 ที่ล็อกถาวร)
+-- วันที่: 2026-09-08
+--
+-- ═══════════════════════════════════════════════════════════════════════
+-- ทำให้ audit log รู้ว่า "ใครทำ" แม้ตอนที่โค้ดต้องเขียนผ่าน Service Role
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ── ปัญหาที่เจอจากการลองใช้หน้าจอจริง ──
+-- แก้ "เลขพร้อมเพย์" ในหน้าตั้งค่าหอ แล้ว log ขึ้นว่า "ระบบ" ทำ ไม่มีชื่อคนแก้
+--
+-- สาเหตุ: saveFinanceSettings / saveTaxSettings / savePropertyLogoUrl ต้องเขียน
+-- ผ่าน Service Role เพราะ RLS ของตาราง workspaces อนุญาตให้แก้ได้เฉพาะ admin ของหอ
+-- ในขณะที่หน้าเหล่านั้นเปิดให้ staff ที่ได้รับสิทธิ์แก้ไขบันทึกได้ด้วย
+-- Service Role ไม่มี JWT ติดไป จึงทำให้ auth.uid() เป็น null และ trigger ไม่รู้ว่าใครทำ
+--
+-- นี่คือจุดกันโกงอันดับหนึ่ง (เลขพร้อมเพย์คือปลายทางของเงินทุกบาท) ปล่อยไว้ไม่ได้
+--
+-- ── สิ่งที่ไฟล์นี้ทำ ──
+-- เพิ่มชั้นสำรองในการหาตัวคนทำ:
+--   ชั้นที่ 1  auth.uid() จาก JWT      => actor_source = 'jwt'      (พิสูจน์แล้ว)
+--   ชั้นที่ 2  header x-horset-actor    => actor_source = 'server'   (เซิร์ฟเวอร์แจ้ง)
+--   ไม่มีทั้งคู่                         => actor_source = 'unknown'  (ระบบ/ไม่ทราบ)
+--
+-- ── น้ำหนักหลักฐานของ 'server' ──
+-- header ถูกใส่โดยโค้ดฝั่งเซิร์ฟเวอร์ หลังตรวจ session ด้วย supabase.auth.getUser()
+-- แล้วเท่านั้น (ดู src/lib/supabase/service-actor.ts) ปลอมได้เฉพาะผู้ที่ถือ
+-- SUPABASE_SERVICE_ROLE_KEY ซึ่งไม่เคยถูกส่งถึงเบราว์เซอร์ พนักงานทั่วไปจึงปลอมไม่ได้
+--
+-- แต่ยังต่ำกว่า 'jwt' หนึ่งขั้น เพราะเป็นการ "แจ้ง" ไม่ใช่การ "พิสูจน์ด้วยลายเซ็น"
+-- หน้าจอจึงต้องแยกป้ายให้เห็นชัด ไม่กลืนเป็นอันเดียวกับ 'jwt'
+--
+-- ปลอดภัยที่จะรันซ้ำได้ · ไม่แตะข้อมูลที่จดไปแล้ว · ไม่แตะ trigger (แค่แทนฟังก์ชัน)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+-- ═══════════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 0. กันรันผิดลำดับ
+-- ═══════════════════════════════════════════════════════════════════════
+
+do $guard$
+begin
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'audit_capture'
+  ) then
+    raise exception
+      'ยังไม่มีฟังก์ชัน audit_capture — กรุณารัน database_patch_add_audit_logs.sql (ขั้นที่ 1) ก่อน';
+  end if;
+end
+$guard$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 1. แทนฟังก์ชันจดบันทึก (เปลี่ยนเฉพาะส่วน "ใครทำ")
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ⚠️ ยังตั้งใจไม่มี EXCEPTION handler ครอบการเขียน log (fail-closed)
+--    ถ้าจดไม่ได้ การแก้ข้อมูลต้องล้มไปด้วย ไม่งั้นคนที่รู้จะจงใจทำให้ trigger พัง
+--    เพื่อแก้ข้อมูลแบบไม่ทิ้งร่องรอย
+--    (มี handler อยู่จุดเดียวคือตอนอ่าน header ซึ่งไม่เกี่ยวกับการเขียน log)
+
+create or replace function public.audit_capture()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $audit$
+declare
+  _old        jsonb := case when tg_op = 'INSERT' then '{}'::jsonb else to_jsonb(old) end;
+  _new        jsonb := case when tg_op = 'DELETE' then '{}'::jsonb else to_jsonb(new) end;
+  _row        jsonb := case when tg_op = 'DELETE' then _old else _new end;
+
+  -- คอลัมน์ที่ไม่ต้องจด (เปลี่ยนทุกครั้งอยู่แล้ว ไม่ได้บอกอะไร)
+  _ignore     text[] := array['updated_at', 'created_at'];
+  -- คอลัมน์ที่จดว่า "เปลี่ยน" ได้ แต่ห้ามเก็บค่าจริง
+  _mask_full  text[] := array['tenant_phone', 'line_user_id', 'channel_access_token', 'channel_secret'];
+  -- คอลัมน์ที่เก็บได้แค่ 4 ตัวท้าย
+  _mask_tail  text[] := array['promptpay_id', 'tax_id'];
+  -- ตารางที่จดได้เฉพาะบางคอลัมน์ (ที่เหลือเป็นข้อมูลส่วนบุคคล ไม่เกี่ยวกับการกันโกง)
+  _allow_only text[];
+
+  _changed    text[] := array[]::text[];
+  _b          jsonb := '{}'::jsonb;
+  _a          jsonb := '{}'::jsonb;
+
+  _key        text;
+  _ov         jsonb;
+  _nv         jsonb;
+
+  _ws         uuid;
+  _label      text;
+  _actor      uuid := auth.uid();
+  _actor_name text;
+  _actor_role text;
+  _actor_src  text := 'unknown';
+  _hdr        text;
+begin
+  -- profiles มีทั้งอีเมล ชื่อ เบอร์โทร — จดเฉพาะสิ่งที่เกี่ยวกับสิทธิ์
+  if tg_table_name = 'profiles' then
+    _allow_only := array['role', 'permissions', 'workspace_id'];
+  end if;
+
+  -- ── หาว่าคอลัมน์ไหนเปลี่ยน แล้วเก็บเฉพาะคอลัมน์นั้น ──
+  for _key in select jsonb_object_keys(_old || _new) loop
+    continue when _key = any(_ignore);
+    continue when _allow_only is not null and not (_key = any(_allow_only));
+
+    _ov := _old -> _key;
+    _nv := _new -> _key;
+    continue when _ov is not distinct from _nv;
+
+    _changed := array_append(_changed, _key);
+
+    if _key = any(_mask_full) then
+      _b := _b || jsonb_build_object(_key, case when _ov is null then null else '(ซ่อนไว้)' end);
+      _a := _a || jsonb_build_object(_key, case when _nv is null then null else '(ซ่อนไว้)' end);
+    elsif _key = any(_mask_tail) then
+      _b := _b || jsonb_build_object(_key,
+        case when _ov is null or _ov = 'null'::jsonb then null
+             else '•••' || right(_ov #>> '{}', 4) end);
+      _a := _a || jsonb_build_object(_key,
+        case when _nv is null or _nv = 'null'::jsonb then null
+             else '•••' || right(_nv #>> '{}', 4) end);
+    else
+      -- jsonb ก้อนใหญ่ (extra_expenses, utility_segments, permissions) อาจโตได้
+      -- ถ้าเกิน 2 KB เก็บแค่ว่าเปลี่ยน ไม่เก็บค่า เพื่อไม่ให้แถว log บวมจนอ่านไม่ไหว
+      _b := _b || jsonb_build_object(_key,
+        case when length(coalesce(_ov::text, '')) > 2048 then to_jsonb('(ข้อมูลยาวเกิน)'::text) else _ov end);
+      _a := _a || jsonb_build_object(_key,
+        case when length(coalesce(_nv::text, '')) > 2048 then to_jsonb('(ข้อมูลยาวเกิน)'::text) else _nv end);
+    end if;
+  end loop;
+
+  -- ไม่มีอะไรเปลี่ยนที่ต้องจด (เช่นแก้แต่ updated_at) — ไม่ต้องเขียน log
+  if tg_op = 'UPDATE' and array_length(_changed, 1) is null then
+    return null;
+  end if;
+
+  -- ── หา workspace ของแถวนี้ ──
+  if tg_table_name = 'workspaces' then
+    _ws := (_row ->> 'id')::uuid;
+  else
+    _ws := nullif(_row ->> 'workspace_id', '')::uuid;
+  end if;
+
+  -- ── ป้ายอ่านง่าย ──
+  _label := case tg_table_name
+    when 'bills'         then 'ห้อง ' || coalesce(_row ->> 'room_number', '-') ||
+                              ' · รอบ ' || coalesce(_row ->> 'billing_cycle', '-')
+    when 'meter_records' then 'ห้อง ' || coalesce(_row ->> 'room_number', '-') ||
+                              ' · รอบ ' || coalesce(_row ->> 'billing_cycle', '-')
+    when 'rooms'         then 'ห้อง ' || coalesce(_row ->> 'room_number', '-')
+    when 'expenses'      then coalesce(_row ->> 'title', '(ไม่มีชื่อรายการ)')
+    when 'workspaces'    then coalesce(_row ->> 'name', '-')
+    when 'profiles'      then 'ผู้ใช้บทบาท ' || coalesce(_row ->> 'role', '-')
+    when 'tenants'       then (
+      select 'ห้อง ' || coalesce(r.room_number, '-')
+      from public.rooms r where r.id = nullif(_row ->> 'room_id', '')::uuid
+    )
+    else null
+  end;
+
+  -- ── ใครทำ ──
+  -- ชั้นที่ 1: JWT ของผู้ใช้ — เซ็นด้วยลายเซ็นดิจิทัล ปลอมไม่ได้
+  if _actor is not null then
+    _actor_src := 'jwt';
+  else
+    -- ชั้นที่ 2: header ที่โค้ดฝั่งเซิร์ฟเวอร์ใส่มาให้ หลังตรวจ session แล้ว
+    -- (จำเป็นสำหรับ action ที่ต้องเขียนผ่าน Service Role เช่นบันทึกตั้งค่าหอ)
+    --
+    -- ครอบ exception ไว้เฉพาะการอ่าน header เท่านั้น — ถ้า header ไม่ใช่ JSON
+    -- ที่อ่านได้ ก็แค่ถือว่าไม่มีตัวตนติดมา ไม่ทำให้การจด log ทั้งก้อนล้ม
+    begin
+      _hdr := current_setting('request.headers', true)::json ->> 'x-horset-actor';
+    exception when others then
+      _hdr := null;
+    end;
+
+    if _hdr ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+      _actor := _hdr::uuid;
+      _actor_src := 'server';
+    end if;
+  end if;
+
+  if _actor is not null then
+    select p.full_name, p.role into _actor_name, _actor_role
+    from public.profiles p where p.id = _actor;
+
+    -- id ที่ไม่มีตัวตนอยู่จริงในระบบ = header เชื่อถือไม่ได้
+    -- ถอยไปเป็น 'unknown' ดีกว่าจดชื่อผิดคน (log ที่ชี้ผิดคนอันตรายกว่า log ที่ว่าง)
+    if _actor_src = 'server' and _actor_role is null then
+      _actor := null;
+      _actor_name := null;
+      _actor_src := 'unknown';
+    end if;
+  end if;
+
+  insert into public.audit_logs (
+    workspace_id, actor_id, actor_name, actor_role, actor_source,
+    action, table_name, record_id, record_label, changed_fields, before, after
+  ) values (
+    _ws,
+    _actor,
+    _actor_name,
+    _actor_role,
+    _actor_src,
+    tg_op,
+    tg_table_name,
+    nullif(_row ->> 'id', '')::uuid,
+    _label,
+    case when tg_op = 'UPDATE' then _changed else null end,
+    case when tg_op = 'INSERT' then null else _b end,
+    case when tg_op = 'DELETE' then null else _a end
+  );
+
+  return null;  -- AFTER trigger ไม่สนค่าที่คืน
+end
+$audit$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 2. อัปเดตคำอธิบายคอลัมน์ให้ตรงกับความจริงใหม่
+-- ═══════════════════════════════════════════════════════════════════════
+
+comment on column public.audit_logs.actor_source is
+  'jwt = พิสูจน์ตัวตนจาก JWT ปลอมไม่ได้ / server = โค้ดฝั่งเซิร์ฟเวอร์แจ้งมาหลังตรวจ session (ปลอมได้เฉพาะผู้ถือ service role key) / unknown = ไม่มีตัวตนติดมา (cron, webhook, ลิงก์ผู้เช่า)';
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 3. ตรวจผล
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ต้องได้ 'ok' ทั้งสองแถว
+-- หลังจากนั้นให้ไปกด "บันทึก" ในหน้าตั้งค่าการเงิน แล้วเปิดดูประวัติการแก้ไข
+-- แถวใหม่ของ "ตั้งค่าหอ" ต้องขึ้นชื่อคนทำ พร้อมป้าย "เซิร์ฟเวอร์ยืนยัน" ไม่ใช่ "ระบบ"
+
+select
+  'ฟังก์ชันอ่าน header ได้แล้ว' as "รายการตรวจ",
+  case when pg_get_functiondef(p.oid) like '%x-horset-actor%' then 'ok' else 'ยังไม่อัปเดต' end as "ผล"
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'audit_capture'
+
+union all
+
+select
+  'trigger ยังอยู่ครบ 7 ตัวและเปิดใช้งาน' as "รายการตรวจ",
+  case when count(*) = 7 then 'ok' else 'เหลือ ' || count(*) || ' ตัว — ต้องได้ 7' end as "ผล"
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and t.tgname like 'audit_%'
+  and not t.tgisinternal
+  and t.tgenabled = 'O';
+
+
+------------------------------------------------------------------------------
+-- [32/34]  database_patch_audit_ignore_machine_state.sql
+------------------------------------------------------------------------------
+
+-- Patch: audit_ignore_machine_state (ขั้นที่ 2.6 — ทำก่อนขั้นที่ 3 ที่ล็อกถาวร)
+-- วันที่: 2026-09-09
+--
+-- ═══════════════════════════════════════════════════════════════════════
+-- ไม่จดคอลัมน์ที่เป็น "สภาวะภายในของระบบ" ลง audit log
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ── ปัญหาที่ 1: log ท่วมด้วยแถวที่ไม่มีความหมาย ──
+-- ผู้เช่าส่งสลิป 1 ใบผ่าน Rich menu ใน LINE ทำให้เกิด log 6-7 แถว
+-- เพราะ tenants.slip_armed_at / slip_target_bill_id เป็นสวิตช์ที่ระบบใช้จำว่า
+-- กำลังรอรูปสลิปของบิลใบไหน ถูกเขียน 3 ครั้งต่อสลิป 1 ใบ (เปิด → เลือกบิล → ปิด)
+-- คูณจำนวนห้องที่ผู้เช่าคนนั้นเช่า
+--
+-- ผลคือแถวที่มีความหมายจริง (บิลเปลี่ยนสถานะ ค่าปรับขึ้น 200) จมหายไปในกองขยะ
+-- ซึ่งทำให้ระบบกันโกงใช้ไม่ได้จริง เพราะไม่มีใครอ่าน log ที่อ่านไม่รู้เรื่อง
+--
+-- ── ปัญหาที่ 2 (ร้ายแรงกว่า): LINE user id หลุดลง log ──
+-- workspaces.richmenu_admin_linked_uids เก็บ LINE user id ของแอดมินที่ผูกเมนูไว้
+-- กฎปิดบังข้อมูลอ่อนไหวมองหาชื่อคอลัมน์ 'line_user_id' ตรง ๆ จึงไม่ครอบตัวนี้
+-- → id ถูกเขียนลง log แบบเต็ม ๆ
+--
+-- และ guard ในไฟล์ขั้นที่ 3 ตรวจแค่ promptpay_id กับ tenant_phone จึงปล่อยผ่าน
+-- ถ้าล็อกถาวรไปก่อน ข้อมูลนี้จะลบไม่ได้อีกเลย
+--
+-- ── โครงสร้างใหม่ ──
+-- ย้ายรายการ "คอลัมน์ที่ไม่ต้องจด" ออกมาเป็นฟังก์ชันเล็ก ๆ ของตัวเอง
+-- ครั้งต่อไปที่ต้องเพิ่ม/ลดคอลัมน์ จะแทนแค่ฟังก์ชันนั้น ไม่ต้องแตะ audit_capture
+-- ทั้งก้อน (ลดโอกาสพิมพ์ตกหล่นในฟังก์ชันที่เป็นหัวใจของระบบหลักฐาน)
+--
+-- ปลอดภัยที่จะรันซ้ำได้ · ไม่แตะ trigger · ไม่แตะข้อมูลที่จดไปแล้ว
+--
+-- ⚠️ ไฟล์นี้ทำให้ "ของใหม่" ไม่ถูกจด แต่แถวที่จดไว้แล้วยังอยู่
+--    ให้รัน database_patch_audit_cleanup_before_lock.sql ต่อ เพื่อล้างของเก่า
+--    ก่อนล็อกถาวร
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+-- ═══════════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 0. กันรันผิดลำดับ
+-- ═══════════════════════════════════════════════════════════════════════
+
+do $guard$
+begin
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'audit_capture'
+  ) then
+    raise exception
+      'ยังไม่มีฟังก์ชัน audit_capture — กรุณารัน database_patch_add_audit_logs.sql (ขั้นที่ 1) ก่อน';
+  end if;
+end
+$guard$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 1. รายการคอลัมน์ที่ไม่ต้องจด (ที่เดียวในระบบ)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- หลักการตัดสินว่าคอลัมน์ไหนควรอยู่ในรายการนี้:
+--   ✅ ใส่ได้   — ค่าที่ "ระบบ" เขียนเองเพื่อจำสถานะการทำงาน ไม่ใช่คนตั้งใจแก้
+--   ❌ ห้ามใส่  — ค่าที่คนกรอก/กดเปลี่ยนได้ แม้จะดูไม่สำคัญก็ต้องจด
+--
+-- ถ้าไม่แน่ใจ ให้จดไว้ก่อน — log ที่รกยังแก้ที่หน้าจอได้ แต่หลักฐานที่ไม่ได้จด
+-- ย้อนกลับไปเอาไม่ได้
+
+create or replace function public.audit_ignored_columns(_table text)
+returns text[]
+language sql
+immutable
+as $ignored$
+  select case _table
+
+    -- สวิตช์รับสลิปทาง LINE — ระบบเปิด/ปิดเองทุกครั้งที่ผู้เช่ากดปุ่ม
+    -- (ดู armAllRooms / setTargetBill / disarm ใน src/features/notification/line-slip.ts)
+    when 'tenants' then array[
+      'updated_at', 'created_at',
+      'slip_armed_at', 'slip_target_bill_id'
+    ]
+
+    -- ร่องรอยการติดตั้ง Rich menu ที่ LINE คืนค่ามาให้ ไม่ใช่การตั้งค่าของคน
+    --
+    -- ⚠️ richmenu_admin_linked_uids อยู่ในนี้เพราะเก็บ LINE user id ของแอดมิน
+    --    ซึ่งเป็นข้อมูลส่วนบุคคลที่ไม่เกี่ยวกับการกันโกง
+    --
+    -- ตั้งใจ "ไม่" ใส่: richmenu_enabled, richmenu_admin_enabled,
+    -- richmenu_image_url, richmenu_admin_image_url, richmenu_contact_uri,
+    -- richmenu_liff_id — ทั้งหมดนี้คนกดเปลี่ยนเอง ต้องจด
+    when 'workspaces' then array[
+      'updated_at', 'created_at',
+      'richmenu_id', 'richmenu_installed_at', 'richmenu_template_version',
+      'richmenu_admin_id', 'richmenu_admin_installed_at',
+      'richmenu_admin_template_version', 'richmenu_admin_linked_uids',
+      'richmenu_admin_installed_image_url'
+    ]
+
+    else array['updated_at', 'created_at']
+  end;
+$ignored$;
+
+-- ไม่ต้องให้ใครเรียกผ่าน API — audit_capture เป็น security definer จึงเรียกได้เอง
+revoke execute on function public.audit_ignored_columns(text) from public;
+revoke execute on function public.audit_ignored_columns(text) from anon;
+revoke execute on function public.audit_ignored_columns(text) from authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 2. แทนฟังก์ชันจดบันทึก (เปลี่ยนเฉพาะบรรทัดที่อ่านรายการข้างบน)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ⚠️ ยังตั้งใจไม่มี EXCEPTION handler ครอบการเขียน log (fail-closed)
+--    ถ้าจดไม่ได้ การแก้ข้อมูลต้องล้มไปด้วย ไม่งั้นคนที่รู้จะจงใจทำให้ trigger พัง
+--    เพื่อแก้ข้อมูลแบบไม่ทิ้งร่องรอย
+
+create or replace function public.audit_capture()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $audit$
+declare
+  _old        jsonb := case when tg_op = 'INSERT' then '{}'::jsonb else to_jsonb(old) end;
+  _new        jsonb := case when tg_op = 'DELETE' then '{}'::jsonb else to_jsonb(new) end;
+  _row        jsonb := case when tg_op = 'DELETE' then _old else _new end;
+
+  -- คอลัมน์ที่ไม่ต้องจด — รายการอยู่ในฟังก์ชัน audit_ignored_columns ข้างบน
+  _ignore     text[] := public.audit_ignored_columns(tg_table_name);
+  -- คอลัมน์ที่จดว่า "เปลี่ยน" ได้ แต่ห้ามเก็บค่าจริง
+  _mask_full  text[] := array['tenant_phone', 'line_user_id', 'channel_access_token', 'channel_secret'];
+  -- คอลัมน์ที่เก็บได้แค่ 4 ตัวท้าย
+  _mask_tail  text[] := array['promptpay_id', 'tax_id'];
+  -- ตารางที่จดได้เฉพาะบางคอลัมน์ (ที่เหลือเป็นข้อมูลส่วนบุคคล ไม่เกี่ยวกับการกันโกง)
+  _allow_only text[];
+
+  _changed    text[] := array[]::text[];
+  _b          jsonb := '{}'::jsonb;
+  _a          jsonb := '{}'::jsonb;
+
+  _key        text;
+  _ov         jsonb;
+  _nv         jsonb;
+
+  _ws         uuid;
+  _label      text;
+  _actor      uuid := auth.uid();
+  _actor_name text;
+  _actor_role text;
+  _actor_src  text := 'unknown';
+  _hdr        text;
+begin
+  -- profiles มีทั้งอีเมล ชื่อ เบอร์โทร — จดเฉพาะสิ่งที่เกี่ยวกับสิทธิ์
+  if tg_table_name = 'profiles' then
+    _allow_only := array['role', 'permissions', 'workspace_id'];
+  end if;
+
+  -- ── หาว่าคอลัมน์ไหนเปลี่ยน แล้วเก็บเฉพาะคอลัมน์นั้น ──
+  for _key in select jsonb_object_keys(_old || _new) loop
+    continue when _key = any(_ignore);
+    continue when _allow_only is not null and not (_key = any(_allow_only));
+
+    _ov := _old -> _key;
+    _nv := _new -> _key;
+    continue when _ov is not distinct from _nv;
+
+    _changed := array_append(_changed, _key);
+
+    if _key = any(_mask_full) then
+      _b := _b || jsonb_build_object(_key, case when _ov is null then null else '(ซ่อนไว้)' end);
+      _a := _a || jsonb_build_object(_key, case when _nv is null then null else '(ซ่อนไว้)' end);
+    elsif _key = any(_mask_tail) then
+      _b := _b || jsonb_build_object(_key,
+        case when _ov is null or _ov = 'null'::jsonb then null
+             else '•••' || right(_ov #>> '{}', 4) end);
+      _a := _a || jsonb_build_object(_key,
+        case when _nv is null or _nv = 'null'::jsonb then null
+             else '•••' || right(_nv #>> '{}', 4) end);
+    else
+      -- jsonb ก้อนใหญ่ (extra_expenses, utility_segments, permissions) อาจโตได้
+      -- ถ้าเกิน 2 KB เก็บแค่ว่าเปลี่ยน ไม่เก็บค่า เพื่อไม่ให้แถว log บวมจนอ่านไม่ไหว
+      _b := _b || jsonb_build_object(_key,
+        case when length(coalesce(_ov::text, '')) > 2048 then to_jsonb('(ข้อมูลยาวเกิน)'::text) else _ov end);
+      _a := _a || jsonb_build_object(_key,
+        case when length(coalesce(_nv::text, '')) > 2048 then to_jsonb('(ข้อมูลยาวเกิน)'::text) else _nv end);
+    end if;
+  end loop;
+
+  -- ไม่มีอะไรเปลี่ยนที่ต้องจด (เช่นแก้แต่ updated_at) — ไม่ต้องเขียน log
+  if tg_op = 'UPDATE' and array_length(_changed, 1) is null then
+    return null;
+  end if;
+
+  -- ── หา workspace ของแถวนี้ ──
+  if tg_table_name = 'workspaces' then
+    _ws := (_row ->> 'id')::uuid;
+  else
+    _ws := nullif(_row ->> 'workspace_id', '')::uuid;
+  end if;
+
+  -- ── ป้ายอ่านง่าย ──
+  _label := case tg_table_name
+    when 'bills'         then 'ห้อง ' || coalesce(_row ->> 'room_number', '-') ||
+                              ' · รอบ ' || coalesce(_row ->> 'billing_cycle', '-')
+    when 'meter_records' then 'ห้อง ' || coalesce(_row ->> 'room_number', '-') ||
+                              ' · รอบ ' || coalesce(_row ->> 'billing_cycle', '-')
+    when 'rooms'         then 'ห้อง ' || coalesce(_row ->> 'room_number', '-')
+    when 'expenses'      then coalesce(_row ->> 'title', '(ไม่มีชื่อรายการ)')
+    when 'workspaces'    then coalesce(_row ->> 'name', '-')
+    when 'profiles'      then 'ผู้ใช้บทบาท ' || coalesce(_row ->> 'role', '-')
+    when 'tenants'       then (
+      select 'ห้อง ' || coalesce(r.room_number, '-')
+      from public.rooms r where r.id = nullif(_row ->> 'room_id', '')::uuid
+    )
+    else null
+  end;
+
+  -- ── ใครทำ ──
+  -- ชั้นที่ 1: JWT ของผู้ใช้ — เซ็นด้วยลายเซ็นดิจิทัล ปลอมไม่ได้
+  if _actor is not null then
+    _actor_src := 'jwt';
+  else
+    -- ชั้นที่ 2: header ที่โค้ดฝั่งเซิร์ฟเวอร์ใส่มาให้ หลังตรวจ session แล้ว
+    -- (จำเป็นสำหรับ action ที่ต้องเขียนผ่าน Service Role เช่นบันทึกตั้งค่าหอ)
+    --
+    -- ครอบ exception ไว้เฉพาะการอ่าน header เท่านั้น — ถ้า header ไม่ใช่ JSON
+    -- ที่อ่านได้ ก็แค่ถือว่าไม่มีตัวตนติดมา ไม่ทำให้การจด log ทั้งก้อนล้ม
+    begin
+      _hdr := current_setting('request.headers', true)::json ->> 'x-horset-actor';
+    exception when others then
+      _hdr := null;
+    end;
+
+    if _hdr ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+      _actor := _hdr::uuid;
+      _actor_src := 'server';
+    end if;
+  end if;
+
+  if _actor is not null then
+    select p.full_name, p.role into _actor_name, _actor_role
+    from public.profiles p where p.id = _actor;
+
+    -- id ที่ไม่มีตัวตนอยู่จริงในระบบ = header เชื่อถือไม่ได้
+    -- ถอยไปเป็น 'unknown' ดีกว่าจดชื่อผิดคน (log ที่ชี้ผิดคนอันตรายกว่า log ที่ว่าง)
+    if _actor_src = 'server' and _actor_role is null then
+      _actor := null;
+      _actor_name := null;
+      _actor_src := 'unknown';
+    end if;
+  end if;
+
+  insert into public.audit_logs (
+    workspace_id, actor_id, actor_name, actor_role, actor_source,
+    action, table_name, record_id, record_label, changed_fields, before, after
+  ) values (
+    _ws,
+    _actor,
+    _actor_name,
+    _actor_role,
+    _actor_src,
+    tg_op,
+    tg_table_name,
+    nullif(_row ->> 'id', '')::uuid,
+    _label,
+    case when tg_op = 'UPDATE' then _changed else null end,
+    case when tg_op = 'INSERT' then null else _b end,
+    case when tg_op = 'DELETE' then null else _a end
+  );
+
+  return null;  -- AFTER trigger ไม่สนค่าที่คืน
+end
+$audit$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 3. ตรวจผล
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ต้องได้ 'ok' ทั้ง 6 แถว
+
+select 'ฟังก์ชันรายการคอลัมน์ที่ไม่ต้องจด มีอยู่' as "รายการตรวจ",
+       case when exists (
+         select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname = 'audit_ignored_columns'
+       ) then 'ok' else 'ไม่พบ' end as "ผล"
+
+union all
+
+select 'audit_capture เรียกใช้ฟังก์ชันนั้นแล้ว',
+       case when pg_get_functiondef(p.oid) like '%audit_ignored_columns%'
+            then 'ok' else 'ยังไม่อัปเดต' end
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'audit_capture'
+
+union all
+
+select 'สวิตช์รับสลิปของผู้เช่าถูกกันแล้ว',
+       case when 'slip_armed_at' = any(public.audit_ignored_columns('tenants'))
+             and 'slip_target_bill_id' = any(public.audit_ignored_columns('tenants'))
+            then 'ok' else 'ยังไม่ถูกกัน' end
+
+union all
+
+select 'LINE user id ของแอดมินถูกกันแล้ว',
+       case when 'richmenu_admin_linked_uids' = any(public.audit_ignored_columns('workspaces'))
+            then 'ok' else 'ยังไม่ถูกกัน' end
+
+union all
+
+select 'ยังจดการตั้งค่าที่คนกดเปลี่ยนเอง (ต้องไม่ถูกกัน)',
+       case when 'richmenu_admin_enabled' = any(public.audit_ignored_columns('workspaces'))
+              or 'promptpay_id' = any(public.audit_ignored_columns('workspaces'))
+            then 'ผิด — กันมากเกินไป' else 'ok' end
+
+union all
+
+select 'trigger ยังอยู่ครบ 7 ตัวและเปิดใช้งาน',
+       case when count(*) = 7 then 'ok' else 'เหลือ ' || count(*) || ' ตัว — ต้องได้ 7' end
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and t.tgname like 'audit_%'
+  and not t.tgisinternal and t.tgenabled = 'O';
+
+
+------------------------------------------------------------------------------
+-- [33/34]  database_patch_audit_cleanup_before_lock.sql
+------------------------------------------------------------------------------
+
+-- Patch: audit_cleanup_before_lock (ขั้นที่ 2.7 — ขั้นสุดท้ายก่อนล็อกถาวร)
+-- วันที่: 2026-09-09
+--
+-- ═══════════════════════════════════════════════════════════════════════
+-- ล้าง log ที่จดไว้ก่อนแก้กฎ ให้เหลือแต่ของที่มีความหมาย
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ไฟล์ก่อนหน้า (audit_ignore_machine_state) ทำให้ "ของใหม่" ไม่ถูกจด
+-- แต่แถวที่จดไว้แล้วยังอยู่ ไฟล์นี้ล้างของเก่าออก
+--
+-- ── ทำไมต้องล้างก่อนล็อก ──
+-- ขั้นที่ 3 (database_patch_audit_logs_lock.sql) จะ REVOKE สิทธิ์ลบแบบถาวร
+-- หลังจากนั้นแอปลบ log ไม่ได้อีกเลย ซึ่งเป็นเรื่องที่ต้องการ
+-- แต่แปลว่าต้องแน่ใจก่อนว่าไม่มีอะไรที่ไม่ควรอยู่ในนั้นค้างไว้
+--
+-- ── ลบอะไร ──
+--   1. แถวที่ทุกคอลัมน์ที่เปลี่ยนเป็นสภาวะภายในของระบบ (สวิตช์รับสลิป,
+--      ร่องรอยการติดตั้ง Rich menu) — ไม่มีความหมายในการตรวจย้อนหลัง
+--   2. คีย์ richmenu_admin_linked_uids (LINE user id ของแอดมิน) ที่ปนอยู่ในแถว
+--      ซึ่งมีของจริงด้วย — ตัดออกเฉพาะคีย์นั้น ไม่ลบทั้งแถว
+--
+-- ── ไม่ลบอะไร ──
+-- ทุกแถวที่มีคอลัมน์ซึ่งคนกดเปลี่ยนเองอยู่ในนั้น แม้จะปนกับของระบบก็เก็บไว้
+-- (เกณฑ์คือ "ทุกคอลัมน์ที่เปลี่ยน" ต้องเป็นของระบบทั้งหมดจึงจะลบ)
+--
+-- ⚠️ ก่อนรันไฟล์นี้ ควรรัน query พรีวิวก่อนเพื่อดูว่าจะลบอะไรบ้าง (อยู่ในแชท)
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (รันรอบสองจะไม่มีอะไรให้ลบ)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+-- ═══════════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 0. กันรันผิดลำดับ
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ต้องรัน audit_ignore_machine_state ก่อน ไม่งั้นจะล้างของเก่าทิ้ง
+-- แล้ว trigger ก็จดของแบบเดิมกลับมาใหม่ทันที เสียเวลาเปล่า
+
+do $guard$
+begin
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'audit_ignored_columns'
+  ) then
+    raise exception
+      'ยังไม่มีฟังก์ชัน audit_ignored_columns — กรุณารัน database_patch_audit_ignore_machine_state.sql ก่อน';
+  end if;
+
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'audit_capture'
+      and pg_get_functiondef(p.oid) like '%audit_ignored_columns%'
+  ) then
+    raise exception
+      'audit_capture ยังไม่ได้เรียกใช้ audit_ignored_columns — กรุณารันไฟล์ก่อนหน้าให้ครบก่อน';
+  end if;
+end
+$guard$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 1. ลบแถวที่เป็นสภาวะภายในของระบบล้วน ๆ
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- <@ อ่านว่า "อยู่ในเซ็ตของ" — เงื่อนไขนี้เป็นจริงเมื่อทุกคอลัมน์ที่เปลี่ยน
+-- อยู่ในรายการที่ไม่ต้องจด แปลว่าถ้ากฎใหม่มีผลตอนนั้น แถวนี้จะไม่เกิดขึ้นเลย
+
+delete from public.audit_logs
+where action = 'UPDATE'
+  and changed_fields is not null
+  and array_length(changed_fields, 1) > 0
+  and changed_fields <@ public.audit_ignored_columns(table_name);
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 2. ตัด LINE user id ของแอดมินออกจากแถวที่เหลือ
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- แถวที่มาถึงขั้นนี้คือแถวที่มีของจริงปนอยู่ด้วย จึงห้ามลบทั้งแถว
+-- ตัดเฉพาะคอลัมน์ที่ไม่ต้องจด แล้วเก็บส่วนที่เป็นหลักฐานไว้ครบ
+--
+-- ⚠️ ต้องดูใน before/after ไม่ใช่แค่ changed_fields
+--    เพราะเหตุการณ์ "เพิ่ม" กับ "ลบ" จดทั้งแถวโดยที่ changed_fields เป็น null
+--    ถ้าดูแค่ changed_fields จะพลาด LINE user id ที่ติดอยู่ในแถวประเภทนั้น
+--
+-- ตัวดำเนินการที่ใช้:
+--   jsonb - text[]   ลบทุกคีย์ในลิสต์ออกจาก jsonb
+--   jsonb ?| text[]  จริงเมื่อมีคีย์ใดคีย์หนึ่งในลิสต์อยู่ใน jsonb
+
+update public.audit_logs a
+set changed_fields = case
+      when a.changed_fields is null then null
+      else (
+        select array_agg(f)
+        from unnest(a.changed_fields) f
+        where not (f = any(public.audit_ignored_columns(a.table_name)))
+      )
+    end,
+    before = case when a.before is null then null
+                  else a.before - public.audit_ignored_columns(a.table_name) end,
+    after  = case when a.after  is null then null
+                  else a.after  - public.audit_ignored_columns(a.table_name) end
+where a.table_name in ('tenants', 'workspaces')
+  and (
+    (a.changed_fields is not null and exists (
+      select 1 from unnest(a.changed_fields) f
+      where f = any(public.audit_ignored_columns(a.table_name))
+    ))
+    or (a.before is not null and a.before ?| public.audit_ignored_columns(a.table_name))
+    or (a.after  is not null and a.after  ?| public.audit_ignored_columns(a.table_name))
+  );
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 3. ตรวจผล
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ทุกแถวที่เขียนว่า "ต้องได้ 0" ต้องเป็น 0 ถึงจะไปขั้นที่ 3 (ล็อกถาวร) ได้
+
+select 'แถวสภาวะภายในที่เหลืออยู่ (ต้องได้ 0)' as "รายการตรวจ",
+       count(*)::text as "ผล"
+from public.audit_logs
+where action = 'UPDATE'
+  and changed_fields is not null
+  and array_length(changed_fields, 1) > 0
+  and changed_fields <@ public.audit_ignored_columns(table_name)
+
+union all
+
+-- ครอบทั้ง 3 ที่ที่ค่าอาจซ่อนอยู่ (รายการคอลัมน์ที่เปลี่ยน, ค่าก่อน, ค่าหลัง)
+select 'แถวที่ยังมี LINE user id ของแอดมิน (ต้องได้ 0)',
+       count(*)::text
+from public.audit_logs
+where (changed_fields is not null and 'richmenu_admin_linked_uids' = any(changed_fields))
+   or (before is not null and before ? 'richmenu_admin_linked_uids')
+   or (after  is not null and after  ? 'richmenu_admin_linked_uids')
+
+union all
+
+select 'แถวที่ยังมีคอลัมน์สภาวะภายในติดอยู่ (ต้องได้ 0)',
+       count(*)::text
+from public.audit_logs
+where table_name in ('tenants', 'workspaces')
+  and (
+    (changed_fields is not null and exists (
+      select 1 from unnest(changed_fields) f
+      where f = any(public.audit_ignored_columns(table_name))
+    ))
+    or (before is not null and before ?| public.audit_ignored_columns(table_name))
+    or (after  is not null and after  ?| public.audit_ignored_columns(table_name))
+  )
+
+union all
+
+select 'แถวที่มีคอลัมน์ที่เปลี่ยนเป็นศูนย์ (ต้องได้ 0)',
+       count(*)::text
+from public.audit_logs
+where action = 'UPDATE'
+  and (changed_fields is null or array_length(changed_fields, 1) is null)
+
+union all
+
+select 'log ที่เหลือทั้งหมด', count(*)::text from public.audit_logs
+
+union all
+
+select 'เหลือ · ' || table_name, count(*)::text
+from public.audit_logs
+group by table_name
+
+order by 1;
+
+
+------------------------------------------------------------------------------
+-- [34/34]  database_patch_audit_logs_lock.sql
+------------------------------------------------------------------------------
+
+-- Patch: audit_logs_lock (ขั้นที่ 3 จาก 3 — ขั้นสุดท้าย)
+-- วันที่: 2026-09-08
+--
+-- ═══════════════════════════════════════════════════════════════════════
+-- ล็อก audit_logs ให้ "เขียนได้ทางเดียวคือผ่าน trigger" และลบไม่ได้
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ⚠️⚠️ อ่านก่อนรัน — ขั้นนี้ย้อนกลับได้ยากในทางปฏิบัติ
+--
+-- หลังรันไฟล์นี้:
+--   - ไม่มี role ใดที่แอปใช้ (anon / authenticated / service_role) แก้หรือลบ log ได้
+--   - แม้แต่ service-role ที่ bypass RLS ก็ทำไม่ได้ เพราะเป็นการถอนสิทธิ์ระดับตาราง
+--     ซึ่งอยู่เหนือ RLS (RLS ป้องกัน TRUNCATE ไม่ได้เลย จึงต้องกันที่ระดับนี้)
+--   - เขียน log ได้เฉพาะผ่าน trigger audit_capture() ซึ่งเป็น SECURITY DEFINER
+--     ทำงานในสิทธิ์เจ้าของฟังก์ชัน (postgres) จึงไม่ถูกกระทบจากการ REVOKE
+--
+-- สิ่งที่ยังทำได้อยู่ (ยอมรับตั้งแต่ออกแบบ):
+--   - role postgres ผ่าน Supabase SQL Editor ยังลบได้ — เป็นทางออกฉุกเฉินที่จำเป็น
+--     และทิ้งร่องรอยคนละชั้น (ต้องเข้าถึง dashboard ไม่ใช่ช่องทางที่แอปเปิดไว้)
+--
+-- ต้องรันไฟล์เหล่านี้ให้ครบก่อน + ผ่าน QA เรื่องการกรองความลับ:
+--   1. database_patch_add_audit_logs.sql
+--   2. database_patch_audit_logs_all_tables.sql
+--   3. database_patch_audit_actor_from_server.sql
+--   4. database_patch_audit_ignore_machine_state.sql
+--   5. database_patch_audit_cleanup_before_lock.sql
+--
+-- ไฟล์นี้มีตัวกันพลาด 4 ชั้นที่จะหยุดทำงานเองถ้ายังไม่พร้อม (ดูด้านล่าง)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+-- ═══════════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ตัวกันพลาด 1 — trigger ต้องครบ 7 ตัวก่อนล็อก
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ถ้าล็อกตอน trigger ยังไม่ครบ จะเหลือตารางที่แก้ได้โดยไม่ทิ้งร่องรอย
+-- แล้วเราจะเข้าใจผิดว่าระบบคุมครบแล้ว
+
+do $$
+declare
+  _expected text[] := array[
+    'audit_bills', 'audit_expenses', 'audit_rooms', 'audit_meter_records',
+    'audit_tenants', 'audit_workspaces', 'audit_profiles'
+  ];
+  _found  text[];
+  _missing text[];
+begin
+  select coalesce(array_agg(tgname order by tgname), array[]::text[])
+    into _found
+  from pg_trigger
+  where tgname = any(_expected) and not tgisinternal and tgenabled = 'O';
+
+  select coalesce(array_agg(e order by e), array[]::text[])
+    into _missing
+  from unnest(_expected) e
+  where not (e = any(_found));
+
+  if array_length(_missing, 1) is not null then
+    raise exception
+      'ยังติด trigger ไม่ครบ (ขาด: %) — กรุณารันขั้นที่ 2 ให้เสร็จและผ่าน QA ก่อนล็อก',
+      array_to_string(_missing, ', ');
+  end if;
+end $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ตัวกันพลาด 2 — ต้องมี log จากทั้ง 7 ตารางแล้ว (พิสูจน์ว่าเคยทดสอบจริง)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- เตือนอย่างเดียว ไม่บล็อก — บางตารางอาจยังไม่มีเหตุการณ์เกิดขึ้นจริง
+-- แต่ถ้าตารางที่มีความลับ (workspaces / tenants / profiles) ยังไม่เคยถูกจด
+-- แปลว่ายังไม่ได้ทดสอบกฎกรอง ซึ่งอันตรายที่จะล็อกตอนนี้
+
+do $$
+declare _untested text[];
+begin
+  select coalesce(array_agg(t order by t), array[]::text[])
+    into _untested
+  from unnest(array['workspaces', 'tenants', 'profiles']) t
+  where not exists (select 1 from public.audit_logs where table_name = t);
+
+  if array_length(_untested, 1) is not null then
+    raise exception
+      'ตารางที่มีข้อมูลอ่อนไหวยังไม่เคยถูกจด log เลย (%) — ยังไม่ได้ทดสอบกฎกรองความลับ '
+      'กรุณาแก้ข้อมูลในตารางเหล่านั้นแล้วตรวจว่า promptpay_id/tenant_phone ถูกซ่อน ก่อนล็อก',
+      array_to_string(_untested, ', ');
+  end if;
+end $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ตัวกันพลาด 3 — ต้องไม่มีความลับหลุดอยู่ใน log ตอนนี้
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ตรวจหาค่าที่ "ควรถูกซ่อนแต่ไม่ถูกซ่อน" — ถ้าเจอ ต้องแก้ก่อนล็อก
+-- ไม่งั้นข้อมูลนั้นจะค้างอยู่ตลอดไปโดยลบไม่ได้
+
+do $$
+declare _leaks int;
+begin
+  select count(*) into _leaks
+  from public.audit_logs
+  where
+    -- promptpay/tax_id ที่ไม่ได้ถูกแปลงเป็นรูป ••• 4 ตัวท้าย
+    (before -> 'promptpay_id' is not null and (before ->> 'promptpay_id') not like '•••%')
+    or (after  -> 'promptpay_id' is not null and (after  ->> 'promptpay_id') not like '•••%')
+    or (before -> 'tax_id' is not null and (before ->> 'tax_id') not like '•••%')
+    or (after  -> 'tax_id' is not null and (after  ->> 'tax_id') not like '•••%')
+    -- เบอร์โทร/LINE UID ที่ไม่ได้ถูกซ่อน
+    or (before -> 'tenant_phone' is not null and (before ->> 'tenant_phone') <> '(ซ่อนไว้)')
+    or (after  -> 'tenant_phone' is not null and (after  ->> 'tenant_phone') <> '(ซ่อนไว้)')
+    or (before -> 'line_user_id' is not null and (before ->> 'line_user_id') <> '(ซ่อนไว้)')
+    or (after  -> 'line_user_id' is not null and (after  ->> 'line_user_id') <> '(ซ่อนไว้)')
+    -- LINE UID ของแอดมินที่ผูกเมนูล่างไว้ — คอลัมน์นี้ชื่อไม่ตรงกับ line_user_id
+    -- จึงรอดกฎซ่อนความลับ ต้องไม่มีเหลืออยู่เลย (ดู audit_ignored_columns)
+    or (before ? 'richmenu_admin_linked_uids')
+    or (after  ? 'richmenu_admin_linked_uids');
+
+  if _leaks > 0 then
+    raise exception
+      'พบ % แถวที่มีข้อมูลอ่อนไหวไม่ถูกกรอง — ห้ามล็อกตอนนี้ '
+      'ให้รัน database_patch_audit_ignore_machine_state.sql แล้วต่อด้วย '
+      'database_patch_audit_cleanup_before_lock.sql ก่อน (ยังลบได้เพราะยังไม่ REVOKE)',
+      _leaks;
+  end if;
+end $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ตัวกันพลาด 4 — กฎ "คอลัมน์ที่ไม่ต้องจด" ต้องถูกติดตั้งแล้ว
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ถ้ายังไม่ได้ติดตั้ง log จะเต็มไปด้วยสวิตช์ภายในของระบบ (สลิปใบเดียว = 7 แถว)
+-- แล้วเรื่องจริงจะจมหาย ซึ่งทำให้ระบบกันโกงใช้ไม่ได้จริง
+-- ต้องกันไว้ก่อนล็อก เพราะหลังล็อกแล้วล้างของเก่าออกไม่ได้
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'audit_capture'
+      and pg_get_functiondef(p.oid) like '%audit_ignored_columns%'
+  ) then
+    raise exception
+      'audit_capture ยังไม่ได้ใช้ audit_ignored_columns — '
+      'กรุณารัน database_patch_audit_ignore_machine_state.sql ก่อนล็อก';
+  end if;
+
+  if exists (
+    select 1 from public.audit_logs
+    where table_name in ('tenants', 'workspaces')
+      and changed_fields is not null
+      and array_length(changed_fields, 1) > 0
+      and changed_fields <@ public.audit_ignored_columns(table_name)
+  ) then
+    raise exception
+      'ยังมีแถวสภาวะภายในของระบบค้างอยู่ใน log — '
+      'กรุณารัน database_patch_audit_cleanup_before_lock.sql ก่อนล็อก';
+  end if;
+end $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ล็อก
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ถอน INSERT ด้วย: trigger เขียนได้อยู่แล้วในสิทธิ์เจ้าของฟังก์ชัน
+-- ผลคือแอปสร้างแถว log ปลอมไม่ได้ ต้องเกิดจากการแก้ข้อมูลจริงเท่านั้น
+
+revoke insert, update, delete, truncate on public.audit_logs from anon;
+revoke insert, update, delete, truncate on public.audit_logs from authenticated;
+revoke insert, update, delete, truncate on public.audit_logs from service_role;
+
+-- คงสิทธิ์อ่านไว้ (RLS คุมว่าใครเห็นแถวไหน)
+grant select on public.audit_logs to authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- ตรวจผล
+-- ═══════════════════════════════════════════════════════════════════════
+
+select
+  grantee                                                  as "role",
+  string_agg(privilege_type, ', ' order by privilege_type)  as "สิทธิ์ที่เหลือ",
+  case
+    when bool_or(privilege_type in ('INSERT','UPDATE','DELETE','TRUNCATE'))
+      then 'ยังเขียน/ลบได้ ⚠️'
+    when bool_or(privilege_type = 'SELECT')
+      then 'อ่านได้เท่านั้น ✅'
+    else 'ไม่มีสิทธิ์เลย'
+  end                                                      as "สรุป"
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name = 'audit_logs'
+  and grantee in ('anon', 'authenticated', 'service_role')
+group by grantee
+order by grantee;
 
