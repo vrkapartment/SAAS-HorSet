@@ -6187,7 +6187,17 @@ begin
 
   update public.tenants_old set reverted_at = now() where id = _old.id;
 
-  update public.rooms set status = 'Pending_Refund' where id = _room.id;
+  -- วันย้ายออกเดิมจากสัญญา — ไม่ใช่วันที่กดยกเลิก (ไม่งั้น trigger ตั้งเป็นวันนี้ แล้วแถบแจ้งย้ายออก
+  -- กับค่าเช่าตามสัดส่วนในหน้าคืนเงินประกันจะเลื่อนไปตามวันที่กด)
+  -- รูปแบบวันที่ผิด → null แล้วปล่อยให้ trigger ใช้วันนี้แทน ดีกว่าทำทั้งก้อนล้ม
+  update public.rooms
+  set status = 'Pending_Refund',
+      checkout_date = case
+        when substring(_c.cancellation_date from 1 for 10) ~ '^\d{4}-\d{2}-\d{2}$'
+          then substring(_c.cancellation_date from 1 for 10)::date
+        else null
+      end
+  where id = _room.id;
 
   update public.cancelled_contracts
   set reverted_at = now(), reverted_by = p_actor
