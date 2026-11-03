@@ -40,10 +40,13 @@ import {
   Zap,
   Droplet,
   ArrowRightLeft,
+  FileText,
+  MessageCircle,
   RotateCcw
 } from "lucide-react"
 import RoomTransferModal from "@/features/tenant/components/RoomTransferModal"
 import RevertCheckoutModal from "@/features/tenant/components/RevertCheckoutModal"
+import { RENT_WAIVED_LABEL, buildSettlementDocument, type CheckoutSettlement } from "@/features/tenant/checkout-settlement"
 import {
   getRooms, 
   createRoom, 
@@ -165,6 +168,11 @@ function RoomsContent() {
   // ยกเลิกการคืนห้องเฉพาะ Admin ของหอ (ไม่รวม Super Admin) เพราะต้องยืนยันด้วยรหัสผ่าน Admin ของหอนั้น
   const [isWorkspaceAdmin, setIsWorkspaceAdmin] = useState(false)
   const [revertTarget, setRevertTarget] = useState<{ id: string; roomNumber: string; tenantName: string } | null>(null)
+  // ใบสรุปการย้ายออก — สิทธิ์เดียวกับปุ่ม PDF / ส่ง LINE ของบิลค่าเช่า
+  const [canDownloadPdf, setCanDownloadPdf] = useState(false)
+  const [canSendLine, setCanSendLine] = useState(false)
+  const [settlementPdfLoadingId, setSettlementPdfLoadingId] = useState<string | null>(null)
+  const [settlementLineSendingId, setSettlementLineSendingId] = useState<string | null>(null)
   const [transferModalOpen, setTransferModalOpen] = useState(false)
 
   // CSV Import States
@@ -189,6 +197,8 @@ function RoomsContent() {
           setIsWorkspaceAdmin(profile.role === "admin")
           if (isUserAdminOrSuper) {
             setHasEditPermission(true)
+            setCanDownloadPdf(true)
+            setCanSendLine(true)
           } else {
             let perms = profile.permissions
             if (typeof perms === "string") {
@@ -197,6 +207,8 @@ function RoomsContent() {
             const defaultPerms = DEFAULT_STAFF_PERMISSIONS
             const userPerms = { ...defaultPerms, ...perms }
             setHasEditPermission(!!userPerms.manage_rooms_tenants_edit)
+            setCanDownloadPdf(!!userPerms.billing_download_pdf)
+            setCanSendLine(!!userPerms.billing_send_line)
           }
         }
       } catch (err) {
@@ -1666,11 +1678,13 @@ function RoomsContent() {
       
       // 2. สรุปการแบ่งประเภทรายได้หักภาษีปลายงวด
       let totalUtilities408 = 0
+      const elecRate = financeSettings?.electric_rate || 7
+      const waterRate = financeSettings?.water_rate || 18
+      const elecUnits = fElec - prevElec
+      const waterUnits = fWater - prevWater
+      const elecCost = elecUnits * elecRate
+      const waterCost = waterUnits * waterRate
       if (!isHistoricalEdit) {
-        const elecUnits = fElec - prevElec
-        const waterUnits = fWater - prevWater
-        const elecCost = elecUnits * (financeSettings?.electric_rate || 7)
-        const waterCost = waterUnits * (financeSettings?.water_rate || 18)
         totalUtilities408 = elecCost + waterCost
       }
 
@@ -1733,6 +1747,28 @@ function RoomsContent() {
         cancellationPayload.closingWaterPrev = prevWater
         cancellationPayload.closingWaterCurr = fWater
         cancellationPayload.roomId = refundingRoom.id
+
+        // รายละเอียดสำหรับใบสรุปการย้ายออก (PDF / LINE) — ตามที่กรอกไว้ในหน้านี้
+        // ยอดเงินจริงยังเป็นคอลัมน์ deducted_* ที่ server คิดซ้ำ ส่วนนี้แค่แจกแจงที่มา
+        const settlement: CheckoutSettlement = {
+          version: 1,
+          rent: {
+            waived: isRentWaived,
+            label: isRentWaived ? RENT_WAIVED_LABEL : undefined,
+            policy: financeSettings?.checkout_policy || "DAILY_PRORATE",
+            baseRent: refundingRoom.baseRent,
+            daysStayed: typeof daysStayed === "number" ? daysStayed : null,
+            amount: Number(rentDeductionVal)
+          },
+          utilities: {
+            elec: { units: elecUnits, rate: elecRate, amount: elecCost },
+            water: { units: waterUnits, rate: waterRate, amount: waterCost }
+          },
+          items: customDeductions
+            .map(d => ({ name: String(d.name || "").trim(), amount: Number(d.amount) || 0 }))
+            .filter(d => d.name !== "" && d.amount > 0)
+        }
+        cancellationPayload.settlement = settlement
       }
       
       if (isHistoricalEdit) {
@@ -1833,6 +1869,83 @@ function RoomsContent() {
   }
 
 
+
+  // แปลงแถวประวัติเป็นใบสรุปการย้ายออก — ตัวเลขทุกบรรทัดตัดสินที่ buildSettlementDocument ที่เดียว
+  const toSettlementDocument = (c: any) => buildSettlementDocument({
+    roomNumber: c.roomNumber || "-",
+    tenantName: c.tenantName || "",
+    cancellationDate: c.cancellationDate || "",
+    depositAmount: Number(c.depositAmount || 0),
+    actualRefund: Number(c.actualRefund ?? c.refundedAmount ?? 0),
+    forfeitedAmount: Number(c.forfeitedAmount || 0),
+    deductedRent405: Number(c.deductedRent405 || 0),
+    deductedUtilities408: Number(c.deductedUtilities408 || 0),
+    deductedServices408: Number(c.deductedServices408 || 0),
+    closingElecPrev: c.closingElecPrev ?? null,
+    closingElecCurr: c.closingElecCurr ?? null,
+    closingWaterPrev: c.closingWaterPrev ?? null,
+    closingWaterCurr: c.closingWaterCurr ?? null,
+    settlement: c.settlement ?? null
+  })
+
+  // บันทึกใบสรุปการย้ายออกเป็น PDF
+  const handleDownloadSettlementPdf = async (c: any) => {
+    if (!canDownloadPdf) {
+      showToast(t("rooms.toasts.permission_denied"), "error")
+      return
+    }
+    setSettlementPdfLoadingId(c.id)
+    try {
+      const { generateCheckoutSettlementPdf } = await import("@/lib/checkoutSettlementPdf")
+      const blob = await generateCheckoutSettlementPdf(toSettlementDocument(c), {
+        name: financeSettings?.name,
+        address: financeSettings?.tax_address,
+        phone: financeSettings?.tax_phone,
+        taxId: financeSettings?.tax_id
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `ใบสรุปย้ายออก-ห้อง${c.roomNumber}-${String(c.cancellationDate || "").substring(0, 10)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "สร้าง PDF ไม่สำเร็จ", "error")
+    } finally {
+      setSettlementPdfLoadingId(null)
+    }
+  }
+
+  // ส่งใบสรุปการย้ายออกเข้า LINE ของผู้เช่าที่ย้ายออก
+  const handleSendSettlementLine = async (c: any) => {
+    if (!canSendLine) {
+      showToast(t("rooms.toasts.permission_denied"), "error")
+      return
+    }
+    const resendNote = c.lineSentAt
+      ? `\n\nเคยส่งไปแล้วเมื่อ ${new Date(c.lineSentAt).toLocaleString("th-TH")} — ส่งซ้ำ?`
+      : ""
+    if (!confirm(`ส่งใบสรุปการย้ายออกห้อง ${c.roomNumber} ให้ ${c.tenantName || "ผู้เช่า"} ทาง LINE?${resendNote}`)) return
+
+    setSettlementLineSendingId(c.id)
+    try {
+      const { sendCheckoutSettlementLineAction } = await import("@/features/notification/checkout-settlement-line")
+      const res = await sendCheckoutSettlementLineAction(c.id)
+      if (res.success) {
+        const updated = cancelledContracts.map(x => x.id === c.id ? { ...x, lineSentAt: res.sentAt } : x)
+        setCancelledContracts(updated)
+        const wsId = getCookie("horset_current_workspace_id") || ""
+        if (wsId) setCachedData(wsId, "cancelled_contracts", updated)
+        showToast(`ส่งใบสรุปการย้ายออกห้อง ${c.roomNumber} ทาง LINE แล้ว`, "success")
+      } else {
+        showToast(res.error, "error")
+      }
+    } finally {
+      setSettlementLineSendingId(null)
+    }
+  }
 
   // ลบประวัติการยกเลิกสัญญา มาตรา 40(8)
   const handleDeleteCancellation = async (id: string) => {
@@ -3097,7 +3210,7 @@ function RoomsContent() {
                       <th className="py-3 px-4 text-right">{t("rooms.table_header_deposit")}</th>
                       <th className="py-3 px-4 text-right">{t("rooms.table_header_actual_refund")}</th>
                       <th className="py-3 px-4 text-right">{t("rooms.table_header_forfeited")}</th>
-                      <th className="py-3 px-4 text-center w-28">{t("rooms.table_header_action")}</th>
+                      <th className="py-3 px-4 text-center w-48">{t("rooms.table_header_action")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
@@ -3124,6 +3237,38 @@ function RoomsContent() {
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
+                            {canDownloadPdf && (
+                              <button
+                                onClick={() => handleDownloadSettlementPdf(c)}
+                                disabled={settlementPdfLoadingId === c.id}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 bg-slate-50 hover:bg-blue-50 dark:bg-slate-900 dark:hover:bg-blue-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90 disabled:opacity-50 disabled:cursor-wait"
+                                title="บันทึกใบสรุปการย้ายออกเป็น PDF"
+                              >
+                                {settlementPdfLoadingId === c.id
+                                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                  : <FileText className="w-4 h-4" />}
+                              </button>
+                            )}
+                            {canSendLine && (
+                              <button
+                                onClick={() => handleSendSettlementLine(c)}
+                                disabled={!c.hasLine || settlementLineSendingId === c.id}
+                                className={`p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed ${
+                                  c.lineSentAt
+                                    ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                                    : "text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                                }`}
+                                title={!c.hasLine
+                                  ? "ผู้เช่ารายนี้ไม่ได้เชื่อม LINE ไว้"
+                                  : c.lineSentAt
+                                    ? `ส่งทาง LINE แล้วเมื่อ ${new Date(c.lineSentAt).toLocaleString("th-TH")} (กดเพื่อส่งซ้ำ)`
+                                    : "ส่งใบสรุปการย้ายออกทาง LINE"}
+                              >
+                                {settlementLineSendingId === c.id
+                                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                  : <MessageCircle className="w-4 h-4" />}
+                              </button>
+                            )}
                             {isWorkspaceAdmin && (
                               <button
                                 onClick={() => setRevertTarget({ id: c.id, roomNumber: c.roomNumber, tenantName: c.tenantName || "" })}

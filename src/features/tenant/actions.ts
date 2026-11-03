@@ -21,6 +21,7 @@ import { billKindRank, hasBillSnapshot, readBillSnapshot, resolveBillPenalty } f
  */
 type BillOrderRow = { billing_cycle: string; bill_kind: string | null }
 import { calculateDepositProration, computeStandardDeposit } from "@/features/room/deposit-calculator"
+import { parseCheckoutSettlement, type CheckoutSettlement } from "@/features/tenant/checkout-settlement"
 import { getFinanceSettings } from "@/features/finance/actions"
 
 const isSupabaseConfigured = 
@@ -902,6 +903,25 @@ export async function getCancelledContracts(workspaceId: string) {
       throw error
     }
 
+    // ผู้เช่าที่ย้ายออกยังเชื่อม LINE อยู่หรือไม่ (ปุ่มส่งใบสรุปทาง LINE) — ส่งแค่ true/false ไม่ส่ง LINE id ไป client
+    const tenantIds = data.map((item: any) => item.tenant_id).filter(Boolean)
+    const lineLinkedTenantIds = new Set<string>()
+    if (tenantIds.length > 0) {
+      const { data: oldRows, error: oldError } = await supabase
+        .from("tenants_old")
+        .select("tenant_id, line_user_id")
+        .eq("workspace_id", workspaceId)
+        .in("tenant_id", tenantIds)
+      if (oldError) {
+        console.warn("[getCancelledContracts] อ่าน tenants_old ไม่ได้ (ปุ่มส่ง LINE จะกดไม่ได้):", oldError.message)
+      }
+      for (const row of oldRows ?? []) {
+        if (row.line_user_id) lineLinkedTenantIds.add(String(row.tenant_id))
+      }
+    }
+
+    const numOrNull = (value: unknown) => value === null || value === undefined ? null : Number(value)
+
     const formatted = data.map((item: any) => ({
       id: item.id,
       tenantId: item.tenant_id,
@@ -918,7 +938,15 @@ export async function getCancelledContracts(workspaceId: string) {
       // ยกเลิกการคืนห้องได้เฉพาะรายการที่เก็บเลขมิเตอร์ปิดห้องไว้ (ไม่งั้นย้อนมิเตอร์ไม่ได้)
       canRevert: !!item.tenant_id
         && item.closing_elec_curr !== null && item.closing_elec_curr !== undefined
-        && item.closing_water_curr !== null && item.closing_water_curr !== undefined
+        && item.closing_water_curr !== null && item.closing_water_curr !== undefined,
+      // ใบสรุปการย้ายออก (PDF / LINE)
+      closingElecPrev: numOrNull(item.closing_elec_prev),
+      closingElecCurr: numOrNull(item.closing_elec_curr),
+      closingWaterPrev: numOrNull(item.closing_water_prev),
+      closingWaterCurr: numOrNull(item.closing_water_curr),
+      settlement: parseCheckoutSettlement(item.settlement),
+      lineSentAt: typeof item.line_sent_at === "string" ? item.line_sent_at : null,
+      hasLine: !!item.tenant_id && lineLinkedTenantIds.has(String(item.tenant_id))
     }))
 
     return { success: true, data: formatted }
@@ -1026,6 +1054,9 @@ export async function saveCancelledContract(workspaceId: string, contract: {
 
   /** rooms.id ของห้องที่ย้ายออก — หน้าจดมิเตอร์ใช้แสดงเลขปิดห้องในรอบที่ย้ายออก */
   roomId?: string
+
+  /** รายละเอียดใบสรุปการย้ายออก (ดู checkout-settlement.ts) — ไม่ส่งตอนแก้ประวัติย้อนหลัง */
+  settlement?: CheckoutSettlement
 }) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -1153,6 +1184,9 @@ export async function saveCancelledContract(workspaceId: string, contract: {
     // ห้องที่ย้ายออก — ใส่เฉพาะเมื่อส่งมา (การแก้ประวัติย้อนหลังไม่ส่ง ไม่ให้ทับเป็น null)
     if (contract.roomId) {
       insertData.room_id = contract.roomId
+    }
+    if (contract.settlement) {
+      insertData.settlement = contract.settlement
     }
 
     if (contract.id) {

@@ -82,6 +82,7 @@ const ORDER = [
   "database_patch_add_revert_checkout.sql",
   "database_patch_add_room_checkout_date.sql",
   "database_patch_add_cancelled_contract_room_id.sql",
+  "database_patch_add_checkout_settlement.sql",
 ]
 
 // schema.sql = สคีมารุ่นเก่าก่อนรองรับหลาย workspace ไม่ใช้แล้ว (schema_multi_workspace.sql แทน)
