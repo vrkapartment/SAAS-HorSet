@@ -3,7 +3,8 @@ import { useLanguage } from "@/lib/translations/LanguageProvider"
 import { DynamicText } from "@/lib/translations/DynamicText"
 import { Save, Eye, Download, Send, CheckCircle, RefreshCw, Zap, Droplet, Sparkles, FileText, X, Copy, Check, AlertCircle, AlertTriangle, MessageSquare, Edit3, Lock, Wrench, Link, Trash2 } from "lucide-react"
 import { StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "@/features/permissions/types"
-import { generateSecurePortalLinkAction } from "@/features/tenant/actions"
+import { generateSecurePortalLinkAction, type CheckoutClosing } from "@/features/tenant/actions"
+import CheckoutClosingNotice from "@/features/billing/components/CheckoutClosingNotice"
 import { findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
 import { saveMeterReplacement, deleteMeterReplacement } from "@/features/meter/actions"
 import { useIsDesktop } from "@/hooks/useIsDesktop"
@@ -43,6 +44,8 @@ export type MeterReadingRow = {
   waiveElectricMin?: boolean
   waiveWaterMin?: boolean
   hasNotifiedCheckout?: boolean
+  /** ผู้เช่าย้ายออกในรอบนี้ (คืนเงินประกันแล้ว) — แสดงเลขมิเตอร์ช่วงของเขาแทนช่องกรอก ถ้าห้องว่างในรอบนี้ */
+  checkoutClosing?: CheckoutClosing | null
 }
 
 interface MeterReadingTableProps {
@@ -1225,6 +1228,8 @@ Thank you 🙏`
                         </p>
                       </div>
                     </div>
+                  ) : item.checkoutClosing && item.status !== "occupied" ? (
+                    <CheckoutClosingNotice closing={item.checkoutClosing} isDark={isDark} layout="card" />
                   ) : (
                     <>
                       {/* 1. แถบจัดการบิล (อ่านอย่างเดียว ไม่มีแบบกรอก ไม่มีปุ่มเซฟ) */}
@@ -1993,6 +1998,10 @@ Thank you 🙏`
                               </span>
                             </div>
                           </div>
+                        </td>
+                      ) : item.checkoutClosing && item.status !== "occupied" ? (
+                        <td colSpan={colSpanVal - 2} className="py-4 px-4">
+                          <CheckoutClosingNotice closing={item.checkoutClosing} isDark={isDark} layout="row" />
                         </td>
                       ) : (
                         <>

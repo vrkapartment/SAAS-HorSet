@@ -1732,6 +1732,7 @@ function RoomsContent() {
         cancellationPayload.closingElecCurr = fElec
         cancellationPayload.closingWaterPrev = prevWater
         cancellationPayload.closingWaterCurr = fWater
+        cancellationPayload.roomId = refundingRoom.id
       }
       
       if (isHistoricalEdit) {

@@ -31,6 +31,7 @@ import {
 import { createBill, updateBillStatus, getBillingPageData, saveAllBillsForCycle, type BulkBillItem } from "@/features/billing/actions"
 import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
 import { getRooms } from "@/features/room/actions"
+import { getCheckoutClosingsForCycle, type CheckoutClosing } from "@/features/tenant/actions"
 import { findActiveTenantInCycle, resolveTenantNameForCycle } from "@/features/tenant/occupancy"
 import { meterUnitsUsed } from "@/features/meter/utils"
 import { saveMeterRecord } from "@/features/meter/actions"
@@ -94,6 +95,7 @@ interface UnifiedRoomBillingItem {
   waiveWaterMin?: boolean
   invoiceId?: string
   hasNotifiedCheckout?: boolean
+  checkoutClosing?: CheckoutClosing | null
   vatAmount?: number
 }
 
@@ -520,6 +522,8 @@ function UnifiedBillingContent() {
       // ดึงข้อมูลทั้งหมดในคราวเดียวผ่าน Server Action แบบขนาน (หรือใช้ Cache ท้องถิ่นถ้ามีครบและไม่ใช่การ Force Refresh)
       let rooms = wsId ? getCachedData(wsId, "rooms", sharedCacheTtl) : null
       const prevCycle = getPreviousCycle(cycle)
+      // เลขมิเตอร์ของผู้เช่าที่ย้ายออกในรอบนี้ — ดึงสดทุกครั้ง (ไม่แคช) ขนานกับข้อมูลอื่น
+      const checkoutClosingsPromise = wsId ? getCheckoutClosingsForCycle(wsId, cycle) : Promise.resolve(null)
       let dbBills = wsId ? getCachedData(wsId, `bills_${cycle}`) : null
       let dbMeters = wsId ? getCachedData(wsId, `meters_${cycle}`) : null
       let dbReplacements = wsId ? getCachedData(wsId, `replacements_${cycle}`) : null
@@ -592,6 +596,9 @@ function UnifiedBillingContent() {
 
       // โหมด Supabase ดั้งเดิมและถาวร (รวมทุกห้องแม้ไม่มีผู้เช่า)
       const activeRooms = rooms
+      const checkoutClosings: CheckoutClosing[] = (await checkoutClosingsPromise)?.data ?? []
+      if (loadDataSeqRef.current !== seq) return
+
       const compiled = activeRooms.map((r: any) => {
         // จับคู่ด้วย rooms.id — เลขห้องซ้ำกันได้ข้ามอาคาร ถ้าเทียบด้วยเลขห้อง ห้อง 101 ของสองอาคาร
         // จะได้บิล/เลขมิเตอร์ของห้องเดียวกันมาแสดงทั้งคู่ แล้วการกดบันทึกจะเขียนทับกันเอง
@@ -686,6 +693,8 @@ function UnifiedBillingContent() {
           status: isOccupiedInCycle ? "occupied" : "available",
           buildingId: r.buildingId ?? null,
           hasNotifiedCheckout: !!hasNotifiedCheckout,
+          // แสดงช่วงมิเตอร์ของผู้เช่าที่ย้ายออก (หักจากเงินประกันแล้ว) แทนช่องกรอก เมื่อห้องว่างในรอบนี้
+          checkoutClosing: checkoutClosings.find(c => c.roomId === roomId) ?? null,
           
           meterRecordId: roomMeter?.id || undefined,
           elecPrev,

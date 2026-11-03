@@ -928,6 +928,64 @@ export async function getCancelledContracts(workspaceId: string) {
   }
 }
 
+/** เลขมิเตอร์ช่วงที่ผู้เช่าย้ายออกใช้ในรอบที่ย้ายออก (หักจากเงินประกันแล้ว) */
+export type CheckoutClosing = {
+  roomId: string
+  tenantName: string
+  cancellationDate: string
+  elecPrev: number
+  elecCurr: number
+  waterPrev: number
+  waterCurr: number
+}
+
+/**
+ * เลขมิเตอร์ปิดห้องของทุกห้องที่ย้ายออกในรอบบิลนี้ — ให้หน้าจดมิเตอร์แสดงช่วงของผู้เช่าที่ย้ายออก
+ *
+ * ทำไมต้องดึงจากที่นี่: ตอนคืนเงินประกัน แถว meter_records ของรอบนั้นถูกตั้งให้เริ่มนับใหม่ที่เลขปิด
+ * (กันผู้เช่าใหม่ถูกคิดหน่วยซ้ำ) ช่วงที่ผู้เช่าเดิมใช้จึงเหลืออยู่ใน cancelled_contracts.closing_* ที่เดียว
+ *
+ * แสดงอย่างเดียว — ห้ามนำไปออกบิล เพราะยอดนี้หักจากเงินประกันไปแล้ว
+ */
+export async function getCheckoutClosingsForCycle(workspaceId: string, billingCycle: string) {
+  if (!isSupabaseConfigured) {
+    return { success: false, data: [] as CheckoutClosing[] }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("cancelled_contracts")
+      .select("room_id, tenant_name, cancellation_date, closing_elec_prev, closing_elec_curr, closing_water_prev, closing_water_curr")
+      .eq("workspace_id", workspaceId)
+      .like("cancellation_date", `${billingCycle}%`)
+      .is("reverted_at", null)
+      .not("room_id", "is", null)
+      .not("closing_elec_curr", "is", null)
+
+    if (error) {
+      // ยังไม่ได้รัน patch / RLS ไม่ให้อ่าน → ไม่แสดงแถวย้ายออก หน้าจดมิเตอร์ทำงานต่อได้ปกติ
+      console.warn("[getCheckoutClosingsForCycle] อ่าน cancelled_contracts ไม่ได้:", error.message)
+      return { success: false, data: [] as CheckoutClosing[] }
+    }
+
+    const closings: CheckoutClosing[] = (data ?? []).map(row => ({
+      roomId: String(row.room_id),
+      tenantName: row.tenant_name || "",
+      cancellationDate: row.cancellation_date || "",
+      elecPrev: Number(row.closing_elec_prev ?? 0),
+      elecCurr: Number(row.closing_elec_curr ?? 0),
+      waterPrev: Number(row.closing_water_prev ?? 0),
+      waterCurr: Number(row.closing_water_curr ?? 0)
+    }))
+
+    return { success: true, data: closings }
+  } catch (error) {
+    console.warn("[getCheckoutClosingsForCycle]", error instanceof Error ? error.message : error)
+    return { success: false, data: [] as CheckoutClosing[] }
+  }
+}
+
 export async function saveCancelledContract(workspaceId: string, contract: {
   id?: string
   tenantId: string | null
@@ -965,6 +1023,9 @@ export async function saveCancelledContract(workspaceId: string, contract: {
   closingElecCurr?: number
   closingWaterPrev?: number
   closingWaterCurr?: number
+
+  /** rooms.id ของห้องที่ย้ายออก — หน้าจดมิเตอร์ใช้แสดงเลขปิดห้องในรอบที่ย้ายออก */
+  roomId?: string
 }) {
   if (!isSupabaseConfigured) {
     return { success: false, fallback: true }
@@ -1087,6 +1148,11 @@ export async function saveCancelledContract(workspaceId: string, contract: {
       insertData.closing_elec_curr = contract.closingElecCurr
       insertData.closing_water_prev = contract.closingWaterPrev ?? null
       insertData.closing_water_curr = contract.closingWaterCurr ?? null
+    }
+
+    // ห้องที่ย้ายออก — ใส่เฉพาะเมื่อส่งมา (การแก้ประวัติย้อนหลังไม่ส่ง ไม่ให้ทับเป็น null)
+    if (contract.roomId) {
+      insertData.room_id = contract.roomId
     }
 
     if (contract.id) {
