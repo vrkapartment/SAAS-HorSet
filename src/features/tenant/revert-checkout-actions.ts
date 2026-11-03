@@ -94,6 +94,11 @@ export async function revertCheckout(input: {
   password: string
   /** id การย้ายห้องที่ผู้ดูแลยืนยันให้ย้ายกลับ (null = ไม่มีการย้ายห้องเข้ามาทับ) */
   expectedTransferId: string | null
+  /**
+   * โทเค็น Cloudflare Turnstile — Supabase เปิด CAPTCHA ของการล็อกอินไว้
+   * การยืนยันรหัสผ่าน (signInWithPassword) จึงต้องแนบโทเค็นเหมือนหน้า login
+   */
+  captchaToken?: string
 }): Promise<RevertCheckoutResult> {
   try {
     if (!input.password) {
@@ -118,13 +123,14 @@ export async function revertCheckout(input: {
     })
     const { error: signInError } = await verifyClient.auth.signInWithPassword({
       email: guard.email,
-      password: input.password
+      password: input.password,
+      options: { captchaToken: input.captchaToken || undefined }
     })
     if (signInError) {
       if (/captcha/i.test(signInError.message)) {
         return {
           success: false,
-          error: "ยืนยันรหัสผ่านไม่ได้ เพราะ Supabase เปิด CAPTCHA สำหรับการล็อกอินไว้ — กรุณาแจ้งผู้พัฒนาระบบ"
+          error: "ตรวจสอบความปลอดภัย (Cloudflare) ไม่ผ่านหรือหมดอายุ กรุณาติ๊กตรวจสอบใหม่แล้วลองอีกครั้ง"
         }
       }
       return { success: false, error: "รหัสผ่านไม่ถูกต้อง — ยังไม่ได้ยกเลิกการคืนห้อง" }

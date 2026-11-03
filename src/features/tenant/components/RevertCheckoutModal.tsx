@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import Script from "next/script"
 import { AlertTriangle, ArrowRightLeft, Lock, RotateCcw, X } from "lucide-react"
 import { previewRevertCheckout, revertCheckout } from "@/features/tenant/revert-checkout-actions"
 import type { RevertCheckoutPlan } from "@/features/tenant/revert-checkout"
@@ -34,6 +35,50 @@ export default function RevertCheckoutModal({
   const [password, setPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
+  // Cloudflare Turnstile — Supabase เปิด CAPTCHA ของการล็อกอินไว้ การยืนยันรหัสผ่านจึงต้องแนบโทเค็น
+  // (ค่า fallback คือ test key ของ Cloudflare เหมือนหน้า login)
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const turnstileContainerRef = useRef<HTMLDivElement>(null)
+  const widgetIdRef = useRef<string | null>(null)
+
+  const renderTurnstile = useCallback(() => {
+    if (typeof window === "undefined" || !window.turnstile) return
+    if (!turnstileContainerRef.current || widgetIdRef.current) return
+    try {
+      widgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: turnstileSiteKey,
+        callback: (token: string) => setCaptchaToken(token),
+        "error-callback": () => setCaptchaToken(null),
+        "expired-callback": () => setCaptchaToken(null),
+        theme: "auto"
+      })
+    } catch (err) {
+      console.error("Turnstile render error:", err)
+    }
+  }, [turnstileSiteKey])
+
+  // โทเค็นใช้ได้ครั้งเดียว — ยืนยันไม่ผ่านต้องขอใหม่
+  const resetTurnstile = () => {
+    setCaptchaToken(null)
+    if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+      try { window.turnstile.reset(widgetIdRef.current) } catch { /* widget ถูกถอดไปแล้ว */ }
+    }
+  }
+
+  useEffect(() => {
+    if (step === "password") renderTurnstile()
+  }, [step, renderTurnstile])
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.turnstile && widgetIdRef.current) {
+        try { window.turnstile.remove(widgetIdRef.current) } catch { /* ไม่มี widget แล้ว */ }
+        widgetIdRef.current = null
+      }
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     previewRevertCheckout(contract.id).then(res => {
@@ -56,12 +101,17 @@ export default function RevertCheckoutModal({
       setError("กรุณากรอกรหัสผ่านของบัญชี Admin")
       return
     }
+    if (!captchaToken) {
+      setError("กรุณาผ่านการตรวจสอบความปลอดภัย (Cloudflare) ก่อน")
+      return
+    }
     setSubmitting(true)
     setError(null)
     const res = await revertCheckout({
       contractId: contract.id,
       password,
-      expectedTransferId: plan.transfer?.id ?? null
+      expectedTransferId: plan.transfer?.id ?? null,
+      captchaToken
     })
     setSubmitting(false)
     if (res.success) {
@@ -69,6 +119,7 @@ export default function RevertCheckoutModal({
     } else {
       setError(res.error)
       setPassword("")
+      resetTurnstile()
     }
   }
 
@@ -215,6 +266,12 @@ export default function RevertCheckoutModal({
                 className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-60"
               />
             </label>
+            <Script
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+              strategy="afterInteractive"
+              onReady={renderTurnstile}
+            />
+            <div ref={turnstileContainerRef} className="flex justify-center min-h-[65px]" />
             {error && (
               <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200/60 dark:border-red-900/40 text-xs text-red-700 dark:text-red-300">
                 {error}
@@ -231,7 +288,7 @@ export default function RevertCheckoutModal({
               </button>
               <button
                 type="submit"
-                disabled={submitting || !password}
+                disabled={submitting || !password || !captchaToken}
                 className="order-1 sm:order-2 w-full sm:flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? "กำลังยกเลิกการคืนห้อง..." : "ยืนยันด้วยรหัสผ่าน"}
