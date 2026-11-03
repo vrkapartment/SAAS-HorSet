@@ -292,6 +292,8 @@ export async function transferTenantRoom(input: TransferTenantRoomInput) {
       .eq("to_room_id", toRoom.id)
       .eq("billing_cycle", billingCycle)
       .eq("transfer_date", input.transferDate)
+      // การย้ายที่ถูกย้อนไปแล้วไม่นับ — ย้ายใหม่ด้วยวันเดิมได้
+      .is("reverted_at", null)
       .maybeSingle()
     if (duplicateError && duplicateError.code !== "42P01") {
       return { success: false, error: `ตรวจประวัติการย้ายซ้ำไม่สำเร็จ: ${duplicateError.message}` }
@@ -571,6 +573,7 @@ export async function getTenantRoomTransferHistory(workspaceId: string, tenantId
       .from("tenant_room_transfers")
       .select("*")
       .eq("workspace_id", workspaceId)
+      .is("reverted_at", null)
       .order("created_at", { ascending: false })
 
     if (tenantId) {

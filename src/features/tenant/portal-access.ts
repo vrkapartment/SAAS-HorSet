@@ -124,6 +124,7 @@ async function readTenantTransfers(db: SupabaseClient, tenant: PortalTenantRow):
     .select("id, tenant_id, from_room_id, to_room_id, transfer_date")
     .eq("workspace_id", tenant.workspace_id)
     .eq("tenant_id", tenant.id)
+    .is("reverted_at", null)
 
   if (error) {
     // อ่านประวัติไม่ได้ → เห็นแค่ห้องปัจจุบัน (ปลอดภัยกว่าเปิดกว้าง)

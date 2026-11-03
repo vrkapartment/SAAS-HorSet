@@ -184,6 +184,7 @@ export async function getRooms(workspaceId?: string) {
         .from("tenant_room_transfers")
         .select("id, tenant_id, from_room_id, to_room_id, transfer_date")
         .eq("workspace_id", workspaceId)
+        .is("reverted_at", null)
       if (transferError) {
         console.warn("[getRooms] อ่าน tenant_room_transfers ไม่ได้ (ใช้ lease_start อย่างเดียว):", transferError.message)
       } else {

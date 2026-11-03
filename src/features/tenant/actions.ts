@@ -253,6 +253,8 @@ export async function lazyCleanupPastDueTenants(workspaceId: string) {
       .select("tenant_id, room_number")
       .eq("workspace_id", workspaceId)
       .lte("cancellation_date", todayStr)
+      // ⚠️ ต้องข้ามรายการที่ยกเลิกการคืนห้องแล้ว ไม่งั้นผู้เช่าที่เพิ่งคืนกลับเข้าห้องจะถูกลบออกอีกรอบ
+      .is("reverted_at", null)
 
     if (cancelError) throw cancelError
 
@@ -341,6 +343,8 @@ export async function getOldTenants(workspaceId?: string) {
       .from("tenants_old")
       .select("id, tenant_id, room_number, tenant_name, tenant_phone, line_user_id, lease_start, lease_end, moved_out_at")
       .gte("moved_out_at", cutoffDate)
+      // ผู้เช่าที่ถูกคืนกลับเข้าห้อง (ยกเลิกการคืนห้อง) ไม่ใช่ผู้เช่าเก่าแล้ว
+      .is("reverted_at", null)
     if (workspaceId) {
       query = query.eq("workspace_id", workspaceId)
     }
@@ -886,6 +890,8 @@ export async function getCancelledContracts(workspaceId: string) {
       .from("cancelled_contracts")
       .select("*")
       .eq("workspace_id", workspaceId)
+      // รายการที่ยกเลิกการคืนห้องแล้วไม่มีผล — ไม่แสดงในประวัติและไม่นับใน ภ.ง.ด.
+      .is("reverted_at", null)
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -908,7 +914,11 @@ export async function getCancelledContracts(workspaceId: string) {
       forfeitedAmount: Number(item.forfeited_amount || 0),
       deductedRent405: Number(item.deducted_rent_405 || 0),
       deductedUtilities408: Number(item.deducted_utilities_408 || 0),
-      deductedServices408: Number(item.deducted_services_408 || 0)
+      deductedServices408: Number(item.deducted_services_408 || 0),
+      // ยกเลิกการคืนห้องได้เฉพาะรายการที่เก็บเลขมิเตอร์ปิดห้องไว้ (ไม่งั้นย้อนมิเตอร์ไม่ได้)
+      canRevert: !!item.tenant_id
+        && item.closing_elec_curr !== null && item.closing_elec_curr !== undefined
+        && item.closing_water_curr !== null && item.closing_water_curr !== undefined
     }))
 
     return { success: true, data: formatted }

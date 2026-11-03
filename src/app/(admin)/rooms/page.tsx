@@ -39,10 +39,12 @@ import {
   Coins,
   Zap,
   Droplet,
-  ArrowRightLeft
+  ArrowRightLeft,
+  RotateCcw
 } from "lucide-react"
 import RoomTransferModal from "@/features/tenant/components/RoomTransferModal"
-import { 
+import RevertCheckoutModal from "@/features/tenant/components/RevertCheckoutModal"
+import {
   getRooms, 
   createRoom, 
   updateRoom, 
@@ -158,6 +160,9 @@ function RoomsContent() {
   const [hasEditPermission, setHasEditPermission] = useState(true)
   // ย้ายห้องจำกัดสิทธิ์เฉพาะ Admin/Super Admin เท่านั้น (เข้มกว่า hasEditPermission ทั่วไป เพราะแตะเงินประกัน)
   const [isAdminOrSuper, setIsAdminOrSuper] = useState(false)
+  // ยกเลิกการคืนห้องเฉพาะ Admin ของหอ (ไม่รวม Super Admin) เพราะต้องยืนยันด้วยรหัสผ่าน Admin ของหอนั้น
+  const [isWorkspaceAdmin, setIsWorkspaceAdmin] = useState(false)
+  const [revertTarget, setRevertTarget] = useState<{ id: string; roomNumber: string; tenantName: string } | null>(null)
   const [transferModalOpen, setTransferModalOpen] = useState(false)
 
   // CSV Import States
@@ -179,6 +184,7 @@ function RoomsContent() {
           const profile = res.data
           const isUserAdminOrSuper = profile.role === "admin" || profile.role === "super_admin"
           setIsAdminOrSuper(isUserAdminOrSuper)
+          setIsWorkspaceAdmin(profile.role === "admin")
           if (isUserAdminOrSuper) {
             setHasEditPermission(true)
           } else {
@@ -3109,6 +3115,18 @@ function RoomsContent() {
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
+                            {isWorkspaceAdmin && (
+                              <button
+                                onClick={() => setRevertTarget({ id: c.id, roomNumber: c.roomNumber, tenantName: c.tenantName || "" })}
+                                disabled={!c.canRevert}
+                                className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 bg-slate-50 hover:bg-amber-50 dark:bg-slate-900 dark:hover:bg-amber-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-50 disabled:hover:text-slate-400"
+                                title={c.canRevert
+                                  ? "ยกเลิกการคืนห้อง/ย้ายออก"
+                                  : "ยกเลิกไม่ได้ — รายการนี้ไม่มีเลขมิเตอร์ตอนปิดห้อง"}
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleEditCancelledContract(c)}
                               className="p-1.5 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 bg-slate-50 hover:bg-purple-50 dark:bg-slate-900 dark:hover:bg-purple-950/20 border border-slate-200/40 dark:border-slate-800 rounded-lg transition-all cursor-pointer active:scale-90"
@@ -5461,6 +5479,26 @@ function RoomsContent() {
             onSuccess={({ toRoomNumber }) => {
               setTransferModalOpen(false)
               showToast(`ย้ายห้องสำเร็จ! ย้ายไปห้อง ${toRoomNumber} เรียบร้อยแล้ว`, "success")
+              loadData(true)
+            }}
+          />
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL 8: ยกเลิกการคืนห้อง/ย้ายออก (Admin + รหัสผ่าน) */}
+        {/* ========================================================= */}
+        {revertTarget && (
+          <RevertCheckoutModal
+            contract={revertTarget}
+            onClose={() => setRevertTarget(null)}
+            onSuccess={(plan) => {
+              setRevertTarget(null)
+              showToast(
+                plan.transfer
+                  ? `ยกเลิกการคืนห้อง ${plan.roomNumber} แล้ว และย้าย ${plan.transfer.tenantName} กลับห้อง ${plan.transfer.fromRoomNumber}`
+                  : `ยกเลิกการคืนห้อง ${plan.roomNumber} แล้ว — ห้องกลับเป็นรอคืนเงินประกัน`,
+                "success"
+              )
               loadData(true)
             }}
           />

@@ -82,6 +82,8 @@ async function fetchTransferSegments(
     `)
     .eq("workspace_id", workspaceId)
     .eq("billing_cycle", billingCycle)
+    // การย้ายที่ถูกย้อนแล้ว (ยกเลิกการคืนห้อง) ผู้เช่ากลับห้องเดิม ค่าน้ำ-ไฟห้องเดิมต้องไม่ถูกยกมาอีก
+    .is("reverted_at", null)
     .order("transfer_date", { ascending: true })
 
   // ตารางหรือคอลัมน์ยังไม่มี (ยังไม่ได้รัน patch) → ไม่มี segment ให้รวม ออกบิลต่อได้ปกติ

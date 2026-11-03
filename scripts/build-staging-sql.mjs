@@ -77,6 +77,9 @@ const ORDER = [
   "database_patch_audit_ignore_machine_state.sql",
   "database_patch_audit_cleanup_before_lock.sql",
   "database_patch_audit_logs_lock.sql",
+
+  // 14) ยกเลิกการคืนห้อง — อ่าน audit_logs เพื่อคืนค่ามิเตอร์/ผู้เช่า จึงต้องมาหลังชุด audit
+  "database_patch_add_revert_checkout.sql",
 ]
 
 // schema.sql = สคีมารุ่นเก่าก่อนรองรับหลาย workspace ไม่ใช้แล้ว (schema_multi_workspace.sql แทน)
