@@ -336,6 +336,8 @@ function RoomsContent() {
   const [refundError, setRefundError] = useState<string | null>(null)
   const [refundSubmitting, setRefundSubmitting] = useState(false)
   const [editingCancelledContractId, setEditingCancelledContractId] = useState<string | null>(null)
+  // รายละเอียดใบสรุปเดิมของรายการที่กำลังแก้ประวัติ — คงส่วนที่ไม่ได้แก้ (ค่าน้ำ-ไฟ/จำนวนวัน) ไว้ตอนบันทึก
+  const [editingSettlement, setEditingSettlement] = useState<CheckoutSettlement | null>(null)
   const [historicalRentDeduction, setHistoricalRentDeduction] = useState<number | "">(0)
   const [historicalUtilitiesDeduction, setHistoricalUtilitiesDeduction] = useState<number | "">(0)
   const [isHistoricalBreach, setIsHistoricalBreach] = useState<boolean>(false)
@@ -1609,10 +1611,18 @@ function RoomsContent() {
     const wasRefundZero = Number(c.actualRefund ?? c.refundedAmount ?? 0) === 0
     setIsHistoricalBreach(wasRefundZero)
     
-    setCustomDeductions([
-      { id: "edit-1", name: "ค่าบริการและค่าปรับอื่นๆ", amount: c.deductedServices408 || 0 }
-    ])
-    
+    // รายการหักแยกตามที่บันทึกไว้ (ชื่อ + ยอด) — ถ้าผลรวมไม่ตรงยอดจริง (ข้อมูลเก่า) ถอยไปเป็นก้อนเดียวเหมือนเดิม
+    const savedItems: { name: string; amount: number }[] = c.settlement?.items ?? []
+    const savedItemsSum = savedItems.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+    if (savedItems.length > 0 && Math.abs(savedItemsSum - Number(c.deductedServices408 || 0)) < 0.01) {
+      setCustomDeductions(savedItems.map((item, i) => ({ id: `edit-${i + 1}`, name: item.name, amount: item.amount })))
+    } else {
+      setCustomDeductions([
+        { id: "edit-1", name: "ค่าบริการและค่าปรับอื่นๆ", amount: c.deductedServices408 || 0 }
+      ])
+    }
+    setEditingSettlement(c.settlement ?? null)
+
     setRefundError(null)
     setRefundModalOpen(true)
   }
@@ -1773,8 +1783,24 @@ function RoomsContent() {
       
       if (isHistoricalEdit) {
         cancellationPayload.id = editingCancelledContractId
+
+        // แก้ประวัติย้อนหลัง: บันทึกรายการหักแยกตามชื่อที่แก้ด้วย (เดิมไม่ส่ง ใบสรุปจึงรวมเป็นก้อนเดียว)
+        // ส่วนที่หน้านี้ไม่ได้แก้ (ค่าน้ำ-ไฟแยก, จำนวนวัน) ใช้ของเดิม — ใบสรุปจะเช็คผลรวมกับยอดจริงเองอีกชั้น
+        cancellationPayload.settlement = {
+          version: 1,
+          rent: {
+            ...(editingSettlement?.rent ?? {}),
+            waived: isRentWaived,
+            label: isRentWaived ? (editingSettlement?.rent.label || RENT_WAIVED_LABEL) : undefined,
+            amount: Number(rentDeductionVal)
+          },
+          utilities: editingSettlement?.utilities,
+          items: customDeductions
+            .map(d => ({ name: String(d.name || "").trim(), amount: Number(d.amount) || 0 }))
+            .filter(d => d.name !== "" && d.amount > 0)
+        } satisfies CheckoutSettlement
       }
-      
+
       const saveRes = await saveCancelledContract(wsId, cancellationPayload)
       if (!saveRes.success) {
         setRefundError(saveRes.error || t("rooms.toasts.tax_submitting_error"))

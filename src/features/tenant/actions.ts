@@ -1055,7 +1055,7 @@ export async function saveCancelledContract(workspaceId: string, contract: {
   /** rooms.id ของห้องที่ย้ายออก — หน้าจดมิเตอร์ใช้แสดงเลขปิดห้องในรอบที่ย้ายออก */
   roomId?: string
 
-  /** รายละเอียดใบสรุปการย้ายออก (ดู checkout-settlement.ts) — ไม่ส่งตอนแก้ประวัติย้อนหลัง */
+  /** รายละเอียดใบสรุปการย้ายออก (ดู checkout-settlement.ts) — ส่งทั้งตอนคืนเงินประกันและตอนแก้ประวัติย้อนหลัง */
   settlement?: CheckoutSettlement
 }) {
   if (!isSupabaseConfigured) {
