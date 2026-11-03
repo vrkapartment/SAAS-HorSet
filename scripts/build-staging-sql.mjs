@@ -80,6 +80,7 @@ const ORDER = [
 
   // 14) ยกเลิกการคืนห้อง — อ่าน audit_logs เพื่อคืนค่ามิเตอร์/ผู้เช่า จึงต้องมาหลังชุด audit
   "database_patch_add_revert_checkout.sql",
+  "database_patch_add_room_checkout_date.sql",
 ]
 
 // schema.sql = สคีมารุ่นเก่าก่อนรองรับหลาย workspace ไม่ใช้แล้ว (schema_multi_workspace.sql แทน)

@@ -220,6 +220,8 @@ export async function getRooms(workspaceId?: string) {
         roomNumber: room.room_number,
         floor: room.floor || "",
         status: room.status,
+        // วันย้ายออกที่แจ้งไว้ (มีค่าเฉพาะห้องที่รอคืนเงินประกัน)
+        checkoutDate: typeof room.checkout_date === "string" ? room.checkout_date : null,
         baseRent: room.room_types ? Number(room.room_types.default_rent) : Number(room.base_rent),
         tenantId: tenant ? tenant.id : null,
         tenantName: tenant ? tenant.tenant_name : null,
@@ -681,7 +683,16 @@ export async function createRoomsBatch(rooms: {
   }
 }
 
-export async function updateRoomStatus(id: string, status: "occupied" | "available" | "Pending_Refund") {
+/**
+ * @param checkoutDate วันย้ายออกที่แจ้ง (YYYY-MM-DD) — ส่งมาเฉพาะตอนแจ้งย้ายออก (Pending_Refund)
+ *   หน้าจดมิเตอร์/ดูบิลใช้ค่านี้ขึ้นแถบ "แจ้งย้ายออก" เฉพาะรอบนั้นเป็นต้นไป
+ *   สถานะอื่นไม่ต้องส่ง — trigger ในฐานข้อมูลล้างค่าให้เอง (database_patch_add_room_checkout_date.sql)
+ */
+export async function updateRoomStatus(
+  id: string,
+  status: "occupied" | "available" | "Pending_Refund",
+  checkoutDate?: string
+) {
   try {
     const { assertSubscriptionActive, getCurrentWorkspaceId } = await import("@/features/subscription/actions")
     const workspaceId = await getCurrentWorkspaceId()
@@ -692,7 +703,11 @@ export async function updateRoomStatus(id: string, status: "occupied" | "availab
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("rooms")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({
+        status,
+        ...(status === "Pending_Refund" && checkoutDate ? { checkout_date: checkoutDate } : {}),
+        updated_at: new Date().toISOString()
+      })
       .eq("id", id)
       .select()
 

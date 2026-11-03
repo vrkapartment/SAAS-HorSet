@@ -124,3 +124,21 @@ export function sortFloors(floors: string[]): string[] {
     a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
   )
 }
+
+/**
+ * รอบบิลนี้ต้องขึ้นแถบ "แจ้งย้ายออกในรอบบิลนี้" หรือไม่
+ *
+ * ขึ้นตั้งแต่รอบของวันย้ายออกที่แจ้งไว้เป็นต้นไป — รอบก่อนหน้าผู้เช่ายังอยู่ปกติ
+ * ต้องดู/จดมิเตอร์และออกบิลได้ตามเดิม (เดิมขึ้นแถบทุกรอบ ทำให้ดูย้อนหลังไม่ได้)
+ *
+ * ห้องที่ไม่มีวันย้ายออก (แจ้งก่อนมีคอลัมน์ checkout_date และหา log ไม่เจอ)
+ * ถอยไปพฤติกรรมเดิมคือขึ้นทุกรอบ — ปลอดภัยกว่าเปิดให้ออกบิลรอบที่ผู้เช่าย้ายออกแล้ว
+ */
+export function isCheckoutNoticeCycle(
+  room: { status: string; checkoutDate?: string | null },
+  billingCycle: string
+): boolean {
+  if (room.status !== "Pending_Refund") return false
+  if (!room.checkoutDate) return true
+  return billingCycle >= room.checkoutDate.substring(0, 7)
+}

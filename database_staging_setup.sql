@@ -14,7 +14,7 @@
 -- วิธีใช้: คัดลอกทั้งไฟล์ไปวางใน Supabase SQL Editor แล้วกด Run ครั้งเดียว
 --         ถ้าเจอ error ให้ดูว่า error อยู่ในส่วนของไฟล์ไหน (มีหัวข้อคั่นไว้ทุกไฟล์)
 --
--- รวม 36 ไฟล์:
+-- รวม 37 ไฟล์:
 --   1. schema_multi_workspace.sql  (สคีมาหลัก)
 --   2. database_patch_fix_handle_new_user_workspace_fallback.sql
 --   3. database_patch_add_vat_pp30.sql
@@ -51,11 +51,12 @@
 --   34. database_patch_audit_cleanup_before_lock.sql
 --   35. database_patch_audit_logs_lock.sql
 --   36. database_patch_add_revert_checkout.sql
+--   37. database_patch_add_room_checkout_date.sql
 ------------------------------------------------------------------------------
 
 
 ------------------------------------------------------------------------------
--- [1/36]  schema_multi_workspace.sql
+-- [1/37]  schema_multi_workspace.sql
 ------------------------------------------------------------------------------
 
 -- =========================================================================
@@ -1510,7 +1511,7 @@ using (public.get_current_user_role() = 'super_admin');
 
 
 ------------------------------------------------------------------------------
--- [2/36]  database_patch_fix_handle_new_user_workspace_fallback.sql
+-- [2/37]  database_patch_fix_handle_new_user_workspace_fallback.sql
 ------------------------------------------------------------------------------
 
 -- Patch: fix_handle_new_user_workspace_fallback
@@ -1550,7 +1551,7 @@ $$ language plpgsql security definer;
 
 
 ------------------------------------------------------------------------------
--- [3/36]  database_patch_add_vat_pp30.sql
+-- [3/37]  database_patch_add_vat_pp30.sql
 ------------------------------------------------------------------------------
 
 -- ============================================================================
@@ -1897,7 +1898,7 @@ using (public.get_current_user_role() in ('admin', 'staff', 'super_admin'));
 
 
 ------------------------------------------------------------------------------
--- [4/36]  database_patch_add_pp30_output_vat_manual.sql
+-- [4/37]  database_patch_add_pp30_output_vat_manual.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_pp30_output_vat_manual
@@ -1917,7 +1918,7 @@ alter table public.pp30_filings
 
 
 ------------------------------------------------------------------------------
--- [5/36]  database_patch_add_building_utility_billing.sql
+-- [5/37]  database_patch_add_building_utility_billing.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_building_utility_billing
@@ -2075,7 +2076,7 @@ where b.building_id is null
 
 
 ------------------------------------------------------------------------------
--- [6/36]  database_patch_add_staff_building_access.sql
+-- [6/37]  database_patch_add_staff_building_access.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_staff_building_access
@@ -2386,7 +2387,7 @@ using (
 
 
 ------------------------------------------------------------------------------
--- [7/36]  database_patch_add_tenant_room_transfers.sql
+-- [7/37]  database_patch_add_tenant_room_transfers.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_tenant_room_transfers
@@ -2505,7 +2506,7 @@ where t.room_id = r.id
 
 
 ------------------------------------------------------------------------------
--- [8/36]  database_patch_add_meter_entry_mode.sql
+-- [8/37]  database_patch_add_meter_entry_mode.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_meter_entry_mode
@@ -2567,7 +2568,7 @@ comment on column public.workspaces.meter_entry_floor is 'ขอบเขตช�
 
 
 ------------------------------------------------------------------------------
--- [9/36]  database_patch_add_room_id_to_meters_bills.sql
+-- [9/37]  database_patch_add_room_id_to_meters_bills.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_room_id_to_meters_bills
@@ -2652,7 +2653,7 @@ comment on column public.bills.room_id is 'ตัวระบุห้องท�
 
 
 ------------------------------------------------------------------------------
--- [10/36]  database_patch_fix_tenant_rls_scope.sql
+-- [10/37]  database_patch_fix_tenant_rls_scope.sql
 ------------------------------------------------------------------------------
 
 -- Patch: fix_tenant_rls_scope
@@ -2769,7 +2770,7 @@ using (
 
 
 ------------------------------------------------------------------------------
--- [11/36]  database_patch_room_id_identity_1_additive.sql
+-- [11/37]  database_patch_room_id_identity_1_additive.sql
 ------------------------------------------------------------------------------
 
 -- Patch: room_id_identity — ส่วนที่ 1 จาก 2 "เพิ่มของใหม่เท่านั้น"
@@ -2951,7 +2952,7 @@ end $$;
 
 
 ------------------------------------------------------------------------------
--- [12/36]  database_patch_room_id_identity_2_switch.sql
+-- [12/37]  database_patch_room_id_identity_2_switch.sql
 ------------------------------------------------------------------------------
 
 -- Patch: room_id_identity — ส่วนที่ 2 จาก 2 "สวิตช์เปิดใช้จริง"
@@ -3107,7 +3108,7 @@ end $$;
 
 
 ------------------------------------------------------------------------------
--- [13/36]  database_patch_room_id_identity_3_close_null_building_gap.sql
+-- [13/37]  database_patch_room_id_identity_3_close_null_building_gap.sql
 ------------------------------------------------------------------------------
 
 -- Patch: room_id_identity — ส่วนที่ 3 "ปิดช่องห้องที่ไม่มีอาคาร"
@@ -3181,7 +3182,7 @@ comment on index public.rooms_workspace_room_number_no_building_key is
 
 
 ------------------------------------------------------------------------------
--- [14/36]  database_patch_add_bill_snapshot.sql
+-- [14/37]  database_patch_add_bill_snapshot.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_bill_snapshot
@@ -3338,7 +3339,7 @@ comment on column public.bills.water_min_unit is 'snapshot: จำนวนห�
 
 
 ------------------------------------------------------------------------------
--- [15/36]  database_patch_add_saas_payments_manual_review.sql
+-- [15/37]  database_patch_add_saas_payments_manual_review.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_saas_payments_manual_review
@@ -3363,7 +3364,7 @@ alter table public.saas_payments
 
 
 ------------------------------------------------------------------------------
--- [16/36]  database_patch_add_saas_payments_archived_drive_url.sql
+-- [16/37]  database_patch_add_saas_payments_archived_drive_url.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_saas_payments_archived_drive_url
@@ -3381,7 +3382,7 @@ alter table public.saas_payments
 
 
 ------------------------------------------------------------------------------
--- [17/36]  database_patch_add_super_admin_line_settings.sql
+-- [17/37]  database_patch_add_super_admin_line_settings.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_super_admin_line_settings
@@ -3417,7 +3418,7 @@ create policy "Super Admins can manage super admin line settings"
 
 
 ------------------------------------------------------------------------------
--- [18/36]  database_patch_add_super_admin_line_connection.sql
+-- [18/37]  database_patch_add_super_admin_line_connection.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_super_admin_line_connection
@@ -3460,7 +3461,7 @@ create policy "Super Admins can manage their own connection codes"
 
 
 ------------------------------------------------------------------------------
--- [19/36]  database_patch_add_super_admin_line_quota_behavior.sql
+-- [19/37]  database_patch_add_super_admin_line_quota_behavior.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_super_admin_line_quota_behavior
@@ -3483,7 +3484,7 @@ alter table public.super_admin_line_settings
 
 
 ------------------------------------------------------------------------------
--- [20/36]  database_patch_add_workspace_google_drive_settings.sql
+-- [20/37]  database_patch_add_workspace_google_drive_settings.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_workspace_google_drive_settings
@@ -3522,7 +3523,7 @@ create policy "Users can manage their own workspace google drive settings"
 
 
 ------------------------------------------------------------------------------
--- [21/36]  database_patch_move_segments.sql
+-- [21/37]  database_patch_move_segments.sql
 ------------------------------------------------------------------------------
 
 -- Patch: move_segments
@@ -3684,7 +3685,7 @@ notify pgrst, 'reload schema';
 
 
 ------------------------------------------------------------------------------
--- [22/36]  database_patch_add_meter_records_updated_at.sql
+-- [22/37]  database_patch_add_meter_records_updated_at.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_meter_records_updated_at
@@ -3759,7 +3760,7 @@ create trigger set_meter_records_updated_at
 
 
 ------------------------------------------------------------------------------
--- [23/36]  database_patch_add_line_richmenu.sql
+-- [23/37]  database_patch_add_line_richmenu.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_line_richmenu
@@ -3820,7 +3821,7 @@ comment on column public.workspace_line_settings.richmenu_enabled is
 
 
 ------------------------------------------------------------------------------
--- [24/36]  database_patch_add_line_admin_richmenu.sql
+-- [24/37]  database_patch_add_line_admin_richmenu.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_line_admin_richmenu
@@ -3899,7 +3900,7 @@ comment on column public.workspace_line_settings.richmenu_admin_linked_uids is
 
 
 ------------------------------------------------------------------------------
--- [25/36]  database_patch_add_line_slip_upload.sql
+-- [25/37]  database_patch_add_line_slip_upload.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_line_slip_upload
@@ -3952,7 +3953,7 @@ comment on column public.tenants.slip_target_bill_id is
 
 
 ------------------------------------------------------------------------------
--- [26/36]  database_patch_add_paid_notify.sql
+-- [26/37]  database_patch_add_paid_notify.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_paid_notify
@@ -3986,7 +3987,7 @@ comment on column public.workspace_line_settings.paid_notify_template is
 
 
 ------------------------------------------------------------------------------
--- [27/36]  database_patch_fix_support_access_rls.sql
+-- [27/37]  database_patch_fix_support_access_rls.sql
 ------------------------------------------------------------------------------
 
 -- Patch: fix_support_access_rls
@@ -4268,7 +4269,7 @@ order by tablename, cmd, policyname;
 
 
 ------------------------------------------------------------------------------
--- [28/36]  database_patch_add_staff_read_tenant_room_transfers.sql
+-- [28/37]  database_patch_add_staff_read_tenant_room_transfers.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_staff_read_tenant_room_transfers
@@ -4313,7 +4314,7 @@ using (
 
 
 ------------------------------------------------------------------------------
--- [29/36]  database_patch_tenant_bills_rls_own_only.sql
+-- [29/37]  database_patch_tenant_bills_rls_own_only.sql
 ------------------------------------------------------------------------------
 
 -- Patch: tenant_bills_rls_own_only
@@ -4374,7 +4375,7 @@ using (
 
 
 ------------------------------------------------------------------------------
--- [30/36]  database_patch_add_audit_logs.sql
+-- [30/37]  database_patch_add_audit_logs.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_audit_logs (ขั้นที่ 1 จาก 2)
@@ -4666,7 +4667,7 @@ from pg_policies where schemaname = 'public' and tablename = 'audit_logs';
 
 
 ------------------------------------------------------------------------------
--- [31/36]  database_patch_audit_logs_all_tables.sql
+-- [31/37]  database_patch_audit_logs_all_tables.sql
 ------------------------------------------------------------------------------
 
 -- Patch: audit_logs_all_tables (ขั้นที่ 2 จาก 3)
@@ -4779,7 +4780,7 @@ order by c.relname;
 
 
 ------------------------------------------------------------------------------
--- [32/36]  database_patch_audit_actor_from_server.sql
+-- [32/37]  database_patch_audit_actor_from_server.sql
 ------------------------------------------------------------------------------
 
 -- Patch: audit_actor_from_server (ขั้นที่ 2.5 — ทำก่อนขั้นที่ 3 ที่ล็อกถาวร)
@@ -5044,7 +5045,7 @@ where n.nspname = 'public'
 
 
 ------------------------------------------------------------------------------
--- [33/36]  database_patch_audit_ignore_machine_state.sql
+-- [33/37]  database_patch_audit_ignore_machine_state.sql
 ------------------------------------------------------------------------------
 
 -- Patch: audit_ignore_machine_state (ขั้นที่ 2.6 — ทำก่อนขั้นที่ 3 ที่ล็อกถาวร)
@@ -5375,7 +5376,7 @@ where n.nspname = 'public' and t.tgname like 'audit_%'
 
 
 ------------------------------------------------------------------------------
--- [34/36]  database_patch_audit_cleanup_before_lock.sql
+-- [34/37]  database_patch_audit_cleanup_before_lock.sql
 ------------------------------------------------------------------------------
 
 -- Patch: audit_cleanup_before_lock (ขั้นที่ 2.7 — ขั้นสุดท้ายก่อนล็อกถาวร)
@@ -5557,7 +5558,7 @@ order by 1;
 
 
 ------------------------------------------------------------------------------
--- [35/36]  database_patch_audit_logs_lock.sql
+-- [35/37]  database_patch_audit_logs_lock.sql
 ------------------------------------------------------------------------------
 
 -- Patch: audit_logs_lock (ขั้นที่ 3 จาก 3 — ขั้นสุดท้าย)
@@ -5764,7 +5765,7 @@ order by grantee;
 
 
 ------------------------------------------------------------------------------
--- [36/36]  database_patch_add_revert_checkout.sql
+-- [36/37]  database_patch_add_revert_checkout.sql
 ------------------------------------------------------------------------------
 
 -- Patch: add_revert_checkout
@@ -6204,4 +6205,97 @@ revoke execute on function public.revert_checkout(uuid, uuid, boolean, uuid) fro
 revoke execute on function public.revert_checkout(uuid, uuid, boolean, uuid) from anon;
 revoke execute on function public.revert_checkout(uuid, uuid, boolean, uuid) from authenticated;
 grant execute on function public.revert_checkout(uuid, uuid, boolean, uuid) to service_role;
+
+
+------------------------------------------------------------------------------
+-- [37/37]  database_patch_add_room_checkout_date.sql
+------------------------------------------------------------------------------
+
+-- Patch: add_room_checkout_date
+-- วันที่: 2026-11-03
+--
+-- ═══════════════════════════════════════════════════════════════════════
+-- เก็บ "วันที่แจ้งย้ายออก" ไว้กับห้อง
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ปัญหาเดิม: การแจ้งย้ายออกเปลี่ยนแค่ rooms.status เป็น 'Pending_Refund' ไม่ได้จำว่าแจ้งรอบไหน
+--   หน้าจดมิเตอร์/ดูบิลจึงขึ้นแถบ "แจ้งย้ายออกในรอบบิลนี้" ทุกรอบที่เปิดดู รวมถึงรอบก่อนหน้า
+--   ที่ผู้เช่ายังอยู่ปกติ — ดูหรือจดมิเตอร์ย้อนหลังของห้องนั้นไม่ได้เลย
+--
+-- rooms.checkout_date = วันย้ายออกที่ผู้ดูแลกรอกตอนแจ้งย้ายออก
+--   หน้าจดมิเตอร์/ดูบิลแสดงแถบตั้งแต่รอบของวันนี้เป็นต้นไป รอบก่อนหน้าแสดงมิเตอร์ตามปกติ
+--
+-- trigger ดูแลให้ค่าไม่ค้าง:
+--   - ห้องเปลี่ยนเป็น 'Pending_Refund' โดยไม่ได้ส่งวันที่มา (เช่นยกเลิกการคืนห้อง) → ใช้วันนี้ (เวลาไทย)
+--   - ห้องเปลี่ยนออกจาก 'Pending_Refund' (ยกเลิกการแจ้งย้ายออก / คืนเงินประกันเสร็จ) → ล้างค่า
+--
+-- ⚠️ ต้องรันไฟล์นี้ใน Supabase "ก่อน" deploy โค้ดชุดนี้ — โค้ดใหม่เขียนคอลัมน์ checkout_date
+--    ถ้ายังไม่มีคอลัมน์ การแจ้งย้ายออกในหน้า /rooms จะล้ม
+--
+-- ปลอดภัยที่จะรันซ้ำได้ (IF NOT EXISTS / CREATE OR REPLACE / backfill เฉพาะแถวที่ยังว่าง)
+--
+-- วิธีใช้: คัดลอกทั้งไฟล์ไปรันใน Supabase SQL Editor
+-- https://supabase.com/dashboard/project/qumimpfrebffooagpqgt/sql/new
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 1. คอลัมน์
+-- ═══════════════════════════════════════════════════════════════════════
+
+alter table public.rooms
+  add column if not exists checkout_date date;
+
+comment on column public.rooms.checkout_date is
+  'วันย้ายออกที่แจ้งไว้ (มีค่าเฉพาะตอน status = Pending_Refund) — หน้าจดมิเตอร์/ดูบิลขึ้นแถบแจ้งย้ายออกตั้งแต่รอบของวันนี้';
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 2. trigger กันค่าค้าง
+-- ═══════════════════════════════════════════════════════════════════════
+
+create or replace function public.sync_room_checkout_date()
+returns trigger
+language plpgsql
+set search_path = public
+as $fn$
+begin
+  if new.status = 'Pending_Refund' then
+    if old.status is distinct from 'Pending_Refund' and new.checkout_date is null then
+      new.checkout_date := (now() at time zone 'Asia/Bangkok')::date;
+    end if;
+  else
+    new.checkout_date := null;
+  end if;
+  return new;
+end;
+$fn$;
+
+drop trigger if exists trg_rooms_sync_checkout_date on public.rooms;
+create trigger trg_rooms_sync_checkout_date
+  before update of status, checkout_date on public.rooms
+  for each row execute procedure public.sync_room_checkout_date();
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 3. backfill ห้องที่รอคืนเงินประกันอยู่ตอนนี้
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ใช้เวลาที่สถานะเปลี่ยนเป็น Pending_Refund ครั้งล่าสุดจาก audit_logs
+-- ห้องที่หาไม่เจอ (ไม่มี log) ปล่อยว่าง — หน้าจอจะขึ้นแถบทุกรอบเหมือนพฤติกรรมเดิม
+
+update public.rooms r
+set checkout_date = sub.changed_on
+from (
+  select distinct on (record_id)
+    record_id,
+    (created_at at time zone 'Asia/Bangkok')::date as changed_on
+  from public.audit_logs
+  where table_name = 'rooms'
+    and action = 'UPDATE'
+    and after ->> 'status' = 'Pending_Refund'
+  order by record_id, created_at desc
+) sub
+where r.id = sub.record_id
+  and r.status = 'Pending_Refund'
+  and r.checkout_date is null;
 

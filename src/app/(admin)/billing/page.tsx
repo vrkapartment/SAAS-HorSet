@@ -36,7 +36,7 @@ import { meterUnitsUsed } from "@/features/meter/utils"
 import { saveMeterRecord } from "@/features/meter/actions"
 import { getCurrentUserProfileAction } from "@/features/auth/actions"
 import { getFinanceSettings, saveMeterEntryModeAction } from "@/features/finance/actions"
-import { getRoomFloor, sortFloors, asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
+import { getRoomFloor, sortFloors, asRoomId, findDuplicateRoomNumbers, formatRoomLabel, isCheckoutNoticeCycle, type RoomId } from "@/features/room/utils"
 import { getBuildings } from "@/features/building/actions"
 import { getBuildingUtilityBillsForWorkspaceCycle, type BuildingUtilityBill } from "@/features/billing/building-utility-actions"
 
@@ -608,7 +608,8 @@ function UnifiedBillingContent() {
 
         const isOccupiedInCycle = resolvedTenantName !== null
 
-        const hasNotifiedCheckout = r.status === "Pending_Refund"
+        // แถบแจ้งย้ายออกเฉพาะรอบที่แจ้งย้ายออกเป็นต้นไป — รอบก่อนหน้าดู/จดมิเตอร์ได้ตามปกติ
+        const hasNotifiedCheckout = isCheckoutNoticeCycle(r, cycle)
 
         // กำหนดเลขมิเตอร์ครั้งก่อนหน้าแบบไดนามิกและยืดหยุ่นสูง ปรับเปลี่ยนอัตโนมัติเมื่อเลือกเดือนย้อนหลัง
         const fallbacks = getFallbackPrevReadings(roomId, cycle)

@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 import { getBills, createBill, updateBillStatus, getBillingPageData, deleteBill } from "@/features/billing/actions"
 import { buildInvoiceId, type BillSnapshot } from "@/features/billing/utils"
-import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, type RoomId } from "@/features/room/utils"
+import { asRoomId, findDuplicateRoomNumbers, formatRoomLabel, isCheckoutNoticeCycle, type RoomId } from "@/features/room/utils"
 import { getRooms } from "@/features/room/actions"
 import { findActiveTenantInCycle, resolveTenantNameForCycle } from "@/features/tenant/occupancy"
 import { meterUnitsUsed } from "@/features/meter/utils"
@@ -613,7 +613,8 @@ function ManageBillsContent() {
         
         const isOccupiedInCycle = resolvedTenantName !== null
 
-        const hasNotifiedCheckout = r.status === "Pending_Refund"
+        // แถบแจ้งย้ายออกเฉพาะรอบที่แจ้งย้ายออกเป็นต้นไป — รอบก่อนหน้าดู/จดมิเตอร์ได้ตามปกติ
+        const hasNotifiedCheckout = isCheckoutNoticeCycle(r, cycle)
 
         const fallbacks = getFallbackPrevReadings(roomId, cycle)
         const hasPrevMeterElec = !!(prevMeter && prevMeter.elecCurr !== "" && prevMeter.elecCurr !== null && prevMeter.elecCurr !== undefined)

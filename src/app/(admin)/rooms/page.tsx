@@ -113,6 +113,8 @@ interface RoomItem {
   extraExpenses?: { name: string; amount: number }[]
   depositPaid?: number | null
   buildingId?: string | null
+  /** วันย้ายออกที่แจ้งไว้ (YYYY-MM-DD) — มีค่าเฉพาะห้องที่รอคืนเงินประกัน */
+  checkoutDate?: string | null
 }
 
 interface RoomTypeItem {
@@ -1423,7 +1425,7 @@ function RoomsContent() {
       } else {
         // 2. ปรับสถานะห้องเป็น Pending_Refund เพื่อรอจัดการคืนเงินประกันปลายงวด
         const { updateRoomStatus } = await import("@/features/room/actions")
-        const res = await updateRoomStatus(selectedRoom.id, "Pending_Refund")
+        const res = await updateRoomStatus(selectedRoom.id, "Pending_Refund", checkoutDate)
         if (res.success) {
           showToast(t("rooms.toasts.moved_to_pending_refund").replace("{roomNumber}", selectedRoom.roomNumber), "success")
           setCheckoutModalOpen(false)
@@ -1484,7 +1486,14 @@ function RoomsContent() {
     setRefundingRoom(room)
     setLoadingMeter(true)
     setRefundError(null)
-    setRefundCheckoutDate(new Date().toISOString().split("T")[0])
+    // วันย้ายออก = วันที่แจ้งไว้ตอนแจ้งย้ายออก ไม่ใช่วันที่เปิดหน้านี้
+    // ค่าเช่าตามสัดส่วน, รอบมิเตอร์ที่ปิด และวันที่ในสัญญายกเลิก คิดจากวันนี้ทั้งหมด —
+    // เดิมใช้วันปัจจุบัน ถ้าคืนเงินประกันช้ากว่าวันย้ายออกจริง ผู้เช่าจะถูกหักค่าเช่าเกิน
+    // ห้องที่ไม่มีวันที่แจ้งไว้ (ข้อมูลเก่า) ถอยไปใช้วันนี้ตามเวลาไทยเหมือนเดิม
+    const bangkokToday = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split("T")[0]
+    const checkoutDate = room.checkoutDate || bangkokToday
+    const checkoutCycle = checkoutDate.substring(0, 7)
+    setRefundCheckoutDate(checkoutDate)
     setIsRentWaived(false)
     
     // ตั้งค่าบริการและค่าเสียหายอื่นเริ่มต้นเป็น "ค่าล้างแอร์" 500 บาท
@@ -1515,7 +1524,6 @@ function RoomsContent() {
       // รอบนี้ไปแล้ว เลขนั้นคือ "เลขกลางเดือน" → ค่าน้ำ-ไฟที่หักจากเงินประกันจะนับแค่ช่วง
       // กลางเดือนถึงวันย้ายออก ไม่ใช่ต้นเดือนถึงวันย้ายออก (หักน้อยกว่าที่ผู้เช่าใช้จริง)
       const { getMeterStartForCycle } = await import("@/features/meter/actions")
-      const checkoutCycle = new Date().toISOString().split("T")[0].substring(0, 7)
       const meterRes = await getMeterStartForCycle(
         { roomId: room.id },
         checkoutCycle,
@@ -1544,7 +1552,7 @@ function RoomsContent() {
     // ห้องนี้มีบิลของรอบที่จะย้ายออกอยู่แล้วหรือไม่ (ดูเหตุผลที่ต้องเตือนใน state ด้านบน)
     setExistingBillWarning(null)
     try {
-      const cycle = new Date().toISOString().split("T")[0].substring(0, 7)
+      const cycle = checkoutCycle
       const { getBills } = await import("@/features/billing/actions")
       const billsRes = await getBills(cycle, undefined, getCookie("horset_current_workspace_id") || undefined)
       if (billsRes.success && billsRes.data) {
